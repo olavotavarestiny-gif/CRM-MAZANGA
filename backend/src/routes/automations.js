@@ -1,0 +1,145 @@
+const express = require('express');
+const router = express.Router();
+const prisma = require('../lib/prisma');
+
+// GET all automations
+router.get('/', async (req, res) => {
+  try {
+    const automations = await prisma.automation.findMany();
+    res.json(automations);
+  } catch (error) {
+    console.error('Error fetching automations:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST create automation
+router.post('/', async (req, res) => {
+  try {
+    const {
+      trigger,
+      triggerValue,
+      action,
+      targetStage,
+      templateName,
+      emailSubject,
+      emailBody,
+    } = req.body;
+
+    if (!trigger || !action) {
+      return res.status(400).json({ error: 'trigger and action are required' });
+    }
+
+    // Validate trigger value for conditional triggers
+    if (
+      ['contact_tag', 'contact_revenue', 'contact_sector'].includes(trigger) &&
+      !triggerValue
+    ) {
+      return res
+        .status(400)
+        .json({
+          error: 'triggerValue is required for tag, revenue, and sector triggers',
+        });
+    }
+
+    // Validate action-specific fields
+    if (action === 'update_stage' && !targetStage) {
+      return res
+        .status(400)
+        .json({ error: 'targetStage is required for update_stage action' });
+    }
+
+    if (
+      ['send_whatsapp_template', 'send_whatsapp_text'].includes(action) &&
+      !templateName
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'templateName is required for WhatsApp actions' });
+    }
+
+    if (action === 'send_email' && (!emailSubject || !emailBody)) {
+      return res
+        .status(400)
+        .json({
+          error: 'emailSubject and emailBody are required for send_email action',
+        });
+    }
+
+    const data = {
+      trigger,
+      action,
+    };
+
+    if (triggerValue) data.triggerValue = triggerValue;
+    if (targetStage) data.targetStage = targetStage;
+    if (templateName) data.templateName = templateName;
+    if (emailSubject) data.emailSubject = emailSubject;
+    if (emailBody) data.emailBody = emailBody;
+
+    const automation = await prisma.automation.create({ data });
+
+    res.status(201).json(automation);
+  } catch (error) {
+    console.error('Error creating automation:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT update automation
+router.put('/:id', async (req, res) => {
+  try {
+    const {
+      active,
+      trigger,
+      triggerValue,
+      action,
+      targetStage,
+      templateName,
+      emailSubject,
+      emailBody,
+    } = req.body;
+    const updateData = {};
+
+    if (active !== undefined) updateData.active = active;
+    if (trigger !== undefined) updateData.trigger = trigger;
+    if (triggerValue !== undefined) updateData.triggerValue = triggerValue;
+    if (action !== undefined) updateData.action = action;
+    if (targetStage !== undefined) updateData.targetStage = targetStage;
+    if (templateName !== undefined) updateData.templateName = templateName;
+    if (emailSubject !== undefined) updateData.emailSubject = emailSubject;
+    if (emailBody !== undefined) updateData.emailBody = emailBody;
+
+    const automation = await prisma.automation.update({
+      where: { id: req.params.id },
+      data: updateData,
+    });
+
+    res.json(automation);
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Automation not found' });
+    }
+    console.error('Error updating automation:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE automation
+router.delete('/:id', async (req, res) => {
+  try {
+    await prisma.automation.delete({
+      where: { id: req.params.id },
+    });
+
+    res.json({ message: 'Automation deleted' });
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Automation not found' });
+    }
+    console.error('Error deleting automation:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+module.exports = router;

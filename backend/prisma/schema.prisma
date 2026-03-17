@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  name         String
+  email        String    @unique
+  passwordHash String
+  resetToken   String?
+  resetExpiry  DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+model Contact {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String
+  phone     String    @unique
+  company   String
+  revenue   String?
+  sector    String?
+  stage     String    @default("Novo")
+  inPipeline Boolean  @default(false)
+  tags      String    @default("[]") // JSON array stored as string: ["tag1", "tag2"]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+  tasks     Task[]
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  contactId Int
+  direction String
+  text      String
+  channel   String   @default("whatsapp")
+  subject   String?
+  timestamp DateTime @default(now())
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id        Int       @id @default(autoincrement())
+  contactId Int
+  title     String
+  notes     String?
+  dueDate   DateTime?
+  priority  String    @default("Media")
+  done      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  contact   Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+}
+
+model Automation {
+  id           String  @id @default(cuid())
+  trigger      String  // "new_contact", "form_submission", "contact_tag", "contact_revenue", "contact_sector"
+  triggerValue String? // tag name, revenue range, or sector (for matching conditions)
+  action       String  // "send_email", "send_template", "send_text", "update_stage"
+  targetStage  String? // "Novo", "Contactado", etc. (for update_stage action)
+  templateName String?
+  emailSubject String?
+  emailBody    String?
+  active       Boolean @default(true)
+}
+
+model Form {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  mode        String   @default("step")
+  thankYouUrl String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  fields      FormField[]
+  submissions FormSubmission[]
+}
+
+model FormField {
+  id           String  @id @default(cuid())
+  formId       String
+  type         String
+  label        String
+  required     Boolean @default(false)
+  order        Int
+  options      String?
+  contactField String?
+  form         Form    @relation(fields: [formId], references: [id], onDelete: Cascade)
+  answers      FormAnswer[]
+}
+
+model FormSubmission {
+  id          String   @id @default(cuid())
+  formId      String
+  submittedAt DateTime @default(now())
+  form        Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  answers     FormAnswer[]
+}
+
+model FormAnswer {
+  id           String         @id @default(cuid())
+  submissionId String
+  fieldId      String
+  value        String
+  submission   FormSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  field        FormField      @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+}
