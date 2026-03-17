@@ -18,10 +18,16 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-// Allow CORS from any localhost origin (for development)
+// Allow CORS from localhost (development) and production frontend URL
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+    const allowed = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      process.env.FRONTEND_URL, // Production frontend URL (e.g., https://mazanga-crm.vercel.app)
+    ].filter(Boolean);
+
+    if (!origin || allowed.some(u => origin === u || origin?.startsWith(u))) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
