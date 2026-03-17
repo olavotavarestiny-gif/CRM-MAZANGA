@@ -47,6 +47,14 @@
 
 ---
 
+## 🔴 IMPORTANTE: Erro de Database Render
+
+Se teve erro `P1001: Can't reach database server`, **leia RENDER_SETUP.md AGORA!**
+
+A solução é usar **PostgreSQL do Render** em vez de Supabase (muito mais simples).
+
+---
+
 ## Fase 1: Deploy do Backend no Render
 
 ### Passo 1.1 — Aceder ao Render
