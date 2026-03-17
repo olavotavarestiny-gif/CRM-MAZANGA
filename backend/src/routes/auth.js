@@ -6,50 +6,7 @@ const prisma = require('../lib/prisma');
 const { sendEmail } = require('../lib/email');
 const requireAuth = require('../middleware/auth');
 
-// POST /api/auth/register - Criar nova conta
-router.post('/register', async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
-
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email e password são obrigatórios' });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Password deve ter pelo menos 6 caracteres' });
-    }
-
-    // Verificar se email já existe
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({ error: 'Email já está registado' });
-    }
-
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Criar user
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        passwordHash,
-      },
-    });
-
-    // Gerar JWT
-    const token = jwt.sign(
-      { id: user.id, email: user.email, name: user.name },
-      process.env.JWT_SECRET,
-      { expiresIn: '30d' }
-    );
-
-    res.status(201).json({ token, user: { id: user.id, name: user.name, email: user.email } });
-  } catch (error) {
-    console.error('Error registering user:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+// POST /api/auth/register - REMOVED (only admin can create users via /api/admin/users)
 
 // POST /api/auth/login - Fazer login
 router.post('/login', async (req, res) => {
@@ -66,20 +23,34 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Email ou password incorretos' });
     }
 
+    // Verificar se user está activo
+    if (!user.active) {
+      return res.status(403).json({ error: 'Conta desactivada. Contacte o administrador.' });
+    }
+
     // Verificar password
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
       return res.status(401).json({ error: 'Email ou password incorretos' });
     }
 
-    // Gerar JWT
+    // Gerar JWT (incluir role)
     const token = jwt.sign(
-      { id: user.id, email: user.email, name: user.name },
+      { id: user.id, email: user.email, name: user.name, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '30d' }
     );
 
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
+    // Registar login
+    await prisma.loginLog.create({
+      data: {
+        userId: user.id,
+        ip: req.ip || req.headers['x-forwarded-for'] || 'unknown',
+        userAgent: req.headers['user-agent'] || 'unknown',
+      },
+    });
+
+    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (error) {
     console.error('Error logging in:', error);
     res.status(500).json({ error: error.message });
@@ -91,7 +62,7 @@ router.get('/me', requireAuth, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: { id: true, name: true, email: true, createdAt: true },
+      select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
     });
 
     if (!user) {

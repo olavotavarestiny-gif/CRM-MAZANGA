@@ -11,13 +11,25 @@ datasource db {
 }
 
 model User {
-  id           Int       @id @default(autoincrement())
+  id           Int        @id @default(autoincrement())
   name         String
-  email        String    @unique
+  email        String     @unique
   passwordHash String
+  role         String     @default("user")   // "admin" | "user"
+  active       Boolean    @default(true)
   resetToken   String?
   resetExpiry  DateTime?
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime   @default(now())
+  loginLogs    LoginLog[]
+}
+
+model LoginLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Contact {

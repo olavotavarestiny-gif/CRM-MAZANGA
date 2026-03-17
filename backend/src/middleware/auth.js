@@ -16,4 +16,12 @@ function requireAuth(req, res, next) {
   }
 }
 
+function requireAdmin(req, res, next) {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Acesso restrito a administradores' });
+  }
+  next();
+}
+
 module.exports = requireAuth;
+module.exports.requireAdmin = requireAdmin;

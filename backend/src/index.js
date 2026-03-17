@@ -12,7 +12,9 @@ const tasksRouter = require('./routes/tasks');
 const formsRouter = require('./routes/forms');
 const inboxRouter = require('./routes/inbox');
 const authRouter = require('./routes/auth');
+const adminRouter = require('./routes/admin');
 const requireAuth = require('./middleware/auth');
+const { requireAdmin } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -61,6 +63,9 @@ app.use('/api/automations', requireAuth, automationsRouter);
 app.use('/api/whatsapp', requireAuth, whatsappRouter);
 app.use('/api/tasks', requireAuth, tasksRouter);
 app.use('/api/inbox', requireAuth, inboxRouter);
+
+// Admin-only routes (require authentication + admin role)
+app.use('/api/admin', requireAuth, requireAdmin, adminRouter);
 
 // Start server
 app.listen(PORT, () => {
