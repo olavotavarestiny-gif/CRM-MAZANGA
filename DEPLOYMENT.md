@@ -111,13 +111,18 @@ No painel Render, ir a **Environment** e adicionar **TODAS** as variáveis abaix
 
 ## Fase 2: Deploy do Frontend no Vercel
 
+**⚠️ Se o Root Directory só mostra `backend`, leia VERCEL_SETUP.md!**
+
+O `vercel.json` na raiz do projecto já está configurado para seleccionar `frontend` automaticamente.
+
 ### Passo 2.1 — Aceder ao Vercel
 1. Ir a **https://vercel.com**
 2. Click **Add New... → Project**
 3. **Import Git Repository** → seleccionar `mazanga-crm`
 
 ### Passo 2.2 — Configurar Project
-1. **Root Directory**: `frontend`
+1. **Root Directory**: `frontend` (deve aparecer automaticamente)
+   - Se não aparecer, ver VERCEL_SETUP.md para solução
 2. **Framework Preset**: Next.js (automático)
 3. **Build Command**: `npm run build` (automático)
 4. **Output Directory**: `.next` (automático)
@@ -129,6 +134,8 @@ No painel Render, ir a **Environment** e adicionar **TODAS** as variáveis abaix
 | Variável | Valor |
 |----------|-------|
 | `NEXT_PUBLIC_API_URL` | `https://mazanga-crm-backend.onrender.com` |
+
+(Substituir com URL real do seu backend Render)
 
 ### Passo 2.4 — Deploy
 1. Click **Deploy**
