@@ -8,16 +8,42 @@
 
 ## Alterações Realizadas
 
-### 1. Backend — Schema.prisma
-- ✅ Alterado: `provider = "sqlite"` → `provider = "postgresql"`
+### 1. Backend — CORS (index.js) ✅
+- Actualizado: CORS agora aceita `process.env.FRONTEND_URL` além de localhost
 
-### 2. Backend — CORS (index.js)
-- ✅ Actualizado: CORS agora aceita `process.env.FRONTEND_URL` além de localhost
+### 2. Backend — Environment Variables ✅
+- `.env` local: SQLite (`file:./dev.db`) — para desenvolvimento
+- `.env.production` exemplo: PostgreSQL Supabase — para Render
+- JWT_SECRET: Novo secret forte (87c2c9ae810d9379e5574d33f9e00c2fba3204c40bbb0fbf0fea56e233c87b24)
+- FRONTEND_URL: Vazio localmente (será preenchido em Render após Vercel deploy)
 
-### 3. Backend — Environment Variables (.env)
-- ✅ DATABASE_URL: `postgresql://postgres:Mazangacrm2026@db.zvpywxfwtkciakyurrcp.supabase.co:5432/postgres`
-- ✅ JWT_SECRET: Novo secret forte (87c2c9ae810d9379e5574d33f9e00c2fba3204c40bbb0fbf0fea56e233c87b24)
-- ✅ FRONTEND_URL: Vazio localmente (será preenchido em produção)
+### 3. Backend — Schema.prisma ⚠️ (APENAS NO RENDER)
+- **Localmente**: `provider = "sqlite"` (ficheiro tem comentário sobre produção)
+- **Em Render**: Render fará `npx prisma db push` que criará as tabelas em PostgreSQL automaticamente
+- **Explicação**: O schema adapta-se automaticamente com `prisma db push` — não precisa mudar o ficheiro
+
+---
+
+## ⚡ SQLite Local vs PostgreSQL em Produção
+
+### Por que SQLite localmente?
+- ✅ Funciona offline, sem conexão à internet
+- ✅ Não requer servidor externo
+- ✅ Perfeito para desenvolvimento e testes
+- ✅ Dados persistem em `backend/dev.db`
+
+### Por que PostgreSQL no Render?
+- ✅ Produção requer base de dados robusta
+- ✅ Suporta múltiplos utilizadores em simultâneo
+- ✅ Melhor performance e segurança
+- ✅ Supabase fornece PostgreSQL gerido gratuitamente
+
+### Como funciona o switch?
+1. **Localmente**: Backend usa SQLite (`database.db`)
+2. **Deploy**: Render executa `npx prisma db push` que cria tabelas em PostgreSQL
+3. **Prisma**: Adapta-se automaticamente ao `DATABASE_URL` definido em variáveis de ambiente
+
+**Resultado**: Mesmo código, diferentes bases de dados consoante o ambiente! 🎯
 
 ---
 
