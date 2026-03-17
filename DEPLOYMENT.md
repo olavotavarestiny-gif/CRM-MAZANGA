@@ -73,23 +73,25 @@
    node src/index.js
    ```
 
-### Passo 1.4 — Adicionar Environment Variables
-No painel Render, ir a **Environment** e adicionar:
+### ⚠️ Passo 1.4 — IMPORTANTE: Adicionar Environment Variables ANTES do Deploy
+**CRÍTICO**: Render precisa das variáveis de ambiente ANTES de fazer deploy, senão o build falha.
+
+No painel Render, ir a **Environment** e adicionar **TODAS** as variáveis abaixo:
 
 | Variável | Valor |
 |----------|-------|
-| `DATABASE_URL` | `postgresql://postgres:Mazangacrm2026@db.zvpywxfwtkciakyurrcp.supabase.co:5432/postgres` |
-| `FRONTEND_URL` | (deixar em branco por enquanto) |
+| `DATABASE_URL` | `postgresql://postgres:Mazangacrm2026@db.zvpywxfwtkciakyurrcp.supabase.co:5432/postgres?sslmode=require` |
+| `FRONTEND_URL` | (deixar vazio por enquanto) |
 | `JWT_SECRET` | `87c2c9ae810d9379e5574d33f9e00c2fba3204c40bbb0fbf0fea56e233c87b24` |
 | `WHATSAPP_API_VERSION` | `v25.0` |
 | `WHATSAPP_PHONE_NUMBER_ID` | `1040074275848932` |
-| `WHATSAPP_ACCESS_TOKEN` | (ver em `backend/.env`) |
+| `WHATSAPP_ACCESS_TOKEN` | `EAAcHwZCAqZBfABQ8kk82pKXv15KElpSYjDKOStJxX6JQhtk7FNbPHguMZAQWnFwGDCqzblhyfdVXFArFhroaEcssgqR4QlwiURfXEkcAxZCbHehsHz9t00D4KvZAvZAQF80y9FiTgUnLWlmHaOM9COMfRIEtZA5mSmQ9rwNxHJ1dP7SRBRdoqsANfwnhYomxQZDZD` |
 | `WABA_ID` | `904177792335249` |
 | `WEBHOOK_VERIFY_TOKEN` | `686abf0a1474fe0f4b278053606d234c` |
 | `SMTP_HOST` | `smtp.hostinger.com` |
 | `SMTP_PORT` | `465` |
 | `SMTP_USER` | `suporteaocliente@mazanga.digital` |
-| `SMTP_PASS` | (ver em `backend/.env`) |
+| `SMTP_PASS` | `Suporteaocliente20206.` |
 | `SMTP_FROM` | `Mazanga CRM <suporteaocliente@mazanga.digital>` |
 
 ### Passo 1.5 — Deploy
