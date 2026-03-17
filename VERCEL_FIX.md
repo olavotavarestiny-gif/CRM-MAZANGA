@@ -1,6 +1,19 @@
-# 🔧 Vercel Fix — Frontend Não Aparece
+# 🔧 Vercel Troubleshooting
 
-## O Problema
+## 🔴 Se o Build Falha com "exited with 1"
+
+**Causa**: `NEXT_PUBLIC_API_URL` não está configurada no Vercel
+
+**Solução Rápida**:
+1. Vercel Dashboard → Settings → Environment Variables
+2. Adicionar: `NEXT_PUBLIC_API_URL=https://mazanga-crm-backend.onrender.com`
+3. Redeploy
+
+📖 **Detalhes**: Ler `VERCEL_ENV_VARS.md`
+
+---
+
+## O Problema: Frontend Não Aparece
 Quando importa `mazanga-crm` no Vercel, a pasta `frontend` não aparece no dropdown "Root Directory".
 
 ## Solução Definitiva
