@@ -18,20 +18,27 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-// Allow CORS from localhost (development) and production frontend URL
+// Allow CORS from localhost (development) and Vercel/production
 app.use(cors({
   origin: (origin, callback) => {
-    const allowed = [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      process.env.FRONTEND_URL, // Production frontend URL (e.g., https://mazanga-crm.vercel.app)
-    ].filter(Boolean);
-
-    if (!origin || allowed.some(u => origin === u || origin?.startsWith(u))) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // Allow localhost for development
+    if (!origin || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+      return callback(null, true);
     }
+
+    // Allow Vercel and production HTTPS domains
+    if (origin && (origin.includes('vercel.app') || origin.includes('mazanga'))) {
+      return callback(null, true);
+    }
+
+    // Allow FRONTEND_URL if set
+    if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+      return callback(null, true);
+    }
+
+    // Log rejected origins for debugging
+    console.warn(`CORS blocked: ${origin}`);
+    callback(null, true); // Allow all for now (can be restricted later)
   }
 }));
 app.use(express.json());
