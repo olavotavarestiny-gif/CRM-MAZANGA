@@ -13,6 +13,7 @@ const formsRouter = require('./routes/forms');
 const inboxRouter = require('./routes/inbox');
 const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
+const setupRouter = require('./routes/setup');
 const requireAuth = require('./middleware/auth');
 const { requireAdmin } = require('./middleware/auth');
 
@@ -54,6 +55,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/webhook', webhookRouter);
 app.use('/api/forms', formsRouter);
+app.use('/api/setup', setupRouter);
 
 // Protected routes (require authentication)
 app.use('/api/contacts', requireAuth, contactsRouter);
