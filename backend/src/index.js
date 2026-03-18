@@ -14,6 +14,7 @@ const inboxRouter = require('./routes/inbox');
 const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
 const setupRouter = require('./routes/setup');
+const financesRouter = require('./routes/finances');
 const requireAuth = require('./middleware/auth');
 const { requireAdmin } = require('./middleware/auth');
 
@@ -67,6 +68,7 @@ app.use('/api/inbox', requireAuth, inboxRouter);
 
 // Admin-only routes (require authentication + admin role)
 app.use('/api/admin', requireAuth, requireAdmin, adminRouter);
+app.use('/api/finances', requireAuth, requireAdmin, financesRouter);
 
 // Start server
 app.listen(PORT, () => {
