@@ -2,10 +2,7 @@
   "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/.next",
   "framework": "nextjs",
-  "env": [
-    {
-      "key": "NEXT_PUBLIC_API_URL",
-      "value": "https://mazanga-crm-backend.onrender.com"
-    }
-  ]
+  "env": {
+    "NEXT_PUBLIC_API_URL": "https://mazanga-crm-backend.onrender.com"
+  }
 }
