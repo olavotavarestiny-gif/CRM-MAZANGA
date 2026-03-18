@@ -5,7 +5,7 @@
   "env": [
     {
       "key": "NEXT_PUBLIC_API_URL",
-      "value": "https://api.mazanga.digital"
+      "value": "https://mazanga-crm-backend.onrender.com"
     }
   ]
 }

@@ -102,7 +102,8 @@ router.post('/forgot-password', async (req, res) => {
     });
 
     // Enviar email
-    const resetLink = `http://localhost:3000/reset-password?token=${resetToken}`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
     await sendEmail({
       to: user.email,
       subject: 'Reset de Password - Mazanga CRM',
