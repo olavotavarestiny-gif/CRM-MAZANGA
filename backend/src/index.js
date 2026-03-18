@@ -21,7 +21,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-// Allow CORS from localhost (development) and Vercel/production
+// Allow CORS from localhost (development) and production domains
 app.use(cors({
   origin: (origin, callback) => {
     // Allow localhost for development
@@ -29,12 +29,12 @@ app.use(cors({
       return callback(null, true);
     }
 
-    // Allow Vercel and production HTTPS domains
-    if (origin && (origin.includes('vercel.app') || origin.includes('mazanga'))) {
+    // Allow *.vercel.app and *.mazanga.digital
+    if (origin.endsWith('.vercel.app') || origin.endsWith('.mazanga.digital')) {
       return callback(null, true);
     }
 
-    // Allow FRONTEND_URL if set
+    // Allow exact FRONTEND_URL if set (e.g. crm.mazanga.digital without subdomain wildcard)
     if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
       return callback(null, true);
     }

@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const automationRunner = require('../services/automationRunner');
+const requireAuth = require('../middleware/auth');
 
 // GET /api/forms - lista todos os formulários com contagem de submissões
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     const forms = await prisma.form.findMany({
       include: {
@@ -21,7 +22,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/forms - criar novo formulário
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const { title, description, mode, thankYouUrl } = req.body;
     const form = await prisma.form.create({
@@ -64,7 +65,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PUT /api/forms/:id - atualizar metadados do formulário
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { title, description, mode, thankYouUrl } = req.body;
     const form = await prisma.form.update({
@@ -84,7 +85,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/forms/:id - eliminar formulário (cascata)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     await prisma.form.delete({
       where: { id: req.params.id },
@@ -97,7 +98,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // POST /api/forms/:id/fields - adicionar campo ao formulário
-router.post('/:id/fields', async (req, res) => {
+router.post('/:id/fields', requireAuth, async (req, res) => {
   try {
     const { type, label, required, order, options, contactField } = req.body;
     const field = await prisma.formField.create({
@@ -122,7 +123,7 @@ router.post('/:id/fields', async (req, res) => {
 });
 
 // PUT /api/forms/:id/fields/:fieldId - atualizar campo
-router.put('/:id/fields/:fieldId', async (req, res) => {
+router.put('/:id/fields/:fieldId', requireAuth, async (req, res) => {
   try {
     const { type, label, required, order, options, contactField } = req.body;
     const field = await prisma.formField.update({
@@ -147,7 +148,7 @@ router.put('/:id/fields/:fieldId', async (req, res) => {
 });
 
 // DELETE /api/forms/:id/fields/:fieldId - eliminar campo
-router.delete('/:id/fields/:fieldId', async (req, res) => {
+router.delete('/:id/fields/:fieldId', requireAuth, async (req, res) => {
   try {
     await prisma.formField.delete({
       where: { id: req.params.fieldId },
@@ -160,7 +161,7 @@ router.delete('/:id/fields/:fieldId', async (req, res) => {
 });
 
 // POST /api/forms/:id/fields/reorder - reordenar campos
-router.post('/:id/fields/reorder', async (req, res) => {
+router.post('/:id/fields/reorder', requireAuth, async (req, res) => {
   try {
     const { fields } = req.body; // [{id, order}, ...]
     for (const f of fields) {
@@ -205,13 +206,13 @@ router.post('/:id/submit', async (req, res) => {
         }
       }
 
-      // Só criar se tiver pelo menos phone ou email
-      if (contactData.phone || contactData.email) {
+      // Só criar se tiver phone (campo único obrigatório)
+      if (contactData.phone) {
         try {
           const newContact = await prisma.contact.create({
             data: {
               name: contactData.name || 'Sem nome',
-              phone: contactData.phone || `form-${submission.id}`,
+              phone: contactData.phone,
               email: contactData.email || '',
               company: contactData.company || '',
               revenue: contactData.revenue || null,
@@ -241,7 +242,7 @@ router.post('/:id/submit', async (req, res) => {
 });
 
 // GET /api/forms/:id/submissions - obter submissões do formulário
-router.get('/:id/submissions', async (req, res) => {
+router.get('/:id/submissions', requireAuth, async (req, res) => {
   try {
     const submissions = await prisma.formSubmission.findMany({
       where: { formId: req.params.id },

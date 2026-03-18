@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
+const prisma = require('../lib/prisma');
 
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -8,12 +9,28 @@ function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Não autenticado' });
   }
 
+  let decoded;
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Token inválido ou expirado' });
   }
+
+  // Verificar se o utilizador ainda está activo na BD
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { active: true },
+    });
+    if (!user || !user.active) {
+      return res.status(403).json({ error: 'Conta desactivada. Contacte o administrador.' });
+    }
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao verificar autenticação' });
+  }
+
+  req.user = decoded;
+  next();
 }
 
 function requireAdmin(req, res, next) {
