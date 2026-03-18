@@ -4,6 +4,7 @@
   "description": "CRM backend with WhatsApp integration",
   "main": "src/index.js",
   "scripts": {
+    "build": "npx prisma generate && npx prisma db push",
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "db:push": "prisma db push",
