@@ -1,9 +1,16 @@
 const { createRemoteJWKSet, jwtVerify } = require('jose');
 const prisma = require('../lib/prisma');
 
-const JWKS = createRemoteJWKSet(
-  new URL(`${process.env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`)
-);
+// Lazy JWKS — created on first request so SUPABASE_URL is guaranteed to be loaded
+let _jwks = null;
+function getJWKS() {
+  if (!_jwks) {
+    const url = process.env.SUPABASE_URL;
+    if (!url) throw new Error('SUPABASE_URL env var not set');
+    _jwks = createRemoteJWKSet(new URL(`${url}/auth/v1/.well-known/jwks.json`));
+  }
+  return _jwks;
+}
 
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -15,12 +22,14 @@ async function requireAuth(req, res, next) {
 
   let decoded;
   try {
+    const JWKS = getJWKS();
     const { payload } = await jwtVerify(token, JWKS, {
       issuer: `${process.env.SUPABASE_URL}/auth/v1`,
       audience: 'authenticated',
     });
     decoded = payload;
   } catch (error) {
+    console.error('[auth] JWT verify error:', error.code || error.message);
     return res.status(401).json({ error: 'Token inválido ou expirado' });
   }
 
