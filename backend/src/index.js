@@ -15,8 +15,18 @@ const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
 const setupRouter = require('./routes/setup');
 const financesRouter = require('./routes/finances');
+const accountRouter = require('./routes/account');
+const pipelineStagesRouter = require('./routes/pipeline-stages');
+const calendarRouter = require('./routes/calendar');
+const faturacaoConfigRouter = require('./routes/faturacao-config');
+const faturacaoSeriesRouter = require('./routes/faturacao-series');
+const faturacaoClientesRouter = require('./routes/faturacao-clientes');
+const faturacaoProdutosRouter = require('./routes/faturacao-produtos');
+const faturacaoFacturasRouter = require('./routes/faturacao-facturas');
+const faturacaoSaftRouter = require('./routes/faturacao-saft');
+const faturacaoRecorrentesRouter = require('./routes/faturacao-recorrentes');
 const requireAuth = require('./middleware/auth');
-const { requireAdmin } = require('./middleware/auth');
+const { requireAdmin, requireAccountOwnerOrAdmin } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -48,7 +58,26 @@ app.use(express.json());
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', node: process.version, supabaseUrl: process.env.SUPABASE_URL ? 'set' : 'MISSING' });
+});
+
+// Temporary JWT debug endpoint — remove after diagnosis
+app.post('/debug-jwt', async (req, res) => {
+  try {
+    const { createRemoteJWKSet, jwtVerify } = require('jose');
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.json({ error: 'no token' });
+    const supabaseUrl = process.env.SUPABASE_URL;
+    if (!supabaseUrl) return res.json({ error: 'SUPABASE_URL not set' });
+    const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: `${supabaseUrl}/auth/v1`,
+      audience: 'authenticated',
+    });
+    res.json({ ok: true, sub: payload.sub, email: payload.email });
+  } catch (err) {
+    res.json({ error: err.message, code: err.code });
+  }
 });
 
 // Public routes
@@ -68,7 +97,33 @@ app.use('/api/inbox', requireAuth, inboxRouter);
 
 // Admin-only routes (require authentication + admin role)
 app.use('/api/admin', requireAuth, requireAdmin, adminRouter);
-app.use('/api/finances', requireAuth, requireAdmin, financesRouter);
+
+// Account owner or admin routes
+app.use('/api/finances', requireAuth, requireAccountOwnerOrAdmin, financesRouter);
+app.use('/api/account', requireAuth, accountRouter);
+app.use('/api/pipeline-stages', requireAuth, pipelineStagesRouter);
+app.use('/api/calendar', calendarRouter);
+// Faturação AGT
+app.use('/api/faturacao', requireAuth, faturacaoConfigRouter);
+app.use('/api/faturacao', requireAuth, faturacaoSeriesRouter);
+app.use('/api/faturacao', requireAuth, faturacaoClientesRouter);
+app.use('/api/faturacao', requireAuth, faturacaoProdutosRouter);
+app.use('/api/faturacao', requireAuth, faturacaoFacturasRouter);
+app.use('/api/faturacao', requireAuth, faturacaoSaftRouter);
+app.use('/api/faturacao', requireAuth, faturacaoRecorrentesRouter);
+
+// Scheduler: process recurring invoices daily at 00:05
+try {
+  const cron = require('node-cron');
+  const { processRecorrentes } = require('./lib/faturacao/scheduler');
+  cron.schedule('5 0 * * *', () => {
+    console.log('[Scheduler] A processar faturas recorrentes...');
+    processRecorrentes().catch(err => console.error('[Scheduler] Erro:', err.message));
+  });
+  console.log('[Scheduler] Cron de faturas recorrentes iniciado (00:05 diário)');
+} catch (err) {
+  console.warn('[Scheduler] node-cron não disponível:', err.message);
+}
 
 // Start server
 app.listen(PORT, () => {
