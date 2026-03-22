@@ -1,8 +1,6 @@
 {
-  "buildCommand": "cd frontend && npm run build",
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "installCommand": "echo 'install handled in buildCommand'",
   "outputDirectory": "frontend/.next",
-  "framework": "nextjs",
-  "env": {
-    "NEXT_PUBLIC_API_URL": "https://mazanga-crm-backend.onrender.com"
-  }
+  "framework": "nextjs"
 }
