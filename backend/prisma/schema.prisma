@@ -14,6 +14,9 @@ model User {
   name                 String
   email                String     @unique
   supabaseUid          String?    @unique  // UUID from Supabase auth.users
+  passwordHash         String?    // kept nullable for migration safety; not used after Supabase auth
+  resetToken           String?    // kept for migration safety; not used after Supabase auth
+  resetExpiry          DateTime?  // kept for migration safety; not used after Supabase auth
   role                 String     @default("user")   // "admin" | "user"
   active               Boolean    @default(true)
   mustChangePassword   Boolean    @default(false)
