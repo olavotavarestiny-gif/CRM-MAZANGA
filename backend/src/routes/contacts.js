@@ -4,6 +4,202 @@ const prisma = require('../lib/prisma');
 const automationRunner = require('../services/automationRunner');
 
 const VALID_STAGES = ['Novo', 'Contactado', 'Qualificado', 'Proposta Enviada', 'Fechado', 'Perdido'];
+const VALID_FIELD_TYPES = ['text', 'number', 'date', 'select', 'url'];
+
+// Built-in system field defaults (name and stage are never configurable)
+const SYSTEM_FIELD_DEFAULTS = [
+  { key: 'email',   label: 'Email',            required: false, order: 0 },
+  { key: 'phone',   label: 'Telefone',          required: true,  order: 1 },
+  { key: 'company', label: 'Empresa',           required: false, order: 2 },
+  { key: 'revenue', label: 'Faturamento Anual', required: false, order: 3 },
+  { key: 'sector',  label: 'Setor',             required: false, order: 4 },
+  { key: 'tags',    label: 'Tags',              required: false, order: 5 },
+];
+
+// Slugify a label into a unique key
+function slugify(label) {
+  return label
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 40);
+}
+
+// Merge system defaults with user overrides and return full config list
+async function getSystemFieldConfigs(userId) {
+  const overrides = await prisma.contactFieldConfig.findMany({ where: { userId } });
+  const overrideMap = Object.fromEntries(overrides.map(o => [o.fieldKey, o]));
+  return SYSTEM_FIELD_DEFAULTS.map(def => {
+    const o = overrideMap[def.key];
+    return {
+      fieldKey:  def.key,
+      label:     o?.label    ?? def.label,
+      visible:   o !== undefined ? o.visible  : true,
+      required:  o !== undefined ? o.required : def.required,
+      order:     o !== undefined ? o.order    : def.order,
+      configId:  o?.id ?? null,
+    };
+  });
+}
+
+// ── System Field Config ───────────────────────────────────────────────────────
+
+// GET /contacts/field-config — returns system field visibility/label config
+router.get('/field-config', async (req, res) => {
+  try {
+    const configs = await getSystemFieldConfigs(req.user.effectiveUserId);
+    res.json(configs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /contacts/field-config/:key — update a system field config
+router.put('/field-config/:key', async (req, res) => {
+  try {
+    const { label, visible, required, order } = req.body;
+    const { key } = req.params;
+    const userId = req.user.effectiveUserId;
+
+    if (!SYSTEM_FIELD_DEFAULTS.find(f => f.key === key)) {
+      return res.status(400).json({ error: 'Invalid field key' });
+    }
+
+    const data = {};
+    if (label    !== undefined) data.label    = label.trim();
+    if (visible  !== undefined) data.visible  = !!visible;
+    if (required !== undefined) data.required = !!required;
+    if (order    !== undefined) data.order    = order;
+
+    await prisma.contactFieldConfig.upsert({
+      where: { userId_fieldKey: { userId, fieldKey: key } },
+      update: data,
+      create: {
+        userId,
+        fieldKey: key,
+        label: label?.trim() ?? SYSTEM_FIELD_DEFAULTS.find(f => f.key === key).label,
+        visible: visible !== undefined ? !!visible : true,
+        required: required !== undefined ? !!required : SYSTEM_FIELD_DEFAULTS.find(f => f.key === key).required,
+        order: order ?? SYSTEM_FIELD_DEFAULTS.find(f => f.key === key).order,
+      },
+    });
+
+    const configs = await getSystemFieldConfigs(userId);
+    res.json(configs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ── Custom Field Definitions ─────────────────────────────────────────────────
+
+// GET /contacts/fields — list custom field defs only
+router.get('/fields', async (req, res) => {
+  try {
+    const fields = await prisma.contactFieldDef.findMany({
+      where: { userId: req.user.effectiveUserId, active: true },
+      orderBy: { order: 'asc' },
+    });
+    res.json(fields.map(f => ({ ...f, options: f.options ? JSON.parse(f.options) : [] })));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /contacts/fields — create new field def
+router.post('/fields', async (req, res) => {
+  try {
+    const { label, type, options, required } = req.body;
+    if (!label || !label.trim()) return res.status(400).json({ error: 'Label is required' });
+    const fieldType = VALID_FIELD_TYPES.includes(type) ? type : 'text';
+
+    const userId = req.user.effectiveUserId;
+    let key = slugify(label);
+    if (!key) key = 'campo_' + Date.now();
+
+    // Ensure key uniqueness within user scope
+    const existing = await prisma.contactFieldDef.findFirst({ where: { userId, key } });
+    if (existing) key = key + '_' + Date.now().toString().slice(-4);
+
+    const maxOrder = await prisma.contactFieldDef.aggregate({
+      where: { userId },
+      _max: { order: true },
+    });
+
+    const field = await prisma.contactFieldDef.create({
+      data: {
+        userId,
+        label: label.trim(),
+        key,
+        type: fieldType,
+        options: fieldType === 'select' && Array.isArray(options) ? JSON.stringify(options) : null,
+        required: !!required,
+        order: (maxOrder._max.order ?? -1) + 1,
+      },
+    });
+    res.status(201).json({ ...field, options: field.options ? JSON.parse(field.options) : [] });
+  } catch (error) {
+    if (error.code === 'P2002') return res.status(400).json({ error: 'A field with this key already exists' });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /contacts/fields/reorder — MUST be before /fields/:id to avoid route conflict
+router.put('/fields/reorder', async (req, res) => {
+  try {
+    const { order } = req.body; // [{ id, order }, ...]
+    if (!Array.isArray(order)) return res.status(400).json({ error: 'Invalid order array' });
+    await Promise.all(
+      order.map(({ id, order: o }) =>
+        prisma.contactFieldDef.updateMany({
+          where: { id, userId: req.user.effectiveUserId },
+          data: { order: o },
+        })
+      )
+    );
+    res.json({ message: 'Reordered' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /contacts/fields/:id — update field def
+router.put('/fields/:id', async (req, res) => {
+  try {
+    const { label, type, options, required, order } = req.body;
+    const existing = await prisma.contactFieldDef.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.userId !== req.user.effectiveUserId) {
+      return res.status(404).json({ error: 'Field not found' });
+    }
+    const updateData = {};
+    if (label !== undefined) updateData.label = label.trim();
+    if (type !== undefined && VALID_FIELD_TYPES.includes(type)) updateData.type = type;
+    if (options !== undefined && Array.isArray(options)) updateData.options = JSON.stringify(options);
+    if (required !== undefined) updateData.required = !!required;
+    if (order !== undefined) updateData.order = order;
+
+    const field = await prisma.contactFieldDef.update({ where: { id: req.params.id }, data: updateData });
+    res.json({ ...field, options: field.options ? JSON.parse(field.options) : [] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /contacts/fields/:id — hide field (active=false). System fields are hidden; custom fields are hard-deleted.
+router.delete('/fields/:id', async (req, res) => {
+  try {
+    const existing = await prisma.contactFieldDef.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.userId !== req.user.effectiveUserId) {
+      return res.status(404).json({ error: 'Field not found' });
+    }
+    // System fields are always soft-deleted so they can be restored later
+    await prisma.contactFieldDef.update({ where: { id: req.params.id }, data: { active: false } });
+    res.json({ message: 'Field hidden', isSystem: existing.isSystem });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 const VALID_REVENUES = [
   '- 50 Milhões De Kwanzas',
   'Entre 50 - 100 Milhões',
@@ -11,11 +207,21 @@ const VALID_REVENUES = [
   '+ 500 M',
 ];
 
+// Phone format validation (basic: only digits and common symbols)
+function isValidPhone(phone) {
+  return /^[\d\s\+\-\(\)]{7,20}$/.test(phone);
+}
+
+// Helper: parse customFields JSON safely
+function parseCustomFields(raw) {
+  try { return JSON.parse(raw || '{}'); } catch { return {}; }
+}
+
 // GET all contacts with optional filters
 router.get('/', async (req, res) => {
   try {
     const { stage, search, inPipeline, revenue } = req.query;
-    const where = {};
+    const where = { userId: req.user.effectiveUserId };
 
     if (stage && VALID_STAGES.includes(stage)) {
       where.stage = stage;
@@ -44,7 +250,11 @@ router.get('/', async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json(contacts);
+    res.json(contacts.map(c => ({
+      ...c,
+      tags: (() => { try { return JSON.parse(c.tags); } catch { return []; } })(),
+      customFields: parseCustomFields(c.customFields),
+    })));
   } catch (error) {
     console.error('Error fetching contacts:', error);
     res.status(500).json({ error: error.message });
@@ -54,16 +264,21 @@ router.get('/', async (req, res) => {
 // POST create new contact
 router.post('/', async (req, res) => {
   try {
-    const { name, email, phone, company, revenue, sector, stage, tags } = req.body;
+    const { name, email, phone, company, revenue, sector, stage, tags, customFields } = req.body;
 
     if (!name || !phone) {
       return res.status(400).json({ error: 'Name and phone are required' });
+    }
+
+    if (!isValidPhone(phone)) {
+      return res.status(400).json({ error: 'Phone format is invalid. Use only digits, spaces, +, -, (, )' });
     }
 
     const finalStage = stage && VALID_STAGES.includes(stage) ? stage : 'Novo';
 
     const contact = await prisma.contact.create({
       data: {
+        userId: req.user.effectiveUserId,
         name,
         email: email || '',
         phone,
@@ -72,6 +287,7 @@ router.post('/', async (req, res) => {
         sector: sector || null,
         tags: Array.isArray(tags) ? JSON.stringify(tags) : '[]',
         stage: finalStage,
+        customFields: customFields && typeof customFields === 'object' ? JSON.stringify(customFields) : '{}',
       },
     });
 
@@ -100,7 +316,11 @@ router.post('/', async (req, res) => {
       });
     }
 
-    res.status(201).json(contact);
+    res.status(201).json({
+      ...contact,
+      tags: (() => { try { return JSON.parse(contact.tags); } catch { return []; } })(),
+      customFields: parseCustomFields(contact.customFields),
+    });
   } catch (error) {
     if (error.code === 'P2002') {
       return res.status(400).json({ error: 'Phone number already exists' });
@@ -123,6 +343,7 @@ router.post('/import', async (req, res) => {
     const preparedContacts = contacts
       .filter((c) => c.phone) // Required field
       .map((c) => ({
+        userId: req.user.effectiveUserId,
         name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.phone,
         email: c.email || '',
         phone: c.phone,
@@ -181,11 +402,15 @@ router.get('/:id', async (req, res) => {
       },
     });
 
-    if (!contact) {
+    if (!contact || contact.userId !== req.user.id) {
       return res.status(404).json({ error: 'Contact not found' });
     }
 
-    res.json(contact);
+    res.json({
+      ...contact,
+      tags: (() => { try { return JSON.parse(contact.tags); } catch { return []; } })(),
+      customFields: parseCustomFields(contact.customFields),
+    });
   } catch (error) {
     console.error('Error fetching contact:', error);
     res.status(500).json({ error: error.message });
@@ -195,9 +420,19 @@ router.get('/:id', async (req, res) => {
 // PUT update contact
 router.put('/:id', async (req, res) => {
   try {
-    const { name, email, phone, company, revenue, sector, stage, inPipeline, tags } = req.body;
+    const { name, email, phone, company, revenue, sector, stage, inPipeline, tags, customFields } = req.body;
     const updateData = {};
     const contactId = parseInt(req.params.id);
+
+    // Verify ownership
+    const existing = await prisma.contact.findUnique({ where: { id: contactId } });
+    if (!existing || existing.userId !== req.user.id) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    if (phone !== undefined && !isValidPhone(phone)) {
+      return res.status(400).json({ error: 'Phone format is invalid. Use only digits, spaces, +, -, (, )' });
+    }
 
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email;
@@ -209,6 +444,12 @@ router.put('/:id', async (req, res) => {
     if (Array.isArray(tags)) updateData.tags = JSON.stringify(tags);
     if (stage && VALID_STAGES.includes(stage)) {
       updateData.stage = stage;
+    }
+    if (customFields && typeof customFields === 'object') {
+      // Merge existing customFields with incoming to avoid overwriting unrelated keys
+      const existing2 = await prisma.contact.findUnique({ where: { id: contactId }, select: { customFields: true } });
+      const merged = { ...parseCustomFields(existing2?.customFields), ...customFields };
+      updateData.customFields = JSON.stringify(merged);
     }
 
     const contact = await prisma.contact.update({
@@ -235,7 +476,11 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    res.json(contact);
+    res.json({
+      ...contact,
+      tags: (() => { try { return JSON.parse(contact.tags); } catch { return []; } })(),
+      customFields: parseCustomFields(contact.customFields),
+    });
   } catch (error) {
     if (error.code === 'P2002') {
       return res.status(400).json({ error: 'Phone number already exists' });
@@ -251,8 +496,21 @@ router.put('/:id', async (req, res) => {
 // DELETE contact
 router.delete('/:id', async (req, res) => {
   try {
+    const contactId = parseInt(req.params.id);
+
+    // Only account owners can delete
+    if (!req.user.isAccountOwner) {
+      return res.status(403).json({ error: 'Apenas o dono da conta pode eliminar contactos' });
+    }
+
+    // Verify ownership
+    const existing = await prisma.contact.findUnique({ where: { id: contactId } });
+    if (!existing || existing.userId !== req.user.effectiveUserId) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
     await prisma.contact.delete({
-      where: { id: parseInt(req.params.id) },
+      where: { id: contactId },
     });
 
     res.json({ message: 'Contact deleted' });

@@ -2,10 +2,15 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 
+const VALID_TRIGGERS = ['new_contact', 'form_submission', 'contact_tag', 'contact_revenue', 'contact_sector'];
+const VALID_ACTIONS = ['send_email', 'send_whatsapp_template', 'send_whatsapp_text', 'update_stage'];
+
 // GET all automations
 router.get('/', async (req, res) => {
   try {
-    const automations = await prisma.automation.findMany();
+    const automations = await prisma.automation.findMany({
+      where: { userId: req.user.effectiveUserId },
+    });
     res.json(automations);
   } catch (error) {
     console.error('Error fetching automations:', error);
@@ -28,6 +33,14 @@ router.post('/', async (req, res) => {
 
     if (!trigger || !action) {
       return res.status(400).json({ error: 'trigger and action are required' });
+    }
+
+    if (!VALID_TRIGGERS.includes(trigger)) {
+      return res.status(400).json({ error: `Invalid trigger. Must be one of: ${VALID_TRIGGERS.join(', ')}` });
+    }
+
+    if (!VALID_ACTIONS.includes(action)) {
+      return res.status(400).json({ error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}` });
     }
 
     // Validate trigger value for conditional triggers
@@ -67,6 +80,7 @@ router.post('/', async (req, res) => {
     }
 
     const data = {
+      userId: req.user.effectiveUserId,
       trigger,
       action,
     };
@@ -89,6 +103,14 @@ router.post('/', async (req, res) => {
 // PUT update automation
 router.put('/:id', async (req, res) => {
   try {
+    const automation = await prisma.automation.findUnique({
+      where: { id: req.params.id },
+      select: { userId: true },
+    });
+    if (!automation || automation.userId !== req.user.id) {
+      return res.status(404).json({ error: 'Automation not found' });
+    }
+
     const {
       active,
       trigger,
@@ -99,6 +121,15 @@ router.put('/:id', async (req, res) => {
       emailSubject,
       emailBody,
     } = req.body;
+
+    if (trigger !== undefined && !VALID_TRIGGERS.includes(trigger)) {
+      return res.status(400).json({ error: `Invalid trigger. Must be one of: ${VALID_TRIGGERS.join(', ')}` });
+    }
+
+    if (action !== undefined && !VALID_ACTIONS.includes(action)) {
+      return res.status(400).json({ error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}` });
+    }
+
     const updateData = {};
 
     if (active !== undefined) updateData.active = active;
@@ -110,12 +141,12 @@ router.put('/:id', async (req, res) => {
     if (emailSubject !== undefined) updateData.emailSubject = emailSubject;
     if (emailBody !== undefined) updateData.emailBody = emailBody;
 
-    const automation = await prisma.automation.update({
+    const updatedAutomation = await prisma.automation.update({
       where: { id: req.params.id },
       data: updateData,
     });
 
-    res.json(automation);
+    res.json(updatedAutomation);
   } catch (error) {
     if (error.code === 'P2025') {
       return res.status(404).json({ error: 'Automation not found' });
@@ -128,6 +159,19 @@ router.put('/:id', async (req, res) => {
 // DELETE automation
 router.delete('/:id', async (req, res) => {
   try {
+    // Only account owners can delete
+    if (!req.user.isAccountOwner) {
+      return res.status(403).json({ error: 'Apenas o dono da conta pode eliminar automações' });
+    }
+
+    const automation = await prisma.automation.findUnique({
+      where: { id: req.params.id },
+      select: { userId: true },
+    });
+    if (!automation || automation.userId !== req.user.effectiveUserId) {
+      return res.status(404).json({ error: 'Automation not found' });
+    }
+
     await prisma.automation.delete({
       where: { id: req.params.id },
     });

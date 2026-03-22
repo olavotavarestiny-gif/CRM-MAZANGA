@@ -8,6 +8,7 @@ const requireAuth = require('../middleware/auth');
 router.get('/', requireAuth, async (req, res) => {
   try {
     const forms = await prisma.form.findMany({
+      where: { userId: req.user.effectiveUserId },
       include: {
         _count: { select: { submissions: true } },
         fields: { select: { id: true, type: true, label: true, order: true } },
@@ -27,6 +28,7 @@ router.post('/', requireAuth, async (req, res) => {
     const { title, description, mode, thankYouUrl } = req.body;
     const form = await prisma.form.create({
       data: {
+        userId: req.user.effectiveUserId,
         title,
         description: description || null,
         mode: mode || 'step',
@@ -67,17 +69,28 @@ router.get('/:id', async (req, res) => {
 // PUT /api/forms/:id - atualizar metadados do formulário
 router.put('/:id', requireAuth, async (req, res) => {
   try {
-    const { title, description, mode, thankYouUrl } = req.body;
-    const form = await prisma.form.update({
+    const form = await prisma.form.findUnique({
+      where: { id: req.params.id },
+      select: { userId: true },
+    });
+    if (!form || form.userId !== req.user.id) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+
+    const { title, description, mode, thankYouUrl, brandColor, bgColor, logoUrl } = req.body;
+    const updatedForm = await prisma.form.update({
       where: { id: req.params.id },
       data: {
         ...(title !== undefined && { title }),
         ...(description !== undefined && { description: description || null }),
         ...(mode !== undefined && { mode }),
         ...(thankYouUrl !== undefined && { thankYouUrl: thankYouUrl || null }),
+        ...(brandColor !== undefined && { brandColor: brandColor || null }),
+        ...(bgColor !== undefined && { bgColor: bgColor || null }),
+        ...(logoUrl !== undefined && { logoUrl: logoUrl || null }),
       },
     });
-    res.json(form);
+    res.json(updatedForm);
   } catch (error) {
     console.error('Error updating form:', error);
     res.status(500).json({ error: error.message });
@@ -87,6 +100,19 @@ router.put('/:id', requireAuth, async (req, res) => {
 // DELETE /api/forms/:id - eliminar formulário (cascata)
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
+    // Only account owners can delete
+    if (!req.user.isAccountOwner) {
+      return res.status(403).json({ error: 'Apenas o dono da conta pode eliminar formulários' });
+    }
+
+    const form = await prisma.form.findUnique({
+      where: { id: req.params.id },
+      select: { userId: true },
+    });
+    if (!form || form.userId !== req.user.effectiveUserId) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+
     await prisma.form.delete({
       where: { id: req.params.id },
     });
@@ -100,6 +126,15 @@ router.delete('/:id', requireAuth, async (req, res) => {
 // POST /api/forms/:id/fields - adicionar campo ao formulário
 router.post('/:id/fields', requireAuth, async (req, res) => {
   try {
+    // Verify form ownership
+    const form = await prisma.form.findUnique({
+      where: { id: req.params.id },
+      select: { userId: true },
+    });
+    if (!form || form.userId !== req.user.id) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+
     const { type, label, required, order, options, contactField } = req.body;
     const field = await prisma.formField.create({
       data: {
@@ -125,6 +160,15 @@ router.post('/:id/fields', requireAuth, async (req, res) => {
 // PUT /api/forms/:id/fields/:fieldId - atualizar campo
 router.put('/:id/fields/:fieldId', requireAuth, async (req, res) => {
   try {
+    // Verify form ownership
+    const form = await prisma.form.findUnique({
+      where: { id: req.params.id },
+      select: { userId: true },
+    });
+    if (!form || form.userId !== req.user.id) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+
     const { type, label, required, order, options, contactField } = req.body;
     const field = await prisma.formField.update({
       where: { id: req.params.fieldId },
@@ -150,6 +194,15 @@ router.put('/:id/fields/:fieldId', requireAuth, async (req, res) => {
 // DELETE /api/forms/:id/fields/:fieldId - eliminar campo
 router.delete('/:id/fields/:fieldId', requireAuth, async (req, res) => {
   try {
+    // Verify form ownership
+    const form = await prisma.form.findUnique({
+      where: { id: req.params.id },
+      select: { userId: true },
+    });
+    if (!form || form.userId !== req.user.id) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+
     await prisma.formField.delete({
       where: { id: req.params.fieldId },
     });
@@ -163,6 +216,15 @@ router.delete('/:id/fields/:fieldId', requireAuth, async (req, res) => {
 // POST /api/forms/:id/fields/reorder - reordenar campos
 router.post('/:id/fields/reorder', requireAuth, async (req, res) => {
   try {
+    // Verify form ownership
+    const form = await prisma.form.findUnique({
+      where: { id: req.params.id },
+      select: { userId: true },
+    });
+    if (!form || form.userId !== req.user.id) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+
     const { fields } = req.body; // [{id, order}, ...]
     for (const f of fields) {
       await prisma.formField.update({
@@ -196,6 +258,7 @@ router.post('/:id/submit', async (req, res) => {
       const formWithFields = await prisma.form.findUnique({
         where: { id: req.params.id },
         include: { fields: true },
+        select: { fields: true, userId: true },
       });
 
       const contactData = {};
@@ -211,6 +274,7 @@ router.post('/:id/submit', async (req, res) => {
         try {
           const newContact = await prisma.contact.create({
             data: {
+              userId: formWithFields.userId,
               name: contactData.name || 'Sem nome',
               phone: contactData.phone,
               email: contactData.email || '',
@@ -244,6 +308,15 @@ router.post('/:id/submit', async (req, res) => {
 // GET /api/forms/:id/submissions - obter submissões do formulário
 router.get('/:id/submissions', requireAuth, async (req, res) => {
   try {
+    // Verify form ownership
+    const form = await prisma.form.findUnique({
+      where: { id: req.params.id },
+      select: { userId: true },
+    });
+    if (!form || form.userId !== req.user.id) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+
     const submissions = await prisma.formSubmission.findMany({
       where: { formId: req.params.id },
       include: { answers: true },

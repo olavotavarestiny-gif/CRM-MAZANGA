@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* ULU Gestão — 2 cores: #0A2540 navy + #FFFFFF white */
+  --background: 0 0% 100%;
+  --foreground: 210 73% 15%;           /* #0A2540 */
+  --card: 0 0% 100%;
+  --card-foreground: 210 73% 15%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 210 73% 15%;
+  --primary: 210 73% 15%;             /* #0A2540 */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 30% 97%;           /* near-white surface */
+  --secondary-foreground: 210 73% 15%;
+  --muted: 210 20% 96%;
+  --muted-foreground: 210 30% 40%;    /* #0A2540 at ~40% lightness */
+  --accent: 210 73% 15%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 210 20% 90%;              /* very light navy tint */
+  --input: 210 20% 90%;
+  --ring: 210 73% 15%;               /* #0A2540 */
+  --ring-offset-background: 0 0% 100%;
+  --radius: 0.5rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background: #f0f4f9;
+  color: #0A2540;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Montserrat', sans-serif;
+  color: #0A2540;
+}
+
+h1 { font-weight: 700; }
+h2 { font-weight: 700; }
+h3 { font-weight: 600; }
+h4, h5, h6 { font-weight: 600; }
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .font-display {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 800;
+  }
+}

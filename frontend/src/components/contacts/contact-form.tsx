@@ -1,0 +1,310 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { createContact, updateContact, getContactFieldDefs, getContactFieldConfigs, getPipelineStages } from '@/lib/api';
+import { Contact, ContactFieldDef, ContactFieldConfig, ContactFieldType } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { X } from 'lucide-react';
+
+// System field keys that are always shown (non-configurable core)
+const CORE_FIELDS = ['name', 'stage'];
+
+// Renders a single field based on its type
+function FieldInput({
+  fieldKey,
+  type,
+  options,
+  value,
+  onChange,
+  required,
+  placeholder,
+}: {
+  fieldKey: string;
+  type: ContactFieldType | 'tags';
+  options?: string[];
+  value: string | string[];
+  onChange: (v: string | string[]) => void;
+  required?: boolean;
+  placeholder?: string;
+}) {
+  const [tagInput, setTagInput] = useState('');
+
+  if (type === 'tags') {
+    const tags = Array.isArray(value) ? value : [];
+    const addTag = () => {
+      const v = tagInput.trim();
+      if (v && !tags.includes(v)) {
+        onChange([...tags, v]);
+        setTagInput('');
+      }
+    };
+    return (
+      <div>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Escrever tag e pressionar Enter..."
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+          />
+          <Button type="button" variant="outline" size="sm" onClick={addTag} className="flex-shrink-0">
+            Adicionar
+          </Button>
+        </div>
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center gap-1 bg-[#0A2540]/8 border border-[#dde3ec] rounded-full px-2.5 py-0.5 text-xs text-[#0A2540]"
+              >
+                {tag}
+                <button type="button" onClick={() => onChange(tags.filter((t) => t !== tag))}>
+                  <X className="w-3 h-3 hover:text-red-500" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (type === 'select') {
+    return (
+      <Select value={value as string} onValueChange={(v) => onChange(v)}>
+        <SelectTrigger>
+          <SelectValue placeholder="Selecionar..." />
+        </SelectTrigger>
+        <SelectContent>
+          {(options ?? []).map((opt) => (
+            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  return (
+    <Input
+      type={
+        type === 'number' ? 'number'
+        : type === 'date' ? 'date'
+        : type === 'url' ? 'url'
+        : fieldKey === 'email' ? 'email'
+        : 'text'
+      }
+      value={value as string}
+      onChange={(e) => onChange(e.target.value)}
+      required={required}
+      placeholder={placeholder}
+    />
+  );
+}
+
+export default function ContactForm({
+  contact,
+  contactId,
+  onSuccess,
+}: {
+  contact?: Contact;
+  contactId?: number;
+  onSuccess?: () => void;
+}) {
+  const isEditMode = !!contactId;
+
+  // Core values (always present)
+  const [name, setName] = useState(contact?.name ?? '');
+  const [stage, setStage] = useState(contact?.stage ?? 'Novo');
+
+  // Dynamic values keyed by field.key
+  const [values, setValues] = useState<Record<string, string | string[]>>(() => {
+    const base: Record<string, string | string[]> = {
+      email: contact?.email ?? '',
+      phone: contact?.phone ?? '',
+      company: contact?.company ?? '',
+      revenue: contact?.revenue ?? '',
+      sector: contact?.sector ?? '',
+      tags: contact?.tags ?? [],
+      ...(contact?.customFields ?? {}),
+    };
+    return base;
+  });
+
+  useEffect(() => {
+    if (contact) {
+      setName(contact.name);
+      setStage(contact.stage);
+      setValues({
+        email: contact.email ?? '',
+        phone: contact.phone ?? '',
+        company: contact.company ?? '',
+        revenue: contact.revenue ?? '',
+        sector: contact.sector ?? '',
+        tags: contact.tags ?? [],
+        ...(contact.customFields ?? {}),
+      });
+    }
+  }, [contact]);
+
+  const { data: fieldDefs = [] } = useQuery({
+    queryKey: ['contactFieldDefs'],
+    queryFn: getContactFieldDefs,
+  });
+
+  const { data: systemConfigs = [] } = useQuery({
+    queryKey: ['contactFieldConfigs'],
+    queryFn: getContactFieldConfigs,
+  });
+
+  const { data: pipelineStages = [] } = useQuery({
+    queryKey: ['pipeline-stages'],
+    queryFn: getPipelineStages,
+  });
+
+  // Only show visible system fields, sorted by order
+  const visibleSystemFields = systemConfigs
+    .filter(c => c.visible)
+    .sort((a, b) => a.order - b.order);
+
+  const setValue = (key: string, val: string | string[]) =>
+    setValues((prev) => ({ ...prev, [key]: val }));
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      // Separate system field values from custom field values
+      const systemKeys = new Set(['email', 'phone', 'company', 'revenue', 'sector', 'tags']);
+      const customFields: Record<string, string> = {};
+      for (const [k, v] of Object.entries(values)) {
+        if (!systemKeys.has(k)) customFields[k] = v as string;
+      }
+
+      const payload = {
+        name,
+        stage,
+        email: (values.email as string) || '',
+        phone: (values.phone as string) || '',
+        company: (values.company as string) || '',
+        revenue: (values.revenue as string) || null,
+        sector: (values.sector as string) || null,
+        tags: Array.isArray(values.tags) ? values.tags : [],
+        customFields,
+      };
+
+      return isEditMode
+        ? updateContact(String(contactId), payload as any)
+        : createContact(payload as any);
+    },
+    onSuccess: () => {
+      if (!isEditMode) {
+        setName('');
+        setStage('Novo');
+        setValues({ email: '', phone: '', company: '', revenue: '', sector: '', tags: [] });
+      }
+      onSuccess?.();
+    },
+  });
+
+  const customFieldDefs = fieldDefs;
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4">
+
+      {/* Name — always shown */}
+      <div>
+        <Label>Nome *</Label>
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          className="mt-1"
+        />
+      </div>
+
+      {/* System fields — driven by ContactFieldConfig visibility */}
+      {visibleSystemFields.map((cfg) => (
+        <div key={cfg.fieldKey}>
+          <Label>
+            {cfg.label}
+            {cfg.required && <span className="text-red-500 ml-0.5">*</span>}
+          </Label>
+          <div className="mt-1">
+            <FieldInput
+              fieldKey={cfg.fieldKey}
+              type={cfg.fieldKey === 'tags' ? 'tags'
+                : cfg.fieldKey === 'revenue' ? 'select'
+                : cfg.fieldKey === 'sector'  ? 'select'
+                : 'text'}
+              options={
+                cfg.fieldKey === 'revenue'
+                  ? ['- 50 Milhões De Kwanzas','Entre 50 - 100 Milhões','Entre 100 Milhões - 500 Milhões','+ 500 M']
+                  : cfg.fieldKey === 'sector'
+                  ? ['Serviços','Construção','Retalho','Energia','Oil & Gas','Logística','E-commerce','Telecomunicações']
+                  : undefined
+              }
+              value={values[cfg.fieldKey] ?? (cfg.fieldKey === 'tags' ? [] : '')}
+              onChange={(v) => setValue(cfg.fieldKey, v)}
+              required={cfg.required}
+            />
+          </div>
+        </div>
+      ))}
+
+      {/* Stage — always shown */}
+      <div>
+        <Label>Etapa *</Label>
+        <Select value={stage} onValueChange={(v) => setStage(v)}>
+          <SelectTrigger className="mt-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {pipelineStages.map((s) => (
+              <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Custom fields */}
+      {customFieldDefs.length > 0 && (
+        <div className="border-t border-[#dde3ec] pt-4 space-y-4">
+          <p className="text-xs font-semibold text-[#6b7e9a] uppercase tracking-wide">Campos personalizados</p>
+          {customFieldDefs.map((field) => (
+            <div key={field.key}>
+              <Label>
+                {field.label}
+                {field.required && <span className="text-red-500 ml-0.5">*</span>}
+              </Label>
+              <div className="mt-1">
+                <FieldInput
+                  fieldKey={field.key}
+                  type={field.type}
+                  options={field.options}
+                  value={values[field.key] ?? ''}
+                  onChange={(v) => setValue(field.key, v)}
+                  required={field.required}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Button type="submit" disabled={mutation.isPending} className="w-full">
+        {mutation.isPending
+          ? isEditMode ? 'Guardando...' : 'Criando...'
+          : isEditMode ? 'Guardar Alterações' : 'Criar Contacto'}
+      </Button>
+    </form>
+  );
+}

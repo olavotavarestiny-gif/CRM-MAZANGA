@@ -26,6 +26,7 @@ router.get('/dashboard', async (req, res) => {
     const to = endOfMonth(targetDate);
 
     const baseWhere = {
+      userId: req.user.id,
       deleted: false,
       status: 'pago',
       date: { gte: from, lte: to },
@@ -78,7 +79,7 @@ router.get('/transactions', async (req, res) => {
     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    const where = { deleted: false };
+    const where = { userId: req.user.id, deleted: false };
 
     if (type && ['entrada', 'saida'].includes(type)) where.type = type;
     if (status && ['pago', 'pendente', 'atrasado'].includes(status)) where.status = status;
@@ -179,6 +180,7 @@ router.post('/transactions', async (req, res) => {
 
     const transaction = await prisma.transaction.create({
       data: {
+        userId: req.user.id,
         date: new Date(date),
         clientId: clientId ? parseInt(clientId) : null,
         clientName: resolvedClientName,
@@ -213,7 +215,7 @@ router.post('/transactions', async (req, res) => {
 router.put('/transactions/:id', async (req, res) => {
   try {
     const existing = await prisma.transaction.findUnique({ where: { id: req.params.id } });
-    if (!existing || existing.deleted) {
+    if (!existing || existing.deleted || existing.userId !== req.user.id) {
       return res.status(404).json({ error: 'Transação não encontrada.' });
     }
 
@@ -259,7 +261,7 @@ router.put('/transactions/:id', async (req, res) => {
 router.delete('/transactions/:id', async (req, res) => {
   try {
     const existing = await prisma.transaction.findUnique({ where: { id: req.params.id } });
-    if (!existing || existing.deleted) {
+    if (!existing || existing.deleted || existing.userId !== req.user.id) {
       return res.status(404).json({ error: 'Transação não encontrada.' });
     }
 
@@ -279,7 +281,7 @@ router.delete('/transactions/:id', async (req, res) => {
 router.post('/transactions/:id/mark-paid', async (req, res) => {
   try {
     const original = await prisma.transaction.findUnique({ where: { id: req.params.id } });
-    if (!original || original.deleted) {
+    if (!original || original.deleted || original.userId !== req.user.id) {
       return res.status(404).json({ error: 'Transação não encontrada.' });
     }
     if (original.type !== 'entrada' || original.revenueType !== 'recorrente') {
@@ -353,12 +355,12 @@ router.get('/profitability', async (req, res) => {
     const [revenues, costs] = await Promise.all([
       prisma.transaction.groupBy({
         by: ['clientId', 'clientName'],
-        where: { deleted: false, type: 'entrada', status: 'pago', clientId: { not: null } },
+        where: { userId: req.user.id, deleted: false, type: 'entrada', status: 'pago', clientId: { not: null } },
         _sum: { amountKz: true },
       }),
       prisma.transaction.groupBy({
         by: ['clientId', 'clientName'],
-        where: { deleted: false, type: 'saida', status: 'pago', clientId: { not: null } },
+        where: { userId: req.user.id, deleted: false, type: 'saida', status: 'pago', clientId: { not: null } },
         _sum: { amountKz: true },
       }),
     ]);
@@ -410,26 +412,33 @@ router.get('/profitability/:clientId', async (req, res) => {
   try {
     const clientId = parseInt(req.params.clientId);
 
-    const [transactions, costsByCategory, contact] = await Promise.all([
+    // Verify contact belongs to user
+    const contact = await prisma.contact.findUnique({
+      where: { id: clientId },
+      select: { id: true, name: true, company: true, userId: true },
+    });
+
+    if (!contact || contact.userId !== req.user.id) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    const [transactions, costsByCategory] = await Promise.all([
       prisma.transaction.findMany({
-        where: { deleted: false, clientId, status: 'pago' },
+        where: { userId: req.user.id, deleted: false, clientId, status: 'pago' },
         orderBy: { date: 'desc' },
         take: 20,
       }),
       prisma.transaction.groupBy({
         by: ['category'],
-        where: { deleted: false, clientId, type: 'saida', status: 'pago' },
+        where: { userId: req.user.id, deleted: false, clientId, type: 'saida', status: 'pago' },
         _sum: { amountKz: true },
-      }),
-      prisma.contact.findUnique({
-        where: { id: clientId },
-        select: { id: true, name: true, company: true },
       }),
     ]);
 
     // Contratos recorrentes activos
     const activeContracts = await prisma.transaction.findMany({
       where: {
+        userId: req.user.id,
         deleted: false,
         clientId,
         type: 'entrada',
@@ -533,7 +542,7 @@ router.post('/seed-categories', async (req, res) => {
 router.get('/export-csv', async (req, res) => {
   try {
     const { dateFrom, dateTo, type, status } = req.query;
-    const where = { deleted: false };
+    const where = { userId: req.user.id, deleted: false };
     if (type) where.type = type;
     if (status) where.status = status;
     if (dateFrom || dateTo) {

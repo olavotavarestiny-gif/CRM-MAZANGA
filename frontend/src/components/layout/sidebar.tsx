@@ -1,0 +1,127 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { BarChart3, Users, MessageSquare, Zap, ExternalLink, Kanban, CheckSquare, FileText, LogOut, X, DollarSign, User as UserIcon, CalendarDays, Package, Settings } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { removeToken } from '@/lib/auth';
+import type { User } from '@/lib/api';
+
+export default function Sidebar({
+  open = false,
+  onClose = () => {},
+  currentUser = null,
+}: {
+  open?: boolean;
+  onClose?: () => void;
+  currentUser?: User | null;
+}) {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const isActive = (path: string) => {
+    if (path === '/') {
+      return pathname === '/' || pathname === '/dashboard' || pathname.startsWith('/dashboard/');
+    }
+    return pathname === path || pathname.startsWith(path + '/');
+  };
+
+  const handleLogout = () => {
+    removeToken();
+    router.push('/login');
+  };
+
+  const links = [
+    { href: '/', label: 'Painel', icon: BarChart3 },
+    { href: '/pipeline', label: 'Negociações', icon: Kanban },
+    { href: '/contacts', label: 'Contactos', icon: Users },
+    { href: '/tasks', label: 'Tarefas', icon: CheckSquare },
+    { href: '/calendario', label: 'Calendário', icon: CalendarDays },
+    { href: '/inbox', label: 'Conversas', icon: MessageSquare },
+    { href: '/automations', label: 'Automações', icon: Zap },
+    { href: '/forms', label: 'Formulários', icon: FileText },
+  ];
+
+  const ownerLinks = currentUser && !currentUser.accountOwnerId ? [
+    { href: '/finances', label: 'Finanças', icon: DollarSign },
+    { href: '/produtos', label: 'Produtos', icon: Package },
+  ] : [];
+
+  const navItemClass = (active: boolean) => cn(
+    'flex items-center gap-3 px-3 py-2 transition-all text-sm font-medium rounded-lg',
+    active
+      ? 'bg-[#0A2540]/8 text-[#0A2540] font-semibold'
+      : 'text-[#6b7e9a] hover:text-[#0A2540] hover:bg-[#0A2540]/5'
+  );
+
+  return (
+    <div
+      className={`w-56 min-h-screen flex flex-col fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:static border-r border-[#dde3ec] bg-white ${
+        open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      }`}
+    >
+      {/* Logo */}
+      <div className="px-5 py-5 flex items-center justify-between flex-shrink-0 border-b border-[#dde3ec]">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-[#0A2540] flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-black text-xs" style={{ fontFamily: "'Montserrat', sans-serif" }}>U</span>
+          </div>
+          <span className="text-[#0A2540] font-bold text-base leading-none" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+            ULU <span className="font-medium text-[#6b7e9a]">Gestão</span>
+          </span>
+        </div>
+        <button onClick={onClose} className="md:hidden p-1 hover:bg-[#f5f7fa] rounded transition-colors">
+          <X className="w-4 h-4 text-[#6b7e9a]" />
+        </button>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
+        {links.map(({ href, label, icon: Icon }) => (
+          <Link key={href} href={href} className={navItemClass(isActive(href))}>
+            <Icon className="w-4 h-4 flex-shrink-0" />
+            <span>{label}</span>
+          </Link>
+        ))}
+
+        {ownerLinks.length > 0 && (
+          <div className="pt-4 mt-2 border-t border-[#dde3ec]">
+            <p className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/60">
+              Gestão
+            </p>
+            {ownerLinks.map(({ href, label, icon: Icon }) => (
+              <Link key={href} href={href} className={navItemClass(isActive(href))}>
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                <span>{label}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </nav>
+
+      {/* Footer */}
+      <div className="px-3 py-4 border-t border-[#dde3ec] space-y-0.5">
+        <a
+          href="/form"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 px-3 py-2 text-[#6b7e9a] hover:text-[#0A2540] hover:bg-[#0A2540]/5 transition-all text-sm font-medium rounded-lg"
+        >
+          <ExternalLink className="w-4 h-4 flex-shrink-0" />
+          <span>Formulário</span>
+        </a>
+        <Link href="/configuracoes" className={navItemClass(isActive('/configuracoes'))}>
+          <Settings className="w-4 h-4 flex-shrink-0" />
+          <span>Configurações</span>
+        </Link>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2 text-[#6b7e9a] hover:text-[#0A2540] hover:bg-[#0A2540]/5 transition-all text-left text-sm font-medium rounded-lg"
+        >
+          <LogOut className="w-4 h-4 flex-shrink-0" />
+          <span>Sair</span>
+        </button>
+      </div>
+    </div>
+  );
+}
