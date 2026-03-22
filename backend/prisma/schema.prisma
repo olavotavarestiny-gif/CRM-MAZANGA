@@ -10,16 +10,35 @@ datasource db {
 }
 
 model User {
-  id           Int        @id @default(autoincrement())
-  name         String
-  email        String     @unique
-  passwordHash String
-  role         String     @default("user")   // "admin" | "user"
-  active       Boolean    @default(true)
-  resetToken   String?
-  resetExpiry  DateTime?
-  createdAt    DateTime   @default(now())
-  loginLogs    LoginLog[]
+  id                   Int        @id @default(autoincrement())
+  name                 String
+  email                String     @unique
+  supabaseUid          String?    @unique  // UUID from Supabase auth.users
+  role                 String     @default("user")   // "admin" | "user"
+  active               Boolean    @default(true)
+  mustChangePassword   Boolean    @default(false)
+  accountOwnerId       Int?       // null = owner of their own account; Int = member of another account
+  createdAt            DateTime   @default(now())
+  loginLogs            LoginLog[]
+  contacts             Contact[]  @relation("ContactUser")
+  contactFieldDefs     ContactFieldDef[] @relation("ContactFieldDefUser")
+  contactFieldConfigs  ContactFieldConfig[] @relation("ContactFieldConfigUser")
+  pipelineStages       PipelineStage[]     @relation("PipelineStageUser")
+  tasks                Task[]     @relation("TaskUser")
+  transactions         Transaction[] @relation("TransactionUser")
+  automations          Automation[] @relation("AutomationUser")
+  forms                Form[]     @relation("FormUser")
+  googleCalendarToken  GoogleCalendarToken?
+  estabelecimentos     Estabelecimento[]     @relation("EstabelecimentoUser")
+  series               Serie[]               @relation("SerieUser")
+  clientesFaturacao    ClienteFaturacao[]    @relation("ClienteFaturacaoUser")
+  produtos             Produto[]             @relation("ProdutoUser")
+  facturas             Factura[]             @relation("FacturaUser")
+  facturaRecorrentes   FacturaRecorrente[]   @relation("FacturaRecorrenteUser")
+  saftPeriodos         SaftPeriodo[]         @relation("SaftPeriodoUser")
+  configuracaoFaturacao ConfiguracaoFaturacao? @relation("ConfigFaturacaoUser")
+  accountOwner         User?      @relation("AccountMembers", fields: [accountOwnerId], references: [id], onDelete: SetNull)
+  accountMembers       User[]     @relation("AccountMembers")
 }
 
 model LoginLog {
@@ -32,21 +51,69 @@ model LoginLog {
 }
 
 model Contact {
-  id           Int           @id @default(autoincrement())
-  name         String
-  email        String
-  phone        String        @unique
-  company      String
-  revenue      String?
-  sector       String?
-  stage        String        @default("Novo")
-  inPipeline   Boolean       @default(false)
-  tags         String        @default("[]") // JSON array stored as string: ["tag1", "tag2"]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  messages     Message[]
-  tasks        Task[]
-  transactions Transaction[]
+  id            Int           @id @default(autoincrement())
+  userId        Int?
+  name          String
+  email         String
+  phone         String
+  company       String
+  revenue       String?
+  sector        String?
+  stage         String        @default("Novo")
+  inPipeline    Boolean       @default(false)
+  tags          String        @default("[]") // JSON array stored as string: ["tag1", "tag2"]
+  customFields  String        @default("{}") // JSON object: { "fieldKey": "value" }
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  user          User?         @relation("ContactUser", fields: [userId], references: [id], onDelete: SetNull)
+  messages      Message[]
+  tasks         Task[]
+  transactions  Transaction[]
+
+  @@unique([userId, phone], name: "user_phone_unique")
+}
+
+model ContactFieldDef {
+  id        String   @id @default(cuid())
+  userId    Int
+  label     String
+  key       String   // slug used as key in customFields JSON
+  type      String   @default("text") // "text" | "number" | "date" | "select" | "url"
+  options   String?  // JSON array for select type: '["Option A","Option B"]'
+  required  Boolean  @default(false)
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  user      User     @relation("ContactFieldDefUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+// Stores per-user config overrides for built-in contact fields (email, phone, company, revenue, sector, tags)
+// Per-user customisable pipeline stages
+model PipelineStage {
+  id        String   @id @default(cuid())
+  userId    Int
+  name      String
+  color     String   @default("#6b7e9a") // hex color for the stage badge
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  user      User     @relation("PipelineStageUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+}
+
+model ContactFieldConfig {
+  id       String  @id @default(cuid())
+  userId   Int
+  fieldKey String  // "email" | "phone" | "company" | "revenue" | "sector" | "tags"
+  label    String  // user-defined label (defaults to the built-in label)
+  visible  Boolean @default(true)
+  required Boolean @default(false)
+  order    Int     @default(0)
+  user     User    @relation("ContactFieldConfigUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fieldKey])
 }
 
 model Message {
@@ -62,7 +129,8 @@ model Message {
 
 model Task {
   id        Int       @id @default(autoincrement())
-  contactId Int
+  userId    Int?
+  contactId Int?
   title     String
   notes     String?
   dueDate   DateTime?
@@ -70,11 +138,13 @@ model Task {
   done      Boolean   @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  contact   Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user      User?     @relation("TaskUser", fields: [userId], references: [id], onDelete: SetNull)
+  contact   Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
 }
 
 model Automation {
   id           String  @id @default(cuid())
+  userId       Int?
   trigger      String  // "new_contact", "form_submission", "contact_tag", "contact_revenue", "contact_sector"
   triggerValue String? // tag name, revenue range, or sector (for matching conditions)
   action       String  // "send_email", "send_template", "send_text", "update_stage"
@@ -83,16 +153,22 @@ model Automation {
   emailSubject String?
   emailBody    String?
   active       Boolean @default(true)
+  user         User?   @relation("AutomationUser", fields: [userId], references: [id], onDelete: SetNull)
 }
 
 model Form {
   id          String   @id @default(cuid())
+  userId      Int?
   title       String
   description String?
   mode        String   @default("step")
   thankYouUrl String?
+  brandColor  String?  // hex — cor principal (botões, barra de progresso)
+  bgColor     String?  // hex — cor de fundo
+  logoUrl     String?  // base64 data URL do logotipo
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  user        User?    @relation("FormUser", fields: [userId], references: [id], onDelete: SetNull)
   fields      FormField[]
   submissions FormSubmission[]
 }
@@ -129,6 +205,7 @@ model FormAnswer {
 
 model Transaction {
   id                     String    @id @default(cuid())
+  userId                 Int?
   date                   DateTime
   clientId               Int?
   clientName             String?
@@ -149,6 +226,7 @@ model Transaction {
   deleted                Boolean   @default(false)
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
+  user                   User?     @relation("TransactionUser", fields: [userId], references: [id], onDelete: SetNull)
   contact                Contact?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
 }
 
@@ -163,4 +241,206 @@ model FinancialCategory {
   sortOrder     Int     @default(0)
 
   @@unique([type, category])
+}
+
+model GoogleCalendarToken {
+  id           String   @id @default(cuid())
+  userId       Int      @unique
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime
+  googleEmail  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// MÓDULO FATURAÇÃO AGT
+// ============================================
+
+model Estabelecimento {
+  id          String    @id @default(cuid())
+  userId      Int
+  nome        String
+  nif         String
+  morada      String?
+  telefone    String?
+  email       String?
+  isPrincipal Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  user        User      @relation("EstabelecimentoUser", fields: [userId], references: [id], onDelete: Cascade)
+  series               Serie[]
+  facturas             Factura[]
+  facturaRecorrentes   FacturaRecorrente[]
+}
+
+model Serie {
+  id                  String          @id @default(cuid())
+  userId              Int
+  estabelecimentoId   String
+  seriesCode          String
+  seriesYear          Int
+  documentType        String          // FT, FR, ND, NC, FA
+  firstDocumentNumber Int             @default(1)
+  lastDocumentNumber  Int?
+  seriesStatus        String          @default("A") // A=Ativa, U=Em uso, F=Fechada
+  createdAt           DateTime        @default(now())
+  user                User            @relation("SerieUser", fields: [userId], references: [id], onDelete: Cascade)
+  estabelecimento     Estabelecimento @relation(fields: [estabelecimentoId], references: [id], onDelete: Cascade)
+  facturas             Factura[]
+  facturaRecorrentes   FacturaRecorrente[]
+
+  @@unique([userId, seriesCode, seriesYear, documentType])
+}
+
+model ClienteFaturacao {
+  id              String    @id @default(cuid())
+  userId          Int
+  customerTaxID   String
+  customerName    String
+  customerAddress String?
+  customerPhone   String?
+  customerEmail   String?
+  contactId       Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user                User      @relation("ClienteFaturacaoUser", fields: [userId], references: [id], onDelete: Cascade)
+  facturas            Factura[]
+  facturaRecorrentes  FacturaRecorrente[]
+
+  @@unique([userId, customerTaxID])
+}
+
+model Produto {
+  id                 String   @id @default(cuid())
+  userId             Int
+  productCode        String
+  productDescription String
+  unitPrice          Float    @default(0)
+  unitOfMeasure      String   @default("UN")
+  taxPercentage      Float    @default(14)
+  taxCode            String   @default("NOR")
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  user               User     @relation("ProdutoUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productCode])
+}
+
+model Factura {
+  id                   String           @id @default(cuid())
+  userId               Int
+  documentNo           String
+  documentType         String
+  serieId              String
+  estabelecimentoId    String
+  documentDate         DateTime         @default(now())
+  documentStatus       String           @default("N") // N=Normal, A=Anulada
+  documentCancelReason String?
+  customerTaxID        String
+  customerName         String
+  customerAddress      String?
+  clienteFaturacaoId   String?
+  lines                String           // JSON
+  netTotal             Float
+  taxPayable           Float
+  grossTotal           Float
+  qrCodeUrl            String?
+  qrCodeImage          String?
+  jwsSignature         String           @default("PLACEHOLDER")
+  agtRequestId         String?
+  agtValidationStatus  String           @default("P") // P=Pendente, V=Válida, I=Inválida, A=Anulada
+  agtSubmittedAt       DateTime?
+  currencyCode         String           @default("AOA")
+  currencyAmount       Float?
+  exchangeRate         Float?
+  paymentMethod        String           @default("Transferência Bancária")
+  isOffline            Boolean          @default(false)
+  offlineEmittedAt     DateTime?
+  offlineSubmittedAt   DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  user                 User             @relation("FacturaUser", fields: [userId], references: [id], onDelete: SetNull)
+  serie                Serie            @relation(fields: [serieId], references: [id])
+  estabelecimento      Estabelecimento  @relation(fields: [estabelecimentoId], references: [id])
+  clienteFaturacao     ClienteFaturacao? @relation(fields: [clienteFaturacaoId], references: [id])
+
+  @@unique([userId, documentNo])
+}
+
+model SaftPeriodo {
+  id            String   @id @default(cuid())
+  userId        Int
+  periodo       String   // "2026-01"
+  startDate     DateTime
+  endDate       DateTime
+  status        String   @default("GENERATED")
+  xmlContent    String?
+  totalFacturas Int      @default(0)
+  generatedAt   DateTime @default(now())
+  user          User     @relation("SaftPeriodoUser", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditoriaEvento {
+  id         String   @id @default(cuid())
+  userId     Int?
+  eventType  String
+  entityType String
+  entityId   String
+  eventData  String?
+  errorData  String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+}
+
+model FacturaRecorrente {
+  id                  String    @id @default(cuid())
+  userId              Int
+  serieId             String
+  estabelecimentoId   String
+  clienteFaturacaoId  String?
+  customerTaxID       String
+  customerName        String
+  customerAddress     String?
+  documentType        String    @default("FT")
+  lines               String    // JSON array (template das linhas)
+  currencyCode        String    @default("AOA")
+  exchangeRate        Float?
+  paymentMethod       String    @default("Transferência Bancária")
+  frequency           String    // WEEKLY | MONTHLY | QUARTERLY | ANNUAL
+  startDate           DateTime
+  nextRunDate         DateTime
+  lastRunDate         DateTime?
+  lastFacturaId       String?
+  isActive            Boolean   @default(true)
+  totalGenerated      Int       @default(0)
+  maxOccurrences      Int?
+  notes               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  user                User      @relation("FacturaRecorrenteUser", fields: [userId], references: [id], onDelete: Cascade)
+  serie               Serie     @relation(fields: [serieId], references: [id])
+  estabelecimento     Estabelecimento @relation(fields: [estabelecimentoId], references: [id])
+  clienteFaturacao    ClienteFaturacao? @relation(fields: [clienteFaturacaoId], references: [id])
+}
+
+model ConfiguracaoFaturacao {
+  id                       String    @id @default(cuid())
+  userId                   Int       @unique
+  nifEmpresa               String    @default("")
+  nomeEmpresa              String    @default("")
+  moradaEmpresa            String    @default("")
+  iban                     String    @default("")
+  logoUrl                  String?
+  agtMockMode              Boolean   @default(true)
+  agtCertNumber            String    @default("PENDING")
+  contingencyMode          Boolean   @default(false)
+  contingencyActivatedAt   DateTime?
+  defaultSerieId           String?
+  defaultEstabelecimentoId String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  user                     User      @relation("ConfigFaturacaoUser", fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -1,7 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
+const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
+
+// Supabase admin client (service role)
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 // GET /api/admin/users - Lista todos os utilizadores
 router.get('/users', async (req, res) => {
@@ -13,24 +19,33 @@ router.get('/users', async (req, res) => {
         email: true,
         role: true,
         active: true,
+        accountOwnerId: true,
         createdAt: true,
         loginLogs: {
           take: 1,
           orderBy: { createdAt: 'desc' },
           select: { createdAt: true },
         },
+        accountOwner: {
+          select: { id: true, name: true, email: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    // Mapear último login
-    const usersWithLastLogin = users.map(u => ({
-      ...u,
+    const usersWithInfo = users.map(u => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      active: u.active,
+      accountOwnerId: u.accountOwnerId,
+      accountOwnerName: u.accountOwner?.name || null,
+      createdAt: u.createdAt,
       lastLogin: u.loginLogs[0]?.createdAt || null,
-      loginLogs: undefined,
     }));
 
-    res.json(usersWithLastLogin);
+    res.json(usersWithInfo);
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: error.message });
@@ -40,7 +55,7 @@ router.get('/users', async (req, res) => {
 // POST /api/admin/users - Criar novo utilizador (só admin)
 router.post('/users', async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, accountOwnerId } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email e password são obrigatórios' });
@@ -50,23 +65,42 @@ router.post('/users', async (req, res) => {
       return res.status(400).json({ error: 'Password deve ter pelo menos 6 caracteres' });
     }
 
-    // Verificar se email já existe
+    // Verificar se email já existe no PostgreSQL
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ error: 'Email já está registado' });
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
+    // Validar accountOwnerId se fornecido
+    if (accountOwnerId) {
+      const accountOwner = await prisma.user.findUnique({ where: { id: parseInt(accountOwnerId) } });
+      if (!accountOwner) {
+        return res.status(400).json({ error: 'Account owner não encontrado' });
+      }
+    }
 
-    // Criar user
+    // 1. Criar no Supabase Auth
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // sistema fechado — confirmar automaticamente
+      user_metadata: { name },
+    });
+
+    if (authError) {
+      return res.status(400).json({ error: authError.message });
+    }
+
+    // 2. Criar no PostgreSQL com o UID do Supabase
     const user = await prisma.user.create({
       data: {
         name,
         email,
-        passwordHash,
+        supabaseUid: authData.user.id,
         role: role === 'admin' ? 'admin' : 'user',
         active: true,
+        mustChangePassword: true,
+        accountOwnerId: accountOwnerId ? parseInt(accountOwnerId) : null,
       },
     });
 
@@ -76,10 +110,12 @@ router.post('/users', async (req, res) => {
       email: user.email,
       role: user.role,
       active: user.active,
+      accountOwnerId: user.accountOwnerId,
       createdAt: user.createdAt,
     });
   } catch (error) {
     console.error('Error creating user:', error);
+    // Se o user foi criado no Supabase mas falhou no PostgreSQL, limpar
     res.status(500).json({ error: error.message });
   }
 });
@@ -127,14 +163,27 @@ router.delete('/users/:id', async (req, res) => {
     const { id } = req.params;
     const userId = parseInt(id);
 
-    // Não permitir eliminar o próprio admin
     if (userId === req.user.id) {
       return res.status(400).json({ error: 'Não pode eliminar sua própria conta' });
     }
 
-    await prisma.user.delete({
+    // Buscar supabaseUid antes de eliminar
+    const user = await prisma.user.findUnique({
       where: { id: userId },
+      select: { supabaseUid: true },
     });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Utilizador não encontrado' });
+    }
+
+    // Eliminar do Supabase Auth (se tiver uid)
+    if (user.supabaseUid) {
+      await supabaseAdmin.auth.admin.deleteUser(user.supabaseUid);
+    }
+
+    // Eliminar do PostgreSQL
+    await prisma.user.delete({ where: { id: userId } });
 
     res.json({ message: 'Utilizador eliminado' });
   } catch (error) {
@@ -156,7 +205,7 @@ router.get('/logins', async (req, res) => {
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: 100, // Últimos 100 logins
+      take: 100,
     });
 
     res.json(logins);

@@ -1,72 +1,64 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
-const { sendEmail } = require('../lib/email');
 const requireAuth = require('../middleware/auth');
 
-// POST /api/auth/register - REMOVED (only admin can create users via /api/admin/users)
+// Supabase admin client (service role — only used server-side)
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-// POST /api/auth/login - Fazer login
-router.post('/login', async (req, res) => {
+// POST /api/auth/sync
+// Called by the frontend after the first Supabase login to link supabaseUid → User record
+router.post('/sync', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { supabaseUid, email } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email e password são obrigatórios' });
+    if (!supabaseUid || !email) {
+      return res.status(400).json({ error: 'supabaseUid e email são obrigatórios' });
     }
 
-    // Buscar user
+    // Verify the supabaseUid is a real Supabase user (prevents spoofing)
+    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(supabaseUid);
+    if (authError || !authUser?.user || authUser.user.email !== email) {
+      return res.status(401).json({ error: 'Utilizador Supabase inválido' });
+    }
+
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return res.status(401).json({ error: 'Email ou password incorretos' });
+      return res.status(404).json({ error: 'Utilizador não encontrado' });
     }
 
-    // Verificar se user está activo
-    if (!user.active) {
-      return res.status(403).json({ error: 'Conta desactivada. Contacte o administrador.' });
+    if (user.supabaseUid && user.supabaseUid !== supabaseUid) {
+      return res.status(409).json({ error: 'Email já associado a outra conta Supabase' });
     }
 
-    // Verificar password
-    const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid) {
-      return res.status(401).json({ error: 'Email ou password incorretos' });
+    if (!user.supabaseUid) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { supabaseUid },
+      });
     }
 
-    // Gerar JWT (incluir role)
-    const token = jwt.sign(
-      { id: user.id, email: user.email, name: user.name, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '30d' }
-    );
-
-    // Registar login
-    await prisma.loginLog.create({
-      data: {
-        userId: user.id,
-        ip: req.ip || req.headers['x-forwarded-for'] || 'unknown',
-        userAgent: req.headers['user-agent'] || 'unknown',
-      },
-    });
-
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    res.json({ ok: true, userId: user.id, mustChangePassword: user.mustChangePassword });
   } catch (error) {
-    console.error('Error logging in:', error);
+    console.error('Error syncing user:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// GET /api/auth/me - Obter dados do user logado
+// GET /api/auth/me - Dados do utilizador autenticado
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
+      select: { id: true, name: true, email: true, role: true, active: true, mustChangePassword: true, createdAt: true },
     });
 
     if (!user) {
-      return res.status(404).json({ error: 'User não encontrado' });
+      return res.status(404).json({ error: 'Utilizador não encontrado' });
     }
 
     res.json(user);
@@ -76,92 +68,34 @@ router.get('/me', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/auth/forgot-password - Enviar email de reset
-router.post('/forgot-password', async (req, res) => {
+// POST /api/auth/change-password
+// For first-time password change (mustChangePassword=true) or regular password change
+router.post('/change-password', requireAuth, async (req, res) => {
   try {
-    const { email } = req.body;
+    const { newPassword } = req.body;
 
-    if (!email) {
-      return res.status(400).json({ error: 'Email é obrigatório' });
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: 'Nova password deve ter pelo menos 6 caracteres' });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      // Não revelar se o email existe ou não (segurança)
-      return res.json({ message: 'Se o email existe, um link de reset foi enviado' });
+    // Update password in Supabase Auth
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(req.user.supabaseUid, {
+      password: newPassword,
+    });
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
     }
 
-    // Gerar token de reset (válido por 1 hora)
-    const resetToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    const resetExpiry = new Date(Date.now() + 3600000); // 1 hora
-
-    // Guardar token no DB
+    // Clear mustChangePassword flag
     await prisma.user.update({
-      where: { id: user.id },
-      data: { resetToken, resetExpiry },
+      where: { id: req.user.id },
+      data: { mustChangePassword: false },
     });
 
-    // Enviar email
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
-    await sendEmail({
-      to: user.email,
-      subject: 'Reset de Password - Mazanga CRM',
-      body: `
-        <h2>Reset de Password</h2>
-        <p>Clique no link abaixo para resetar sua password:</p>
-        <a href="${resetLink}">Resetar Password</a>
-        <p>Este link é válido por 1 hora.</p>
-        <p>Se não solicitou um reset, ignore este email.</p>
-      `,
-    });
-
-    res.json({ message: 'Email de reset enviado' });
+    res.json({ message: 'Password alterada com sucesso' });
   } catch (error) {
-    console.error('Error sending reset email:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// POST /api/auth/reset-password - Resetar password com token
-router.post('/reset-password', async (req, res) => {
-  try {
-    const { token, password } = req.body;
-
-    if (!token || !password) {
-      return res.status(400).json({ error: 'Token e password são obrigatórios' });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Password deve ter pelo menos 6 caracteres' });
-    }
-
-    // Verificar token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch {
-      return res.status(400).json({ error: 'Token inválido ou expirado' });
-    }
-
-    // Buscar user e verificar reset token
-    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-    if (!user || user.resetToken !== token || !user.resetExpiry || user.resetExpiry < new Date()) {
-      return res.status(400).json({ error: 'Token inválido ou expirado' });
-    }
-
-    // Hash nova password
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Atualizar user (limpar reset token)
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash, resetToken: null, resetExpiry: null },
-    });
-
-    res.json({ message: 'Password resetada com sucesso' });
-  } catch (error) {
-    console.error('Error resetting password:', error);
+    console.error('Error changing password:', error);
     res.status(500).json({ error: error.message });
   }
 });
