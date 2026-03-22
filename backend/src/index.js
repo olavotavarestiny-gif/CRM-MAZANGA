@@ -58,26 +58,7 @@ app.use(express.json());
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', node: process.version, supabaseUrl: process.env.SUPABASE_URL ? 'set' : 'MISSING' });
-});
-
-// Temporary JWT debug endpoint — remove after diagnosis
-app.post('/debug-jwt', async (req, res) => {
-  try {
-    const { createRemoteJWKSet, jwtVerify } = require('jose');
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.json({ error: 'no token' });
-    const supabaseUrl = process.env.SUPABASE_URL;
-    if (!supabaseUrl) return res.json({ error: 'SUPABASE_URL not set' });
-    const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
-    const { payload } = await jwtVerify(token, JWKS, {
-      issuer: `${supabaseUrl}/auth/v1`,
-      audience: 'authenticated',
-    });
-    res.json({ ok: true, sub: payload.sub, email: payload.email });
-  } catch (err) {
-    res.json({ error: err.message, code: err.code });
-  }
+  res.json({ status: 'ok' });
 });
 
 // Public routes

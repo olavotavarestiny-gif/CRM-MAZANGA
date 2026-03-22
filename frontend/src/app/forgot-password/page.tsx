@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
+import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -21,8 +22,10 @@ export default function ForgotPasswordPage() {
 
     try {
       const supabase = createClient();
+      const redirectTo = `${window.location.origin}/reset-password`;
+
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo,
       });
 
       if (resetError) {
@@ -31,7 +34,7 @@ export default function ForgotPasswordPage() {
       }
 
       setSuccess(true);
-    } catch (err: any) {
+    } catch {
       setError('Erro ao enviar email. Tente novamente.');
     } finally {
       setLoading(false);
@@ -39,67 +42,69 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <div className="p-8">
-          <h1 className="text-2xl font-bold mb-2">Recuperar Password</h1>
-          <p className="text-gray-500 text-sm mb-6">
-            Digite seu email e enviaremos um link para resetar sua password
-          </p>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
-              {error}
-            </div>
-          )}
-
-          {success ? (
-            <div className="text-center space-y-4">
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-green-700 font-medium">Email enviado com sucesso!</p>
-                <p className="text-green-600 text-sm mt-2">
-                  Verifique seu email para o link de reset de password
-                </p>
+    <BackgroundGradientAnimation containerClassName="min-h-screen">
+      <div className="absolute inset-0 flex items-center justify-center p-4 z-10">
+        <Card className="w-full max-w-md shadow-xl bg-white/90 backdrop-blur-sm">
+          <div className="p-8">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#0A2540] mb-4">
+                <span className="text-white font-black text-lg" style={{ fontFamily: "'Montserrat', sans-serif" }}>U</span>
               </div>
-              <Link href="/login">
-                <Button variant="outline" className="w-full">
-                  Voltar para Login
-                </Button>
-              </Link>
+              <h1 className="text-2xl font-bold text-[#0A2540]" style={{ fontFamily: "'Montserrat', sans-serif" }}>Recuperar Password</h1>
+              <p className="text-[#6b7e9a] text-sm mt-1">Enviaremos um link para o seu email</p>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label className="text-[#0A2540]">Email</Label>
-                <Input
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="mt-1"
-                />
-              </div>
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full"
-              >
-                {loading ? 'Enviando...' : 'Enviar Email de Reset'}
-              </Button>
 
-              <div className="text-center">
-                <Link
-                  href="/login"
-                  className="text-sm text-[#0A2540] hover:text-[#0d3060] transition"
-                >
-                  Voltar para Login
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                {error}
+              </div>
+            )}
+
+            {success ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center">
+                  <p className="text-green-700 font-semibold">Email enviado!</p>
+                  <p className="text-green-600 text-sm mt-1">
+                    Verifique a sua caixa de entrada e clique no link para definir a nova password.
+                  </p>
+                </div>
+                <Link href="/login">
+                  <Button variant="outline" className="w-full border-[#0A2540] text-[#0A2540]">
+                    Voltar para Login
+                  </Button>
                 </Link>
               </div>
-            </form>
-          )}
-        </div>
-      </Card>
-    </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Label className="text-[#0A2540]">Email</Label>
+                  <Input
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="mt-1"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-[#0A2540] hover:bg-[#0d3060]"
+                >
+                  {loading ? 'A enviar...' : 'Enviar Link de Reset'}
+                </Button>
+
+                <div className="text-center">
+                  <Link href="/login" className="text-sm text-[#0A2540] hover:text-[#0d3060] transition">
+                    Voltar para Login
+                  </Link>
+                </div>
+              </form>
+            )}
+          </div>
+        </Card>
+      </div>
+    </BackgroundGradientAnimation>
   );
 }
