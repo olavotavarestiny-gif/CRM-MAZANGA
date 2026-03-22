@@ -1,5 +1,9 @@
-const jwt = require('jsonwebtoken');
+const { createRemoteJWKSet, jwtVerify } = require('jose');
 const prisma = require('../lib/prisma');
+
+const JWKS = createRemoteJWKSet(
+  new URL(`${process.env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`)
+);
 
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -11,8 +15,11 @@ async function requireAuth(req, res, next) {
 
   let decoded;
   try {
-    // Verify with Supabase JWT secret (not the old JWT_SECRET)
-    decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET);
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: `${process.env.SUPABASE_URL}/auth/v1`,
+      audience: 'authenticated',
+    });
+    decoded = payload;
   } catch (error) {
     return res.status(401).json({ error: 'Token inválido ou expirado' });
   }
