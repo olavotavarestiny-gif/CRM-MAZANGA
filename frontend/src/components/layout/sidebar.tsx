@@ -2,9 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BarChart3, Users, MessageSquare, Zap, ExternalLink, Kanban, CheckSquare, FileText, LogOut, X, DollarSign, User as UserIcon, CalendarDays, Package, Settings } from 'lucide-react';
+import {
+  BarChart3, Users, MessageSquare, Zap, ExternalLink, Kanban,
+  CheckSquare, FileText, LogOut, X, DollarSign, CalendarDays,
+  Package, Settings, ShieldCheck, Receipt, Users2
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { removeToken } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/client';
 import type { User } from '@/lib/api';
 
 export default function Sidebar({
@@ -20,18 +24,27 @@ export default function Sidebar({
   const router = useRouter();
 
   const isActive = (path: string) => {
-    if (path === '/') {
-      return pathname === '/' || pathname === '/dashboard' || pathname.startsWith('/dashboard/');
-    }
+    if (path === '/') return pathname === '/' || pathname.startsWith('/dashboard');
     return pathname === path || pathname.startsWith(path + '/');
   };
 
-  const handleLogout = () => {
-    removeToken();
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
     router.push('/login');
   };
 
-  const links = [
+  const isAdmin = currentUser?.role === 'admin';
+  const isOwner = currentUser && !currentUser.accountOwnerId;
+
+  const navItemClass = (active: boolean) => cn(
+    'flex items-center gap-3 px-3 py-2 transition-all text-sm font-medium rounded-lg',
+    active
+      ? 'bg-[#0A2540]/8 text-[#0A2540] font-semibold'
+      : 'text-[#6b7e9a] hover:text-[#0A2540] hover:bg-[#0A2540]/5'
+  );
+
+  const mainLinks = [
     { href: '/', label: 'Painel', icon: BarChart3 },
     { href: '/pipeline', label: 'Negociações', icon: Kanban },
     { href: '/contacts', label: 'Contactos', icon: Users },
@@ -42,17 +55,18 @@ export default function Sidebar({
     { href: '/forms', label: 'Formulários', icon: FileText },
   ];
 
-  const ownerLinks = currentUser && !currentUser.accountOwnerId ? [
+  // Visible to account owners (not sub-members) and admins
+  const gestaoLinks = (isOwner || isAdmin) ? [
     { href: '/finances', label: 'Finanças', icon: DollarSign },
+    { href: '/faturacao', label: 'Faturação', icon: Receipt },
     { href: '/produtos', label: 'Produtos', icon: Package },
+    { href: '/equipa', label: 'Equipa', icon: Users2 },
   ] : [];
 
-  const navItemClass = (active: boolean) => cn(
-    'flex items-center gap-3 px-3 py-2 transition-all text-sm font-medium rounded-lg',
-    active
-      ? 'bg-[#0A2540]/8 text-[#0A2540] font-semibold'
-      : 'text-[#6b7e9a] hover:text-[#0A2540] hover:bg-[#0A2540]/5'
-  );
+  // Admin-only
+  const adminLinks = isAdmin ? [
+    { href: '/admin', label: 'Utilizadores', icon: ShieldCheck },
+  ] : [];
 
   return (
     <div
@@ -77,20 +91,34 @@ export default function Sidebar({
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
-        {links.map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={href} className={navItemClass(isActive(href))}>
+        {mainLinks.map(({ href, label, icon: Icon }) => (
+          <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose}>
             <Icon className="w-4 h-4 flex-shrink-0" />
             <span>{label}</span>
           </Link>
         ))}
 
-        {ownerLinks.length > 0 && (
-          <div className="pt-4 mt-2 border-t border-[#dde3ec]">
+        {gestaoLinks.length > 0 && (
+          <div className="pt-3 mt-2 border-t border-[#dde3ec]">
             <p className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/60">
               Gestão
             </p>
-            {ownerLinks.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href} className={navItemClass(isActive(href))}>
+            {gestaoLinks.map(({ href, label, icon: Icon }) => (
+              <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose}>
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                <span>{label}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {adminLinks.length > 0 && (
+          <div className="pt-3 mt-2 border-t border-[#dde3ec]">
+            <p className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/60">
+              Admin
+            </p>
+            {adminLinks.map(({ href, label, icon: Icon }) => (
+              <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose}>
                 <Icon className="w-4 h-4 flex-shrink-0" />
                 <span>{label}</span>
               </Link>
@@ -110,13 +138,13 @@ export default function Sidebar({
           <ExternalLink className="w-4 h-4 flex-shrink-0" />
           <span>Formulário</span>
         </a>
-        <Link href="/configuracoes" className={navItemClass(isActive('/configuracoes'))}>
+        <Link href="/configuracoes" className={navItemClass(isActive('/configuracoes'))} onClick={onClose}>
           <Settings className="w-4 h-4 flex-shrink-0" />
           <span>Configurações</span>
         </Link>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 text-[#6b7e9a] hover:text-[#0A2540] hover:bg-[#0A2540]/5 transition-all text-left text-sm font-medium rounded-lg"
+          className="w-full flex items-center gap-3 px-3 py-2 text-[#6b7e9a] hover:text-red-500 hover:bg-red-50 transition-all text-left text-sm font-medium rounded-lg"
         >
           <LogOut className="w-4 h-4 flex-shrink-0" />
           <span>Sair</span>

@@ -1,15 +1,23 @@
-const { createRemoteJWKSet, jwtVerify } = require('jose');
+const { importJWK, jwtVerify } = require('jose');
 const prisma = require('../lib/prisma');
 
-// Lazy JWKS — created on first request so SUPABASE_URL is guaranteed to be loaded
-let _jwks = null;
-function getJWKS() {
-  if (!_jwks) {
-    const url = process.env.SUPABASE_URL;
-    if (!url) throw new Error('SUPABASE_URL env var not set');
-    _jwks = createRemoteJWKSet(new URL(`${url}/auth/v1/.well-known/jwks.json`));
+// Supabase project's EC public key (from /auth/v1/.well-known/jwks.json)
+// Public keys are safe to hardcode — they're not secret
+const SUPABASE_JWK = {
+  alg: 'ES256', crv: 'P-256',
+  kid: 'bb424079-cb99-41be-97ee-ebd44cbd72d3',
+  kty: 'EC',
+  x: 'zHF8awnfE8CwkcTnZrTpetP8TOzQ-Nvnp6tTtHwcnyQ',
+  y: 'sG2mdRZeicP-BLn1G8jXln1t1xNU50wRD6qNftFMRhc',
+};
+
+// Import once at startup — no network call needed
+let _publicKey = null;
+async function getPublicKey() {
+  if (!_publicKey) {
+    _publicKey = await importJWK(SUPABASE_JWK, 'ES256');
   }
-  return _jwks;
+  return _publicKey;
 }
 
 async function requireAuth(req, res, next) {
@@ -22,8 +30,8 @@ async function requireAuth(req, res, next) {
 
   let decoded;
   try {
-    const JWKS = getJWKS();
-    const { payload } = await jwtVerify(token, JWKS, {
+    const publicKey = await getPublicKey();
+    const { payload } = await jwtVerify(token, publicKey, {
       issuer: `${process.env.SUPABASE_URL}/auth/v1`,
       audience: 'authenticated',
     });
@@ -33,7 +41,6 @@ async function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Token inválido ou expirado' });
   }
 
-  // decoded.sub = Supabase UID (UUID)
   const supabaseUid = decoded.sub;
 
   try {
@@ -67,6 +74,7 @@ async function requireAuth(req, res, next) {
     };
     next();
   } catch (error) {
+    console.error('[auth] DB error:', error.message);
     res.status(500).json({ error: 'Erro ao verificar autenticação' });
   }
 }
