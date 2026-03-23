@@ -20,9 +20,9 @@ export default function WelcomeModal({ open, onClose, onStartTour }: Props) {
         {/* Hero */}
         <div className="bg-[#0A2540] px-8 py-8 text-center">
           <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-black text-xl" style={{ fontFamily: "'Montserrat', sans-serif" }}>U</span>
+            <span className="text-white font-black text-xl" style={{ fontFamily: "'Montserrat', sans-serif" }}>K</span>
           </div>
-          <h2 className="text-xl font-bold text-white mb-2">Bem-vindo ao ULU Gestão</h2>
+          <h2 className="text-xl font-bold text-white mb-2">Bem-vindo ao KukuGest</h2>
           <p className="text-sm text-white/70 leading-relaxed">
             A sua plataforma de CRM e gestão de negócio.<br />
             Aqui está um resumo do que pode fazer.

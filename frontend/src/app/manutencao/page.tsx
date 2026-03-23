@@ -10,7 +10,7 @@ export default function ManutencaoPage() {
         <div className="backdrop-blur-sm bg-white/10 border border-white/20 rounded-2xl p-8 text-center space-y-6">
           {/* Logo */}
           <div className="flex justify-center">
-            <span className="text-2xl font-bold text-white tracking-wide">ULU</span>
+            <span className="text-2xl font-bold text-white tracking-wide">KukuGest</span>
           </div>
 
           {/* Spinning icon */}
@@ -74,7 +74,7 @@ export default function ManutencaoPage() {
 
         {/* Footer */}
         <p className="text-center text-white/30 text-xs mt-6">
-          © 2026 ULU · Mazanga Marketing Lda
+          © 2026 KukuGest · Mazanga Marketing Lda
         </p>
       </div>
     </div>

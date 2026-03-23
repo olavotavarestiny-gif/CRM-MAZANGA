@@ -3,8 +3,8 @@ import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Termos de Serviço — ULU Gestão',
-  description: 'Termos e condições de utilização da plataforma ULU Gestão, sistema de gestão de clientes e faturação AGT.',
+  title: 'Termos de Serviço — KukuGest',
+  description: 'Termos e condições de utilização da plataforma KukuGest, sistema de gestão de clientes e faturação AGT.',
 };
 
 export default function TermosPage() {
@@ -17,7 +17,7 @@ export default function TermosPage() {
             <ChevronLeft className="w-4 h-4" />
             Voltar
           </Link>
-          <span className="text-lg font-bold text-[#0A2540]">ULU</span>
+          <span className="text-lg font-bold text-[#0A2540]">KukuGest</span>
           <span className="text-xs text-gray-400">Termos de Serviço</span>
         </div>
       </div>
@@ -31,7 +31,7 @@ export default function TermosPage() {
         </div>
 
         <p className="text-gray-700 leading-relaxed">
-          Estes Termos de Serviço regulam o acesso e utilização da plataforma <strong>ULU Gestão</strong>, desenvolvida e operada pela
+          Estes Termos de Serviço regulam o acesso e utilização da plataforma <strong>KukuGest</strong>, desenvolvida e operada pela
           <strong> Mazanga Marketing Lda</strong>, com NIF 5001636863, com sede em Luanda, República de Angola.
           Ao criar uma conta ou utilizar o Serviço, aceita integralmente estes Termos.
         </p>
@@ -39,7 +39,7 @@ export default function TermosPage() {
         {/* Secções */}
         <Section number="1" title="Aceitação dos Termos">
           <p>
-            Ao aceder à plataforma ULU Gestão, registar uma conta ou utilizar qualquer funcionalidade do Serviço, o utilizador
+            Ao aceder à plataforma KukuGest, registar uma conta ou utilizar qualquer funcionalidade do Serviço, o utilizador
             confirma ter lido, compreendido e aceite estes Termos. Se actua em nome de uma empresa, garante que tem autoridade
             para vincular essa entidade aos presentes Termos.
           </p>
@@ -50,7 +50,7 @@ export default function TermosPage() {
 
         <Section number="2" title="Descrição do Serviço">
           <p>
-            O ULU Gestão é uma plataforma SaaS (<em>Software as a Service</em>) que inclui:
+            O KukuGest é uma plataforma SaaS (<em>Software as a Service</em>) que inclui:
           </p>
           <ul className="mt-3 space-y-2 list-disc list-inside text-gray-700">
             <li>Sistema de Gestão de Clientes (CRM) — gestão de contactos, pipeline de vendas, tarefas e automações</li>
@@ -77,7 +77,7 @@ export default function TermosPage() {
         </Section>
 
         <Section number="4" title="Planos e Pagamentos">
-          <p>O ULU Gestão oferece os seguintes planos de subscrição:</p>
+          <p>O KukuGest oferece os seguintes planos de subscrição:</p>
           <div className="mt-4 grid sm:grid-cols-2 gap-4">
             <div className="border border-gray-200 rounded-lg p-4">
               <h4 className="font-semibold text-[#0A2540]">Essencial</h4>
@@ -134,7 +134,7 @@ export default function TermosPage() {
 
         <Section number="7" title="Certificação AGT e Faturação Electrónica">
           <p>
-            O módulo de faturação electrónica do ULU Gestão está desenvolvido em conformidade com os requisitos técnicos da
+            O módulo de faturação electrónica do KukuGest está desenvolvido em conformidade com os requisitos técnicos da
             <strong> Administração Geral Tributária (AGT)</strong> de Angola.
           </p>
           <ul className="mt-3 space-y-2 list-disc list-inside text-gray-700">
@@ -204,7 +204,7 @@ export default function TermosPage() {
 
         {/* Footer */}
         <div className="border-t border-gray-200 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
-          <span>© 2026 ULU · Mazanga Marketing Lda</span>
+          <span>© 2026 KukuGest · Mazanga Marketing Lda</span>
           <div className="flex gap-6">
             <Link href="/privacidade" className="hover:text-[#0A2540] transition-colors">Política de Privacidade</Link>
             <a href="mailto:suporte@mazanga.digital" className="hover:text-[#0A2540] transition-colors">Suporte</a>

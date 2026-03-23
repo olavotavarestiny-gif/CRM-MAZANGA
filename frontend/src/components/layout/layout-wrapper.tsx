@@ -99,7 +99,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
         }
 
         // Show welcome modal on first visit
-        if (!localStorage.getItem('ulu_guide_seen')) setShowWelcome(true);
+        if (!localStorage.getItem('kukugest_guide_seen')) setShowWelcome(true);
       } catch (err: any) {
         if (err?.response?.status === 401) {
           router.push('/login');
@@ -113,7 +113,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
   }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStartTour = () => {
-    localStorage.setItem('ulu_guide_seen', '1');
+    localStorage.setItem('kukugest_guide_seen', '1');
     setShowWelcome(false);
     startTour();
   };
@@ -164,7 +164,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
           >
             <Menu className="w-6 h-6 text-[#0A2540]" />
           </button>
-          <h1 className="text-lg font-semibold text-[#0A2540]">ULU Gestão</h1>
+          <h1 className="text-lg font-semibold text-[#0A2540]">KukuGest</h1>
         </div>
 
         {/* Main Scrollable Area */}
@@ -175,7 +175,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
 
       <WelcomeModal
         open={showWelcome}
-        onClose={() => { localStorage.setItem('ulu_guide_seen', '1'); setShowWelcome(false); }}
+        onClose={() => { localStorage.setItem('kukugest_guide_seen', '1'); setShowWelcome(false); }}
         onStartTour={handleStartTour}
       />
     </div>

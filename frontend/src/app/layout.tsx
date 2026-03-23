@@ -5,7 +5,7 @@ import LayoutWrapper from '@/components/layout/layout-wrapper';
 import { Analytics } from '@vercel/analytics/react';
 
 export const metadata: Metadata = {
-  title: 'ULU Gestão',
+  title: 'KukuGest',
   description: 'Sistema de gestão de clientes e faturação AGT',
 };
 

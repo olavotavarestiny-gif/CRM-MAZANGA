@@ -58,7 +58,7 @@ export default function LoginPage() {
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#0A2540] mb-4">
               <span className="text-white font-black text-lg" style={{ fontFamily: "'Montserrat', sans-serif" }}>U</span>
             </div>
-            <h1 className="text-2xl font-bold text-[#0A2540]" style={{ fontFamily: "'Montserrat', sans-serif" }}>ULU Gestão</h1>
+            <h1 className="text-2xl font-bold text-[#0A2540]" style={{ fontFamily: "'Montserrat', sans-serif" }}>KukuGest</h1>
             <p className="text-[#6b7e9a] text-sm mt-1">Bem-vindo de volta</p>
           </div>
 

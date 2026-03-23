@@ -3,8 +3,8 @@ import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Política de Privacidade — ULU Gestão',
-  description: 'Como a ULU Gestão recolhe, utiliza e protege os seus dados pessoais, em conformidade com a Lei 22/11 de Angola.',
+  title: 'Política de Privacidade — KukuGest',
+  description: 'Como a KukuGest recolhe, utiliza e protege os seus dados pessoais, em conformidade com a Lei 22/11 de Angola.',
 };
 
 export default function PrivacidadePage() {
@@ -17,7 +17,7 @@ export default function PrivacidadePage() {
             <ChevronLeft className="w-4 h-4" />
             Voltar
           </Link>
-          <span className="text-lg font-bold text-[#0A2540]">ULU</span>
+          <span className="text-lg font-bold text-[#0A2540]">KukuGest</span>
           <span className="text-xs text-gray-400">Política de Privacidade</span>
         </div>
       </div>
@@ -32,13 +32,13 @@ export default function PrivacidadePage() {
 
         <Section number="1" title="Introdução">
           <p>
-            A <strong>Mazanga Marketing Lda</strong> (&ldquo;nós&rdquo;, &ldquo;nosso&rdquo; ou &ldquo;ULU Gestão&rdquo;) está comprometida com a protecção da
+            A <strong>Mazanga Marketing Lda</strong> (&ldquo;nós&rdquo;, &ldquo;nosso&rdquo; ou &ldquo;KukuGest&rdquo;) está comprometida com a protecção da
             privacidade e dos dados pessoais dos seus utilizadores. Esta Política de Privacidade descreve como recolhemos,
             utilizamos, partilhamos e protegemos os seus dados, em conformidade com a <strong>Lei n.º 22/11 de 17 de Junho</strong> —
             Lei de Protecção de Dados Pessoais da República de Angola.
           </p>
           <p className="mt-3">
-            Ao utilizar a plataforma ULU Gestão, aceita as práticas descritas nesta Política. Se não concordar, deverá
+            Ao utilizar a plataforma KukuGest, aceita as práticas descritas nesta Política. Se não concordar, deverá
             cessar a utilização e contactar-nos para eliminar os seus dados.
           </p>
         </Section>
@@ -231,7 +231,7 @@ export default function PrivacidadePage() {
 
         {/* Footer */}
         <div className="border-t border-gray-200 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
-          <span>© 2026 ULU · Mazanga Marketing Lda</span>
+          <span>© 2026 KukuGest · Mazanga Marketing Lda</span>
           <div className="flex gap-6">
             <Link href="/termos" className="hover:text-[#0A2540] transition-colors">Termos de Serviço</Link>
             <a href="mailto:privacidade@mazanga.digital" className="hover:text-[#0A2540] transition-colors">Privacidade</a>

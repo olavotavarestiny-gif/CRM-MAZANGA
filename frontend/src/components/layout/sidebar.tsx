@@ -80,10 +80,10 @@ export default function Sidebar({
       <div className="px-5 py-5 flex items-center justify-between flex-shrink-0 border-b border-[#dde3ec]">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg bg-[#0A2540] flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-black text-xs" style={{ fontFamily: "'Montserrat', sans-serif" }}>U</span>
+            <span className="text-white font-black text-xs" style={{ fontFamily: "'Montserrat', sans-serif" }}>K</span>
           </div>
           <span className="text-[#0A2540] font-bold text-base leading-none" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-            ULU <span className="font-medium text-[#6b7e9a]">Gestão</span>
+            Kuku<span className="font-medium text-[#6b7e9a]">Gest</span>
           </span>
         </div>
         <button onClick={onClose} className="md:hidden p-1 hover:bg-[#f5f7fa] rounded transition-colors">

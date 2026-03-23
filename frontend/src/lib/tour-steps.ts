@@ -23,7 +23,7 @@ export const TOUR_GROUPS: TourGroup[] = [
         element: '[data-tour="sidebar"]',
         popover: {
           title: 'Navegação principal',
-          description: 'Acedes a todas as secções do ULU Gestão aqui. A barra lateral está sempre visível.',
+          description: 'Acedes a todas as secções do KukuGest aqui. A barra lateral está sempre visível.',
           side: 'right',
           align: 'start',
         },
@@ -171,8 +171,8 @@ export const TOUR_GROUPS: TourGroup[] = [
 ];
 
 export const TOUR_KEYS = {
-  ACTIVE: 'ulu_tour_active',
-  GROUP: 'ulu_tour_group',
+  ACTIVE: 'kukugest_tour_active',
+  GROUP: 'kukugest_tour_group',
 } as const;
 
 export const TOTAL_STEPS = TOUR_GROUPS.reduce((s, g) => s + g.steps.length, 0); // 14
