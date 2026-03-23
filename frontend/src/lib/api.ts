@@ -22,13 +22,11 @@ api.interceptors.request.use(async (config) => {
 let isLoggingOut = false;
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
+  (error) => {
     if (error.response?.status === 401 && !isLoggingOut) {
       isLoggingOut = true;
-      const supabase = createClient();
-      await supabase.auth.signOut();
       if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+        window.location.href = '/auth/signout';
       }
     }
     return Promise.reject(error);

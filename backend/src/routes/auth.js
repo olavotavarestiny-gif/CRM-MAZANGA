@@ -3,27 +3,54 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
 const requireAuth = require('../middleware/auth');
+const { importJWK, jwtVerify } = require('jose');
 
-// Supabase admin client (service role — only used server-side)
+// Supabase admin client (service role — used for change-password only)
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// Shared EC public key for JWT verification (same key as middleware/auth.js)
+const SUPABASE_JWK = {
+  alg: 'ES256', crv: 'P-256',
+  kid: 'bb424079-cb99-41be-97ee-ebd44cbd72d3',
+  kty: 'EC',
+  x: 'zHF8awnfE8CwkcTnZrTpetP8TOzQ-Nvnp6tTtHwcnyQ',
+  y: 'sG2mdRZeicP-BLn1G8jXln1t1xNU50wRD6qNftFMRhc',
+};
+let _publicKey = null;
+async function getPublicKey() {
+  if (!_publicKey) _publicKey = await importJWK(SUPABASE_JWK, 'ES256');
+  return _publicKey;
+}
+
 // POST /api/auth/sync
-// Called by the frontend after the first Supabase login to link supabaseUid → User record
+// Called by the frontend after Supabase login to link supabaseUid → User record.
+// Verifies the Supabase JWT from the Authorization header (no service role key needed).
 router.post('/sync', async (req, res) => {
   try {
     const { supabaseUid, email } = req.body;
-
     if (!supabaseUid || !email) {
       return res.status(400).json({ error: 'supabaseUid e email são obrigatórios' });
     }
 
-    // Verify the supabaseUid is a real Supabase user (prevents spoofing)
-    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(supabaseUid);
-    if (authError || !authUser?.user || authUser.user.email !== email) {
-      return res.status(401).json({ error: 'Utilizador Supabase inválido' });
+    // Verify the JWT token to confirm the supabaseUid is genuine
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ error: 'Token de autenticação em falta' });
+    }
+    try {
+      const publicKey = await getPublicKey();
+      const { payload } = await jwtVerify(token, publicKey, {
+        issuer: `${process.env.SUPABASE_URL}/auth/v1`,
+        audience: 'authenticated',
+      });
+      if (payload.sub !== supabaseUid) {
+        return res.status(401).json({ error: 'Token não corresponde ao utilizador' });
+      }
+    } catch {
+      return res.status(401).json({ error: 'Token inválido ou expirado' });
     }
 
     const user = await prisma.user.findUnique({ where: { email } });

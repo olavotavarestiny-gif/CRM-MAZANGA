@@ -8,7 +8,6 @@ import {
   Package, Settings, ShieldCheck, Receipt, Users2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { createClient } from '@/lib/supabase/client';
 import type { User } from '@/lib/api';
 
 export default function Sidebar({
@@ -28,12 +27,9 @@ export default function Sidebar({
     return pathname === path || pathname.startsWith(path + '/');
   };
 
-  const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    // Full page reload so middleware re-reads cleared cookies (client-side
-    // navigation via router.push sends cookies before they are cleared)
-    window.location.href = '/login';
+  const handleLogout = () => {
+    // Server-side signout clears all Supabase SSR cookie chunks via Set-Cookie
+    window.location.href = '/auth/signout';
   };
 
   const isAdmin = currentUser?.role === 'admin';
