@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
+const { SUPER_ADMIN_EMAIL } = require('../middleware/auth');
 
 // Lazy Supabase admin client — created on first use, not at startup
 let _supabaseAdmin = null;
@@ -83,6 +84,14 @@ router.post('/users', async (req, res) => {
       if (!accountOwner) {
         return res.status(400).json({ error: 'Account owner não encontrado' });
       }
+    }
+
+    // Restrição super-admin: só olavo@mazanga.digital pode criar contas independentes ou admins
+    const isSuperAdmin = req.user && req.user.email === SUPER_ADMIN_EMAIL;
+    if (!isSuperAdmin && (!accountOwnerId || role === 'admin')) {
+      return res.status(403).json({
+        error: 'Só o super-administrador pode criar contas independentes ou atribuir papel admin',
+      });
     }
 
     // 1. Criar no Supabase Auth

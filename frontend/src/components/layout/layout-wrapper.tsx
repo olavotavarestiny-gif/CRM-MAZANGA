@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client';
 import Sidebar from './sidebar';
 import { Footer } from './footer';
 import WelcomeModal from '@/components/help/welcome-modal';
+import OnboardingChecklist from '@/components/help/onboarding-checklist';
+import { ONBOARDING_OPEN } from '@/lib/onboarding-tasks';
 import ProductTourProvider, { useTour } from '@/components/help/product-tour';
 import { ReactNode } from 'react';
 import { Menu } from 'lucide-react';
@@ -119,10 +121,12 @@ function LayoutInner({ children }: { children: ReactNode }) {
     checkAuth();
   }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleStartTour = () => {
+  const handleStartChecklist = () => {
     localStorage.setItem('kukugest_guide_seen', '1');
     setShowWelcome(false);
-    startTour();
+    localStorage.setItem(ONBOARDING_OPEN, '1');
+    // Trigger re-render of OnboardingChecklist by dispatching a storage event
+    window.dispatchEvent(new StorageEvent('storage', { key: ONBOARDING_OPEN }));
   };
 
   if (isLoading && !isPublicPage) {
@@ -183,8 +187,9 @@ function LayoutInner({ children }: { children: ReactNode }) {
       <WelcomeModal
         open={showWelcome}
         onClose={() => { localStorage.setItem('kukugest_guide_seen', '1'); setShowWelcome(false); }}
-        onStartTour={handleStartTour}
+        onStartTour={handleStartChecklist}
       />
+      <OnboardingChecklist />
     </div>
   );
 }

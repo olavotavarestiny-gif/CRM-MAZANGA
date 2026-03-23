@@ -108,7 +108,18 @@ function requireAccountOwnerOrAdmin(req, res, next) {
   return res.status(403).json({ error: 'Acesso não autorizado' });
 }
 
+const SUPER_ADMIN_EMAIL = 'olavo@mazanga.digital';
+
+function requireSuperAdmin(req, res, next) {
+  if (req.user?.email !== SUPER_ADMIN_EMAIL) {
+    return res.status(403).json({ error: 'Acção reservada ao super-administrador' });
+  }
+  next();
+}
+
 module.exports = requireAuth;
 module.exports.requireAdmin = requireAdmin;
 module.exports.requireAccountOwner = requireAccountOwner;
 module.exports.requireAccountOwnerOrAdmin = requireAccountOwnerOrAdmin;
+module.exports.requireSuperAdmin = requireSuperAdmin;
+module.exports.SUPER_ADMIN_EMAIL = SUPER_ADMIN_EMAIL;

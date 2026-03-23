@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
+import { ONBOARDING_OPEN, ONBOARDING_DISMISSED } from '@/lib/onboarding-tasks';
 
 const TOUR_ATTR: Record<string, string> = {
   '/':          'sidebar-painel',
@@ -142,7 +143,12 @@ export default function Sidebar({
           <span>Configurações</span>
         </Link>
         <button
-          onClick={() => { onStartTour?.(); onClose(); }}
+          onClick={() => {
+            localStorage.removeItem(ONBOARDING_DISMISSED);
+            localStorage.setItem(ONBOARDING_OPEN, '1');
+            window.dispatchEvent(new StorageEvent('storage', { key: ONBOARDING_OPEN }));
+            onClose();
+          }}
           className={navItemClass(false)}
         >
           <HelpCircle className="w-4 h-4 flex-shrink-0" />

@@ -64,7 +64,7 @@ export default function WelcomeModal({ open, onClose, onStartTour }: Props) {
               onClick={onStartTour}
               className="w-full py-2.5 rounded-lg border border-gray-200 text-[#0A2540] text-sm font-medium hover:bg-[#f8fafc] transition-colors"
             >
-              Ver tour interactivo →
+              Abrir guia de início →
             </button>
           </div>
         </div>

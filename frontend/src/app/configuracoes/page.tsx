@@ -38,6 +38,7 @@ function ConfiguracoesContent() {
 
   const isOwner = currentUser && !currentUser.accountOwnerId;
   const isAdmin = currentUser?.role === 'admin';
+  const isSuperAdmin = currentUser?.email === 'olavo@mazanga.digital';
 
   // ── Perfil ───────────────────────────────────────────────
   const [pwForm, setPwForm] = useState({ current: '', new: '', confirm: '' });
@@ -697,18 +698,20 @@ function ConfiguracoesContent() {
                   <Label className="text-gray-600">Role</Label>
                   <select value={userForm.role} onChange={e => setUserForm(p => ({ ...p, role: e.target.value }))} className="w-full mt-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-[#0A2540] focus:ring-1 focus:ring-[#0A2540]">
                     <option value="user">Utilizador</option>
-                    <option value="admin">Admin</option>
+                    {isSuperAdmin && <option value="admin">Admin</option>}
                   </select>
                 </div>
-                <div>
-                  <Label className="text-gray-600">Atribuir a Conta (Opcional)</Label>
-                  <select value={userForm.accountOwnerId} onChange={e => setUserForm(p => ({ ...p, accountOwnerId: e.target.value }))} className="w-full mt-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-[#0A2540] focus:ring-1 focus:ring-[#0A2540]">
-                    <option value="">Nenhuma (Independente)</option>
-                    {(allUsers as User[]).filter(u => !u.accountOwnerId && u.role !== 'admin').map(u => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
-                </div>
+                {isSuperAdmin && (
+                  <div>
+                    <Label className="text-gray-600">Atribuir a Conta (Opcional)</Label>
+                    <select value={userForm.accountOwnerId} onChange={e => setUserForm(p => ({ ...p, accountOwnerId: e.target.value }))} className="w-full mt-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-[#0A2540] focus:ring-1 focus:ring-[#0A2540]">
+                      <option value="">Nenhuma (Independente)</option>
+                      {(allUsers as User[]).filter(u => !u.accountOwnerId && u.role !== 'admin').map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="flex gap-3 pt-2">
                   <Button type="button" variant="outline" onClick={() => setShowCreateUser(false)} className="flex-1">Cancelar</Button>
                   <Button type="submit" disabled={createUserMutation.isPending} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90">
