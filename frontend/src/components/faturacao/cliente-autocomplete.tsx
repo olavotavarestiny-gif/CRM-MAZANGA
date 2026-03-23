@@ -40,29 +40,29 @@ export function ClienteAutocomplete({ onChange, value }: Props) {
 
   return (
     <div ref={ref} className="relative">
-      <Label className="text-xs text-zinc-400">Cliente (nome ou NIF)</Label>
+      <Label className="text-xs text-gray-500">Cliente (nome ou NIF)</Label>
       <Input
         value={search}
         onChange={e => setSearch(e.target.value)}
         onFocus={() => clientes.length > 0 && setOpen(true)}
         placeholder="Pesquisar cliente..."
-        className="mt-1 bg-white/5 border-white/10 text-white placeholder:text-zinc-500"
+        className="mt-1 text-[#0A2540] placeholder:text-gray-400"
       />
       {open && (
-        <div className="absolute z-50 w-full mt-1 bg-zinc-900 border border-white/10 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-          {loading && <div className="px-3 py-2 text-sm text-zinc-400">A procurar...</div>}
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+          {loading && <div className="px-3 py-2 text-sm text-gray-500">A procurar...</div>}
           {!loading && clientes.length === 0 && (
-            <div className="px-3 py-2 text-sm text-zinc-400">Nenhum cliente encontrado</div>
+            <div className="px-3 py-2 text-sm text-gray-500">Nenhum cliente encontrado</div>
           )}
           {clientes.map(c => (
             <button
               key={c.id}
               type="button"
-              className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors"
+              className="w-full text-left px-3 py-2 hover:bg-[#f0f4f9] transition-colors"
               onClick={() => { onChange(c); setSearch(c.customerName); setOpen(false); }}
             >
-              <p className="text-sm font-medium text-white">{c.customerName}</p>
-              <p className="text-xs text-zinc-400">NIF: {c.customerTaxID}</p>
+              <p className="text-sm font-medium text-[#0A2540]">{c.customerName}</p>
+              <p className="text-xs text-gray-500">NIF: {c.customerTaxID}</p>
             </button>
           ))}
         </div>

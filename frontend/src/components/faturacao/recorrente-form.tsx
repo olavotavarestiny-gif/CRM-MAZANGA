@@ -31,6 +31,15 @@ const DOCUMENT_TYPES = [
 
 const UNITS = ['UN', 'H', 'KG', 'L', 'M', 'M2', 'M3', 'CX', 'SV'];
 
+const CURRENCIES = [
+  { value: 'AOA', label: 'AOA — Kwanza Angolano' },
+  { value: 'USD', label: 'USD — Dólar Americano' },
+  { value: 'EUR', label: 'EUR — Euro' },
+  { value: 'GBP', label: 'GBP — Libra Esterlina' },
+  { value: 'CHF', label: 'CHF — Franco Suíço' },
+  { value: 'CNY', label: 'CNY — Yuan Chinês' },
+];
+
 const PAYMENT_METHODS = [
   'Transferência Bancária',
   'Numerário',
@@ -78,6 +87,8 @@ export function RecorrenteForm({ open, onClose }: Props) {
   const [startDate, setStartDate] = useState(tomorrow());
   const [maxOccurrences, setMaxOccurrences] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Transferência Bancária');
+  const [currency, setCurrency] = useState('AOA');
+  const [exchangeRate, setExchangeRate] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
 
@@ -120,6 +131,8 @@ export function RecorrenteForm({ open, onClose }: Props) {
         documentType,
         lines: linesPayload as unknown as string,
         paymentMethod,
+        currencyCode: currency,
+        exchangeRate: currency !== 'AOA' && exchangeRate ? parseFloat(exchangeRate) : undefined,
         frequency: frequency as 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL',
         startDate,
         maxOccurrences: maxOccurrences ? parseInt(maxOccurrences) as unknown as number : undefined,
@@ -137,7 +150,7 @@ export function RecorrenteForm({ open, onClose }: Props) {
     setDocumentType('FT'); setSerieId(''); setEstabelecimentoId('');
     setCliente(undefined); setManualNif(''); setManualNome(''); setManualCliente(false);
     setLines([defaultLine()]); setFrequency('MONTHLY'); setStartDate(tomorrow());
-    setMaxOccurrences(''); setPaymentMethod('Transferência Bancária'); setNotes(''); setError('');
+    setMaxOccurrences(''); setPaymentMethod('Transferência Bancária'); setCurrency('AOA'); setExchangeRate(''); setNotes(''); setError('');
     onClose();
   }
 
@@ -323,6 +336,30 @@ export function RecorrenteForm({ open, onClose }: Props) {
                 className="h-9"
               />
             </div>
+          </div>
+
+          {/* Moeda */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-gray-500 mb-1 block">Moeda</Label>
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CURRENCIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {currency !== 'AOA' && (
+              <div>
+                <Label className="text-xs text-gray-500 mb-1 block">Taxa de Câmbio (1 {currency} = ? AOA)</Label>
+                <Input
+                  type="number" min={0} step="any" placeholder="Ex: 850"
+                  value={exchangeRate}
+                  onChange={e => setExchangeRate(e.target.value)}
+                  className="h-9"
+                />
+              </div>
+            )}
           </div>
 
           <div>
