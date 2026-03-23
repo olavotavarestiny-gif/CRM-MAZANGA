@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   BarChart3, Users, MessageSquare, Zap, Kanban,
   CheckSquare, FileText, LogOut, X, DollarSign, CalendarDays,
-  Package, Settings
+  Package, Settings, HelpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
@@ -14,10 +14,12 @@ export default function Sidebar({
   open = false,
   onClose = () => {},
   currentUser = null,
+  onOpenGuide,
 }: {
   open?: boolean;
   onClose?: () => void;
   currentUser?: User | null;
+  onOpenGuide?: () => void;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -126,6 +128,13 @@ export default function Sidebar({
           <Settings className="w-4 h-4 flex-shrink-0" />
           <span>Configurações</span>
         </Link>
+        <button
+          onClick={() => { onOpenGuide?.(); onClose(); }}
+          className={navItemClass(false)}
+        >
+          <HelpCircle className="w-4 h-4 flex-shrink-0" />
+          <span>Ajuda</span>
+        </button>
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2 text-[#6b7e9a] hover:text-red-500 hover:bg-red-50 transition-all text-left text-sm font-medium rounded-lg"

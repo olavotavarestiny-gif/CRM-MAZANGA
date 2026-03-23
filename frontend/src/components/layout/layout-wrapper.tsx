@@ -6,6 +6,8 @@ import { getCurrentUser } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
 import Sidebar from './sidebar';
 import { Footer } from './footer';
+import WelcomeModal from '@/components/help/welcome-modal';
+import UserGuide from '@/components/help/user-guide';
 import { ReactNode } from 'react';
 import { Menu } from 'lucide-react';
 import type { User } from '@/lib/api';
@@ -16,6 +18,8 @@ export default function LayoutWrapper({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const authChecked = useRef(false);
   const currentSessionRef = useRef<string | null>(null);
 
@@ -88,6 +92,7 @@ export default function LayoutWrapper({ children }: { children: ReactNode }) {
         const user = await getCurrentUser();
         setCurrentUser(user);
         authChecked.current = true;
+        if (!localStorage.getItem('ulu_guide_seen')) setShowWelcome(true);
 
         if (pathname.startsWith('/admin') && user.role !== 'admin') {
           router.push('/');
@@ -125,7 +130,7 @@ export default function LayoutWrapper({ children }: { children: ReactNode }) {
     <div className="flex h-screen" style={{ background: 'linear-gradient(145deg, #f0f4f9 0%, #e4edf7 50%, #dce8f5 100%)' }}>
       {/* Sidebar Desktop */}
       <div className="hidden md:flex">
-        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} currentUser={currentUser} />
+        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} currentUser={currentUser} onOpenGuide={() => setShowGuide(true)} />
       </div>
 
       {/* Sidebar Mobile (Overlay) */}
@@ -136,7 +141,7 @@ export default function LayoutWrapper({ children }: { children: ReactNode }) {
             onClick={() => setSidebarOpen(false)}
           />
         )}
-        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} currentUser={currentUser} />
+        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} currentUser={currentUser} onOpenGuide={() => setShowGuide(true)} />
       </div>
 
       {/* Main Content */}
@@ -157,6 +162,13 @@ export default function LayoutWrapper({ children }: { children: ReactNode }) {
           {children}
         </main>
       </div>
+
+      <WelcomeModal
+        open={showWelcome}
+        onClose={() => { localStorage.setItem('ulu_guide_seen', '1'); setShowWelcome(false); }}
+        onOpenGuide={() => { localStorage.setItem('ulu_guide_seen', '1'); setShowWelcome(false); setShowGuide(true); }}
+      />
+      <UserGuide open={showGuide} onClose={() => setShowGuide(false)} />
     </div>
   );
 }
