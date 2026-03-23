@@ -3,11 +3,17 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
 
-// Supabase admin client (service role)
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Lazy Supabase admin client — created on first use, not at startup
+let _supabaseAdmin = null;
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+  }
+  return _supabaseAdmin;
+}
 
 // GET /api/admin/users - Lista todos os utilizadores
 router.get('/users', async (req, res) => {
@@ -80,7 +86,7 @@ router.post('/users', async (req, res) => {
     }
 
     // 1. Criar no Supabase Auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
       email,
       password,
       email_confirm: true, // sistema fechado — confirmar automaticamente
@@ -179,7 +185,7 @@ router.delete('/users/:id', async (req, res) => {
 
     // Eliminar do Supabase Auth (se tiver uid)
     if (user.supabaseUid) {
-      await supabaseAdmin.auth.admin.deleteUser(user.supabaseUid);
+      await getSupabaseAdmin().auth.admin.deleteUser(user.supabaseUid);
     }
 
     // Eliminar do PostgreSQL

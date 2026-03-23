@@ -5,11 +5,18 @@ const prisma = require('../lib/prisma');
 const requireAuth = require('../middleware/auth');
 const { importJWK, jwtVerify } = require('jose');
 
-// Supabase admin client (service role — used for change-password only)
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Lazy Supabase admin client — only created when first used so missing env vars
+// don't crash the server on startup
+let _supabaseAdmin = null;
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+  }
+  return _supabaseAdmin;
+}
 
 // Shared EC public key for JWT verification (same key as middleware/auth.js)
 const SUPABASE_JWK = {
@@ -106,7 +113,7 @@ router.post('/change-password', requireAuth, async (req, res) => {
     }
 
     // Update password in Supabase Auth
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(req.user.supabaseUid, {
+    const { error } = await getSupabaseAdmin().auth.admin.updateUserById(req.user.supabaseUid, {
       password: newPassword,
     });
 
