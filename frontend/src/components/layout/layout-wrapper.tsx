@@ -29,6 +29,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
     pathname === '/login' ||
     pathname === '/forgot-password' ||
     pathname === '/reset-password' ||
+    pathname === '/change-password' ||
     pathname === '/form' ||
     pathname === '/termos' ||
     pathname === '/privacidade' ||
@@ -87,6 +88,12 @@ function LayoutInner({ children }: { children: ReactNode }) {
         const user = await getCurrentUser();
         setCurrentUser(user);
         authChecked.current = true;
+
+        // Force password change before accessing anything
+        if (user.mustChangePassword) {
+          router.push('/change-password');
+          return;
+        }
 
         if (pathname.startsWith('/admin') && user.role !== 'admin') {
           router.push('/');

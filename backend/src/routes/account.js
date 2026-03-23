@@ -1,8 +1,20 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
+const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
 const { requireAccountOwner } = require('../middleware/auth');
+
+// Lazy Supabase admin client
+let _supabaseAdmin = null;
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+  }
+  return _supabaseAdmin;
+}
 
 // GET /api/account/team - Listar membros da conta (donos apenas)
 router.get('/team', requireAccountOwner, async (req, res) => {
@@ -59,16 +71,25 @@ router.post('/team', requireAccountOwner, async (req, res) => {
       return res.status(400).json({ error: 'Email já está registado' });
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
+    // 1. Criar no Supabase Auth
+    const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { name },
+    });
 
-    // Criar membro da conta
+    if (authError) {
+      return res.status(400).json({ error: authError.message });
+    }
+
+    // 2. Criar no PostgreSQL com o UID do Supabase
     const member = await prisma.user.create({
       data: {
         name,
         email,
-        passwordHash,
-        accountOwnerId, // Assign to the account owner
+        supabaseUid: authData.user.id,
+        accountOwnerId,
         role: 'user',
         active: true,
         mustChangePassword: true,
