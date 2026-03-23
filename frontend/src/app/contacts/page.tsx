@@ -111,7 +111,7 @@ export default function ContactsPage() {
           </Button>
           <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto">Novo Contacto</Button>
+              <Button data-tour="contacts-new" className="w-full sm:w-auto">Novo Contacto</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -131,7 +131,7 @@ export default function ContactsPage() {
       <ImportCSVModal open={isImportOpen} onOpenChange={setIsImportOpen} />
       <ContactFieldsManager open={isFieldsOpen} onOpenChange={setIsFieldsOpen} />
 
-      <Card className="mb-6">
+      <Card data-tour="contacts-filters" className="mb-6">
         <div className="p-4 flex flex-col sm:flex-row gap-4">
           <Input
             placeholder="Pesquisar por nome, telefone, empresa..."
@@ -168,7 +168,7 @@ export default function ContactsPage() {
         </div>
       </Card>
 
-      <Card>
+      <Card data-tour="contacts-table">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>

@@ -7,19 +7,21 @@ import { createClient } from '@/lib/supabase/client';
 import Sidebar from './sidebar';
 import { Footer } from './footer';
 import WelcomeModal from '@/components/help/welcome-modal';
-import UserGuide from '@/components/help/user-guide';
+import ProductTourProvider, { useTour } from '@/components/help/product-tour';
 import { ReactNode } from 'react';
 import { Menu } from 'lucide-react';
 import type { User } from '@/lib/api';
 
-export default function LayoutWrapper({ children }: { children: ReactNode }) {
+// ── Inner layout — consumes TourContext ──────────────────────────────────────
+
+function LayoutInner({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { startTour } = useTour();
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
-  const [showGuide, setShowGuide] = useState(false);
   const authChecked = useRef(false);
   const currentSessionRef = useRef<string | null>(null);
 
@@ -60,25 +62,19 @@ export default function LayoutWrapper({ children }: { children: ReactNode }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    // If public page, no auth needed
     if (isPublicPage) {
       setIsLoading(false);
       return;
     }
 
-    // Only call getCurrentUser once per session (not on every route change)
-    // Middleware already protects routes — just need to load user data
     if (authChecked.current) {
-      // Already verified — just check role-based route protection
       if (currentUser) {
         if (pathname.startsWith('/admin') && currentUser.role !== 'admin') {
           router.push('/');
         }
-        // Finances: allow admin or account owners (not members)
         if (pathname.startsWith('/finances') && currentUser.role !== 'admin' && currentUser.accountOwnerId) {
           router.push('/');
         }
-        // Equipa: only for account owners (not members)
         if (pathname.startsWith('/equipa') && currentUser.accountOwnerId) {
           router.push('/');
         }
@@ -86,27 +82,25 @@ export default function LayoutWrapper({ children }: { children: ReactNode }) {
       return;
     }
 
-    // First time: verify session with server
     const checkAuth = async () => {
       try {
         const user = await getCurrentUser();
         setCurrentUser(user);
         authChecked.current = true;
-        if (!localStorage.getItem('ulu_guide_seen')) setShowWelcome(true);
 
         if (pathname.startsWith('/admin') && user.role !== 'admin') {
           router.push('/');
         }
-        // Finances: allow admin or account owners (not members)
         if (pathname.startsWith('/finances') && user.role !== 'admin' && user.accountOwnerId) {
           router.push('/');
         }
-        // Equipa: only for account owners (not members)
         if (pathname.startsWith('/equipa') && user.accountOwnerId) {
           router.push('/');
         }
+
+        // Show welcome modal on first visit
+        if (!localStorage.getItem('ulu_guide_seen')) setShowWelcome(true);
       } catch (err: any) {
-        // Only force logout on explicit 401 — network errors should not log out
         if (err?.response?.status === 401) {
           router.push('/login');
         }
@@ -117,6 +111,12 @@ export default function LayoutWrapper({ children }: { children: ReactNode }) {
 
     checkAuth();
   }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleStartTour = () => {
+    localStorage.setItem('ulu_guide_seen', '1');
+    setShowWelcome(false);
+    startTour();
+  };
 
   if (isLoading && !isPublicPage) {
     return <div className="min-h-screen" style={{ background: 'linear-gradient(145deg, #f0f4f9 0%, #e4edf7 50%, #dce8f5 100%)' }} />;
@@ -130,7 +130,12 @@ export default function LayoutWrapper({ children }: { children: ReactNode }) {
     <div className="flex h-screen" style={{ background: 'linear-gradient(145deg, #f0f4f9 0%, #e4edf7 50%, #dce8f5 100%)' }}>
       {/* Sidebar Desktop */}
       <div className="hidden md:flex">
-        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} currentUser={currentUser} onOpenGuide={() => setShowGuide(true)} />
+        <Sidebar
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          currentUser={currentUser}
+          onStartTour={startTour}
+        />
       </div>
 
       {/* Sidebar Mobile (Overlay) */}
@@ -141,7 +146,12 @@ export default function LayoutWrapper({ children }: { children: ReactNode }) {
             onClick={() => setSidebarOpen(false)}
           />
         )}
-        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} currentUser={currentUser} onOpenGuide={() => setShowGuide(true)} />
+        <Sidebar
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          currentUser={currentUser}
+          onStartTour={startTour}
+        />
       </div>
 
       {/* Main Content */}
@@ -166,9 +176,18 @@ export default function LayoutWrapper({ children }: { children: ReactNode }) {
       <WelcomeModal
         open={showWelcome}
         onClose={() => { localStorage.setItem('ulu_guide_seen', '1'); setShowWelcome(false); }}
-        onOpenGuide={() => { localStorage.setItem('ulu_guide_seen', '1'); setShowWelcome(false); setShowGuide(true); }}
+        onStartTour={handleStartTour}
       />
-      <UserGuide open={showGuide} onClose={() => setShowGuide(false)} />
     </div>
+  );
+}
+
+// ── Outer wrapper — provides TourContext ─────────────────────────────────────
+
+export default function LayoutWrapper({ children }: { children: ReactNode }) {
+  return (
+    <ProductTourProvider>
+      <LayoutInner>{children}</LayoutInner>
+    </ProductTourProvider>
   );
 }

@@ -10,16 +10,22 @@ import {
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
 
+const TOUR_ATTR: Record<string, string> = {
+  '/':          'sidebar-painel',
+  '/pipeline':  'sidebar-negociacoes',
+  '/contacts':  'sidebar-contactos',
+};
+
 export default function Sidebar({
   open = false,
   onClose = () => {},
   currentUser = null,
-  onOpenGuide,
+  onStartTour,
 }: {
   open?: boolean;
   onClose?: () => void;
   currentUser?: User | null;
-  onOpenGuide?: () => void;
+  onStartTour?: () => void;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -65,6 +71,7 @@ export default function Sidebar({
 
   return (
     <div
+      data-tour="sidebar"
       className={`w-56 min-h-screen flex flex-col fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:static border-r border-[#dde3ec] bg-white ${
         open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
       }`}
@@ -87,7 +94,13 @@ export default function Sidebar({
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
         {mainLinks.map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose}>
+          <Link
+            key={href}
+            href={href}
+            data-tour={TOUR_ATTR[href]}
+            className={navItemClass(isActive(href))}
+            onClick={onClose}
+          >
             <Icon className="w-4 h-4 flex-shrink-0" />
             <span>{label}</span>
           </Link>
@@ -129,7 +142,7 @@ export default function Sidebar({
           <span>Configurações</span>
         </Link>
         <button
-          onClick={() => { onOpenGuide?.(); onClose(); }}
+          onClick={() => { onStartTour?.(); onClose(); }}
           className={navItemClass(false)}
         >
           <HelpCircle className="w-4 h-4 flex-shrink-0" />

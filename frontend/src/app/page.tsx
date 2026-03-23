@@ -72,7 +72,7 @@ export default function Dashboard() {
 
       {/* Stat / Goal widgets grid */}
       {statGoalWidgets.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div data-tour="dashboard-stats" className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           {statGoalWidgets.map((w) => {
             const value = sourceValues[w.source!] ?? 0;
             const unit = w.unit || SOURCE_UNITS[w.source!] || '';
@@ -105,7 +105,7 @@ export default function Dashboard() {
       {otherWidgets.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {otherWidgets.map((w) => {
-            if (w.type === 'tasks') return <TasksWidget key={w.id} />;
+            if (w.type === 'tasks') return <div key={w.id} data-tour="dashboard-tasks" className="col-span-full"><TasksWidget /></div>;
             if (w.type === 'pipeline') return <PipelineWidget key={w.id} />;
             return null;
           })}

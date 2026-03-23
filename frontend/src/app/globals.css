@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+@import 'driver.js/dist/driver.css';
 
 @tailwind base;
 @tailwind components;
@@ -61,3 +62,47 @@ h4, h5, h6 { font-weight: 600; }
     font-weight: 800;
   }
 }
+
+/* ── driver.js tour theme ── */
+.driver-popover {
+  border: 1px solid #dde3ec;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(10, 37, 64, 0.15);
+  background: #ffffff;
+}
+.driver-popover-title {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  color: #0A2540;
+  font-size: 0.9375rem;
+}
+.driver-popover-description {
+  font-family: 'Montserrat', sans-serif;
+  color: #6b7e9a;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+.driver-popover-progress-text {
+  color: #6b7e9a;
+  font-size: 0.75rem;
+}
+.driver-popover-navigation-btns button {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.driver-popover-next-btn {
+  background: #0A2540 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+.driver-popover-next-btn:hover { opacity: 0.85 !important; }
+.driver-popover-prev-btn {
+  background: transparent !important;
+  color: #0A2540 !important;
+  border: 1px solid #dde3ec !important;
+}
+.driver-popover-close-btn { color: #6b7e9a !important; }

@@ -114,14 +114,14 @@ export default function TasksPage() {
           <h1 className="text-3xl font-bold text-[#0A2540]">Tarefas</h1>
           <p className="text-sm text-[#6b7e9a] mt-0.5">Agenda e gestão de tarefas</p>
         </div>
-        <Button onClick={() => { setEditingTask(null); setIsFormOpen(true); }}>
+        <Button data-tour="tasks-new" onClick={() => { setEditingTask(null); setIsFormOpen(true); }}>
           <Plus className="w-4 h-4 mr-2" />
           Nova Tarefa
         </Button>
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div data-tour="tasks-stats" className="grid grid-cols-3 gap-3 mb-6">
         <button
           onClick={() => setFilter('todas')}
           className={`p-4 rounded-xl border text-left transition-all ${filter === 'todas' ? 'border-[#0A2540] bg-[#0A2540] text-white' : 'border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0A2540]'}`}
@@ -164,7 +164,7 @@ export default function TasksPage() {
       </div>
 
       {/* Task list */}
-      <Card>
+      <Card data-tour="tasks-list">
         <CardContent className="p-4">
           {filtered.length > 0 ? (
             <div className="space-y-2">

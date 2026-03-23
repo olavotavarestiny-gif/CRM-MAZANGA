@@ -8,10 +8,10 @@ import { GUIDE_SECTIONS } from './user-guide';
 interface Props {
   open: boolean;
   onClose: () => void;
-  onOpenGuide: () => void;
+  onStartTour: () => void;
 }
 
-export default function WelcomeModal({ open, onClose, onOpenGuide }: Props) {
+export default function WelcomeModal({ open, onClose, onStartTour }: Props) {
   const highlights = GUIDE_SECTIONS.filter(s => s.highlight);
 
   return (
@@ -61,10 +61,10 @@ export default function WelcomeModal({ open, onClose, onOpenGuide }: Props) {
               Começar a usar →
             </button>
             <button
-              onClick={onOpenGuide}
+              onClick={onStartTour}
               className="w-full py-2.5 rounded-lg border border-gray-200 text-[#0A2540] text-sm font-medium hover:bg-[#f8fafc] transition-colors"
             >
-              Ver guia completo
+              Ver tour interactivo →
             </button>
           </div>
         </div>

@@ -55,13 +55,15 @@ export default function PipelinePage() {
             <Settings2 className="w-4 h-4 mr-2" />
             Gerir Etapas
           </Button>
-          <Button onClick={() => setIsAddModalOpen(true)}>
+          <Button data-tour="pipeline-add" onClick={() => setIsAddModalOpen(true)}>
             + Adicionar Contacto
           </Button>
         </div>
       </div>
 
-      <KanbanBoard contacts={pipelineContacts} stages={stages} />
+      <div data-tour="pipeline-board">
+        <KanbanBoard contacts={pipelineContacts} stages={stages} />
+      </div>
 
       <PipelineStageManager
         open={isStageManagerOpen}
