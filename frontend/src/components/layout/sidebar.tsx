@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  BarChart3, Users, MessageSquare, Zap, Kanban,
+  BarChart3, Users, MessageSquare, Zap, ExternalLink, Kanban,
   CheckSquare, FileText, LogOut, X, DollarSign, CalendarDays,
-  Package, ShieldCheck, Users2
+  Package, Settings, ShieldCheck, Receipt, Users2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
@@ -56,6 +56,7 @@ export default function Sidebar({
   // Visible to account owners (not sub-members) and admins
   const gestaoLinks = (isOwner || isAdmin) ? [
     { href: '/finances', label: 'Finanças', icon: DollarSign },
+    { href: '/faturacao', label: 'Faturação', icon: Receipt },
     { href: '/produtos', label: 'Produtos', icon: Package },
     { href: '/equipa', label: 'Equipa', icon: Users2 },
   ] : [];
@@ -126,6 +127,19 @@ export default function Sidebar({
 
       {/* Footer */}
       <div className="px-3 py-4 border-t border-[#dde3ec] space-y-0.5">
+        <a
+          href="/form"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 px-3 py-2 text-[#6b7e9a] hover:text-[#0A2540] hover:bg-[#0A2540]/5 transition-all text-sm font-medium rounded-lg"
+        >
+          <ExternalLink className="w-4 h-4 flex-shrink-0" />
+          <span>Formulário</span>
+        </a>
+        <Link href="/configuracoes" className={navItemClass(isActive('/configuracoes'))} onClick={onClose}>
+          <Settings className="w-4 h-4 flex-shrink-0" />
+          <span>Configurações</span>
+        </Link>
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2 text-[#6b7e9a] hover:text-red-500 hover:bg-red-50 transition-all text-left text-sm font-medium rounded-lg"
