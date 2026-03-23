@@ -345,6 +345,7 @@ export interface User {
   active: boolean;
   accountOwnerId?: number | null;
   accountOwnerName?: string | null;
+  mustChangePassword?: boolean;
   createdAt: string;
   lastLogin?: string;
 }

@@ -42,20 +42,28 @@ async function requireAuth(req, res, next) {
   }
 
   const supabaseUid = decoded.sub;
+  const jwtEmail = decoded.email;
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { supabaseUid },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        active: true,
-        accountOwnerId: true,
-        mustChangePassword: true,
-      },
-    });
+    const select = {
+      id: true, name: true, email: true, role: true,
+      active: true, accountOwnerId: true, mustChangePassword: true,
+    };
+
+    let user = await prisma.user.findUnique({ where: { supabaseUid }, select });
+
+    // Auto-link: first login after migration — supabaseUid not yet linked in DB
+    if (!user && jwtEmail) {
+      const byEmail = await prisma.user.findUnique({ where: { email: jwtEmail } });
+      if (byEmail && !byEmail.supabaseUid) {
+        user = await prisma.user.update({
+          where: { id: byEmail.id },
+          data: { supabaseUid },
+          select,
+        });
+        console.log(`[auth] auto-linked supabaseUid for ${jwtEmail}`);
+      }
+    }
 
     if (!user || !user.active) {
       return res.status(403).json({ error: 'Conta desactivada. Contacte o administrador.' });

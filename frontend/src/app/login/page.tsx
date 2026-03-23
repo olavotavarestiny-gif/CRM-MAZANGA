@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import api from '@/lib/api';
+import { getCurrentUser } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -27,7 +27,7 @@ export default function LoginPage() {
       const supabase = createClient();
 
       // 1. Authenticate with Supabase
-      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) {
         setError(authError.message === 'Invalid login credentials'
           ? 'Email ou password incorretos'
@@ -35,19 +35,15 @@ export default function LoginPage() {
         return;
       }
 
-      // 2. Sync Supabase UID with our User record
-      const syncResponse = await api.post('/api/auth/sync', {
-        supabaseUid: data.user.id,
-        email: data.user.email,
-      });
-
-      if (syncResponse.data.mustChangePassword) {
+      // 2. Load user from our backend (middleware auto-links supabaseUid on first login)
+      const user = await getCurrentUser();
+      if (user.mustChangePassword) {
         router.push('/change-password');
       } else {
         router.push('/');
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao fazer login');
+      setError(err.response?.data?.error || 'Erro ao ligar ao servidor. Tente novamente.');
     } finally {
       setLoading(false);
     }
