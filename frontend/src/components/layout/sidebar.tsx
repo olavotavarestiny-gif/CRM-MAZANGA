@@ -31,7 +31,9 @@ export default function Sidebar({
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push('/login');
+    // Full page reload so middleware re-reads cleared cookies (client-side
+    // navigation via router.push sends cookies before they are cleared)
+    window.location.href = '/login';
   };
 
   const isAdmin = currentUser?.role === 'admin';

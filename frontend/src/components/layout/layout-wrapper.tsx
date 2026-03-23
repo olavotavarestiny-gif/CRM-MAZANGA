@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { getCurrentUser } from '@/lib/api';
+import { createClient } from '@/lib/supabase/client';
 import Sidebar from './sidebar';
 import { Footer } from './footer';
 import { ReactNode } from 'react';
@@ -16,6 +17,7 @@ export default function LayoutWrapper({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const authChecked = useRef(false);
+  const currentSessionRef = useRef<string | null>(null);
 
   const isPublicPage =
     pathname === '/login' ||
@@ -26,6 +28,22 @@ export default function LayoutWrapper({ children }: { children: ReactNode }) {
     pathname === '/privacidade' ||
     pathname === '/manutencao' ||
     pathname.startsWith('/f/');
+
+  // Reset auth cache when Supabase session changes (e.g. after login/logout)
+  useEffect(() => {
+    if (isPublicPage) return;
+    const supabase = createClient();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const newSessionId = session?.access_token ?? null;
+      if (newSessionId !== currentSessionRef.current) {
+        currentSessionRef.current = newSessionId;
+        if (event === 'SIGNED_IN') {
+          authChecked.current = false; // force re-fetch user on next render
+        }
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep-alive: ping backend every 14 minutes to prevent Render free tier cold starts
   useEffect(() => {
