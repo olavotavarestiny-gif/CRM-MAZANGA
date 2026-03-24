@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Message, Automation, Task, CRMForm, FormField, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente } from './types';
+import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, Task, CRMForm, FormField, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage } from './types';
 import { createClient } from './supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -52,7 +52,7 @@ export async function createContact(data: Partial<Contact>) {
 }
 
 export async function getContact(id: string) {
-  const response = await api.get<Contact & { messages: Message[]; tasks: Task[] }>(
+  const response = await api.get<Contact & { tasks: Task[] }>(
     `/api/contacts/${id}`
   );
   return response.data;
@@ -156,35 +156,6 @@ export async function updateContactFieldConfig(
   return response.data;
 }
 
-// Inbox & Messages
-export async function getConversations() {
-  const response = await api.get<Contact[]>('/api/inbox');
-  return response.data;
-}
-
-export async function getMessages(contactId: string) {
-  const response = await api.get<Message[]>(`/api/messages/${contactId}`);
-  return response.data;
-}
-
-export async function sendMessage(contactId: string, text?: string, templateName?: string) {
-  const response = await api.post<Message>('/api/send', {
-    contactId,
-    text,
-    templateName,
-  });
-  return response.data;
-}
-
-export async function sendEmailMessage(contactId: string, subject: string, text: string) {
-  const response = await api.post<Message>('/api/send/email', {
-    contactId,
-    subject,
-    text,
-  });
-  return response.data;
-}
-
 // Automations
 export async function getAutomations() {
   const response = await api.get<Automation[]>('/api/automations');
@@ -203,18 +174,6 @@ export async function updateAutomation(id: string, data: Partial<Automation>) {
 
 export async function deleteAutomation(id: string) {
   await api.delete(`/api/automations/${id}`);
-}
-
-// WhatsApp Templates
-export interface WhatsAppTemplate {
-  name: string;
-  language: string;
-  status: string;
-}
-
-export async function getWhatsAppTemplates() {
-  const response = await api.get<WhatsAppTemplate[]>('/api/whatsapp/templates');
-  return response.data;
 }
 
 // Tasks
@@ -350,6 +309,7 @@ export interface User {
   email: string;
   role: string;
   active: boolean;
+  plan?: string;
   accountOwnerId?: number | null;
   accountOwnerName?: string | null;
   mustChangePassword?: boolean;
@@ -683,6 +643,67 @@ export async function deleteRecorrente(id: string): Promise<void> {
 
 export async function triggerRecorrente(id: string): Promise<FacturaRecorrente> {
   const res = await api.post(`/api/faturacao/recorrentes/${id}/trigger`);
+  return res.data;
+}
+
+// ============================================
+// CHAT INTERNO
+// ============================================
+
+export async function getChatChannels(): Promise<ChatChannel[]> {
+  const res = await api.get('/api/chat/channels');
+  return res.data;
+}
+
+export async function createChatChannel(data: {
+  name: string;
+  description?: string;
+  memberIds: number[];
+}): Promise<ChatChannel> {
+  const res = await api.post('/api/chat/channels', data);
+  return res.data;
+}
+
+export async function createDM(targetUserId: number): Promise<ChatChannel> {
+  const res = await api.post('/api/chat/dm', { targetUserId });
+  return res.data;
+}
+
+export async function getChatMessages(channelId: string, before?: string): Promise<ChatMessage[]> {
+  const res = await api.get(`/api/chat/channels/${channelId}/messages`, {
+    params: before ? { before, limit: 50 } : { limit: 50 },
+  });
+  return res.data;
+}
+
+export async function sendChatMessage(
+  channelId: string,
+  text: string,
+  attachments?: { url: string; name: string; size: number; type: string }[]
+): Promise<ChatMessage> {
+  const res = await api.post(`/api/chat/channels/${channelId}/messages`, {
+    text,
+    attachments: attachments ?? [],
+  });
+  return res.data;
+}
+
+export async function markChannelRead(channelId: string): Promise<void> {
+  await api.post(`/api/chat/channels/${channelId}/read`);
+}
+
+export async function getChatUnreadCount(): Promise<number> {
+  const res = await api.get<{ unread: number }>('/api/chat/unread');
+  return res.data.unread;
+}
+
+export async function getChatUsers(): Promise<{ id: number; name: string; email: string }[]> {
+  const res = await api.get('/api/chat/users');
+  return res.data;
+}
+
+export async function getPlanUsage(): Promise<PlanUsage> {
+  const res = await api.get('/api/chat/limits');
   return res.data;
 }
 

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3, Users, MessageSquare, Zap, Kanban,
   CheckSquare, FileText, LogOut, X, DollarSign, CalendarDays,
@@ -9,6 +10,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
+import { getChatUnreadCount } from '@/lib/api';
 import { ONBOARDING_OPEN, ONBOARDING_DISMISSED } from '@/lib/onboarding-tasks';
 
 const TOUR_ATTR: Record<string, string> = {
@@ -44,6 +46,13 @@ export default function Sidebar({
   const isAdmin = currentUser?.role === 'admin';
   const isOwner = currentUser && !currentUser.accountOwnerId;
 
+  const { data: chatUnread = 0 } = useQuery({
+    queryKey: ['chat-unread'],
+    queryFn: getChatUnreadCount,
+    refetchInterval: 15_000,
+    enabled: !!currentUser,
+  });
+
   const navItemClass = (active: boolean) => cn(
     'flex items-center gap-3 px-3 py-2 transition-all text-sm font-medium rounded-lg',
     active
@@ -57,7 +66,7 @@ export default function Sidebar({
     { href: '/contacts', label: 'Contactos', icon: Users },
     { href: '/tasks', label: 'Tarefas', icon: CheckSquare },
     { href: '/calendario', label: 'Calendário', icon: CalendarDays },
-    { href: '/inbox', label: 'Conversas', icon: MessageSquare },
+    { href: '/chat', label: 'Conversas', icon: MessageSquare },
     { href: '/automations', label: 'Automações', icon: Zap },
     { href: '/forms', label: 'Formulários', icon: FileText },
   ];
@@ -103,7 +112,12 @@ export default function Sidebar({
             onClick={onClose}
           >
             <Icon className="w-4 h-4 flex-shrink-0" />
-            <span>{label}</span>
+            <span className="flex-1">{label}</span>
+            {href === '/chat' && chatUnread > 0 && (
+              <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">
+                {chatUnread > 99 ? '99+' : chatUnread}
+              </span>
+            )}
           </Link>
         ))}
 

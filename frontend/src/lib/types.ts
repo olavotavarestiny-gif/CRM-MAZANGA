@@ -362,3 +362,59 @@ export interface FacturaRecorrente {
   estabelecimento?: { nome: string; nif: string };
   clienteFaturacao?: { customerName: string; customerTaxID: string };
 }
+
+// ── CHAT INTERNO ──────────────────────────────────────────────
+export interface ChatMember {
+  userId: number;
+  name: string;
+  email: string;
+}
+
+export interface ChatLastMessage {
+  text: string;
+  createdAt: string;
+  senderName: string;
+}
+
+export interface ChatChannel {
+  id: string;
+  name: string;
+  description?: string;
+  type: 'channel' | 'dm';
+  orgId: number;
+  createdById: number;
+  createdAt: string;
+  members: ChatMember[];
+  unreadCount: number;
+  lastMessage?: ChatLastMessage | null;
+}
+
+export interface ChatAttachment {
+  url: string;
+  name: string;
+  size: number;
+  type: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  channelId: string;
+  senderId: number;
+  senderName: string;
+  senderEmail: string;
+  text: string;
+  attachments: ChatAttachment[];
+  mentions: number[];
+  createdAt: string;
+}
+
+export interface PlanUsageItem {
+  current: number;
+  limit: number;
+}
+
+export interface PlanUsage {
+  plan: string;
+  usage: Record<string, PlanUsageItem>;
+}
+

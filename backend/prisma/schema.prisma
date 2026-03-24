@@ -19,6 +19,7 @@ model User {
   resetExpiry          DateTime?
   role                 String     @default("user")   // "admin" | "user"
   active               Boolean    @default(true)
+  plan                 String     @default("essencial") // "essencial" | "profissional"
   mustChangePassword   Boolean    @default(false)
   accountOwnerId       Int?       // null = owner of their own account; Int = member of another account
   createdAt            DateTime   @default(now())
@@ -42,6 +43,8 @@ model User {
   configuracaoFaturacao ConfiguracaoFaturacao? @relation("ConfigFaturacaoUser")
   accountOwner         User?      @relation("AccountMembers", fields: [accountOwnerId], references: [id], onDelete: SetNull)
   accountMembers       User[]     @relation("AccountMembers")
+  chatChannelMemberships ChatChannelMember[] @relation("ChatMemberUser")
+  chatMessagesSent       ChatMessage[]       @relation("ChatSenderUser")
 }
 
 model LoginLog {
@@ -446,4 +449,48 @@ model ConfiguracaoFaturacao {
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
   user                     User      @relation("ConfigFaturacaoUser", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// MÓDULO CHAT INTERNO
+// ============================================
+
+model ChatChannel {
+  id          String   @id @default(cuid())
+  orgId       Int      // effectiveUserId do criador (= account owner ID)
+  name        String
+  description String?
+  type        String   @default("channel") // "channel" | "dm"
+  createdById Int
+  createdAt   DateTime @default(now())
+  members     ChatChannelMember[]
+  messages    ChatMessage[]
+
+  @@index([orgId])
+}
+
+model ChatChannelMember {
+  id         String      @id @default(cuid())
+  channelId  String
+  userId     Int
+  joinedAt   DateTime    @default(now())
+  lastReadAt DateTime?
+  channel    ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user       User        @relation("ChatMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+}
+
+model ChatMessage {
+  id          String      @id @default(cuid())
+  channelId   String
+  senderId    Int
+  text        String
+  attachments String      @default("[]") // JSON: [{url, name, size, type}]
+  mentions    String      @default("[]") // JSON: [userId, ...]
+  createdAt   DateTime    @default(now())
+  channel     ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  sender      User        @relation("ChatSenderUser", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([channelId, createdAt])
 }

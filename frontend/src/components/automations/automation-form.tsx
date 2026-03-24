@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { createAutomation, getWhatsAppTemplates, getContacts } from '@/lib/api';
+import { createAutomation, getContacts } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,10 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import type { Stage } from '@/lib/types';
 
-const VARIABLES_HINT = 'Variáveis disponíveis: {{nome}}, {{empresa}}, {{telefone}}, {{email}}';
 const STAGES: Stage[] = ['Novo', 'Contactado', 'Qualificado', 'Proposta Enviada', 'Fechado', 'Perdido'];
 const VALID_REVENUES = [
   '- 50 Milhões De Kwanzas',
@@ -25,24 +23,12 @@ const VALID_REVENUES = [
   '+ 500 M',
 ];
 
-export default function AutomationForm({
-  onSuccess,
-}: {
-  onSuccess?: () => void;
-}) {
+export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }) {
   const [formData, setFormData] = useState({
     trigger: 'new_contact',
     triggerValue: '',
-    action: 'send_whatsapp_template',
+    action: 'update_stage',
     targetStage: 'Novo' as Stage,
-    templateName: '',
-    emailSubject: '',
-    emailBody: '',
-  });
-
-  const { data: templates = [], isLoading: isLoadingTemplates } = useQuery({
-    queryKey: ['whatsapp-templates'],
-    queryFn: () => getWhatsAppTemplates(),
   });
 
   const { data: contacts = [] } = useQuery({
@@ -50,17 +36,11 @@ export default function AutomationForm({
     queryFn: () => getContacts(),
   });
 
-  // Extract unique tags and sectors from contacts
   const allTags = Array.from(
-    new Set(
-      contacts.flatMap((c) => {
-        try {
-          return c.tags ? JSON.parse(JSON.stringify(c.tags)) : [];
-        } catch {
-          return [];
-        }
-      })
-    )
+    new Set(contacts.flatMap((c) => {
+      try { return c.tags ? JSON.parse(JSON.stringify(c.tags)) : []; }
+      catch { return []; }
+    }))
   ).sort();
 
   const allSectors = Array.from(
@@ -73,74 +53,35 @@ export default function AutomationForm({
         trigger: formData.trigger,
         action: formData.action,
       };
-
       if (['contact_tag', 'contact_revenue', 'contact_sector'].includes(formData.trigger)) {
         payload.triggerValue = formData.triggerValue;
-      }
-
-      if (formData.action === 'send_whatsapp_template' || formData.action === 'send_whatsapp_text') {
-        payload.templateName = formData.templateName;
-      }
-      if (formData.action === 'send_email') {
-        payload.emailSubject = formData.emailSubject;
-        payload.emailBody = formData.emailBody;
       }
       if (formData.action === 'update_stage') {
         payload.targetStage = formData.targetStage;
       }
-
       return createAutomation(payload);
     },
     onSuccess: () => {
-      setFormData({
-        trigger: 'new_contact',
-        triggerValue: '',
-        action: 'send_whatsapp_template',
-        targetStage: 'Novo',
-        templateName: '',
-        emailSubject: '',
-        emailBody: '',
-      });
+      setFormData({ trigger: 'new_contact', triggerValue: '', action: 'update_stage', targetStage: 'Novo' });
       onSuccess?.();
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    mutation.mutate();
-  };
-
   const isValidForm = () => {
-    // Validate trigger value for conditional triggers
     if (['contact_tag', 'contact_revenue', 'contact_sector'].includes(formData.trigger)) {
       if (!formData.triggerValue) return false;
     }
-
-    if (formData.action === 'update_stage') {
-      return !!formData.targetStage;
-    }
-    if (formData.action === 'send_whatsapp_template' || formData.action === 'send_whatsapp_text') {
-      return !!formData.templateName;
-    }
-    if (formData.action === 'send_email') {
-      return !!formData.emailSubject && !!formData.emailBody;
-    }
-    return false;
+    return !!formData.targetStage;
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4">
       <div>
         <Label htmlFor="trigger">Trigger (Evento)</Label>
         <Select
           value={formData.trigger}
           onValueChange={(value) =>
-            setFormData((prev) => ({
-              ...prev,
-              trigger: value,
-              triggerValue: '',
-              action: value === 'new_contact' ? 'send_whatsapp_template' : 'update_stage',
-            }))
+            setFormData((prev) => ({ ...prev, trigger: value, triggerValue: '' }))
           }
         >
           <SelectTrigger>
@@ -156,41 +97,29 @@ export default function AutomationForm({
         </Select>
       </div>
 
-      {/* Trigger value selection for conditional triggers */}
       {formData.trigger === 'contact_tag' && (
         <div>
-          <Label htmlFor="triggerValue">Selecionar Tag *</Label>
+          <Label>Selecionar Tag *</Label>
           <Input
-            id="triggerValue"
             placeholder="Digite ou selecione uma tag"
             value={formData.triggerValue}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, triggerValue: e.target.value }))
-            }
+            onChange={(e) => setFormData((prev) => ({ ...prev, triggerValue: e.target.value }))}
             list="tags-list"
             required
           />
           <datalist id="tags-list">
-            {allTags.map((tag) => (
-              <option key={tag} value={tag} />
-            ))}
+            {allTags.map((tag) => <option key={tag} value={tag} />)}
           </datalist>
         </div>
       )}
 
       {formData.trigger === 'contact_revenue' && (
         <div>
-          <Label htmlFor="triggerValue">Selecionar Faturação *</Label>
+          <Label>Selecionar Faturação *</Label>
           <Select value={formData.triggerValue} onValueChange={(value) => setFormData((prev) => ({ ...prev, triggerValue: value }))}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione um intervalo" />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Selecione um intervalo" /></SelectTrigger>
             <SelectContent>
-              {VALID_REVENUES.map((revenue) => (
-                <SelectItem key={revenue} value={revenue}>
-                  {revenue}
-                </SelectItem>
-              ))}
+              {VALID_REVENUES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -198,28 +127,19 @@ export default function AutomationForm({
 
       {formData.trigger === 'contact_sector' && (
         <div>
-          <Label htmlFor="triggerValue">Selecionar Setor *</Label>
+          <Label>Selecionar Setor *</Label>
           {allSectors.length > 0 ? (
             <Select value={formData.triggerValue} onValueChange={(value) => setFormData((prev) => ({ ...prev, triggerValue: value }))}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um setor" />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Selecione um setor" /></SelectTrigger>
               <SelectContent>
-                {allSectors.map((sector) => (
-                  <SelectItem key={sector} value={sector!}>
-                    {sector}
-                  </SelectItem>
-                ))}
+                {allSectors.map((sector) => <SelectItem key={sector} value={sector!}>{sector}</SelectItem>)}
               </SelectContent>
             </Select>
           ) : (
             <Input
-              id="triggerValue"
               placeholder="Digite o setor"
               value={formData.triggerValue}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, triggerValue: e.target.value }))
-              }
+              onChange={(e) => setFormData((prev) => ({ ...prev, triggerValue: e.target.value }))}
               required
             />
           )}
@@ -227,169 +147,36 @@ export default function AutomationForm({
       )}
 
       <div>
-        <Label htmlFor="action">Ação</Label>
+        <Label>Ação</Label>
         <Select
           value={formData.action}
-          onValueChange={(value) =>
-            setFormData((prev) => ({
-              ...prev,
-              action: value,
-              templateName: '',
-              emailSubject: '',
-              emailBody: '',
-              targetStage: 'Novo',
-            }))
-          }
+          onValueChange={(value) => setFormData((prev) => ({ ...prev, action: value, targetStage: 'Novo' }))}
         >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
+          <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="update_stage">
-              Mover para Etapa do Pipeline
-            </SelectItem>
-            <SelectItem value="send_whatsapp_template">
-              Template WhatsApp
-            </SelectItem>
-            <SelectItem value="send_whatsapp_text">
-              Mensagem WhatsApp (Texto Livre)
-            </SelectItem>
-            <SelectItem value="send_email">
-              Enviar Email
-            </SelectItem>
+            <SelectItem value="update_stage">Mover para Etapa do Pipeline</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {formData.action === 'update_stage' && (
-        <div>
-          <Label htmlFor="targetStage">Mover para Etapa *</Label>
-          <Select
-            value={formData.targetStage}
-            onValueChange={(value) =>
-              setFormData((prev) => ({ ...prev, targetStage: value as Stage }))
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STAGES.map((stage) => (
-                <SelectItem key={stage} value={stage}>
-                  {stage}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      <div>
+        <Label>Mover para Etapa *</Label>
+        <Select
+          value={formData.targetStage}
+          onValueChange={(value) => setFormData((prev) => ({ ...prev, targetStage: value as Stage }))}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {STAGES.map((stage) => <SelectItem key={stage} value={stage}>{stage}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
 
-      {(formData.action === 'send_whatsapp_template' || formData.action === 'send_whatsapp_text') && (
-        <div>
-          <Label htmlFor="templateName">
-            {formData.action === 'send_whatsapp_template' ? 'Template WhatsApp *' : 'Mensagem WhatsApp *'}
-          </Label>
-          {formData.action === 'send_whatsapp_template' ? (
-            <>
-              {isLoadingTemplates ? (
-                <p className="text-sm text-gray-500">Carregando templates...</p>
-              ) : templates.length > 0 ? (
-                <Select
-                  value={formData.templateName}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, templateName: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um template" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templates.map((template) => (
-                      <SelectItem key={template.name} value={template.name}>
-                        {template.name} ({template.language}) - {template.status}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <>
-                  <p className="text-sm text-red-500 mb-2">
-                    Nenhum template encontrado. Insira o nome manualmente.
-                  </p>
-                  <Input
-                    id="templateName"
-                    value={formData.templateName}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, templateName: e.target.value }))
-                    }
-                    placeholder="Ex: welcome_message"
-                    required
-                  />
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <Textarea
-                id="templateName"
-                value={formData.templateName}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, templateName: e.target.value }))
-                }
-                placeholder="Digite a mensagem. Use variáveis como {{nome}}, {{empresa}}, etc."
-                required
-                className="min-h-24"
-              />
-              <p className="text-xs text-slate-400 mt-1">{VARIABLES_HINT}</p>
-            </>
-          )}
-        </div>
-      )}
-
-      {formData.action === 'send_email' && (
-        <>
-          <div>
-            <Label htmlFor="emailSubject">Assunto do Email *</Label>
-            <Input
-              id="emailSubject"
-              value={formData.emailSubject}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, emailSubject: e.target.value }))
-              }
-              placeholder="Ex: Bem-vindo {{nome}}"
-              required
-            />
-            <p className="text-xs text-slate-400 mt-1">{VARIABLES_HINT}</p>
-          </div>
-
-          <div>
-            <Label htmlFor="emailBody">Corpo do Email (HTML) *</Label>
-            <Textarea
-              id="emailBody"
-              value={formData.emailBody}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, emailBody: e.target.value }))
-              }
-              placeholder="Ex: <p>Olá {{nome}}, bem-vindo!</p>"
-              required
-              className="min-h-32 font-mono text-sm"
-            />
-            <p className="text-xs text-slate-400 mt-1">{VARIABLES_HINT}</p>
-          </div>
-        </>
-      )}
-
-      <Button
-        type="submit"
-        disabled={mutation.isPending || !isValidForm()}
-        className="w-full"
-      >
+      <Button type="submit" disabled={mutation.isPending || !isValidForm()} className="w-full">
         {mutation.isPending ? 'Guardando...' : 'Guardar'}
       </Button>
 
-      {mutation.isError && (
-        <p className="text-red-600 text-sm">Erro ao criar automação</p>
-      )}
+      {mutation.isError && <p className="text-red-600 text-sm">Erro ao criar automação</p>}
     </form>
   );
 }

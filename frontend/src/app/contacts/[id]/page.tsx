@@ -15,7 +15,6 @@ import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import ChatWindow from '@/components/inbox/chat-window';
 import TaskItem from '@/components/tasks/task-item';
 import { Badge } from '@/components/ui/badge';
 import { Pencil, Check, X, ExternalLink } from 'lucide-react';
@@ -419,10 +418,10 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
     <div className="p-4 md:p-6">
       <h1 className="text-3xl font-bold mb-6 text-[#0A2540]">{contact.name}</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className="mb-6">
 
         {/* Info panel */}
-        <div className="col-span-1">
+        <div>
           <Card>
             <CardHeader>
               <CardTitle>Informações</CardTitle>
@@ -475,10 +474,6 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
           </Card>
         </div>
 
-        {/* Chat */}
-        <div className="col-span-1 md:col-span-2 min-h-[450px] md:min-h-0">
-          <ChatWindow contactId={contact.id.toString()} />
-        </div>
       </div>
 
       {/* Tasks */}
