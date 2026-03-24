@@ -10,16 +10,20 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   CheckCircle2, Plus, Building2, Settings, User as UserIcon,
-  Users, Shield, Eye, EyeOff, Trash2,
+  Users, Shield, Eye, EyeOff, Trash2, Pencil,
 } from 'lucide-react';
 import {
   getFaturacaoConfig, updateFaturacaoConfig, getEstabelecimentos, createEstabelecimento,
   getCurrentUser, changePassword,
   getTeamMembers, addTeamMember, removeTeamMember,
   getUsers, createUser, updateUser, deleteUser, getLoginLogs,
+  getClientAccounts, updateClientAccount, createClientAccount,
 } from '@/lib/api';
 import type { User, LoginLog } from '@/lib/api';
-import type { IBANEntry } from '@/lib/types';
+import type { IBANEntry, ClientAccount } from '@/lib/types';
+import MemberPermissionsModal from '@/components/configuracoes/member-permissions-modal';
+import OrgPagesModal from '@/components/configuracoes/org-pages-modal';
+import { PAGE_KEYS } from '@/lib/page-keys';
 
 function ConfiguracoesContent() {
   const searchParams = useSearchParams();
@@ -160,8 +164,11 @@ function ConfiguracoesContent() {
     }
   };
 
+  // ── Equipa: member permissions modal ──────────────────────
+  const [permMember, setPermMember] = useState<User | null>(null);
+
   // ── Admin ────────────────────────────────────────────────
-  const [adminSubTab, setAdminSubTab] = useState<'users' | 'logins'>('users');
+  const [adminSubTab, setAdminSubTab] = useState<'users' | 'accounts' | 'logins'>('users');
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'user', accountOwnerId: '' });
   const [userError, setUserError] = useState('');
@@ -177,6 +184,35 @@ function ConfiguracoesContent() {
     queryFn: getLoginLogs,
     enabled: activeTab === 'admin' && !!isAdmin && adminSubTab === 'logins',
   });
+
+  const { data: clientAccounts = [], refetch: refetchAccounts } = useQuery({
+    queryKey: ['client-accounts'],
+    queryFn: getClientAccounts,
+    enabled: activeTab === 'admin' && !!isAdmin && adminSubTab === 'accounts',
+  });
+
+  const [orgPagesTarget, setOrgPagesTarget] = useState<ClientAccount | null>(null);
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
+  const [accountForm, setAccountForm] = useState({ name: '', email: '', password: '', plan: 'essencial' });
+  const [accountError, setAccountError] = useState('');
+
+  const createAccountMutation = useMutation({
+    mutationFn: () => createClientAccount({ ...accountForm }),
+    onSuccess: () => {
+      refetchAccounts();
+      setShowCreateAccount(false);
+      setAccountForm({ name: '', email: '', password: '', plan: 'essencial' });
+      setAccountError('');
+    },
+    onError: (err: any) => setAccountError(err.response?.data?.error || 'Erro ao criar conta'),
+  });
+
+  const updateAccountPlan = async (accountId: number, plan: string) => {
+    try {
+      await updateClientAccount(accountId, { plan });
+      refetchAccounts();
+    } catch { /* ignore */ }
+  };
 
   const createUserMutation = useMutation({
     mutationFn: () => {
@@ -504,16 +540,32 @@ function ConfiguracoesContent() {
                   <tr className="border-b border-gray-200">
                     <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Nome</th>
                     <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Email</th>
+                    <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Páginas</th>
                     <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Estado</th>
                     <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Último Login</th>
                     <th className="py-3 px-4" />
                   </tr>
                 </thead>
                 <tbody>
-                  {(teamMembers as User[]).map(member => (
+                  {(teamMembers as User[]).map(member => {
+                    const orgPages = currentUser?.allowedPages ?? null;
+                    const available = orgPages ? PAGE_KEYS.filter(p => orgPages.includes(p.key)).length : PAGE_KEYS.length;
+                    const memberPages = member.allowedPages;
+                    const pagesLabel = memberPages ? `${memberPages.length}/${available}` : `${available}/${available}`;
+                    return (
                     <tr key={member.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
                       <td className="py-3 px-4 text-gray-900 text-sm">{member.name}</td>
                       <td className="py-3 px-4 text-gray-500 text-sm">{member.email}</td>
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => setPermMember(member)}
+                          className="flex items-center gap-1 text-xs text-[#0A2540] hover:text-blue-600 transition"
+                          title="Editar permissões"
+                        >
+                          <span className="font-mono">{pagesLabel}</span>
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      </td>
                       <td className="py-3 px-4">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${member.active ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
                           {member.active ? 'Ativo' : 'Inativo'}
@@ -528,7 +580,8 @@ function ConfiguracoesContent() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
               {(teamMembers as User[]).length === 0 && (
@@ -539,6 +592,25 @@ function ConfiguracoesContent() {
         </div>
       )}
 
+      {permMember && (
+        <MemberPermissionsModal
+          member={permMember}
+          orgAllowedPages={currentUser?.allowedPages ?? null}
+          onClose={() => setPermMember(null)}
+          onSaved={() => { refetchTeam(); setPermMember(null); }}
+        />
+      )}
+
+      {orgPagesTarget && (
+        <OrgPagesModal
+          accountId={orgPagesTarget.id}
+          accountName={orgPagesTarget.name}
+          currentAllowedPages={orgPagesTarget.allowedPages}
+          onClose={() => setOrgPagesTarget(null)}
+          onSaved={() => { refetchAccounts(); setOrgPagesTarget(null); }}
+        />
+      )}
+
       {/* ── ADMIN ───────────────────────────────────────────── */}
       {activeTab === 'admin' && (
         <div className="space-y-4">
@@ -547,6 +619,9 @@ function ConfiguracoesContent() {
           <div className="flex gap-4 border-b border-gray-200">
             <button onClick={() => setAdminSubTab('users')} className={subTabBtn('users', adminSubTab)}>
               Utilizadores ({(allUsers as User[]).length})
+            </button>
+            <button onClick={() => setAdminSubTab('accounts')} className={subTabBtn('accounts', adminSubTab)}>
+              Contas
             </button>
             <button onClick={() => setAdminSubTab('logins')} className={subTabBtn('logins', adminSubTab)}>
               Histórico de Logins
@@ -604,6 +679,71 @@ function ConfiguracoesContent() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {adminSubTab === 'accounts' && (
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <Button onClick={() => setShowCreateAccount(true)} className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90 gap-1.5">
+                  <Plus className="w-4 h-4" /> Nova Conta
+                </Button>
+              </div>
+              <Card>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Nome</th>
+                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Email</th>
+                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Plano</th>
+                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Páginas</th>
+                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Membros</th>
+                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Criado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(clientAccounts as ClientAccount[]).map(account => (
+                        <tr key={account.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                          <td className="py-3 px-4 text-gray-900 text-sm font-medium">{account.name}</td>
+                          <td className="py-3 px-4 text-gray-500 text-sm">{account.email}</td>
+                          <td className="py-3 px-4">
+                            <select
+                              value={account.plan}
+                              onChange={e => updateAccountPlan(account.id, e.target.value)}
+                              className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:border-[#0A2540]"
+                            >
+                              <option value="essencial">Essencial</option>
+                              <option value="profissional">Profissional</option>
+                            </select>
+                          </td>
+                          <td className="py-3 px-4">
+                            <button
+                              onClick={() => setOrgPagesTarget(account)}
+                              className="flex items-center gap-1 text-xs text-[#0A2540] hover:text-blue-600 transition"
+                              title="Editar páginas"
+                            >
+                              <span className="font-mono">
+                                {account.allowedPages ? `${account.allowedPages.length}/${PAGE_KEYS.length}` : `∞`}
+                              </span>
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          </td>
+                          <td className="py-3 px-4 text-gray-500 text-sm">
+                            {account._count.accountMembers} membro{account._count.accountMembers !== 1 ? 's' : ''}
+                          </td>
+                          <td className="py-3 px-4 text-gray-500 text-sm">
+                            {new Date(account.createdAt).toLocaleDateString('pt-PT')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {(clientAccounts as ClientAccount[]).length === 0 && (
+                    <div className="text-center py-8 text-gray-400 text-sm">Nenhuma conta de cliente criada ainda.</div>
+                  )}
                 </div>
               </Card>
             </div>
@@ -695,6 +835,44 @@ function ConfiguracoesContent() {
                   <Button type="button" variant="outline" onClick={() => setShowAddMember(false)} className="flex-1">Cancelar</Button>
                   <Button type="submit" disabled={addMemberMutation.isPending} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90">
                     {addMemberMutation.isPending ? 'A criar...' : 'Adicionar'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {showCreateAccount && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-md">
+            <div className="p-6">
+              <h2 className="text-xl font-bold mb-4">Nova Conta Cliente</h2>
+              {accountError && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">{accountError}</div>}
+              <form onSubmit={e => { e.preventDefault(); createAccountMutation.mutate(); }} className="space-y-4">
+                <div>
+                  <Label className="text-gray-600">Nome</Label>
+                  <Input type="text" placeholder="Nome da empresa ou pessoa" value={accountForm.name} onChange={e => setAccountForm(p => ({ ...p, name: e.target.value }))} required className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-gray-600">Email</Label>
+                  <Input type="email" placeholder="email@example.com" value={accountForm.email} onChange={e => setAccountForm(p => ({ ...p, email: e.target.value }))} required className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-gray-600">Password Inicial</Label>
+                  <Input type="password" placeholder="Mínimo 6 caracteres" value={accountForm.password} onChange={e => setAccountForm(p => ({ ...p, password: e.target.value }))} required minLength={6} className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-gray-600">Plano</Label>
+                  <select value={accountForm.plan} onChange={e => setAccountForm(p => ({ ...p, plan: e.target.value }))} className="w-full mt-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-[#0A2540] focus:ring-1 focus:ring-[#0A2540]">
+                    <option value="essencial">Essencial</option>
+                    <option value="profissional">Profissional</option>
+                  </select>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <Button type="button" variant="outline" onClick={() => setShowCreateAccount(false)} className="flex-1">Cancelar</Button>
+                  <Button type="submit" disabled={createAccountMutation.isPending} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90">
+                    {createAccountMutation.isPending ? 'A criar...' : 'Criar Conta'}
                   </Button>
                 </div>
               </form>

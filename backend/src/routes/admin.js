@@ -26,6 +26,8 @@ router.get('/users', async (req, res) => {
         email: true,
         role: true,
         active: true,
+        plan: true,
+        allowedPages: true,
         accountOwnerId: true,
         createdAt: true,
         loginLogs: {
@@ -46,6 +48,8 @@ router.get('/users', async (req, res) => {
       email: u.email,
       role: u.role,
       active: u.active,
+      plan: u.plan,
+      allowedPages: u.allowedPages ? JSON.parse(u.allowedPages) : null,
       accountOwnerId: u.accountOwnerId,
       accountOwnerName: u.accountOwner?.name || null,
       createdAt: u.createdAt,
@@ -59,10 +63,83 @@ router.get('/users', async (req, res) => {
   }
 });
 
-// POST /api/admin/users - Criar novo utilizador (só admin)
+// GET /api/admin/accounts - Lista todas as contas clientes (account owners independentes)
+router.get('/accounts', async (req, res) => {
+  try {
+    const accounts = await prisma.user.findMany({
+      where: { accountOwnerId: null, role: 'user' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        active: true,
+        plan: true,
+        allowedPages: true,
+        createdAt: true,
+        accountMembers: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            active: true,
+            allowedPages: true,
+          },
+          orderBy: { name: 'asc' },
+        },
+        _count: { select: { accountMembers: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(accounts.map(a => ({
+      ...a,
+      allowedPages: a.allowedPages ? JSON.parse(a.allowedPages) : null,
+      accountMembers: a.accountMembers.map(m => ({
+        ...m,
+        allowedPages: m.allowedPages ? JSON.parse(m.allowedPages) : null,
+      })),
+    })));
+  } catch (error) {
+    console.error('Error fetching accounts:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH /api/admin/accounts/:id - Actualizar plano e/ou páginas de uma conta
+router.patch('/accounts/:id', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const { plan, allowedPages } = req.body;
+
+    const data = {};
+    if (plan !== undefined) data.plan = plan;
+    if (allowedPages !== undefined) {
+      data.allowedPages = allowedPages ? JSON.stringify(allowedPages) : null;
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data,
+      select: { id: true, name: true, email: true, plan: true, allowedPages: true },
+    });
+
+    res.json({
+      ...updated,
+      allowedPages: updated.allowedPages ? JSON.parse(updated.allowedPages) : null,
+    });
+  } catch (error) {
+    console.error('Error updating account:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Conta não encontrada' });
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/admin/users - Criar novo utilizador (admin pode criar contas independentes; só super-admin cria outros admins)
 router.post('/users', async (req, res) => {
   try {
-    const { name, email, password, role, accountOwnerId } = req.body;
+    const { name, email, password, role, accountOwnerId, plan, allowedPages } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email e password são obrigatórios' });
@@ -86,11 +163,11 @@ router.post('/users', async (req, res) => {
       }
     }
 
-    // Restrição super-admin: só olavo@mazanga.digital pode criar contas independentes ou admins
+    // Só super-admin pode criar outros admins
     const isSuperAdmin = req.user && req.user.email === SUPER_ADMIN_EMAIL;
-    if (!isSuperAdmin && (!accountOwnerId || role === 'admin')) {
+    if (!isSuperAdmin && role === 'admin') {
       return res.status(403).json({
-        error: 'Só o super-administrador pode criar contas independentes ou atribuir papel admin',
+        error: 'Só o super-administrador pode atribuir papel admin',
       });
     }
 
@@ -98,7 +175,7 @@ router.post('/users', async (req, res) => {
     const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // sistema fechado — confirmar automaticamente
+      email_confirm: true,
       user_metadata: { name },
     });
 
@@ -115,6 +192,8 @@ router.post('/users', async (req, res) => {
         role: role === 'admin' ? 'admin' : 'user',
         active: true,
         mustChangePassword: true,
+        plan: plan || 'essencial',
+        allowedPages: allowedPages ? JSON.stringify(allowedPages) : null,
         accountOwnerId: accountOwnerId ? parseInt(accountOwnerId) : null,
       },
     });
@@ -125,12 +204,13 @@ router.post('/users', async (req, res) => {
       email: user.email,
       role: user.role,
       active: user.active,
+      plan: user.plan,
+      allowedPages: user.allowedPages ? JSON.parse(user.allowedPages) : null,
       accountOwnerId: user.accountOwnerId,
       createdAt: user.createdAt,
     });
   } catch (error) {
     console.error('Error creating user:', error);
-    // Se o user foi criado no Supabase mas falhou no PostgreSQL, limpar
     res.status(500).json({ error: error.message });
   }
 });
@@ -139,7 +219,7 @@ router.post('/users', async (req, res) => {
 router.patch('/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, active, role } = req.body;
+    const { name, active, role, plan, allowedPages } = req.body;
     const userId = parseInt(id);
 
     const updateData = {};
@@ -148,21 +228,21 @@ router.patch('/users/:id', async (req, res) => {
     if (role !== undefined && ['admin', 'user'].includes(role)) {
       updateData.role = role;
     }
+    if (plan !== undefined) updateData.plan = plan;
+    if (allowedPages !== undefined) {
+      updateData.allowedPages = allowedPages ? JSON.stringify(allowedPages) : null;
+    }
 
     const user = await prisma.user.update({
       where: { id: userId },
       data: updateData,
       select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        active: true,
-        createdAt: true,
+        id: true, name: true, email: true, role: true, active: true,
+        plan: true, allowedPages: true, createdAt: true,
       },
     });
 
-    res.json(user);
+    res.json({ ...user, allowedPages: user.allowedPages ? JSON.parse(user.allowedPages) : null });
   } catch (error) {
     console.error('Error updating user:', error);
     if (error.code === 'P2025') {

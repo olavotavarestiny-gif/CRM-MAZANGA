@@ -13,6 +13,7 @@ import ProductTourProvider, { useTour } from '@/components/help/product-tour';
 import { ReactNode } from 'react';
 import { Menu } from 'lucide-react';
 import type { User } from '@/lib/api';
+import { hrefToKey, PAGE_KEYS } from '@/lib/page-keys';
 
 // ── Inner layout — consumes TourContext ──────────────────────────────────────
 
@@ -81,6 +82,14 @@ function LayoutInner({ children }: { children: ReactNode }) {
         if (pathname.startsWith('/equipa') && currentUser.accountOwnerId) {
           router.push('/');
         }
+        if (currentUser.allowedPages) {
+          const firstSegment = pathname === '/' ? '/' : '/' + pathname.split('/')[1];
+          const currentKey = hrefToKey(firstSegment);
+          if (currentKey && !currentUser.allowedPages.includes(currentKey)) {
+            const firstAllowed = PAGE_KEYS.find(p => currentUser.allowedPages!.includes(p.key));
+            router.push(firstAllowed?.href ?? '/');
+          }
+        }
       }
       return;
     }
@@ -105,6 +114,15 @@ function LayoutInner({ children }: { children: ReactNode }) {
         }
         if (pathname.startsWith('/equipa') && user.accountOwnerId) {
           router.push('/');
+        }
+        if (user.allowedPages) {
+          const firstSegment = pathname === '/' ? '/' : '/' + pathname.split('/')[1];
+          const currentKey = hrefToKey(firstSegment);
+          if (currentKey && !user.allowedPages.includes(currentKey)) {
+            const firstAllowed = PAGE_KEYS.find(p => user.allowedPages!.includes(p.key));
+            router.push(firstAllowed?.href ?? '/');
+            return;
+          }
         }
 
         // Show welcome modal on first visit

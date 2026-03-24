@@ -20,6 +20,7 @@ model User {
   role                 String     @default("user")   // "admin" | "user"
   active               Boolean    @default(true)
   plan                 String     @default("essencial") // "essencial" | "profissional"
+  allowedPages         String?    // JSON array: null = all pages; '["painel","contacts"]' = restricted
   mustChangePassword   Boolean    @default(false)
   accountOwnerId       Int?       // null = owner of their own account; Int = member of another account
   createdAt            DateTime   @default(now())

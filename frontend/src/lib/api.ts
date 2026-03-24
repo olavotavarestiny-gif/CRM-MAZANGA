@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, Task, CRMForm, FormField, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage } from './types';
+import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, Task, CRMForm, FormField, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount } from './types';
 import { createClient } from './supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -310,6 +310,7 @@ export interface User {
   role: string;
   active: boolean;
   plan?: string;
+  allowedPages?: string[] | null; // null = no restriction; array = restricted to these page keys
   accountOwnerId?: number | null;
   accountOwnerName?: string | null;
   mustChangePassword?: boolean;
@@ -704,6 +705,41 @@ export async function getChatUsers(): Promise<{ id: number; name: string; email:
 
 export async function getPlanUsage(): Promise<PlanUsage> {
   const res = await api.get('/api/chat/limits');
+  return res.data;
+}
+
+// ============================================
+// RBAC — PERMISSÕES POR PÁGINA
+// ============================================
+
+// Account owner: set allowed pages for a team member (null = all pages)
+export async function setMemberPages(memberId: number, pages: string[] | null): Promise<void> {
+  await api.patch(`/api/account/team/${memberId}/pages`, { pages });
+}
+
+// Admin: list all client accounts (independent account owners)
+export async function getClientAccounts(): Promise<ClientAccount[]> {
+  const res = await api.get('/api/admin/accounts');
+  return res.data;
+}
+
+// Admin: update plan and/or allowedPages for a client account
+export async function updateClientAccount(
+  id: number,
+  data: { plan?: string; allowedPages?: string[] | null }
+): Promise<void> {
+  await api.patch(`/api/admin/accounts/${id}`, data);
+}
+
+// Admin: create a new client account
+export async function createClientAccount(data: {
+  name: string;
+  email: string;
+  password: string;
+  plan?: string;
+  allowedPages?: string[] | null;
+}): Promise<User> {
+  const res = await api.post('/api/admin/users', { ...data, role: 'user' });
   return res.data;
 }
 

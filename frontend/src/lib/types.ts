@@ -418,3 +418,24 @@ export interface PlanUsage {
   usage: Record<string, PlanUsageItem>;
 }
 
+// ── GESTÃO DE CONTAS CLIENTES ────────────────────────────────
+export interface ClientAccountMember {
+  id: number;
+  name: string;
+  email: string;
+  active: boolean;
+  allowedPages: string[] | null;
+}
+
+export interface ClientAccount {
+  id: number;
+  name: string;
+  email: string;
+  active: boolean;
+  plan: string;
+  allowedPages: string[] | null;
+  createdAt: string;
+  accountMembers: ClientAccountMember[];
+  _count: { accountMembers: number };
+}
+

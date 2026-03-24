@@ -11,6 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
 import { getChatUnreadCount } from '@/lib/api';
+import { hrefToKey } from '@/lib/page-keys';
 import { ONBOARDING_OPEN, ONBOARDING_DISMISSED } from '@/lib/onboarding-tasks';
 
 const TOUR_ATTR: Record<string, string> = {
@@ -60,7 +61,7 @@ export default function Sidebar({
       : 'text-[#6b7e9a] hover:text-[#0A2540] hover:bg-[#0A2540]/5'
   );
 
-  const mainLinks = [
+  const allMainLinks = [
     { href: '/', label: 'Painel', icon: BarChart3 },
     { href: '/pipeline', label: 'Negociações', icon: Kanban },
     { href: '/contacts', label: 'Contactos', icon: Users },
@@ -71,11 +72,23 @@ export default function Sidebar({
     { href: '/forms', label: 'Formulários', icon: FileText },
   ];
 
-  // Visible to account owners (not sub-members) and admins
-  const gestaoLinks = (isOwner || isAdmin) ? [
+  const allGestaoLinks = (isOwner || isAdmin) ? [
     { href: '/finances', label: 'Finanças', icon: DollarSign },
     { href: '/produtos', label: 'Produtos', icon: Package },
   ] : [];
+
+  // Filter by allowedPages (null = show all)
+  const allowed = currentUser?.allowedPages ?? null;
+  const filterByAllowed = <T extends { href: string }>(links: T[]): T[] => {
+    if (!allowed) return links;
+    return links.filter(l => {
+      const key = hrefToKey(l.href);
+      return key === null || allowed.includes(key);
+    });
+  };
+
+  const mainLinks = filterByAllowed(allMainLinks);
+  const gestaoLinks = filterByAllowed(allGestaoLinks);
 
   const adminLinks: { href: string; label: string; icon: React.ElementType }[] = [];
 

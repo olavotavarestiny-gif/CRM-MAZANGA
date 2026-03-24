@@ -28,6 +28,7 @@ router.get('/team', requireAccountOwner, async (req, res) => {
         name: true,
         email: true,
         active: true,
+        allowedPages: true,
         createdAt: true,
         loginLogs: {
           take: 1,
@@ -40,6 +41,7 @@ router.get('/team', requireAccountOwner, async (req, res) => {
 
     const membersWithLastLogin = members.map((m) => ({
       ...m,
+      allowedPages: m.allowedPages ? JSON.parse(m.allowedPages) : null,
       lastLogin: m.loginLogs[0]?.createdAt || null,
       loginLogs: undefined,
     }));
@@ -107,6 +109,42 @@ router.post('/team', requireAccountOwner, async (req, res) => {
     res.status(201).json(member);
   } catch (error) {
     console.error('Error creating team member:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH /api/account/team/:memberId/pages - Definir páginas permitidas de um membro
+router.patch('/team/:memberId/pages', requireAccountOwner, async (req, res) => {
+  try {
+    const memberId = parseInt(req.params.memberId);
+    const accountOwnerId = req.user.effectiveUserId;
+    const { pages } = req.body; // string[] | null
+
+    const member = await prisma.user.findFirst({
+      where: { id: memberId, accountOwnerId },
+    });
+    if (!member) return res.status(404).json({ error: 'Membro não encontrado nesta conta' });
+
+    // Fetch org's own allowedPages to enforce intersection
+    const owner = await prisma.user.findUnique({
+      where: { id: accountOwnerId },
+      select: { allowedPages: true },
+    });
+    const orgAllowed = owner?.allowedPages ? JSON.parse(owner.allowedPages) : null;
+
+    let finalPages = pages || null;
+    if (orgAllowed && finalPages) {
+      finalPages = finalPages.filter(p => orgAllowed.includes(p));
+    }
+
+    await prisma.user.update({
+      where: { id: memberId },
+      data: { allowedPages: finalPages ? JSON.stringify(finalPages) : null },
+    });
+
+    res.json({ allowedPages: finalPages });
+  } catch (error) {
+    console.error('Error setting member pages:', error);
     res.status(500).json({ error: error.message });
   }
 });
