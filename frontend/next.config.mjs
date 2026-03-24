@@ -15,6 +15,8 @@ const securityHeaders = [
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   // Restrict browser features
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+  // HSTS — force HTTPS for 1 year (ZAP alert: Strict-Transport-Security Not Set)
+  { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
   // Content Security Policy (alerts 2 & 3)
   // 'unsafe-inline' and 'unsafe-eval' required by Next.js 14 inline script injection
   {
