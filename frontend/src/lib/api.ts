@@ -18,7 +18,7 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Response interceptor: handle 401 errors
+// Response interceptor: handle 401 + extract user-friendly error messages
 let isLoggingOut = false;
 api.interceptors.response.use(
   (response) => response,
@@ -29,7 +29,14 @@ api.interceptors.response.use(
         window.location.href = '/auth/signout';
       }
     }
-    return Promise.reject(error);
+    // Extract the backend error message so .message is always human-readable
+    const message =
+      error.response?.data?.error ||
+      error.response?.data?.message ||
+      error.message;
+    const friendlyError = new Error(message);
+    (friendlyError as any).response = error.response;
+    return Promise.reject(friendlyError);
   }
 );
 

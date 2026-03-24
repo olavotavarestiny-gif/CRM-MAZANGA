@@ -58,7 +58,7 @@ function ConfiguracoesContent() {
       setPwSuccess('Password alterada com sucesso!');
       setPwForm({ current: '', new: '', confirm: '' });
     } catch (err: any) {
-      setPwError(err.response?.data?.error || 'Erro ao alterar password');
+      setPwError(err.message || 'Erro ao alterar a password. Tente novamente.');
     } finally {
       setPwSubmitting(false);
     }
@@ -71,6 +71,7 @@ function ConfiguracoesContent() {
   const [ibans, setIbans] = useState<IBANEntry[]>([]);
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [configSaved, setConfigSaved] = useState(false);
+  const [configError, setConfigError] = useState('');
   const [showEstab, setShowEstab] = useState(false);
   const [estabForm, setEstabForm] = useState({ nome: '', nif: '', morada: '', telefone: '', email: '', isPrincipal: false });
 
@@ -109,8 +110,12 @@ function ConfiguracoesContent() {
     mutationFn: () => updateFaturacaoConfig({ ...configForm, iban: JSON.stringify(ibans), logoUrl }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['faturacao-config'] });
+      setConfigError('');
       setConfigSaved(true);
-      setTimeout(() => setConfigSaved(false), 2000);
+      setTimeout(() => setConfigSaved(false), 2500);
+    },
+    onError: (err: Error) => {
+      setConfigError(err.message || 'Erro ao guardar as configurações. Tente novamente.');
     },
   });
 
@@ -332,9 +337,27 @@ function ConfiguracoesContent() {
                         onChange={e => {
                           const file = e.target.files?.[0];
                           if (!file) return;
-                          if (file.size > 800 * 1024) { alert('Ficheiro demasiado grande. Máx. 800 KB.'); return; }
+                          if (file.size > 2 * 1024 * 1024) { setConfigError('Ficheiro demasiado grande. Use uma imagem com menos de 2 MB.'); return; }
                           const reader = new FileReader();
-                          reader.onload = ev => setLogoUrl(ev.target?.result as string || '');
+                          reader.onload = ev => {
+                            const src = ev.target?.result as string;
+                            if (!src) return;
+                            // Compress via canvas to max 200px height, JPEG quality 0.85
+                            const img = new Image();
+                            img.onload = () => {
+                              const MAX_H = 200;
+                              const scale = img.height > MAX_H ? MAX_H / img.height : 1;
+                              const canvas = document.createElement('canvas');
+                              canvas.width = Math.round(img.width * scale);
+                              canvas.height = Math.round(img.height * scale);
+                              const ctx = canvas.getContext('2d')!;
+                              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                              const mimeOut = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+                              setLogoUrl(canvas.toDataURL(mimeOut, 0.85));
+                              setConfigError('');
+                            };
+                            img.src = src;
+                          };
                           reader.readAsDataURL(file);
                         }}
                       />
@@ -415,7 +438,12 @@ function ConfiguracoesContent() {
                 </div>
                 {configForm.agtMockMode && <span className="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700 border border-amber-200">ATIVO</span>}
               </div>
-              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90">
+              {configError && (
+                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                  {configError}
+                </div>
+              )}
+              <Button onClick={() => { setConfigError(''); saveMutation.mutate(); }} disabled={saveMutation.isPending} className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90">
                 {configSaved ? <><CheckCircle2 className="w-4 h-4 mr-2" /> Guardado!</> : saveMutation.isPending ? 'A guardar...' : 'Guardar Configurações'}
               </Button>
             </div>

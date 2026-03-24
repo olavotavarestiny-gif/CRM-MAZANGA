@@ -118,7 +118,22 @@ router.post('/change-password', requireAuth, async (req, res) => {
     });
 
     if (error) {
-      return res.status(400).json({ error: error.message });
+      const raw = (error.message || '').toLowerCase();
+      let msg = 'Não foi possível alterar a password. Tente novamente.';
+      if (raw.includes('at least') || raw.includes('characters') || raw.includes('length')) {
+        msg = 'A password deve ter pelo menos 6 caracteres.';
+      } else if (raw.includes('weak') || raw.includes('strong') || raw.includes('strength')) {
+        msg = 'A password é demasiado fraca. Use letras maiúsculas, minúsculas, números e símbolos.';
+      } else if (raw.includes('number') || raw.includes('digit')) {
+        msg = 'A password deve conter pelo menos um número.';
+      } else if (raw.includes('uppercase') || raw.includes('lower')) {
+        msg = 'A password deve conter letras maiúsculas e minúsculas.';
+      } else if (raw.includes('special') || raw.includes('symbol')) {
+        msg = 'A password deve conter pelo menos um símbolo especial (ex: @, #, !).';
+      } else if (raw.includes('same') || raw.includes('different') || raw.includes('previous')) {
+        msg = 'A nova password não pode ser igual à anterior.';
+      }
+      return res.status(400).json({ error: msg });
     }
 
     // Clear mustChangePassword flag

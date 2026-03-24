@@ -15,7 +15,7 @@ router.get('/config', async (req, res) => {
     }
     res.json(config);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Erro de servidor. Tente novamente." });
   }
 });
 
@@ -40,7 +40,7 @@ router.put('/config', async (req, res) => {
     });
     res.json(config);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Erro de servidor. Tente novamente." });
   }
 });
 
@@ -59,7 +59,7 @@ router.get('/config/status', async (req, res) => {
       pendingCount,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Erro de servidor. Tente novamente." });
   }
 });
 

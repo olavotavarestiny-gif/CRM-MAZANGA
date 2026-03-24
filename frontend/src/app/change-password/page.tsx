@@ -35,7 +35,7 @@ export default function ChangePasswordPage() {
       await changePassword(newPassword);
       router.push('/');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao alterar password');
+      setError(err.message || 'Erro ao alterar a password. Tente novamente.');
     } finally {
       setLoading(false);
     }

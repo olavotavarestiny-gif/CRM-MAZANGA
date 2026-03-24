@@ -165,7 +165,14 @@ router.post('/facturas', async (req, res) => {
     res.status(201).json({ ...factura, lines: processedLines });
   } catch (err) {
     console.error('Error creating factura:', err);
-    res.status(500).json({ error: err.message });
+    const msg = err.message || '';
+    if (err.code === 'P2002') return res.status(409).json({ error: 'Já existe uma fatura com este número. Por favor tente novamente.' });
+    if (msg.includes('Série não encontrada')) return res.status(400).json({ error: 'A série seleccionada não existe. Selecione outra série nas definições.' });
+    if (msg.includes('Série está fechada')) return res.status(400).json({ error: 'A série está fechada. Crie ou seleccione uma série activa.' });
+    if (msg.includes('serie') || msg.includes('Serie')) return res.status(400).json({ error: 'Problema com a série de faturação. Verifique as configurações de séries.' });
+    if (msg.includes('estabelecimento') || msg.includes('Estabelecimento')) return res.status(400).json({ error: 'O estabelecimento seleccionado não foi encontrado. Configure o estabelecimento nas definições.' });
+    if (msg.includes('cliente') || msg.includes('NIF')) return res.status(400).json({ error: 'Dados do cliente inválidos. Verifique o NIF e o nome.' });
+    res.status(500).json({ error: 'Erro ao criar a fatura. Verifique todos os campos e tente novamente.' });
   }
 });
 
@@ -189,7 +196,8 @@ router.post('/facturas/:id/anular', async (req, res) => {
 
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error cancelling factura:', err);
+    res.status(500).json({ error: 'Erro ao anular a fatura. Tente novamente.' });
   }
 });
 
@@ -216,7 +224,7 @@ router.get('/facturas/:id/pdf', async (req, res) => {
     res.send(pdfBuffer);
   } catch (err) {
     console.error('PDF generation error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Erro ao gerar o PDF. Verifique se as configurações da empresa estão preenchidas (nome, NIF, morada).' });
   }
 });
 

@@ -22,7 +22,7 @@ router.get('/clientes', async (req, res) => {
     ]);
     res.json({ clientes, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Erro de servidor. Tente novamente." });
   }
 });
 
@@ -36,8 +36,8 @@ router.post('/clientes', async (req, res) => {
     });
     res.status(201).json(cliente);
   } catch (err) {
-    if (err.code === 'P2002') return res.status(409).json({ error: 'Cliente com este NIF já existe' });
-    res.status(500).json({ error: err.message });
+    if (err.code === 'P2002') return res.status(409).json({ error: 'Já existe um cliente com este NIF. Selecione-o na lista de clientes em vez de criar um novo.' });
+    res.status(500).json({ error: 'Erro ao criar o cliente. Verifique o NIF e o nome e tente novamente.' });
   }
 });
 
@@ -58,7 +58,7 @@ router.put('/clientes/:id', async (req, res) => {
     });
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Erro de servidor. Tente novamente." });
   }
 });
 
@@ -85,7 +85,7 @@ router.post('/clientes/from-contact', async (req, res) => {
     });
     res.json(cliente);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Erro de servidor. Tente novamente." });
   }
 });
 
