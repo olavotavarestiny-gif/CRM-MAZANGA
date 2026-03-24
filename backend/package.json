@@ -16,6 +16,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@expo-google-fonts/inter": "^0.4.2",
     "@prisma/client": "^5.10.0",
     "@supabase/supabase-js": "^2.99.3",
     "axios": "^1.6.2",

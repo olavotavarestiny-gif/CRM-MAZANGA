@@ -327,12 +327,12 @@ function ConfiguracoesContent() {
                       </span>
                       <input
                         type="file"
-                        accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                        accept="image/png,image/jpeg,image/webp"
                         className="sr-only"
                         onChange={e => {
                           const file = e.target.files?.[0];
                           if (!file) return;
-                          if (file.size > 600 * 1024) { alert('Ficheiro demasiado grande. Máx. 600 KB.'); return; }
+                          if (file.size > 800 * 1024) { alert('Ficheiro demasiado grande. Máx. 800 KB.'); return; }
                           const reader = new FileReader();
                           reader.onload = ev => setLogoUrl(ev.target?.result as string || '');
                           reader.readAsDataURL(file);
@@ -342,7 +342,7 @@ function ConfiguracoesContent() {
                     {logoUrl && (
                       <button type="button" onClick={() => setLogoUrl('')} className="text-xs text-red-500 hover:text-red-700 text-left">Remover</button>
                     )}
-                    <p className="text-xs text-gray-400">PNG, JPG ou SVG · máx. 600 KB</p>
+                    <p className="text-xs text-gray-400">PNG, JPG ou WebP · máx. 800 KB (SVG não suportado em PDF)</p>
                   </div>
                 </div>
               </div>
