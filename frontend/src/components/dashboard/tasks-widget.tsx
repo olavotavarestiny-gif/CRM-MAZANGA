@@ -1,13 +1,17 @@
 'use client';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTasks, updateTask } from '@/lib/api';
 import { Task } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskItem from '@/components/tasks/task-item';
+import TaskFormModal from '@/components/tasks/task-form-modal';
 
 export default function TasksWidget() {
   const queryClient = useQueryClient();
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const { data: tasks = [] } = useQuery({
     queryKey: ['tasks', 'pending'],
@@ -28,35 +32,53 @@ export default function TasksWidget() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
   });
 
+  const handleEdit = (task: Task) => {
+    setEditingTask(task);
+    setModalOpen(true);
+  };
+
+  const handleClose = () => {
+    setModalOpen(false);
+    setEditingTask(null);
+  };
+
   return (
-    <Card className="col-span-full">
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="text-base">Tarefas Pendentes</CardTitle>
-        <Link href="/tasks" className="text-xs text-[#635BFF] hover:underline">Ver todas</Link>
-      </CardHeader>
-      <CardContent>
-        {tasks.length > 0 ? (
-          <div className="space-y-2">
-            {tasks.slice(0, 8).map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onToggleDone={(id, done) => toggleMutation.mutate({ id, done })}
-                onEdit={() => {}}
-                onDelete={() => {}}
-                canDelete={false}
-              />
-            ))}
-            {tasks.length > 8 && (
-              <Link href="/tasks" className="text-xs text-[#635BFF] hover:underline block pt-1">
-                + {tasks.length - 8} mais tarefas
-              </Link>
-            )}
-          </div>
-        ) : (
-          <p className="text-center text-[#6b7e9a] py-6">Nenhuma tarefa pendente 🎉</p>
-        )}
-      </CardContent>
-    </Card>
+    <>
+      <Card className="col-span-full">
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="text-base">Tarefas Pendentes</CardTitle>
+          <Link href="/tasks" className="text-xs text-[#635BFF] hover:underline">Ver todas</Link>
+        </CardHeader>
+        <CardContent>
+          {tasks.length > 0 ? (
+            <div className="space-y-2">
+              {tasks.slice(0, 8).map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onToggleDone={(id, done) => toggleMutation.mutate({ id, done })}
+                  onEdit={handleEdit}
+                  onDelete={() => {}}
+                  canDelete={false}
+                />
+              ))}
+              {tasks.length > 8 && (
+                <Link href="/tasks" className="text-xs text-[#635BFF] hover:underline block pt-1">
+                  + {tasks.length - 8} mais tarefas
+                </Link>
+              )}
+            </div>
+          ) : (
+            <p className="text-center text-[#6b7e9a] py-6">Nenhuma tarefa pendente 🎉</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <TaskFormModal
+        open={modalOpen}
+        onClose={handleClose}
+        task={editingTask}
+      />
+    </>
   );
 }

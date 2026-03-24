@@ -350,7 +350,7 @@ export default function TransactionForm({
                 <SelectTrigger className="border-[#dde3ec] text-[#0A2540]">
                   <SelectValue placeholder="Seleccionar..." />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-slate-200">
+                <SelectContent className="bg-white border-[#E2E8F0]">
                   <SelectItem value="none" className="text-[#6b7e9a]">Sem cliente</SelectItem>
                   {contacts.map((c) => (
                     <SelectItem key={c.id} value={c.id.toString()} className="text-[#0A2540]">
@@ -370,7 +370,7 @@ export default function TransactionForm({
                 <SelectTrigger className="border-[#dde3ec] text-[#0A2540]">
                   <SelectValue placeholder="Seleccionar..." />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-slate-200">
+                <SelectContent className="bg-white border-[#E2E8F0]">
                   {filteredCategories.map((c) => (
                     <SelectItem key={c.id} value={c.category} className="text-[#0A2540]">
                       {c.icon} {c.category}
@@ -389,7 +389,7 @@ export default function TransactionForm({
                 <SelectTrigger className="border-[#dde3ec] text-[#0A2540] disabled:opacity-50">
                   <SelectValue placeholder="Opcional..." />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-slate-200">
+                <SelectContent className="bg-white border-[#E2E8F0]">
                   {subcategoryOptions.map((s) => (
                     <SelectItem key={s} value={s} className="text-[#0A2540]">
                       {s}
@@ -434,7 +434,7 @@ export default function TransactionForm({
                   <SelectTrigger className="border-[#dde3ec] text-[#0A2540]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-zinc-800 border-slate-200">
+                  <SelectContent className="bg-white border-[#E2E8F0]">
                     {['KZ', 'USD', 'EUR', 'CHF'].map((c) => (
                       <SelectItem key={c} value={c} className="text-[#0A2540]">{c}</SelectItem>
                     ))}
@@ -477,7 +477,7 @@ export default function TransactionForm({
                     <SelectTrigger className="border-[#dde3ec] text-[#0A2540]">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-800 border-slate-200">
+                    <SelectContent className="bg-white border-[#E2E8F0]">
                       {['KZ', 'USD', 'EUR', 'CHF'].map((c) => (
                         <SelectItem key={c} value={c} className="text-[#0A2540]">{c}</SelectItem>
                       ))}
@@ -510,7 +510,7 @@ export default function TransactionForm({
                 <SelectTrigger className="border-[#dde3ec] text-[#0A2540]">
                   <SelectValue placeholder="Opcional..." />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-slate-200">
+                <SelectContent className="bg-white border-[#E2E8F0]">
                   {['Transferência Bancária', 'Dinheiro', 'TPA', 'Multicaixa Express', 'Paypal', 'Wise'].map((m) => (
                     <SelectItem key={m} value={m} className="text-[#0A2540]">{m}</SelectItem>
                   ))}
