@@ -259,30 +259,44 @@ async function generateFacturaPDF(factura, config) {
       doc.moveTo(MARGIN, y + rowH).lineTo(MARGIN + tableW, y + rowH)
          .lineWidth(0.4).strokeColor(BORDER).stroke();
 
-      cx = MARGIN;
-      [
-        { v: String(line.lineNumber ?? idx + 1), align: 'center' },
-        null,
-        { v: fmtNum(qty),                           align: 'right' },
-        { v: incl ? 'Incluído' : fmtNum(uprc),      align: 'right' },
-        { v: incl ? '—'        : `${tax}%`,         align: 'right' },
-        { v: incl ? 'Incluído' : fmtNum(tot),       align: 'right' },
-      ].forEach((val, ci) => {
-        const col = cols[ci];
+      // Renderizar cada célula com posição absoluta (evita cursor drift do PDFKit)
+      let colX = MARGIN;
+      cols.forEach((col, ci) => {
         if (ci === 1) {
+          // Coluna de descrição — posição fixa y+5 com código abaixo (só linhas normais)
           doc.font('SB').fontSize(8.5).fillColor(incl ? '#059669' : NAVY)
-             .text(line.productDescription || '—', cx + 5, y + 5, { width: col.w - 10, lineBreak: false });
-          if (line.productCode) {
+             .text(line.productDescription || '—', colX + 5, y + 5, { width: col.w - 10, lineBreak: false, ellipsis: true });
+          if (!incl && line.productCode) {
             doc.font('R').fontSize(7).fillColor(GRAY)
-               .text(line.productCode, cx + 5, y + 15, { width: col.w - 10, lineBreak: false });
+               .text(line.productCode, colX + 5, y + 15, { width: col.w - 10, lineBreak: false, ellipsis: true });
           }
-        } else if (val) {
-          const isInclLabel = incl && (ci === 3 || ci === 5);
-          doc.font(isInclLabel ? 'SB' : 'R').fontSize(8.5)
-             .fillColor(isInclLabel ? '#059669' : NAVY)
-             .text(val.v, cx + 5, y + 7, { width: col.w - 10, align: val.align, lineBreak: false });
+        } else if (ci === 0) {
+          doc.font('R').fontSize(8.5).fillColor(NAVY)
+             .text(String(line.lineNumber ?? 1), colX + 5, y + 7, { width: col.w - 10, align: 'center', lineBreak: false });
+        } else if (ci === 2) {
+          doc.font('R').fontSize(8.5).fillColor(NAVY)
+             .text(fmtNum(qty), colX + 5, y + 7, { width: col.w - 10, align: 'right', lineBreak: false });
+        } else if (ci === 3) {
+          if (incl) {
+            doc.font('SB').fontSize(8).fillColor('#059669')
+               .text('Incluído', colX + 5, y + 7, { width: col.w - 10, align: 'right', lineBreak: false });
+          } else {
+            doc.font('R').fontSize(8.5).fillColor(NAVY)
+               .text(fmtNum(uprc), colX + 5, y + 7, { width: col.w - 10, align: 'right', lineBreak: false });
+          }
+        } else if (ci === 4) {
+          doc.font('R').fontSize(8.5).fillColor(NAVY)
+             .text(incl ? '—' : `${tax}%`, colX + 5, y + 7, { width: col.w - 10, align: 'right', lineBreak: false });
+        } else if (ci === 5) {
+          if (incl) {
+            doc.font('SB').fontSize(8).fillColor('#059669')
+               .text('Incluído', colX + 5, y + 7, { width: col.w - 10, align: 'right', lineBreak: false });
+          } else {
+            doc.font('R').fontSize(8.5).fillColor(NAVY)
+               .text(fmtNum(tot), colX + 5, y + 7, { width: col.w - 10, align: 'right', lineBreak: false });
+          }
         }
-        cx += col.w;
+        colX += col.w;
       });
       y += rowH;
     });
