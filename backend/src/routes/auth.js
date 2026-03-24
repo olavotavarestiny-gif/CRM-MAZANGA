@@ -4,6 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
 const requireAuth = require('../middleware/auth');
 const { importJWK, jwtVerify } = require('jose');
+const { intersectPermissions, parsePermissions } = require('../lib/permissions');
 
 // Lazy Supabase admin client — only created when first used so missing env vars
 // don't crash the server on startup
@@ -90,8 +91,8 @@ router.get('/me', requireAuth, async (req, res) => {
       where: { id: req.user.id },
       select: {
         id: true, name: true, email: true, role: true, active: true,
-        plan: true, allowedPages: true, mustChangePassword: true,
-        accountOwnerId: true, createdAt: true,
+        plan: true, permissions: true, mustChangePassword: true,
+        accountOwnerId: true, createdAt: true, isSuperAdmin: true,
       },
     });
 
@@ -99,34 +100,33 @@ router.get('/me', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Utilizador não encontrado' });
     }
 
-    let effectiveAllowedPages = user.allowedPages ? JSON.parse(user.allowedPages) : null;
+    let effectivePermissions = parsePermissions(user.permissions);
     let effectivePlan = user.plan;
     let accountOwnerName = null;
 
     if (user.accountOwnerId) {
-      // Team member — inherit plan and compute effective allowedPages from org owner
+      // Team member — inherit plan and compute effective permissions (intersection)
       const owner = await prisma.user.findUnique({
         where: { id: user.accountOwnerId },
-        select: { plan: true, allowedPages: true, name: true },
+        select: { plan: true, permissions: true, name: true },
       });
       if (owner) {
         effectivePlan = owner.plan || 'essencial';
         accountOwnerName = owner.name;
-        const orgAllowed = owner.allowedPages ? JSON.parse(owner.allowedPages) : null;
-        const memberAllowed = effectiveAllowedPages;
-        if (orgAllowed && memberAllowed) {
-          effectiveAllowedPages = orgAllowed.filter(p => memberAllowed.includes(p));
-        } else {
-          effectiveAllowedPages = orgAllowed || memberAllowed; // null if both null
-        }
+        const orgPerms = parsePermissions(owner.permissions);
+        effectivePermissions = intersectPermissions(orgPerms, effectivePermissions);
       }
     }
+
+    // Include impersonatedBy if this request is via impersonation
+    const impersonatedBy = req.user.impersonatedBy || null;
 
     res.json({
       ...user,
       plan: effectivePlan,
-      allowedPages: effectiveAllowedPages,
+      permissions: effectivePermissions,
       accountOwnerName,
+      impersonatedBy,
     });
   } catch (error) {
     console.error('Error fetching user:', error);

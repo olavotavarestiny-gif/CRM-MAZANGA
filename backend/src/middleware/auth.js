@@ -1,4 +1,5 @@
 const { importJWK, jwtVerify } = require('jose');
+const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 
 // Supabase project's EC public key (from /auth/v1/.well-known/jwks.json)
@@ -20,6 +21,12 @@ async function getPublicKey() {
   return _publicKey;
 }
 
+const USER_SELECT = {
+  id: true, name: true, email: true, role: true,
+  active: true, accountOwnerId: true, mustChangePassword: true,
+  isSuperAdmin: true, permissions: true,
+};
+
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1];
@@ -28,6 +35,39 @@ async function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Não autenticado' });
   }
 
+  // ── Impersonation token (HS256, signed with JWT_SECRET) ───────────────────
+  // We attempt HS256 verification first. If it succeeds and type='impersonation',
+  // we use the impersonated user. Otherwise fall through to Supabase JWT.
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+    if (decoded.type === 'impersonation') {
+      const targetUser = await prisma.user.findUnique({
+        where: { id: decoded.impersonatedUserId },
+        select: USER_SELECT,
+      });
+      if (!targetUser || !targetUser.active) {
+        return res.status(403).json({ error: 'Utilizador impersonado não encontrado ou inactivo' });
+      }
+      req.user = {
+        id: targetUser.id,
+        email: targetUser.email,
+        name: targetUser.name,
+        role: targetUser.role,
+        isSuperAdmin: targetUser.isSuperAdmin,
+        permissionsJson: targetUser.permissions,
+        accountOwnerId: targetUser.accountOwnerId || null,
+        effectiveUserId: targetUser.accountOwnerId || targetUser.id,
+        isAccountOwner: !targetUser.accountOwnerId,
+        mustChangePassword: targetUser.mustChangePassword,
+        impersonatedBy: decoded.impersonatorId,
+      };
+      return next();
+    }
+  } catch {
+    // Not a valid HS256 token — fall through to Supabase verification
+  }
+
+  // ── Supabase JWT (ES256) ──────────────────────────────────────────────────
   let decoded;
   try {
     const publicKey = await getPublicKey();
@@ -45,12 +85,7 @@ async function requireAuth(req, res, next) {
   const jwtEmail = decoded.email;
 
   try {
-    const select = {
-      id: true, name: true, email: true, role: true,
-      active: true, accountOwnerId: true, mustChangePassword: true,
-    };
-
-    let user = await prisma.user.findUnique({ where: { supabaseUid }, select });
+    let user = await prisma.user.findUnique({ where: { supabaseUid }, select: USER_SELECT });
 
     // Auto-link: first login after migration — supabaseUid not yet linked in DB
     if (!user && jwtEmail) {
@@ -59,7 +94,7 @@ async function requireAuth(req, res, next) {
         user = await prisma.user.update({
           where: { id: byEmail.id },
           data: { supabaseUid },
-          select,
+          select: USER_SELECT,
         });
         console.log(`[auth] auto-linked supabaseUid for ${jwtEmail}`);
       }
@@ -74,11 +109,14 @@ async function requireAuth(req, res, next) {
       email: user.email,
       name: user.name,
       role: user.role,
+      isSuperAdmin: user.isSuperAdmin,
+      permissionsJson: user.permissions,
       accountOwnerId: user.accountOwnerId || null,
       supabaseUid,
       effectiveUserId: user.accountOwnerId || user.id,
       isAccountOwner: !user.accountOwnerId,
       mustChangePassword: user.mustChangePassword,
+      impersonatedBy: null,
     };
     next();
   } catch (error) {
@@ -108,14 +146,15 @@ function requireAccountOwnerOrAdmin(req, res, next) {
   return res.status(403).json({ error: 'Acesso não autorizado' });
 }
 
-const SUPER_ADMIN_EMAIL = 'olavo@mazanga.digital';
-
 function requireSuperAdmin(req, res, next) {
-  if (req.user?.email !== SUPER_ADMIN_EMAIL) {
+  if (!req.user?.isSuperAdmin) {
     return res.status(403).json({ error: 'Acção reservada ao super-administrador' });
   }
   next();
 }
+
+// Keep for backwards compatibility
+const SUPER_ADMIN_EMAIL = 'olavo@mazanga.digital';
 
 module.exports = requireAuth;
 module.exports.requireAdmin = requireAdmin;

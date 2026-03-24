@@ -74,7 +74,7 @@ router.get('/accounts', async (req, res) => {
         email: true,
         active: true,
         plan: true,
-        allowedPages: true,
+        permissions: true,
         createdAt: true,
         accountMembers: {
           select: {
@@ -82,7 +82,7 @@ router.get('/accounts', async (req, res) => {
             name: true,
             email: true,
             active: true,
-            allowedPages: true,
+            permissions: true,
           },
           orderBy: { name: 'asc' },
         },
@@ -93,10 +93,10 @@ router.get('/accounts', async (req, res) => {
 
     res.json(accounts.map(a => ({
       ...a,
-      allowedPages: a.allowedPages ? JSON.parse(a.allowedPages) : null,
+      permissions: a.permissions ? JSON.parse(a.permissions) : null,
       accountMembers: a.accountMembers.map(m => ({
         ...m,
-        allowedPages: m.allowedPages ? JSON.parse(m.allowedPages) : null,
+        permissions: m.permissions ? JSON.parse(m.permissions) : null,
       })),
     })));
   } catch (error) {
@@ -105,27 +105,27 @@ router.get('/accounts', async (req, res) => {
   }
 });
 
-// PATCH /api/admin/accounts/:id - Actualizar plano e/ou páginas de uma conta
+// PATCH /api/admin/accounts/:id - Actualizar plano e/ou permissões de uma conta
 router.patch('/accounts/:id', async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
-    const { plan, allowedPages } = req.body;
+    const { plan, permissions } = req.body;
 
     const data = {};
     if (plan !== undefined) data.plan = plan;
-    if (allowedPages !== undefined) {
-      data.allowedPages = allowedPages ? JSON.stringify(allowedPages) : null;
+    if (permissions !== undefined) {
+      data.permissions = permissions ? JSON.stringify(permissions) : null;
     }
 
     const updated = await prisma.user.update({
       where: { id: userId },
       data,
-      select: { id: true, name: true, email: true, plan: true, allowedPages: true },
+      select: { id: true, name: true, email: true, plan: true, permissions: true },
     });
 
     res.json({
       ...updated,
-      allowedPages: updated.allowedPages ? JSON.parse(updated.allowedPages) : null,
+      permissions: updated.permissions ? JSON.parse(updated.permissions) : null,
     });
   } catch (error) {
     console.error('Error updating account:', error);

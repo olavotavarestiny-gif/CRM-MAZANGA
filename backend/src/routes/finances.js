@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { requirePermission, requireDeletePermission } = require('../lib/permissions');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -17,7 +18,7 @@ function formatKz(value) {
 }
 
 // ─── GET /api/finances/dashboard ────────────────────────────────────────────
-router.get('/dashboard', async (req, res) => {
+router.get('/dashboard', requirePermission('finances', 'transactions_view'), async (req, res) => {
   try {
     const { year, month } = req.query;
     const now = new Date();
@@ -26,7 +27,7 @@ router.get('/dashboard', async (req, res) => {
     const to = endOfMonth(targetDate);
 
     const baseWhere = {
-      userId: req.user.id,
+      userId: req.user.effectiveUserId,
       deleted: false,
       status: 'pago',
       date: { gte: from, lte: to },
@@ -61,7 +62,7 @@ router.get('/dashboard', async (req, res) => {
 });
 
 // ─── GET /api/finances/transactions ─────────────────────────────────────────
-router.get('/transactions', async (req, res) => {
+router.get('/transactions', requirePermission('finances', 'transactions_view'), async (req, res) => {
   try {
     const {
       page = '1',
@@ -79,7 +80,7 @@ router.get('/transactions', async (req, res) => {
     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    const where = { userId: req.user.id, deleted: false };
+    const where = { userId: req.user.effectiveUserId, deleted: false };
 
     if (type && ['entrada', 'saida'].includes(type)) where.type = type;
     if (status && ['pago', 'pendente', 'atrasado'].includes(status)) where.status = status;
@@ -125,7 +126,7 @@ router.get('/transactions', async (req, res) => {
 });
 
 // ─── POST /api/finances/transactions ────────────────────────────────────────
-router.post('/transactions', async (req, res) => {
+router.post('/transactions', requirePermission('finances', 'transactions_edit'), async (req, res) => {
   try {
     const {
       date,
@@ -180,7 +181,7 @@ router.post('/transactions', async (req, res) => {
 
     const transaction = await prisma.transaction.create({
       data: {
-        userId: req.user.id,
+        userId: req.user.effectiveUserId,
         date: new Date(date),
         clientId: clientId ? parseInt(clientId) : null,
         clientName: resolvedClientName,
@@ -212,10 +213,10 @@ router.post('/transactions', async (req, res) => {
 });
 
 // ─── PUT /api/finances/transactions/:id ─────────────────────────────────────
-router.put('/transactions/:id', async (req, res) => {
+router.put('/transactions/:id', requirePermission('finances', 'transactions_edit'), async (req, res) => {
   try {
     const existing = await prisma.transaction.findUnique({ where: { id: req.params.id } });
-    if (!existing || existing.deleted || existing.userId !== req.user.id) {
+    if (!existing || existing.deleted || existing.userId !== req.user.effectiveUserId) {
       return res.status(404).json({ error: 'Transação não encontrada.' });
     }
 
@@ -258,10 +259,10 @@ router.put('/transactions/:id', async (req, res) => {
 });
 
 // ─── DELETE /api/finances/transactions/:id (soft delete) ────────────────────
-router.delete('/transactions/:id', async (req, res) => {
+router.delete('/transactions/:id', requireDeletePermission, async (req, res) => {
   try {
     const existing = await prisma.transaction.findUnique({ where: { id: req.params.id } });
-    if (!existing || existing.deleted || existing.userId !== req.user.id) {
+    if (!existing || existing.deleted || existing.userId !== req.user.effectiveUserId) {
       return res.status(404).json({ error: 'Transação não encontrada.' });
     }
 
@@ -278,10 +279,10 @@ router.delete('/transactions/:id', async (req, res) => {
 });
 
 // ─── POST /api/finances/transactions/:id/mark-paid ──────────────────────────
-router.post('/transactions/:id/mark-paid', async (req, res) => {
+router.post('/transactions/:id/mark-paid', requirePermission('finances', 'transactions_edit'), async (req, res) => {
   try {
     const original = await prisma.transaction.findUnique({ where: { id: req.params.id } });
-    if (!original || original.deleted || original.userId !== req.user.id) {
+    if (!original || original.deleted || original.userId !== req.user.effectiveUserId) {
       return res.status(404).json({ error: 'Transação não encontrada.' });
     }
     if (original.type !== 'entrada' || original.revenueType !== 'recorrente') {
@@ -349,18 +350,18 @@ router.post('/transactions/:id/mark-paid', async (req, res) => {
 });
 
 // ─── GET /api/finances/profitability ────────────────────────────────────────
-router.get('/profitability', async (req, res) => {
+router.get('/profitability', requirePermission('finances', 'transactions_view'), async (req, res) => {
   try {
     // Agregar entradas e saídas por cliente
     const [revenues, costs] = await Promise.all([
       prisma.transaction.groupBy({
         by: ['clientId', 'clientName'],
-        where: { userId: req.user.id, deleted: false, type: 'entrada', status: 'pago', clientId: { not: null } },
+        where: { userId: req.user.effectiveUserId, deleted: false, type: 'entrada', status: 'pago', clientId: { not: null } },
         _sum: { amountKz: true },
       }),
       prisma.transaction.groupBy({
         by: ['clientId', 'clientName'],
-        where: { userId: req.user.id, deleted: false, type: 'saida', status: 'pago', clientId: { not: null } },
+        where: { userId: req.user.effectiveUserId, deleted: false, type: 'saida', status: 'pago', clientId: { not: null } },
         _sum: { amountKz: true },
       }),
     ]);
@@ -408,29 +409,29 @@ router.get('/profitability', async (req, res) => {
 });
 
 // ─── GET /api/finances/profitability/:clientId ──────────────────────────────
-router.get('/profitability/:clientId', async (req, res) => {
+router.get('/profitability/:clientId', requirePermission('finances', 'transactions_view'), async (req, res) => {
   try {
     const clientId = parseInt(req.params.clientId);
 
-    // Verify contact belongs to user
+    // Verify contact belongs to user's org
     const contact = await prisma.contact.findUnique({
       where: { id: clientId },
       select: { id: true, name: true, company: true, userId: true },
     });
 
-    if (!contact || contact.userId !== req.user.id) {
+    if (!contact || contact.userId !== req.user.effectiveUserId) {
       return res.status(404).json({ error: 'Contact not found' });
     }
 
     const [transactions, costsByCategory] = await Promise.all([
       prisma.transaction.findMany({
-        where: { userId: req.user.id, deleted: false, clientId, status: 'pago' },
+        where: { userId: req.user.effectiveUserId, deleted: false, clientId, status: 'pago' },
         orderBy: { date: 'desc' },
         take: 20,
       }),
       prisma.transaction.groupBy({
         by: ['category'],
-        where: { userId: req.user.id, deleted: false, clientId, type: 'saida', status: 'pago' },
+        where: { userId: req.user.effectiveUserId, deleted: false, clientId, type: 'saida', status: 'pago' },
         _sum: { amountKz: true },
       }),
     ]);
@@ -438,7 +439,7 @@ router.get('/profitability/:clientId', async (req, res) => {
     // Contratos recorrentes activos
     const activeContracts = await prisma.transaction.findMany({
       where: {
-        userId: req.user.id,
+        userId: req.user.effectiveUserId,
         deleted: false,
         clientId,
         type: 'entrada',
@@ -539,10 +540,10 @@ router.post('/seed-categories', async (req, res) => {
 });
 
 // ─── GET /api/finances/export-csv ───────────────────────────────────────────
-router.get('/export-csv', async (req, res) => {
+router.get('/export-csv', requirePermission('finances', 'transactions_view'), async (req, res) => {
   try {
     const { dateFrom, dateTo, type, status } = req.query;
-    const where = { userId: req.user.id, deleted: false };
+    const where = { userId: req.user.effectiveUserId, deleted: false };
     if (type) where.type = type;
     if (status) where.status = status;
     if (dateFrom || dateTo) {

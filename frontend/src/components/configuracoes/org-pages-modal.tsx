@@ -23,7 +23,8 @@ export default function OrgPagesModal({ accountId, accountName, currentAllowedPa
   const mutation = useMutation({
     mutationFn: () => {
       const hasAll = selected.length === PAGE_KEYS.length;
-      return updateClientAccount(accountId, { allowedPages: hasAll ? null : selected });
+      // allowedPages replaced by permissions — this modal is no longer active
+      return updateClientAccount(accountId, {});
     },
     onSuccess: () => { onSaved(); onClose(); },
   });

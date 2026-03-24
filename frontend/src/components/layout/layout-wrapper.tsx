@@ -11,9 +11,22 @@ import OnboardingChecklist from '@/components/help/onboarding-checklist';
 import { ONBOARDING_OPEN } from '@/lib/onboarding-tasks';
 import ProductTourProvider, { useTour } from '@/components/help/product-tour';
 import { ReactNode } from 'react';
-import { Menu } from 'lucide-react';
+import { Menu, Eye, LogOut } from 'lucide-react';
 import type { User } from '@/lib/api';
-import { hrefToKey, PAGE_KEYS } from '@/lib/page-keys';
+import { canView, getVisibleModules } from '@/lib/permissions';
+
+// Map route prefix → module key (for permission redirect checks)
+const PATH_MODULE_MAP: Record<string, Parameters<typeof canView>[1]> = {
+  '/contacts':   'contacts',
+  '/pipeline':   'pipeline',
+  '/tasks':      'tasks',
+  '/calendario': 'calendario',
+  '/chat':       'chat',
+  '/automations':'automations',
+  '/forms':      'forms',
+  '/finances':   'finances',
+  '/produtos':   'finances',
+};
 
 // ── Inner layout — consumes TourContext ──────────────────────────────────────
 
@@ -71,26 +84,37 @@ function LayoutInner({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (authChecked.current) {
-      if (currentUser) {
-        if (pathname.startsWith('/admin') && currentUser.role !== 'admin') {
-          router.push('/');
-        }
-        if (pathname.startsWith('/finances') && currentUser.role !== 'admin' && currentUser.accountOwnerId) {
-          router.push('/');
-        }
-        if (pathname.startsWith('/equipa') && currentUser.accountOwnerId) {
-          router.push('/');
-        }
-        if (currentUser.allowedPages) {
-          const firstSegment = pathname === '/' ? '/' : '/' + pathname.split('/')[1];
-          const currentKey = hrefToKey(firstSegment);
-          if (currentKey && !currentUser.allowedPages.includes(currentKey)) {
-            const firstAllowed = PAGE_KEYS.find(p => currentUser.allowedPages!.includes(p.key));
-            router.push(firstAllowed?.href ?? '/');
-          }
+    const enforceAccess = (user: User) => {
+      // SuperAdmin can access /superadmin
+      if (pathname.startsWith('/superadmin') && !user.isSuperAdmin) {
+        router.push('/');
+        return;
+      }
+      // Platform admin routes
+      if (pathname.startsWith('/admin') && user.role !== 'admin') {
+        router.push('/');
+        return;
+      }
+      // Permission-based redirect for team members
+      if (user.accountOwnerId) {
+        const firstSegment = '/' + pathname.split('/')[1];
+        const module = PATH_MODULE_MAP[firstSegment];
+        if (module && !canView(user, module)) {
+          // Redirect to first visible module
+          const visible = getVisibleModules(user);
+          const moduleToPath: Record<string, string> = {
+            contacts: '/contacts', pipeline: '/pipeline', tasks: '/tasks',
+            chat: '/chat', calendario: '/calendario', automations: '/automations',
+            forms: '/forms', finances: '/finances',
+          };
+          const fallback = visible.map(m => moduleToPath[m]).find(Boolean) ?? '/';
+          router.push(fallback);
         }
       }
+    };
+
+    if (authChecked.current) {
+      if (currentUser) enforceAccess(currentUser);
       return;
     }
 
@@ -106,24 +130,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
           return;
         }
 
-        if (pathname.startsWith('/admin') && user.role !== 'admin') {
-          router.push('/');
-        }
-        if (pathname.startsWith('/finances') && user.role !== 'admin' && user.accountOwnerId) {
-          router.push('/');
-        }
-        if (pathname.startsWith('/equipa') && user.accountOwnerId) {
-          router.push('/');
-        }
-        if (user.allowedPages) {
-          const firstSegment = pathname === '/' ? '/' : '/' + pathname.split('/')[1];
-          const currentKey = hrefToKey(firstSegment);
-          if (currentKey && !user.allowedPages.includes(currentKey)) {
-            const firstAllowed = PAGE_KEYS.find(p => user.allowedPages!.includes(p.key));
-            router.push(firstAllowed?.href ?? '/');
-            return;
-          }
-        }
+        enforceAccess(user);
 
         // Show welcome modal on first visit
         if (!localStorage.getItem('kukugest_guide_seen')) setShowWelcome(true);
@@ -195,6 +202,26 @@ function LayoutInner({ children }: { children: ReactNode }) {
           </button>
           <h1 className="text-lg font-semibold text-[#0A2540]">KukuGest</h1>
         </div>
+
+        {/* Impersonation Banner */}
+        {currentUser?.impersonatedBy && (
+          <div className="flex items-center justify-between gap-3 px-4 py-2 bg-amber-500 text-white text-sm font-medium">
+            <div className="flex items-center gap-2">
+              <Eye className="w-4 h-4 flex-shrink-0" />
+              <span>A ver o sistema como <strong>{currentUser.name}</strong> ({currentUser.email})</span>
+            </div>
+            <button
+              onClick={() => {
+                localStorage.removeItem('impersonation_token');
+                window.location.reload();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-white text-xs font-semibold transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sair da Impersonation
+            </button>
+          </div>
+        )}
 
         {/* Main Scrollable Area */}
         <main className="flex-1 overflow-y-auto" style={{ background: 'transparent' }}>

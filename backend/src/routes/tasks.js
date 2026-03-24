@@ -1,5 +1,6 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
+const { requirePermission, requireDeletePermission } = require('../lib/permissions');
 
 const router = express.Router();
 const VALID_PRIORITIES = ['Baixa', 'Media', 'Alta'];
@@ -11,7 +12,7 @@ const TASK_INCLUDE = {
 };
 
 // GET all tasks
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('tasks', 'view'), async (req, res) => {
   try {
     const { done, contactId } = req.query;
     const where = { userId: req.user.effectiveUserId };
@@ -32,7 +33,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST create a new task (contactId is optional)
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('tasks', 'edit'), async (req, res) => {
   try {
     const { contactId, title, notes, dueDate, priority } = req.body;
 
@@ -74,7 +75,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT update a task
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('tasks', 'edit'), async (req, res) => {
   try {
     const { id } = req.params;
     const { title, notes, dueDate, priority, done, contactId } = req.body;
@@ -123,7 +124,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE a task
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireDeletePermission, async (req, res) => {
   try {
     const { id } = req.params;
 

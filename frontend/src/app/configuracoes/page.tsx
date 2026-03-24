@@ -22,8 +22,6 @@ import {
 import type { User, LoginLog } from '@/lib/api';
 import type { IBANEntry, ClientAccount } from '@/lib/types';
 import MemberPermissionsModal from '@/components/configuracoes/member-permissions-modal';
-import OrgPagesModal from '@/components/configuracoes/org-pages-modal';
-import { PAGE_KEYS } from '@/lib/page-keys';
 
 function ConfiguracoesContent() {
   const searchParams = useSearchParams();
@@ -191,7 +189,6 @@ function ConfiguracoesContent() {
     enabled: activeTab === 'admin' && !!isAdmin && adminSubTab === 'accounts',
   });
 
-  const [orgPagesTarget, setOrgPagesTarget] = useState<ClientAccount | null>(null);
   const [showCreateAccount, setShowCreateAccount] = useState(false);
   const [accountForm, setAccountForm] = useState({ name: '', email: '', password: '', plan: 'essencial' });
   const [accountError, setAccountError] = useState('');
@@ -548,10 +545,8 @@ function ConfiguracoesContent() {
                 </thead>
                 <tbody>
                   {(teamMembers as User[]).map(member => {
-                    const orgPages = currentUser?.allowedPages ?? null;
-                    const available = orgPages ? PAGE_KEYS.filter(p => orgPages.includes(p.key)).length : PAGE_KEYS.length;
-                    const memberPages = member.allowedPages;
-                    const pagesLabel = memberPages ? `${memberPages.length}/${available}` : `${available}/${available}`;
+                    const hasRestrictions = member.permissions !== null && member.permissions !== undefined;
+                    const pagesLabel = hasRestrictions ? 'Personalizado' : 'Acesso total';
                     return (
                     <tr key={member.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
                       <td className="py-3 px-4 text-gray-900 text-sm">{member.name}</td>
@@ -595,19 +590,8 @@ function ConfiguracoesContent() {
       {permMember && (
         <MemberPermissionsModal
           member={permMember}
-          orgAllowedPages={currentUser?.allowedPages ?? null}
           onClose={() => setPermMember(null)}
           onSaved={() => { refetchTeam(); setPermMember(null); }}
-        />
-      )}
-
-      {orgPagesTarget && (
-        <OrgPagesModal
-          accountId={orgPagesTarget.id}
-          accountName={orgPagesTarget.name}
-          currentAllowedPages={orgPagesTarget.allowedPages}
-          onClose={() => setOrgPagesTarget(null)}
-          onSaved={() => { refetchAccounts(); setOrgPagesTarget(null); }}
         />
       )}
 
@@ -699,7 +683,6 @@ function ConfiguracoesContent() {
                         <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Nome</th>
                         <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Email</th>
                         <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Plano</th>
-                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Páginas</th>
                         <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Membros</th>
                         <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Criado</th>
                       </tr>
@@ -718,18 +701,6 @@ function ConfiguracoesContent() {
                               <option value="essencial">Essencial</option>
                               <option value="profissional">Profissional</option>
                             </select>
-                          </td>
-                          <td className="py-3 px-4">
-                            <button
-                              onClick={() => setOrgPagesTarget(account)}
-                              className="flex items-center gap-1 text-xs text-[#0A2540] hover:text-blue-600 transition"
-                              title="Editar páginas"
-                            >
-                              <span className="font-mono">
-                                {account.allowedPages ? `${account.allowedPages.length}/${PAGE_KEYS.length}` : `∞`}
-                              </span>
-                              <Pencil className="w-3 h-3" />
-                            </button>
                           </td>
                           <td className="py-3 px-4 text-gray-500 text-sm">
                             {account._count.accountMembers} membro{account._count.accountMembers !== 1 ? 's' : ''}

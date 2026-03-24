@@ -3,6 +3,7 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
 const { requireAccountOwner } = require('../middleware/auth');
+const { parsePermissions, intersectPermissions } = require('../lib/permissions');
 
 // Lazy Supabase admin client
 let _supabaseAdmin = null;
@@ -113,38 +114,35 @@ router.post('/team', requireAccountOwner, async (req, res) => {
   }
 });
 
-// PATCH /api/account/team/:memberId/pages - Definir páginas permitidas de um membro
-router.patch('/team/:memberId/pages', requireAccountOwner, async (req, res) => {
+// PATCH /api/account/team/:memberId/permissions - Set granular permissions for a team member
+router.patch('/team/:memberId/permissions', requireAccountOwner, async (req, res) => {
   try {
     const memberId = parseInt(req.params.memberId);
     const accountOwnerId = req.user.effectiveUserId;
-    const { pages } = req.body; // string[] | null
+    const { permissions } = req.body; // UserPermissions object | null
 
     const member = await prisma.user.findFirst({
       where: { id: memberId, accountOwnerId },
     });
     if (!member) return res.status(404).json({ error: 'Membro não encontrado nesta conta' });
 
-    // Fetch org's own allowedPages to enforce intersection
+    // Enforce org-level restrictions (intersection)
     const owner = await prisma.user.findUnique({
       where: { id: accountOwnerId },
-      select: { allowedPages: true },
+      select: { permissions: true },
     });
-    const orgAllowed = owner?.allowedPages ? JSON.parse(owner.allowedPages) : null;
-
-    let finalPages = pages || null;
-    if (orgAllowed && finalPages) {
-      finalPages = finalPages.filter(p => orgAllowed.includes(p));
-    }
+    const orgPerms = parsePermissions(owner?.permissions);
+    const memberPerms = parsePermissions(permissions ? JSON.stringify(permissions) : null);
+    const finalPerms = intersectPermissions(orgPerms, memberPerms);
 
     await prisma.user.update({
       where: { id: memberId },
-      data: { allowedPages: finalPages ? JSON.stringify(finalPages) : null },
+      data: { permissions: finalPerms ? JSON.stringify(finalPerms) : null },
     });
 
-    res.json({ allowedPages: finalPages });
+    res.json({ permissions: finalPerms });
   } catch (error) {
-    console.error('Error setting member pages:', error);
+    console.error('Error setting member permissions:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { requirePermission, requireDeletePermission } = require('../lib/permissions');
 
 const VALID_TRIGGERS = ['new_contact', 'form_submission', 'contact_tag', 'contact_revenue', 'contact_sector'];
 const VALID_ACTIONS = ['send_email', 'send_whatsapp_template', 'send_whatsapp_text', 'update_stage'];
 
 // GET all automations
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('automations', 'view'), async (req, res) => {
   try {
     const automations = await prisma.automation.findMany({
       where: { userId: req.user.effectiveUserId },
@@ -19,7 +20,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST create automation
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('automations', 'edit'), async (req, res) => {
   try {
     const {
       trigger,
@@ -101,7 +102,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT update automation
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('automations', 'edit'), async (req, res) => {
   try {
     const automation = await prisma.automation.findUnique({
       where: { id: req.params.id },
@@ -157,13 +158,8 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE automation
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireDeletePermission, async (req, res) => {
   try {
-    // Only account owners can delete
-    if (!req.user.isAccountOwner) {
-      return res.status(403).json({ error: 'Apenas o dono da conta pode eliminar automações' });
-    }
-
     const automation = await prisma.automation.findUnique({
       where: { id: req.params.id },
       select: { userId: true },

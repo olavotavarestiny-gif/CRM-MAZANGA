@@ -13,6 +13,7 @@ const formsRouter = require('./routes/forms');
 const inboxRouter = require('./routes/inbox');
 const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
+const superadminRouter = require('./routes/superadmin');
 const setupRouter = require('./routes/setup');
 const financesRouter = require('./routes/finances');
 const accountRouter = require('./routes/account');
@@ -27,7 +28,7 @@ const faturacaoSaftRouter = require('./routes/faturacao-saft');
 const faturacaoRecorrentesRouter = require('./routes/faturacao-recorrentes');
 const chatRouter = require('./routes/chat');
 const requireAuth = require('./middleware/auth');
-const { requireAdmin, requireAccountOwnerOrAdmin } = require('./middleware/auth');
+const { requireAdmin, requireAccountOwnerOrAdmin, requireSuperAdmin } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -41,12 +42,18 @@ app.use(cors({
       return callback(null, true);
     }
 
-    // Allow *.vercel.app and *.mazanga.digital
-    if (origin.endsWith('.vercel.app') || origin.endsWith('.mazanga.digital')) {
+    // Allow only the specific Vercel deployment URL (avoids wildcard *.vercel.app)
+    const allowedVercel = process.env.ALLOWED_VERCEL_URL; // e.g. 'mazanga-crm-xxxx.vercel.app'
+    if (allowedVercel && origin === `https://${allowedVercel}`) {
       return callback(null, true);
     }
 
-    // Allow exact FRONTEND_URL if set (e.g. crm.mazanga.digital without subdomain wildcard)
+    // Allow *.mazanga.digital subdomains
+    if (origin.endsWith('.mazanga.digital')) {
+      return callback(null, true);
+    }
+
+    // Allow exact FRONTEND_URL if set (e.g. crm.mazanga.digital)
     if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
       return callback(null, true);
     }
@@ -55,6 +62,19 @@ app.use(cors({
     return callback(new Error('Not allowed by CORS'));
   }
 }));
+
+// Security headers for all API responses (ZAP alerts 2–5, 7–8)
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -81,8 +101,11 @@ app.use('/api/inbox', requireAuth, inboxRouter);
 // Admin-only routes (require authentication + admin role)
 app.use('/api/admin', requireAuth, requireAdmin, adminRouter);
 
+// SuperAdmin-only routes
+app.use('/api/superadmin', requireAuth, requireSuperAdmin, superadminRouter);
+
 // Account owner or admin routes
-app.use('/api/finances', requireAuth, requireAccountOwnerOrAdmin, financesRouter);
+app.use('/api/finances', requireAuth, financesRouter);
 app.use('/api/account', requireAuth, accountRouter);
 app.use('/api/pipeline-stages', requireAuth, pipelineStagesRouter);
 app.use('/api/calendar', calendarRouter);

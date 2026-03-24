@@ -3,9 +3,10 @@ const router = express.Router();
 const prisma = require('../lib/prisma');
 const automationRunner = require('../services/automationRunner');
 const requireAuth = require('../middleware/auth');
+const { requirePermission, requireDeletePermission } = require('../lib/permissions');
 
 // GET /api/forms - lista todos os formulários com contagem de submissões
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requireAuth, requirePermission('forms', 'view'), async (req, res) => {
   try {
     const forms = await prisma.form.findMany({
       where: { userId: req.user.effectiveUserId },
@@ -23,7 +24,7 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // POST /api/forms - criar novo formulário
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, requirePermission('forms', 'edit'), async (req, res) => {
   try {
     const { title, description, mode, thankYouUrl } = req.body;
     const form = await prisma.form.create({
@@ -67,7 +68,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PUT /api/forms/:id - atualizar metadados do formulário
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', requireAuth, requirePermission('forms', 'edit'), async (req, res) => {
   try {
     const form = await prisma.form.findUnique({
       where: { id: req.params.id },
@@ -98,7 +99,7 @@ router.put('/:id', requireAuth, async (req, res) => {
 });
 
 // DELETE /api/forms/:id - eliminar formulário (cascata)
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', requireAuth, requireDeletePermission, async (req, res) => {
   try {
     // Only account owners can delete
     if (!req.user.isAccountOwner) {
@@ -124,7 +125,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
 });
 
 // POST /api/forms/:id/fields - adicionar campo ao formulário
-router.post('/:id/fields', requireAuth, async (req, res) => {
+router.post('/:id/fields', requireAuth, requirePermission('forms', 'edit'), async (req, res) => {
   try {
     // Verify form ownership
     const form = await prisma.form.findUnique({
@@ -158,7 +159,7 @@ router.post('/:id/fields', requireAuth, async (req, res) => {
 });
 
 // PUT /api/forms/:id/fields/:fieldId - atualizar campo
-router.put('/:id/fields/:fieldId', requireAuth, async (req, res) => {
+router.put('/:id/fields/:fieldId', requireAuth, requirePermission('forms', 'edit'), async (req, res) => {
   try {
     // Verify form ownership
     const form = await prisma.form.findUnique({
@@ -192,7 +193,7 @@ router.put('/:id/fields/:fieldId', requireAuth, async (req, res) => {
 });
 
 // DELETE /api/forms/:id/fields/:fieldId - eliminar campo
-router.delete('/:id/fields/:fieldId', requireAuth, async (req, res) => {
+router.delete('/:id/fields/:fieldId', requireAuth, requireDeletePermission, async (req, res) => {
   try {
     // Verify form ownership
     const form = await prisma.form.findUnique({
@@ -214,7 +215,7 @@ router.delete('/:id/fields/:fieldId', requireAuth, async (req, res) => {
 });
 
 // POST /api/forms/:id/fields/reorder - reordenar campos
-router.post('/:id/fields/reorder', requireAuth, async (req, res) => {
+router.post('/:id/fields/reorder', requireAuth, requirePermission('forms', 'edit'), async (req, res) => {
   try {
     // Verify form ownership
     const form = await prisma.form.findUnique({

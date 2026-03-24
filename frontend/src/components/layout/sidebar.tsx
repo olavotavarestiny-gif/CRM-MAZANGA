@@ -6,12 +6,13 @@ import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3, Users, MessageSquare, Zap, Kanban,
   CheckSquare, FileText, LogOut, X, DollarSign, CalendarDays,
-  Package, Settings, HelpCircle,
+  Package, Settings, HelpCircle, ShieldAlert,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
 import { getChatUnreadCount } from '@/lib/api';
-import { hrefToKey } from '@/lib/page-keys';
+import { canView } from '@/lib/permissions';
+import type { ModuleKey } from '@/lib/permissions';
 import { ONBOARDING_OPEN, ONBOARDING_DISMISSED } from '@/lib/onboarding-tasks';
 
 const TOUR_ATTR: Record<string, string> = {
@@ -61,6 +62,28 @@ export default function Sidebar({
       : 'text-[#6b7e9a] hover:text-[#0A2540] hover:bg-[#0A2540]/5'
   );
 
+  // Map href to module key for permission checks
+  const hrefToModule: Record<string, ModuleKey | null> = {
+    '/':           null, // always visible
+    '/pipeline':   'pipeline',
+    '/contacts':   'contacts',
+    '/tasks':      'tasks',
+    '/calendario': 'calendario',
+    '/chat':       'chat',
+    '/automations':'automations',
+    '/forms':      'forms',
+    '/finances':   'finances',
+    '/produtos':   'finances',
+  };
+
+  const isVisible = (href: string) => {
+    if (!currentUser) return false;
+    const module = hrefToModule[href];
+    if (module === null) return true; // always visible (painel)
+    if (!module) return true;
+    return canView(currentUser, module);
+  };
+
   const allMainLinks = [
     { href: '/', label: 'Painel', icon: BarChart3 },
     { href: '/pipeline', label: 'Negociações', icon: Kanban },
@@ -77,20 +100,12 @@ export default function Sidebar({
     { href: '/produtos', label: 'Produtos', icon: Package },
   ] : [];
 
-  // Filter by allowedPages (null = show all)
-  const allowed = currentUser?.allowedPages ?? null;
-  const filterByAllowed = <T extends { href: string }>(links: T[]): T[] => {
-    if (!allowed) return links;
-    return links.filter(l => {
-      const key = hrefToKey(l.href);
-      return key === null || allowed.includes(key);
-    });
-  };
+  const mainLinks = allMainLinks.filter(l => isVisible(l.href));
+  const gestaoLinks = allGestaoLinks.filter(l => isVisible(l.href));
 
-  const mainLinks = filterByAllowed(allMainLinks);
-  const gestaoLinks = filterByAllowed(allGestaoLinks);
-
-  const adminLinks: { href: string; label: string; icon: React.ElementType }[] = [];
+  const adminLinks: { href: string; label: string; icon: React.ElementType }[] = currentUser?.isSuperAdmin
+    ? [{ href: '/superadmin', label: 'SuperAdmin', icon: ShieldAlert }]
+    : [];
 
   return (
     <div

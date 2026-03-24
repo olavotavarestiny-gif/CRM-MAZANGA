@@ -8,8 +8,15 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
-// Request interceptor: add Supabase session token to all requests
+// Request interceptor: prefer impersonation token, fall back to Supabase session token
 api.interceptors.request.use(async (config) => {
+  if (typeof window !== 'undefined') {
+    const impersonationToken = localStorage.getItem('impersonation_token');
+    if (impersonationToken) {
+      config.headers.Authorization = `Bearer ${impersonationToken}`;
+      return config;
+    }
+  }
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.access_token) {
@@ -306,6 +313,24 @@ export async function acknowledgePasswordChange(): Promise<void> {
   await api.post('/api/auth/acknowledge-password-change');
 }
 
+// User permissions structure
+export interface UserPermissions {
+  contacts?:    'none' | 'view' | 'edit';
+  pipeline?:    'none' | 'view' | 'edit';
+  tasks?:       'none' | 'view' | 'edit';
+  chat?:        'none' | 'view' | 'edit';
+  calendario?:  'none' | 'view' | 'edit';
+  automations?: 'none' | 'view' | 'edit';
+  forms?:       'none' | 'view' | 'edit';
+  finances?: {
+    transactions?:  'none' | 'view' | 'edit';
+    view_invoices?: boolean;
+    emit_invoices?: boolean;
+    view_reports?:  boolean;
+    saft?:          boolean;
+  };
+}
+
 // Admin - User Management
 export interface User {
   id: number;
@@ -314,9 +339,11 @@ export interface User {
   role: string;
   active: boolean;
   plan?: string;
-  allowedPages?: string[] | null; // null = no restriction; array = restricted to these page keys
+  isSuperAdmin?: boolean;
+  permissions?: UserPermissions | null; // null = full access (no restrictions)
   accountOwnerId?: number | null;
   accountOwnerName?: string | null;
+  impersonatedBy?: number | null;
   mustChangePassword?: boolean;
   createdAt: string;
   lastLogin?: string;
@@ -713,37 +740,61 @@ export async function getPlanUsage(): Promise<PlanUsage> {
 }
 
 // ============================================
-// RBAC — PERMISSÕES POR PÁGINA
+// RBAC — PERMISSÕES GRANULARES
 // ============================================
 
-// Account owner: set allowed pages for a team member (null = all pages)
-export async function setMemberPages(memberId: number, pages: string[] | null): Promise<void> {
-  await api.patch(`/api/account/team/${memberId}/pages`, { pages });
+// Account owner: set granular permissions for a team member (null = full access)
+export async function setMemberPermissions(memberId: number, permissions: UserPermissions | null): Promise<void> {
+  await api.patch(`/api/account/team/${memberId}/permissions`, { permissions });
 }
 
-// Admin: list all client accounts (independent account owners)
-export async function getClientAccounts(): Promise<ClientAccount[]> {
+// SuperAdmin: list all orgs (account owners)
+export interface SuperAdminOrg extends User {
+  accountMembers: { id: number; name: string; email: string; active: boolean }[];
+  _count: { accountMembers: number };
+}
+
+export async function getSuperAdminOrgs(): Promise<SuperAdminOrg[]> {
+  const res = await api.get('/api/superadmin/orgs');
+  return res.data;
+}
+
+export async function updateSuperAdminOrg(
+  id: number,
+  data: { plan?: string; active?: boolean; permissions?: UserPermissions | null }
+): Promise<void> {
+  await api.patch(`/api/superadmin/orgs/${id}`, data);
+}
+
+export async function deleteSuperAdminOrg(id: number): Promise<void> {
+  await api.delete(`/api/superadmin/orgs/${id}`);
+}
+
+export async function impersonateUser(userId: number): Promise<{ token: string; targetName: string; targetEmail: string }> {
+  const res = await api.post(`/api/superadmin/impersonate/${userId}`);
+  return res.data;
+}
+
+// Admin: list all client accounts
+export async function getClientAccounts(): Promise<import('./types').ClientAccount[]> {
   const res = await api.get('/api/admin/accounts');
   return res.data;
 }
 
-// Admin: update plan and/or allowedPages for a client account
-export async function updateClientAccount(
-  id: number,
-  data: { plan?: string; allowedPages?: string[] | null }
-): Promise<void> {
+// Admin: update plan for a client account
+export async function updateClientAccount(id: number, data: { plan?: string }): Promise<void> {
   await api.patch(`/api/admin/accounts/${id}`, data);
 }
 
-// Admin: create a new client account
+// SuperAdmin: create a new client account
 export async function createClientAccount(data: {
   name: string;
   email: string;
   password: string;
   plan?: string;
-  allowedPages?: string[] | null;
+  permissions?: UserPermissions | null;
 }): Promise<User> {
-  const res = await api.post('/api/admin/users', { ...data, role: 'user' });
+  const res = await api.post('/api/superadmin/users', data);
   return res.data;
 }
 

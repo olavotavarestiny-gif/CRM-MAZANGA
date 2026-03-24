@@ -424,7 +424,7 @@ export interface ClientAccountMember {
   name: string;
   email: string;
   active: boolean;
-  allowedPages: string[] | null;
+  permissions: import('./api').UserPermissions | null;
 }
 
 export interface ClientAccount {
@@ -433,7 +433,7 @@ export interface ClientAccount {
   email: string;
   active: boolean;
   plan: string;
-  allowedPages: string[] | null;
+  permissions: import('./api').UserPermissions | null;
   createdAt: string;
   accountMembers: ClientAccountMember[];
   _count: { accountMembers: number };

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const automationRunner = require('../services/automationRunner');
+const { requirePermission, requireDeletePermission } = require('../lib/permissions');
 
 const VALID_STAGES = ['Novo', 'Contactado', 'Qualificado', 'Proposta Enviada', 'Fechado', 'Perdido'];
 const VALID_FIELD_TYPES = ['text', 'number', 'date', 'select', 'url'];
@@ -218,7 +219,7 @@ function parseCustomFields(raw) {
 }
 
 // GET all contacts with optional filters
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
   try {
     const { stage, search, inPipeline, revenue } = req.query;
     const where = { userId: req.user.effectiveUserId };
@@ -262,7 +263,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST create new contact
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const { name, email, phone, company, revenue, sector, stage, tags, customFields } = req.body;
 
@@ -331,7 +332,7 @@ router.post('/', async (req, res) => {
 });
 
 // POST import contacts (bulk) - MUST be before /:id routes
-router.post('/import', async (req, res) => {
+router.post('/import', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const { contacts } = req.body;
 
@@ -388,7 +389,7 @@ router.post('/import', async (req, res) => {
 });
 
 // GET contact by id with messages and tasks
-router.get('/:id', async (req, res) => {
+router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
   try {
     const contact = await prisma.contact.findUnique({
       where: { id: parseInt(req.params.id) },
@@ -418,7 +419,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PUT update contact
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const { name, email, phone, company, revenue, sector, stage, inPipeline, tags, customFields } = req.body;
     const updateData = {};
@@ -494,7 +495,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE contact
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireDeletePermission, async (req, res) => {
   try {
     const contactId = parseInt(req.params.id);
 
