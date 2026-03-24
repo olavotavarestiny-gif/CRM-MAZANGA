@@ -416,9 +416,10 @@ export function FacturaForm() {
                       } : l));
                     }}
                   />
-                  {!line.productDescription && (
+                  {!line.productId && (
                     <Input
-                      placeholder="Descrição manual"
+                      value={line.productDescription}
+                      placeholder="Ou digitar descrição directamente..."
                       className="mt-1 text-sm"
                       onChange={e => updateLine(i, 'productDescription', e.target.value)}
                     />

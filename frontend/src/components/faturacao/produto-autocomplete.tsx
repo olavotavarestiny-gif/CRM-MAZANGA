@@ -21,6 +21,11 @@ export function ProdutoAutocomplete({ onChange, onCreateNew, onEditCurrent, valu
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Sync search input when an external selection sets the value (e.g., product selected)
+  useEffect(() => {
+    if (value !== undefined) setSearch(value);
+  }, [value]);
+
   useEffect(() => {
     if (search.length < 1) { setProdutos([]); return; }
     const t = setTimeout(async () => {
