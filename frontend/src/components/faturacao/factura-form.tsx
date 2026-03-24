@@ -23,6 +23,7 @@ interface LineState {
   unitPrice: number;
   unitOfMeasure: string;
   taxPercentage: number;
+  isIncluded?: boolean; // Proforma: item sem custo extra ("Incluído")
 }
 
 const DOCUMENT_TYPES = [
@@ -144,10 +145,11 @@ export function FacturaForm() {
           productCode: l.productCode || l.productDescription.substring(0, 10).toUpperCase().replace(/\s/g, '_'),
           productDescription: l.productDescription,
           quantity: l.quantity,
-          unitPrice: l.unitPrice,
+          unitPrice: l.isIncluded ? 0 : l.unitPrice,
           unitOfMeasure: l.unitOfMeasure,
-          settlementAmount: l.quantity * l.unitPrice,
-          taxes: [{ taxType: 'IVA', taxCode: l.taxPercentage === 0 ? 'ISE' : 'NOR', taxPercentage: l.taxPercentage }],
+          settlementAmount: l.isIncluded ? 0 : l.quantity * l.unitPrice,
+          isIncluded: l.isIncluded || false,
+          taxes: [{ taxType: 'IVA', taxCode: l.isIncluded || l.taxPercentage === 0 ? 'ISE' : 'NOR', taxPercentage: l.isIncluded ? 0 : l.taxPercentage }],
         })),
       });
     },
@@ -159,14 +161,17 @@ export function FacturaForm() {
     onError: (err: Error) => setError(err.message),
   });
 
-  const netTotal = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
-  const taxPayable = lines.reduce((s, l) => s + l.quantity * l.unitPrice * (l.taxPercentage / 100), 0);
+  // Linhas "incluído" contribuem 0 ao total
+  const netTotal = lines.reduce((s, l) => s + (l.isIncluded ? 0 : l.quantity * l.unitPrice), 0);
+  const taxPayable = lines.reduce((s, l) => s + (l.isIncluded ? 0 : l.quantity * l.unitPrice * (l.taxPercentage / 100)), 0);
   const grossTotal = netTotal + taxPayable;
 
-  const addLine = () => setLines(p => [...p, { productCode: '', productDescription: '', quantity: 1, unitPrice: 0, unitOfMeasure: 'UN', taxPercentage: 14 }]);
+  const addLine = () => setLines(p => [...p, { productCode: '', productDescription: '', quantity: 1, unitPrice: 0, unitOfMeasure: 'UN', taxPercentage: 14, isIncluded: false }]);
   const removeLine = (i: number) => setLines(p => p.filter((_, idx) => idx !== i));
   const updateLine = (i: number, field: keyof LineState, val: string | number) =>
     setLines(p => p.map((l, idx) => idx === i ? { ...l, [field]: val } : l));
+  const toggleIncluded = (i: number) =>
+    setLines(p => p.map((l, idx) => idx === i ? { ...l, isIncluded: !l.isIncluded, unitPrice: !l.isIncluded ? 0 : l.unitPrice } : l));
 
   const activeSeries = series.filter(s => s.seriesStatus !== 'F' && s.documentType === documentType);
 
@@ -378,10 +383,21 @@ export function FacturaForm() {
         </CardHeader>
         <CardContent className="space-y-3">
           {lines.map((line, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2 items-end p-3 rounded-lg bg-gray-50 border border-gray-100">
+            <div key={i} className={`grid grid-cols-12 gap-2 items-end p-3 rounded-lg border ${line.isIncluded ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50 border-gray-100'}`}>
               <div className="col-span-4">
-                <Label className="text-xs text-gray-600">Produto / Serviço</Label>
-                <div className="mt-1">
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-xs text-gray-600">Produto / Serviço</Label>
+                  {documentType === 'PF' && (
+                    <button
+                      type="button"
+                      onClick={() => toggleIncluded(i)}
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${line.isIncluded ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-500 border-gray-300 hover:border-emerald-400 hover:text-emerald-600'}`}
+                    >
+                      {line.isIncluded ? '✓ Incluído' : '+ Incluído'}
+                    </button>
+                  )}
+                </div>
+                <div>
                   <ProdutoAutocomplete
                     value={line.productDescription}
                     placeholder="Pesquisar ou digitar..."
@@ -394,7 +410,7 @@ export function FacturaForm() {
                         productId: p.id,
                         productCode: p.productCode,
                         productDescription: p.productDescription,
-                        unitPrice: p.unitPrice,
+                        unitPrice: l.isIncluded ? 0 : p.unitPrice,
                         taxPercentage: p.taxPercentage,
                         unitOfMeasure: p.unitOfMeasure,
                       } : l));
@@ -417,26 +433,40 @@ export function FacturaForm() {
               </div>
               <div className="col-span-2">
                 <Label className="text-xs text-gray-600">Preço Unit.</Label>
-                <Input type="number" min="0" step="0.01" value={line.unitPrice}
-                  onChange={e => updateLine(i, 'unitPrice', parseFloat(e.target.value) || 0)}
-                  className="mt-1 text-sm" />
+                {line.isIncluded ? (
+                  <div className="mt-1 h-9 flex items-center px-3 bg-emerald-100 rounded-md border border-emerald-200">
+                    <span className="text-xs font-semibold text-emerald-700">Incluído</span>
+                  </div>
+                ) : (
+                  <Input type="number" min="0" step="0.01" value={line.unitPrice}
+                    onChange={e => updateLine(i, 'unitPrice', parseFloat(e.target.value) || 0)}
+                    className="mt-1 text-sm" />
+                )}
               </div>
               <div className="col-span-1">
                 <Label className="text-xs text-gray-600">IVA%</Label>
-                <Select value={String(line.taxPercentage)} onValueChange={v => updateLine(i, 'taxPercentage', Number(v))}>
-                  <SelectTrigger className="mt-1 text-sm h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="14">14%</SelectItem>
-                    <SelectItem value="0">0% (ISE)</SelectItem>
-                  </SelectContent>
-                </Select>
+                {line.isIncluded ? (
+                  <div className="mt-1 h-9 flex items-center px-3 bg-emerald-100 rounded-md border border-emerald-200">
+                    <span className="text-xs text-emerald-700">—</span>
+                  </div>
+                ) : (
+                  <Select value={String(line.taxPercentage)} onValueChange={v => updateLine(i, 'taxPercentage', Number(v))}>
+                    <SelectTrigger className="mt-1 text-sm h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="14">14%</SelectItem>
+                      <SelectItem value="0">0% (ISE)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="col-span-2">
                 <Label className="text-xs text-gray-600">Total (s/IVA)</Label>
-                <div className="mt-1 h-9 flex items-center px-3 bg-gray-50 rounded-md border border-gray-200">
-                  <span className="text-sm text-[#0A2540] font-mono">{(line.quantity * line.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                <div className={`mt-1 h-9 flex items-center px-3 rounded-md border ${line.isIncluded ? 'bg-emerald-100 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}>
+                  {line.isIncluded
+                    ? <span className="text-xs font-semibold text-emerald-700">Incluído</span>
+                    : <span className="text-sm text-[#0A2540] font-mono">{(line.quantity * line.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>}
                 </div>
               </div>
               <div className="col-span-1 flex justify-center">

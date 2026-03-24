@@ -93,9 +93,10 @@ router.post('/facturas', async (req, res) => {
     let netTotal = 0;
     let taxPayable = 0;
     const processedLines = (lines || []).map((line, idx) => {
-      const settlementAmount = Number(line.quantity) * Number(line.unitPrice);
-      const taxes = line.taxes || [{ taxType: 'IVA', taxCode: 'NOR', taxPercentage: 14, taxAmount: settlementAmount * 0.14 }];
-      const taxAmount = taxes.reduce((sum, t) => sum + (settlementAmount * (Number(t.taxPercentage) / 100)), 0);
+      const isIncluded = !!line.isIncluded;
+      const settlementAmount = isIncluded ? 0 : Number(line.quantity) * Number(line.unitPrice);
+      const taxes = line.taxes || [{ taxType: 'IVA', taxCode: 'NOR', taxPercentage: isIncluded ? 0 : 14, taxAmount: 0 }];
+      const taxAmount = isIncluded ? 0 : taxes.reduce((sum, t) => sum + (settlementAmount * (Number(t.taxPercentage) / 100)), 0);
       netTotal += settlementAmount;
       taxPayable += taxAmount;
       return {
@@ -103,9 +104,10 @@ router.post('/facturas', async (req, res) => {
         productCode: line.productCode,
         productDescription: line.productDescription,
         quantity: Number(line.quantity),
-        unitPrice: Number(line.unitPrice),
+        unitPrice: isIncluded ? 0 : Number(line.unitPrice),
         unitOfMeasure: line.unitOfMeasure || 'UN',
         settlementAmount,
+        isIncluded,
         taxes,
       };
     });

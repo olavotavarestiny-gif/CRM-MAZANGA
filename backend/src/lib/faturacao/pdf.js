@@ -244,15 +244,18 @@ async function generateFacturaPDF(factura, config) {
     y += hdrH;
 
     lines.forEach((line, idx) => {
+      const incl = !!line.isIncluded;
       const qty  = Number(line.quantity)  || 0;
-      const uprc = Number(line.unitPrice) || 0;
+      const uprc = incl ? 0 : (Number(line.unitPrice) || 0);
       const sub  = qty * uprc;
-      const tax  = line.taxes?.[0]?.taxPercentage ?? 14;
+      const tax  = incl ? 0 : (line.taxes?.[0]?.taxPercentage ?? 14);
       const tot  = sub * (1 + tax / 100);
 
       if (y > PAGE_H - 200) { doc.addPage(); y = MARGIN; }
 
-      doc.rect(MARGIN, y, tableW, rowH).fill(idx % 2 === 0 ? WHITE : LIGHT);
+      // Linhas "incluído" têm fundo verde suave
+      const rowBg = incl ? '#F0FDF4' : (idx % 2 === 0 ? WHITE : LIGHT);
+      doc.rect(MARGIN, y, tableW, rowH).fill(rowBg);
       doc.moveTo(MARGIN, y + rowH).lineTo(MARGIN + tableW, y + rowH)
          .lineWidth(0.4).strokeColor(BORDER).stroke();
 
@@ -260,21 +263,23 @@ async function generateFacturaPDF(factura, config) {
       [
         { v: String(line.lineNumber ?? idx + 1), align: 'center' },
         null,
-        { v: fmtNum(qty),  align: 'right' },
-        { v: fmtNum(uprc), align: 'right' },
-        { v: `${tax}%`,    align: 'right' },
-        { v: fmtNum(tot),  align: 'right' },
+        { v: fmtNum(qty),                           align: 'right' },
+        { v: incl ? 'Incluído' : fmtNum(uprc),      align: 'right' },
+        { v: incl ? '—'        : `${tax}%`,         align: 'right' },
+        { v: incl ? 'Incluído' : fmtNum(tot),       align: 'right' },
       ].forEach((val, ci) => {
         const col = cols[ci];
         if (ci === 1) {
-          doc.font('SB').fontSize(8.5).fillColor(NAVY)
+          doc.font('SB').fontSize(8.5).fillColor(incl ? '#059669' : NAVY)
              .text(line.productDescription || '—', cx + 5, y + 5, { width: col.w - 10, lineBreak: false });
           if (line.productCode) {
             doc.font('R').fontSize(7).fillColor(GRAY)
                .text(line.productCode, cx + 5, y + 15, { width: col.w - 10, lineBreak: false });
           }
         } else if (val) {
-          doc.font('R').fontSize(8.5).fillColor(NAVY)
+          const isInclLabel = incl && (ci === 3 || ci === 5);
+          doc.font(isInclLabel ? 'SB' : 'R').fontSize(8.5)
+             .fillColor(isInclLabel ? '#059669' : NAVY)
              .text(val.v, cx + 5, y + 7, { width: col.w - 10, align: val.align, lineBreak: false });
         }
         cx += col.w;
