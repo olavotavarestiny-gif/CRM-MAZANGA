@@ -302,6 +302,10 @@ export async function changePassword(newPassword: string) {
   return response.data;
 }
 
+export async function acknowledgePasswordChange(): Promise<void> {
+  await api.post('/api/auth/acknowledge-password-change');
+}
+
 // Admin - User Management
 export interface User {
   id: number;

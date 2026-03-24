@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { acknowledgePasswordChange } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -55,6 +56,8 @@ function ResetPasswordForm() {
         setError(updateError.message);
         return;
       }
+      // Clear mustChangePassword flag in our DB (avoids forced redirect after reset)
+      try { await acknowledgePasswordChange(); } catch { /* non-critical */ }
       setSuccess(true);
       setTimeout(() => router.push('/'), 2000);
     } catch {

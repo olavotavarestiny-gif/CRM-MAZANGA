@@ -181,4 +181,20 @@ router.post('/change-password', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/auth/acknowledge-password-change
+// Called after a successful Supabase password reset (forgot-password flow)
+// to clear the mustChangePassword flag without re-setting the password.
+router.post('/acknowledge-password-change', requireAuth, async (req, res) => {
+  try {
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { mustChangePassword: false },
+    });
+    res.json({ message: 'OK' });
+  } catch (error) {
+    console.error('Error acknowledging password change:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
