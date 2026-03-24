@@ -40,7 +40,7 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 function docTypeLabel(t) {
-  return { FT: 'Factura', FR: 'Factura/Recibo', ND: 'Nota de Débito', NC: 'Nota de Crédito', FA: 'Factura Simpl.' }[t] || t;
+  return { FT: 'Factura', FR: 'Factura/Recibo', ND: 'Nota de Débito', NC: 'Nota de Crédito', FA: 'Factura Simpl.', PF: 'Proforma' }[t] || t;
 }
 function agtStatusLabel(s) {
   return { P: 'Pendente AGT', V: 'Válida', I: 'Inválida', A: 'Anulada' }[s] || s;
@@ -346,13 +346,20 @@ async function generateFacturaPDF(factura, config) {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // MARCA DE ÁGUA ANULADA
+    // MARCA DE ÁGUA ANULADA / PROFORMA
     // ═══════════════════════════════════════════════════════════
     if (factura.documentStatus === 'A') {
       doc.save();
       doc.rotate(-35, { origin: [PAGE_W / 2, PAGE_H / 2] });
       doc.font('B').fontSize(90).fillColor(RED).opacity(0.07)
          .text('ANULADA', 60, PAGE_H / 2 - 50, { width: PAGE_W - 120, align: 'center' });
+      doc.restore().opacity(1);
+    }
+    if (factura.documentType === 'PF') {
+      doc.save();
+      doc.rotate(-35, { origin: [PAGE_W / 2, PAGE_H / 2] });
+      doc.font('B').fontSize(72).fillColor('#F59E0B').opacity(0.08)
+         .text('PROFORMA', 40, PAGE_H / 2 - 40, { width: PAGE_W - 80, align: 'center' });
       doc.restore().opacity(1);
     }
 
@@ -363,47 +370,64 @@ async function generateFacturaPDF(factura, config) {
     doc.moveTo(MARGIN, footerY).lineTo(MARGIN + INNER_W, footerY)
        .lineWidth(0.5).strokeColor(BORDER).stroke();
 
-    const qrSize = 80;
-    const qrX    = PAGE_W - MARGIN - qrSize;
-    const qrY    = footerY + 10;
+    const isProforma = factura.documentType === 'PF';
 
-    if (factura.qrCodeImage) {
-      try {
-        const ci    = factura.qrCodeImage.indexOf(',');
-        const qrBuf = Buffer.from(ci >= 0 ? factura.qrCodeImage.slice(ci + 1) : factura.qrCodeImage, 'base64');
-        if (isValidImageBuffer(qrBuf, 'image/png')) {
-          doc.image(qrBuf, qrX, qrY, { fit: [qrSize, qrSize] });
-          doc.font('R').fontSize(6).fillColor(GRAY)
-             .text('Consultar em AGT', qrX, qrY + qrSize + 3, { width: qrSize, align: 'center' });
-        }
-      } catch { /* qr inválido */ }
-    }
+    if (isProforma) {
+      // Rodapé simplificado para Proforma — sem QR nem AGT
+      let ay = footerY + 12;
+      doc.font('SB').fontSize(8).fillColor('#F59E0B')
+         .text('DOCUMENTO PROFORMA — SEM VALIDADE FISCAL', MARGIN, ay, { width: INNER_W, align: 'center' });
+      ay += 14;
+      doc.font('R').fontSize(7.5).fillColor(GRAY)
+         .text('Este documento é uma proposta comercial. Não substitui factura nem tem qualquer efeito fiscal ou legal.', MARGIN, ay, { width: INNER_W, align: 'center' });
+      ay += 12;
+      if (factura.serie) {
+        doc.font('R').fontSize(7.5).fillColor(GRAY)
+           .text(`Série: ${factura.serie.seriesCode}/${factura.serie.seriesYear}   ·   Emitido em: ${fmtDate(factura.documentDate)}   ·   ${config.nomeEmpresa || ''} · NIF: ${config.nifEmpresa || ''}`, MARGIN, ay, { width: INNER_W, align: 'center' });
+      }
+    } else {
+      const qrSize = 80;
+      const qrX    = PAGE_W - MARGIN - qrSize;
+      const qrY    = footerY + 10;
 
-    const agtW = INNER_W - qrSize - 16;
-    let ay = footerY + 12;
-    doc.font('SB').fontSize(7).fillColor(INDIGO).text('INFORMAÇÕES AGT', MARGIN, ay);
-    ay += 13;
-    doc.font('R').fontSize(8).fillColor(NAVY);
-    if (factura.serie) {
+      if (factura.qrCodeImage) {
+        try {
+          const ci    = factura.qrCodeImage.indexOf(',');
+          const qrBuf = Buffer.from(ci >= 0 ? factura.qrCodeImage.slice(ci + 1) : factura.qrCodeImage, 'base64');
+          if (isValidImageBuffer(qrBuf, 'image/png')) {
+            doc.image(qrBuf, qrX, qrY, { fit: [qrSize, qrSize] });
+            doc.font('R').fontSize(6).fillColor(GRAY)
+               .text('Consultar em AGT', qrX, qrY + qrSize + 3, { width: qrSize, align: 'center' });
+          }
+        } catch { /* qr inválido */ }
+      }
+
+      const agtW = INNER_W - qrSize - 16;
+      let ay = footerY + 12;
+      doc.font('SB').fontSize(7).fillColor(INDIGO).text('INFORMAÇÕES AGT', MARGIN, ay);
+      ay += 13;
+      doc.font('R').fontSize(8).fillColor(NAVY);
+      if (factura.serie) {
+        doc.text(
+          `Série: ${factura.serie.seriesCode}/${factura.serie.seriesYear}   ·   Tipo: ${docTypeLabel(factura.documentType)}`,
+          MARGIN, ay, { width: agtW }
+        );
+        ay += 12;
+      }
       doc.text(
-        `Série: ${factura.serie.seriesCode}/${factura.serie.seriesYear}   ·   Tipo: ${docTypeLabel(factura.documentType)}`,
+        `Estado AGT: ${agtStatusLabel(factura.agtValidationStatus)}${config.agtMockMode ? '  (modo MOCK)' : ''}`,
         MARGIN, ay, { width: agtW }
       );
       ay += 12;
-    }
-    doc.text(
-      `Estado AGT: ${agtStatusLabel(factura.agtValidationStatus)}${config.agtMockMode ? '  (modo MOCK)' : ''}`,
-      MARGIN, ay, { width: agtW }
-    );
-    ay += 12;
-    if (factura.agtRequestId) {
-      doc.font('R').fontSize(7.5).fillColor(GRAY)
-         .text(`Request ID: ${factura.agtRequestId}`, MARGIN, ay, { width: agtW });
-      ay += 11;
-    }
-    if (factura.jwsSignature && factura.jwsSignature !== 'PLACEHOLDER') {
-      doc.font('R').fontSize(6.5).fillColor(GRAY)
-         .text(`Assinatura: ${factura.jwsSignature.substring(0, 50)}...`, MARGIN, ay, { width: agtW });
+      if (factura.agtRequestId) {
+        doc.font('R').fontSize(7.5).fillColor(GRAY)
+           .text(`Request ID: ${factura.agtRequestId}`, MARGIN, ay, { width: agtW });
+        ay += 11;
+      }
+      if (factura.jwsSignature && factura.jwsSignature !== 'PLACEHOLDER') {
+        doc.font('R').fontSize(6.5).fillColor(GRAY)
+           .text(`Assinatura: ${factura.jwsSignature.substring(0, 50)}...`, MARGIN, ay, { width: agtW });
+      }
     }
 
     // Rodapé legal
@@ -412,7 +436,9 @@ async function generateFacturaPDF(factura, config) {
        .lineWidth(0.4).strokeColor(BORDER).stroke();
     doc.font('R').fontSize(6.5).fillColor(GRAY)
        .text(
-         `Documento processado por programa informático certificado · Nº Cert.: ${config.agtCertNumber || 'PENDENTE'} · ${config.nomeEmpresa || ''} · NIF: ${config.nifEmpresa || ''}`,
+         isProforma
+           ? `Proposta comercial emitida por ${config.nomeEmpresa || ''} · NIF: ${config.nifEmpresa || ''} · Documento sem efeito fiscal`
+           : `Documento processado por programa informático certificado · Nº Cert.: ${config.agtCertNumber || 'PENDENTE'} · ${config.nomeEmpresa || ''} · NIF: ${config.nifEmpresa || ''}`,
          MARGIN, legalY, { width: INNER_W, align: 'center' }
        );
 

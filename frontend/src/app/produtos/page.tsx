@@ -12,7 +12,7 @@ import { getProdutos, createProduto, updateProduto, deleteProduto, getSeries, ge
 import type { Produto } from '@/lib/types';
 
 const UNITS = ['UN', 'H', 'KG', 'L', 'M', 'M2', 'M3'];
-const DOC_TYPES = ['FT', 'FR', 'ND', 'NC', 'FA'];
+const DOC_TYPES = ['FT', 'FR', 'ND', 'NC', 'FA', 'PF'];
 
 const STATUS_MAP: Record<string, { label: string; className: string }> = {
   A: { label: 'Ativa', className: 'bg-green-100 text-green-700 border-green-200' },

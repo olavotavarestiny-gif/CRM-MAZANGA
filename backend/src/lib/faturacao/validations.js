@@ -13,7 +13,7 @@ function validateFactura(data) {
     errors.push('Factura precisa ter pelo menos 1 linha');
   }
 
-  const VALID_TYPES = ['FT', 'FR', 'ND', 'NC', 'FA'];
+  const VALID_TYPES = ['FT', 'FR', 'ND', 'NC', 'FA', 'PF'];
   if (data.documentType && !VALID_TYPES.includes(data.documentType)) {
     errors.push(`Tipo de documento inválido. Use: ${VALID_TYPES.join(', ')}`);
   }

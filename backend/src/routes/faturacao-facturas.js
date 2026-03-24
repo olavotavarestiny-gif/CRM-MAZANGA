@@ -122,15 +122,17 @@ router.post('/facturas', async (req, res) => {
     const qrCodeUrl = getQRCodeUrl(documentNo);
     const qrCodeImage = await generateQRCode(documentNo);
 
-    // Submeter à AGT (mock)
+    // Submeter à AGT — proformas não têm validade fiscal, não submetemos
     let agtRequestId = null;
-    let agtValidationStatus = 'P';
-    try {
-      const agtResult = await registarFatura([{ documentNo, documentType, customerTaxID, grossTotal }]);
-      agtRequestId = agtResult.requestID;
-      agtValidationStatus = isMock() ? 'V' : 'P'; // Mock → imediatamente válida
-    } catch (agtErr) {
-      console.error('AGT submission error:', agtErr);
+    let agtValidationStatus = documentType === 'PF' ? 'NA' : 'P';
+    if (documentType !== 'PF') {
+      try {
+        const agtResult = await registarFatura([{ documentNo, documentType, customerTaxID, grossTotal }]);
+        agtRequestId = agtResult.requestID;
+        agtValidationStatus = isMock() ? 'V' : 'P';
+      } catch (agtErr) {
+        console.error('AGT submission error:', agtErr);
+      }
     }
 
     const factura = await prisma.factura.create({

@@ -15,10 +15,11 @@ function fmtKz(n: number) {
 
 function AgtBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; className: string }> = {
-    P: { label: 'Pendente', className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-    V: { label: 'Válida', className: 'bg-green-100 text-green-700 border-green-200' },
-    I: { label: 'Inválida', className: 'bg-red-100 text-red-700 border-red-200' },
-    A: { label: 'Anulada', className: 'bg-gray-100 text-gray-500 border-gray-200' },
+    P:  { label: 'Pendente',   className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
+    V:  { label: 'Válida',     className: 'bg-green-100 text-green-700 border-green-200' },
+    I:  { label: 'Inválida',   className: 'bg-red-100 text-red-700 border-red-200' },
+    A:  { label: 'Anulada',    className: 'bg-gray-100 text-gray-500 border-gray-200' },
+    NA: { label: 'Não Fiscal', className: 'bg-amber-100 text-amber-700 border-amber-200' },
   };
   const b = map[status] || map.P;
   return <span className={`px-1.5 py-0.5 rounded text-xs border ${b.className}`}>{b.label}</span>;
@@ -101,6 +102,7 @@ export function TabFacturas() {
             <SelectItem value="ND">ND — N. Débito</SelectItem>
             <SelectItem value="NC">NC — N. Crédito</SelectItem>
             <SelectItem value="FA">FA — Simplificada</SelectItem>
+            <SelectItem value="PF">PF — Proforma</SelectItem>
           </SelectContent>
         </Select>
         <Select value={docStatus} onValueChange={v => { setDocStatus(v === 'all' ? '' : v); setPage(1); }}>
@@ -142,7 +144,7 @@ export function TabFacturas() {
             className={`grid grid-cols-12 px-4 py-3 border-b border-gray-100 hover:bg-white transition-colors ${f.documentStatus === 'A' ? 'opacity-50' : ''}`}>
             <span className="col-span-2 text-[#0A2540] font-mono text-sm">{f.documentNo}</span>
             <span className="col-span-1">
-              <span className="px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700 border border-purple-200">{f.documentType}</span>
+              <span className={`px-1.5 py-0.5 rounded text-xs border ${f.documentType === 'PF' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-purple-100 text-purple-700 border-purple-200'}`}>{f.documentType}</span>
             </span>
             <div className="col-span-3">
               <p className="text-[#0A2540] text-sm truncate">{f.customerName}</p>

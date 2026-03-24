@@ -31,6 +31,7 @@ const DOCUMENT_TYPES = [
   { value: 'ND', label: 'ND — Nota de Débito' },
   { value: 'NC', label: 'NC — Nota de Crédito' },
   { value: 'FA', label: 'FA — Factura Simplificada' },
+  { value: 'PF', label: 'PF — Fatura Proforma' },
 ];
 
 const CURRENCIES = [
@@ -234,6 +235,16 @@ export function FacturaForm() {
         <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
           <AlertCircle className="w-4 h-4 shrink-0" />
           {error}
+        </div>
+      )}
+
+      {documentType === 'PF' && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+          <div>
+            <p className="font-semibold">Fatura Proforma — Documento sem validade fiscal</p>
+            <p className="text-xs mt-0.5 text-amber-700">Este documento é uma proposta comercial. Não é submetido à AGT e não substitui uma fatura. Para faturar oficialmente, emita uma FT ou FR.</p>
+          </div>
         </div>
       )}
 
