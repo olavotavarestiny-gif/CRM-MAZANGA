@@ -41,6 +41,7 @@ export interface Contact {
   customFields?: Record<string, string>;
   contactType: 'interessado' | 'cliente';
   status: 'ativo' | 'inativo';
+  clienteType?: 'empresa' | 'particular';
   documents: { name: string; url: string; size?: number; uploadedAt: string }[];
   createdAt: string;
   updatedAt: string;

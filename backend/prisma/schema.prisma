@@ -74,6 +74,7 @@ model Contact {
   customFields  String        @default("{}") // JSON object: { "fieldKey": "value" }
   contactType   String        @default("interessado")
   status        String        @default("ativo")
+  clienteType   String        @default("particular") // "empresa" | "particular"
   documents     String        @default("[]")
   notes         ContactNote[]
   createdAt     DateTime      @default(now())

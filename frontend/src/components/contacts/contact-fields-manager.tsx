@@ -73,7 +73,10 @@ function SystemFieldRow({ config }: { config: ContactFieldConfig }) {
   const [label, setLabel] = useState(config.label);
   const [required, setRequired] = useState(config.required);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['contactFieldConfigs'] });
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['contactFieldConfigs'] });
+    await queryClient.refetchQueries({ queryKey: ['contactFieldConfigs'] });
+  };
 
   const updateMutation = useMutation({
     mutationFn: (data: Parameters<typeof updateContactFieldConfig>[1]) =>

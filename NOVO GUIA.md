@@ -1,4 +1,4 @@
-# CucoGest — Documento de Reestruturação UX e Lógica do Sistema
+# KukuGest — Documento de Reestruturação UX e Lógica do Sistema
 
 ## 🎯 Objetivo
 
