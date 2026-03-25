@@ -176,9 +176,11 @@ export default function ContactForm({
     queryFn: getPipelineStages,
   });
 
-  // Only show visible system fields, sorted by order
+  // phone is hardcoded (always shown), exclude from config-driven loop
+  const ALWAYS_SHOWN = new Set(['phone']);
   const allSystemFieldsSorted = systemConfigs.sort((a, b) => a.order - b.order);
   const visibleSystemFields = allSystemFieldsSorted.filter(c => {
+    if (ALWAYS_SHOWN.has(c.fieldKey)) return false; // rendered separately
     if (!c.visible) return false;
     // For particulares, hide company and sector
     if (tipoCliente === 'particular' && (c.fieldKey === 'company' || c.fieldKey === 'sector')) return false;
@@ -268,6 +270,17 @@ export default function ContactForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
+          className="mt-1"
+        />
+      </div>
+
+      {/* Phone — always shown */}
+      <div>
+        <Label>Telefone</Label>
+        <Input
+          value={values['phone'] as string}
+          onChange={(e) => setValue('phone', e.target.value)}
+          placeholder="+244 9xx xxx xxx"
           className="mt-1"
         />
       </div>

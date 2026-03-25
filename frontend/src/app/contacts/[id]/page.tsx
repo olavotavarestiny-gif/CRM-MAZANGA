@@ -534,10 +534,11 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const clienteType: 'empresa' | 'particular' = (contact as any).clienteType || 'particular';
   const isEmpresa = clienteType === 'empresa';
 
+  // phone is hardcoded — always shown; exclude from config-driven loop
   const visibleSystem = systemConfigs
     .filter(c => c.visible)
     .filter(c => {
-      // For particulares, hide company and sector
+      if (c.fieldKey === 'phone') return false; // rendered separately
       if (!isEmpresa && (c.fieldKey === 'company' || c.fieldKey === 'sector')) return false;
       return true;
     })
@@ -652,6 +653,7 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
             </CardHeader>
             <CardContent className="space-y-4">
               <InlineField label="Nome" value={contact.name} onSave={v => save('name', v)} />
+              <InlineField label="Telefone" value={contact.phone ?? ''} onSave={v => save('phone', v)} />
               {/* Force company + sector for Empresa regardless of visibility config */}
               {isEmpresa && companyConfig && (
                 <InlineField label={companyConfig.label} value={contact.company ?? ''} onSave={v => save('company', v)} />

@@ -7,14 +7,15 @@ const { requirePermission, requireDeletePermission } = require('../lib/permissio
 const VALID_STAGES = ['Novo', 'Contactado', 'Qualificado', 'Proposta Enviada', 'Fechado', 'Perdido'];
 const VALID_FIELD_TYPES = ['text', 'number', 'date', 'select', 'url'];
 
-// Built-in system field defaults (name and stage are never configurable)
+// Built-in system field defaults (name, phone and stage are never configurable core fields)
+// visible: false by default — only shown when explicitly enabled in field config settings
 const SYSTEM_FIELD_DEFAULTS = [
-  { key: 'email',   label: 'Email',            required: false, order: 0 },
-  { key: 'phone',   label: 'Telefone',          required: true,  order: 1 },
-  { key: 'company', label: 'Empresa',           required: false, order: 2 },
-  { key: 'revenue', label: 'Faturamento Anual', required: false, order: 3 },
-  { key: 'sector',  label: 'Setor',             required: false, order: 4 },
-  { key: 'tags',    label: 'Tags',              required: false, order: 5 },
+  { key: 'email',   label: 'Email',            required: false, order: 0, visibleDefault: false },
+  { key: 'phone',   label: 'Telefone',          required: true,  order: 1, visibleDefault: true  },
+  { key: 'company', label: 'Empresa',           required: false, order: 2, visibleDefault: false },
+  { key: 'revenue', label: 'Faturamento Anual', required: false, order: 3, visibleDefault: false },
+  { key: 'sector',  label: 'Setor',             required: false, order: 4, visibleDefault: false },
+  { key: 'tags',    label: 'Tags',              required: false, order: 5, visibleDefault: false },
 ];
 
 // Slugify a label into a unique key
@@ -36,7 +37,7 @@ async function getSystemFieldConfigs(userId) {
     return {
       fieldKey:  def.key,
       label:     o?.label    ?? def.label,
-      visible:   o !== undefined ? o.visible  : true,
+      visible:   o !== undefined ? o.visible  : def.visibleDefault,
       required:  o !== undefined ? o.required : def.required,
       order:     o !== undefined ? o.order    : def.order,
       configId:  o?.id ?? null,
@@ -269,7 +270,7 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
 // POST create new contact
 router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
-    const { name, email, phone, company, revenue, sector, stage, tags, customFields, contactType, status } = req.body;
+    const { name, email, phone, company, revenue, sector, stage, tags, customFields, contactType, status, clienteType } = req.body;
 
     if (!name || !phone) {
       return res.status(400).json({ error: 'Name and phone are required' });
@@ -295,6 +296,7 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
         customFields: customFields && typeof customFields === 'object' ? JSON.stringify(customFields) : '{}',
         contactType: ['interessado', 'cliente'].includes(contactType) ? contactType : 'interessado',
         status: ['ativo', 'inativo'].includes(status) ? status : 'ativo',
+        clienteType: ['empresa', 'particular'].includes(clienteType) ? clienteType : 'particular',
       },
     });
 
@@ -469,7 +471,7 @@ router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
 // PUT update contact
 router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
-    const { name, email, phone, company, revenue, sector, stage, inPipeline, tags, customFields, contactType, status, documents } = req.body;
+    const { name, email, phone, company, revenue, sector, stage, inPipeline, tags, customFields, contactType, status, documents, clienteType } = req.body;
     const updateData = {};
     const contactId = parseInt(req.params.id);
 
@@ -502,6 +504,7 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
     }
     if (contactType !== undefined && ['interessado', 'cliente'].includes(contactType)) updateData.contactType = contactType;
     if (status !== undefined && ['ativo', 'inativo'].includes(status)) updateData.status = status;
+    if (clienteType !== undefined && ['empresa', 'particular'].includes(clienteType)) updateData.clienteType = clienteType;
     if (documents !== undefined) {
       try { JSON.parse(documents); updateData.documents = documents; } catch {}
     }
