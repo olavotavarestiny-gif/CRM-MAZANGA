@@ -156,9 +156,6 @@ function requireSuperAdmin(req, res, next) {
   next();
 }
 
-// Keep for backwards compatibility
-const SUPER_ADMIN_EMAIL = 'olavo@mazanga.digital';
-
 module.exports = requireAuth;
 module.exports.requireAdmin = requireAdmin;
 module.exports.requireAccountOwner = requireAccountOwner;
