@@ -1,24 +1,54 @@
-const { importJWK, jwtVerify } = require('jose');
+const { createRemoteJWKSet, importJWK, jwtVerify } = require('jose');
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 
-// Supabase project's EC public key (from /auth/v1/.well-known/jwks.json)
-// Public keys are safe to hardcode — they're not secret
-const SUPABASE_JWK = {
+// Dynamic JWKS — fetched from Supabase and cached automatically by jose.
+// Handles key rotation without redeployment.
+// Falls back to the hardcoded key if SUPABASE_URL is not configured (local dev).
+let _remoteJwks = null;
+function getRemoteJwks() {
+  if (!_remoteJwks && process.env.SUPABASE_URL) {
+    _remoteJwks = createRemoteJWKSet(
+      new URL(`${process.env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`)
+    );
+  }
+  return _remoteJwks;
+}
+
+// Hardcoded fallback key (for local dev without SUPABASE_URL)
+const SUPABASE_JWK_FALLBACK = {
   alg: 'ES256', crv: 'P-256',
   kid: 'bb424079-cb99-41be-97ee-ebd44cbd72d3',
   kty: 'EC',
   x: 'zHF8awnfE8CwkcTnZrTpetP8TOzQ-Nvnp6tTtHwcnyQ',
   y: 'sG2mdRZeicP-BLn1G8jXln1t1xNU50wRD6qNftFMRhc',
 };
+let _fallbackKey = null;
+async function getFallbackKey() {
+  if (!_fallbackKey) _fallbackKey = await importJWK(SUPABASE_JWK_FALLBACK, 'ES256');
+  return _fallbackKey;
+}
 
-// Import once at startup — no network call needed
-let _publicKey = null;
-async function getPublicKey() {
-  if (!_publicKey) {
-    _publicKey = await importJWK(SUPABASE_JWK, 'ES256');
+async function verifySupabaseJwt(token) {
+  const issuer = process.env.SUPABASE_URL
+    ? `${process.env.SUPABASE_URL}/auth/v1`
+    : undefined;
+
+  const remoteJwks = getRemoteJwks();
+  if (remoteJwks) {
+    const { payload } = await jwtVerify(token, remoteJwks, {
+      issuer,
+      audience: 'authenticated',
+    });
+    return payload;
   }
-  return _publicKey;
+
+  // Fallback: hardcoded key (local dev without SUPABASE_URL)
+  const fallbackKey = await getFallbackKey();
+  const { payload } = await jwtVerify(token, fallbackKey, {
+    audience: 'authenticated',
+  });
+  return payload;
 }
 
 const USER_SELECT = {
@@ -71,15 +101,10 @@ async function requireAuth(req, res, next) {
     // Not a valid HS256 token — fall through to Supabase verification
   }
 
-  // ── Supabase JWT (ES256) ──────────────────────────────────────────────────
+  // ── Supabase JWT (ES256, dynamic JWKS) ───────────────────────────────────
   let decoded;
   try {
-    const publicKey = await getPublicKey();
-    const { payload } = await jwtVerify(token, publicKey, {
-      issuer: `${process.env.SUPABASE_URL}/auth/v1`,
-      audience: 'authenticated',
-    });
-    decoded = payload;
+    decoded = await verifySupabaseJwt(token);
   } catch (error) {
     console.error('[auth] JWT verify error:', error.code || error.message);
     return res.status(401).json({ error: 'Token inválido ou expirado' });

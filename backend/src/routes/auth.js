@@ -19,18 +19,42 @@ function getSupabaseAdmin() {
   return _supabaseAdmin;
 }
 
-// Shared EC public key for JWT verification (same key as middleware/auth.js)
-const SUPABASE_JWK = {
+// Re-use the same dynamic JWKS logic from the auth middleware
+const { createRemoteJWKSet } = require('jose');
+
+let _remoteJwks = null;
+function getRemoteJwks() {
+  if (!_remoteJwks && process.env.SUPABASE_URL) {
+    _remoteJwks = createRemoteJWKSet(
+      new URL(`${process.env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`)
+    );
+  }
+  return _remoteJwks;
+}
+
+const SUPABASE_JWK_FALLBACK = {
   alg: 'ES256', crv: 'P-256',
   kid: 'bb424079-cb99-41be-97ee-ebd44cbd72d3',
   kty: 'EC',
   x: 'zHF8awnfE8CwkcTnZrTpetP8TOzQ-Nvnp6tTtHwcnyQ',
   y: 'sG2mdRZeicP-BLn1G8jXln1t1xNU50wRD6qNftFMRhc',
 };
-let _publicKey = null;
-async function getPublicKey() {
-  if (!_publicKey) _publicKey = await importJWK(SUPABASE_JWK, 'ES256');
-  return _publicKey;
+let _fallbackKey = null;
+async function getFallbackKey() {
+  if (!_fallbackKey) _fallbackKey = await importJWK(SUPABASE_JWK_FALLBACK, 'ES256');
+  return _fallbackKey;
+}
+
+async function verifySupabaseJwt(token) {
+  const issuer = process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL}/auth/v1` : undefined;
+  const remoteJwks = getRemoteJwks();
+  if (remoteJwks) {
+    const { payload } = await jwtVerify(token, remoteJwks, { issuer, audience: 'authenticated' });
+    return payload;
+  }
+  const fallbackKey = await getFallbackKey();
+  const { payload } = await jwtVerify(token, fallbackKey, { audience: 'authenticated' });
+  return payload;
 }
 
 // POST /api/auth/sync
@@ -49,11 +73,7 @@ router.post('/sync', async (req, res) => {
       return res.status(401).json({ error: 'Token de autenticação em falta' });
     }
     try {
-      const publicKey = await getPublicKey();
-      const { payload } = await jwtVerify(token, publicKey, {
-        issuer: `${process.env.SUPABASE_URL}/auth/v1`,
-        audience: 'authenticated',
-      });
+      const payload = await verifySupabaseJwt(token);
       if (payload.sub !== supabaseUid) {
         return res.status(401).json({ error: 'Token não corresponde ao utilizador' });
       }
