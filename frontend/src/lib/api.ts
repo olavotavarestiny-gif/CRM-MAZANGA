@@ -805,6 +805,38 @@ export async function impersonateUser(userId: number): Promise<{ token: string; 
   return res.data;
 }
 
+// SuperAdmin: usage stats per org
+export interface SuperAdminUsageStat {
+  orgId: number;
+  orgName: string;
+  logins7d: number;
+  logins30d: number;
+  lastLogin: string | null;
+  sparkline: { date: string; count: number }[];
+}
+
+export async function getSuperAdminUsage(): Promise<SuperAdminUsageStat[]> {
+  const res = await api.get('/api/superadmin/usage');
+  return res.data;
+}
+
+// SuperAdmin: storage/record counts per org
+export interface SuperAdminStorageStat {
+  orgId: number;
+  orgName: string;
+  contacts: number;
+  tasks: number;
+  transactions: number;
+  notes: number;
+  fileCount: number;
+  fileSizeBytes: number;
+}
+
+export async function getSuperAdminStorage(): Promise<SuperAdminStorageStat[]> {
+  const res = await api.get('/api/superadmin/storage');
+  return res.data;
+}
+
 // Admin: list all client accounts
 export async function getClientAccounts(): Promise<import('./types').ClientAccount[]> {
   const res = await api.get('/api/admin/accounts');

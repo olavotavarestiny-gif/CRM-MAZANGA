@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   CheckCircle2, Plus, Building2, Settings, User as UserIcon,
-  Users, Shield, Eye, EyeOff, Trash2, Pencil,
+  Users, Shield, Eye, EyeOff, Trash2, Pencil, ShieldCheck,
 } from 'lucide-react';
 import {
   getFaturacaoConfig, updateFaturacaoConfig, getEstabelecimentos, createEstabelecimento,
@@ -18,8 +18,10 @@ import {
   getTeamMembers, addTeamMember, removeTeamMember,
   getUsers, createUser, updateUser, deleteUser, getLoginLogs,
   getClientAccounts, updateClientAccount, createClientAccount,
+  getSuperAdminOrgs, updateSuperAdminOrg, deleteSuperAdminOrg, impersonateUser,
+  getSuperAdminUsage, getSuperAdminStorage,
 } from '@/lib/api';
-import type { User, LoginLog } from '@/lib/api';
+import type { User, LoginLog, SuperAdminOrg, SuperAdminUsageStat, SuperAdminStorageStat } from '@/lib/api';
 import type { IBANEntry, ClientAccount } from '@/lib/types';
 import MemberPermissionsModal from '@/components/configuracoes/member-permissions-modal';
 
@@ -27,7 +29,7 @@ function ConfiguracoesContent() {
   const searchParams = useSearchParams();
   const qc = useQueryClient();
 
-  type TabId = 'perfil' | 'empresa' | 'equipa' | 'admin';
+  type TabId = 'perfil' | 'empresa' | 'equipa' | 'admin' | 'superadmin';
   const [activeTab, setActiveTab] = useState<TabId>(
     (searchParams?.get('tab') as TabId) || 'perfil'
   );
@@ -40,7 +42,7 @@ function ConfiguracoesContent() {
 
   const isOwner = currentUser && !currentUser.accountOwnerId;
   const isAdmin = currentUser?.role === 'admin';
-  const isSuperAdmin = currentUser?.email === 'olavo@mazanga.digital';
+  const isSuperAdmin = !!(currentUser?.isSuperAdmin || currentUser?.email === 'olavo@mazanga.digital');
 
   // ── Perfil ───────────────────────────────────────────────
   const [pwForm, setPwForm] = useState({ current: '', new: '', confirm: '' });
@@ -197,6 +199,7 @@ function ConfiguracoesContent() {
     mutationFn: () => createClientAccount({ ...accountForm }),
     onSuccess: () => {
       refetchAccounts();
+      qc.invalidateQueries({ queryKey: ['sa-orgs'] });
       setShowCreateAccount(false);
       setAccountForm({ name: '', email: '', password: '', plan: 'essencial' });
       setAccountError('');
@@ -246,11 +249,37 @@ function ConfiguracoesContent() {
     }
   };
 
+  // ── Super Admin ──────────────────────────────────────────
+  const [saSubTab, setSaSubTab] = useState<'contas' | 'utilizacao' | 'armazenamento'>('contas');
+  const [expandedOrg, setExpandedOrg] = useState<number | null>(null);
+  const [saError, setSaError] = useState('');
+  const [saModuleUpdating, setSaModuleUpdating] = useState<number | null>(null);
+  const [saDeleteConfirm, setSaDeleteConfirm] = useState<number | null>(null);
+
+  const { data: saOrgs = [], refetch: refetchSaOrgs } = useQuery({
+    queryKey: ['sa-orgs'],
+    queryFn: getSuperAdminOrgs,
+    enabled: activeTab === 'superadmin' && isSuperAdmin,
+  });
+
+  const { data: saUsage = [] } = useQuery({
+    queryKey: ['sa-usage'],
+    queryFn: getSuperAdminUsage,
+    enabled: activeTab === 'superadmin' && saSubTab === 'utilizacao' && isSuperAdmin,
+  });
+
+  const { data: saStorage = [] } = useQuery({
+    queryKey: ['sa-storage'],
+    queryFn: getSuperAdminStorage,
+    enabled: activeTab === 'superadmin' && saSubTab === 'armazenamento' && isSuperAdmin,
+  });
+
   // ── Tab config ───────────────────────────────────────────
   const tabs = [
     { id: 'perfil' as TabId, label: 'Perfil', icon: UserIcon, show: true },
     { id: 'empresa' as TabId, label: 'Empresa', icon: Building2, show: !!isOwner },
     { id: 'equipa' as TabId, label: 'Equipa', icon: Users, show: !!isOwner },
+    { id: 'superadmin' as TabId, label: 'Super Admin', icon: ShieldCheck, show: isSuperAdmin },
   ].filter(t => t.show);
 
   const tabBtn = (id: TabId) =>
@@ -742,6 +771,327 @@ function ConfiguracoesContent() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ── SUPER ADMIN ─────────────────────────────────────── */}
+      {activeTab === 'superadmin' && (
+        <div className="space-y-4">
+          {saError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center justify-between">
+              <span>{saError}</span>
+              <button onClick={() => setSaError('')} className="text-red-400 hover:text-red-600 ml-4">✕</button>
+            </div>
+          )}
+
+          {/* Sub-tab navigation */}
+          <div className="flex gap-4 border-b border-gray-200">
+            <button onClick={() => setSaSubTab('contas')} className={subTabBtn('contas', saSubTab)}>
+              Contas ({(saOrgs as SuperAdminOrg[]).length})
+            </button>
+            <button onClick={() => setSaSubTab('utilizacao')} className={subTabBtn('utilizacao', saSubTab)}>
+              Utilização
+            </button>
+            <button onClick={() => setSaSubTab('armazenamento')} className={subTabBtn('armazenamento', saSubTab)}>
+              Armazenamento
+            </button>
+          </div>
+
+          {/* ── Contas ── */}
+          {saSubTab === 'contas' && (
+            <div className="space-y-3">
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => setShowCreateAccount(true)}
+                  className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90 gap-1.5"
+                >
+                  <Plus className="w-4 h-4" /> Nova Conta
+                </Button>
+              </div>
+
+              {(saOrgs as SuperAdminOrg[]).map(org => (
+                <Card key={org.id}>
+                  <div className="p-4">
+                    {/* Header row */}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 text-sm truncate">{org.name}</div>
+                        <div className="text-gray-400 text-xs truncate">{org.email}</div>
+                      </div>
+                      {/* Badges */}
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${org.plan === 'profissional' ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {org.plan}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${org.active ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                        {org.active ? 'Ativo' : 'Bloqueado'}
+                      </span>
+                      <span className="text-xs text-gray-400 flex-shrink-0">
+                        {org._count.accountMembers} membro{org._count.accountMembers !== 1 ? 's' : ''}
+                      </span>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* Impersonate */}
+                        <button
+                          onClick={async () => {
+                            try {
+                              const { token } = await impersonateUser(org.id);
+                              localStorage.setItem('impersonation_token', token);
+                              window.location.href = '/';
+                            } catch (e: any) {
+                              setSaError(e.response?.data?.error || e.message || 'Erro ao entrar');
+                            }
+                          }}
+                          className="text-xs px-2 py-1 border border-gray-200 rounded text-gray-600 hover:bg-gray-50 transition"
+                        >
+                          Entrar
+                        </button>
+
+                        {/* Block/Unblock */}
+                        <button
+                          onClick={async () => {
+                            try {
+                              await updateSuperAdminOrg(org.id, { active: !org.active });
+                              refetchSaOrgs();
+                            } catch (e: any) {
+                              setSaError(e.response?.data?.error || 'Erro ao atualizar estado');
+                            }
+                          }}
+                          className={`text-xs px-2 py-1 border rounded transition ${org.active ? 'border-orange-200 text-orange-600 hover:bg-orange-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}
+                        >
+                          {org.active ? 'Bloquear' : 'Desbloquear'}
+                        </button>
+
+                        {/* Plan select */}
+                        <select
+                          value={org.plan}
+                          onChange={async (e) => {
+                            try {
+                              await updateSuperAdminOrg(org.id, { plan: e.target.value });
+                              refetchSaOrgs();
+                            } catch (e: any) {
+                              setSaError(e.response?.data?.error || 'Erro ao atualizar plano');
+                            }
+                          }}
+                          className="text-xs border border-gray-200 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none"
+                        >
+                          <option value="essencial">Essencial</option>
+                          <option value="profissional">Profissional</option>
+                        </select>
+
+                        {/* Delete */}
+                        {saDeleteConfirm === org.id ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-red-600">Confirmar?</span>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await deleteSuperAdminOrg(org.id);
+                                  setSaDeleteConfirm(null);
+                                  refetchSaOrgs();
+                                } catch (e: any) {
+                                  setSaError(e.response?.data?.error || 'Erro ao eliminar');
+                                  setSaDeleteConfirm(null);
+                                }
+                              }}
+                              className="text-xs px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                            >Sim</button>
+                            <button onClick={() => setSaDeleteConfirm(null)} className="text-xs px-2 py-1 border border-gray-200 rounded hover:bg-gray-50">Não</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setSaDeleteConfirm(org.id)} className="text-red-400 hover:text-red-600 transition" title="Eliminar conta">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {/* Toggle modules panel */}
+                        <button
+                          onClick={() => setExpandedOrg(expandedOrg === org.id ? null : org.id)}
+                          className="text-xs px-2 py-1 border border-gray-200 rounded text-gray-600 hover:bg-gray-50"
+                        >
+                          {expandedOrg === org.id ? '▲ Fechar' : '▼ Módulos'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Expandable module toggles */}
+                    {expandedOrg === org.id && (
+                      <div className="mt-4 pt-4 border-t border-gray-100">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Módulos da conta</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {/* Standard modules — always on */}
+                          {[
+                            { key: 'contacts', label: 'Clientes' },
+                            { key: 'pipeline', label: 'Processos' },
+                            { key: 'tasks', label: 'Tarefas' },
+                            { key: 'vendas', label: 'Vendas' },
+                            { key: 'finances', label: 'Finanças' },
+                          ].map(mod => (
+                            <div key={mod.key} className="flex items-center gap-2">
+                              <div className="w-8 h-4 bg-green-200 rounded-full flex items-center justify-end pr-0.5 pointer-events-none">
+                                <div className="w-3 h-3 bg-green-600 rounded-full" />
+                              </div>
+                              <span className="text-sm text-gray-500">{mod.label}</span>
+                              <span className="text-xs text-gray-300">(padrão)</span>
+                            </div>
+                          ))}
+
+                          {/* Advanced modules — toggleable */}
+                          {[
+                            { key: 'chat', label: 'Conversas' },
+                            { key: 'calendario', label: 'Calendário' },
+                            { key: 'automations', label: 'Automações' },
+                            { key: 'forms', label: 'Formulários' },
+                          ].map(mod => {
+                            const currentPerms = (org.permissions as Record<string, any>) || {};
+                            const isEnabled = mod.key in currentPerms;
+                            return (
+                              <div key={mod.key} className="flex items-center gap-2">
+                                <button
+                                  disabled={saModuleUpdating === org.id}
+                                  onClick={async () => {
+                                    setSaModuleUpdating(org.id);
+                                    try {
+                                      const newPerms = { ...currentPerms };
+                                      if (isEnabled) {
+                                        delete newPerms[mod.key];
+                                      } else {
+                                        newPerms[mod.key] = 'edit';
+                                      }
+                                      await updateSuperAdminOrg(org.id, {
+                                        permissions: Object.keys(newPerms).length > 0 ? newPerms as any : null,
+                                      });
+                                      refetchSaOrgs();
+                                    } catch (e: any) {
+                                      setSaError(e.response?.data?.error || 'Erro ao atualizar módulo');
+                                    } finally {
+                                      setSaModuleUpdating(null);
+                                    }
+                                  }}
+                                  className={`w-8 h-4 rounded-full flex items-center transition-colors flex-shrink-0 ${
+                                    isEnabled ? 'bg-green-400 justify-end pr-0.5' : 'bg-gray-200 justify-start pl-0.5'
+                                  } ${saModuleUpdating === org.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                  title={`${isEnabled ? 'Desativar' : 'Ativar'} ${mod.label}`}
+                                >
+                                  <div className="w-3 h-3 bg-white rounded-full shadow" />
+                                </button>
+                                <span className="text-sm text-gray-700">{mod.label}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              ))}
+
+              {(saOrgs as SuperAdminOrg[]).length === 0 && (
+                <div className="text-center py-10 text-gray-400 text-sm">Nenhuma conta de cliente encontrada.</div>
+              )}
+            </div>
+          )}
+
+          {/* ── Utilização ── */}
+          {saSubTab === 'utilizacao' && (
+            <Card>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Conta</th>
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Logins (7d)</th>
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Logins (30d)</th>
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Último Acesso</th>
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Atividade (7d)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(saUsage as SuperAdminUsageStat[]).map(stat => (
+                      <tr key={stat.orgId} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                        <td className="py-3 px-4 text-gray-900 text-sm font-medium">{stat.orgName}</td>
+                        <td className="py-3 px-4 text-gray-700 text-sm">{stat.logins7d}</td>
+                        <td className="py-3 px-4 text-gray-500 text-sm">{stat.logins30d}</td>
+                        <td className="py-3 px-4 text-gray-500 text-sm">
+                          {stat.lastLogin ? new Date(stat.lastLogin).toLocaleString('pt-PT') : <span className="text-gray-300">Nunca</span>}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-end gap-0.5 h-6">
+                            {stat.sparkline.map(day => {
+                              const max = Math.max(...stat.sparkline.map(d => d.count), 1);
+                              const pct = Math.round((day.count / max) * 100);
+                              return (
+                                <div
+                                  key={day.date}
+                                  title={`${day.date}: ${day.count}`}
+                                  style={{ height: `${Math.max(pct, 8)}%` }}
+                                  className={`w-3 rounded-sm flex-shrink-0 ${day.count > 0 ? 'bg-[#0A2540]' : 'bg-gray-100'}`}
+                                />
+                              );
+                            })}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {(saUsage as SuperAdminUsageStat[]).length === 0 && (
+                  <div className="text-center py-8 text-gray-400 text-sm">Sem dados de utilização.</div>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* ── Armazenamento ── */}
+          {saSubTab === 'armazenamento' && (
+            <Card>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Conta</th>
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Clientes</th>
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Tarefas</th>
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Transações</th>
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Notas</th>
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Ficheiros</th>
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Armazenamento</th>
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Peso</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(saStorage as SuperAdminStorageStat[]).map(stat => {
+                      const totalRecords = stat.contacts + stat.tasks + stat.transactions + stat.notes;
+                      const storageMb = (stat.fileSizeBytes / (1024 * 1024)).toFixed(1);
+                      const barPct = Math.min((stat.fileSizeBytes / (100 * 1024 * 1024)) * 100, 100);
+                      return (
+                        <tr key={stat.orgId} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                          <td className="py-3 px-4 text-gray-900 text-sm font-medium">{stat.orgName}</td>
+                          <td className="py-3 px-4 text-gray-600 text-sm">{stat.contacts}</td>
+                          <td className="py-3 px-4 text-gray-600 text-sm">{stat.tasks}</td>
+                          <td className="py-3 px-4 text-gray-600 text-sm">{stat.transactions}</td>
+                          <td className="py-3 px-4 text-gray-600 text-sm">{stat.notes}</td>
+                          <td className="py-3 px-4 text-gray-600 text-sm">{stat.fileCount}</td>
+                          <td className="py-3 px-4 text-gray-600 text-sm">{storageMb} MB</td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <div className="w-20 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-[#0A2540] rounded-full" style={{ width: `${barPct}%` }} />
+                              </div>
+                              <span className="text-xs text-gray-400">{totalRecords} reg.</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {(saStorage as SuperAdminStorageStat[]).length === 0 && (
+                  <div className="text-center py-8 text-gray-400 text-sm">Sem dados de armazenamento.</div>
+                )}
               </div>
             </Card>
           )}

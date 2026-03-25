@@ -195,4 +195,96 @@ router.post('/users', async (req, res) => {
   }
 });
 
+// GET /api/superadmin/usage — per-org daily login aggregation (last 30 days)
+router.get('/usage', async (req, res) => {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const orgs = await prisma.user.findMany({
+      where: { accountOwnerId: null, role: 'user' },
+      select: { id: true, name: true, accountMembers: { select: { id: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const results = await Promise.all(orgs.map(async (org) => {
+      const userIds = [org.id, ...org.accountMembers.map(m => m.id)];
+
+      const logs = await prisma.loginLog.findMany({
+        where: { userId: { in: userIds }, createdAt: { gte: thirtyDaysAgo } },
+        select: { createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // Pre-populate daily buckets for the last 7 days
+      const dailyMap = {};
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        dailyMap[d.toISOString().slice(0, 10)] = 0;
+      }
+
+      let logins30d = 0;
+      let lastLogin = null;
+
+      logs.forEach(log => {
+        logins30d++;
+        const key = log.createdAt.toISOString().slice(0, 10);
+        if (key in dailyMap) dailyMap[key]++;
+        if (!lastLogin || log.createdAt > lastLogin) lastLogin = log.createdAt;
+      });
+
+      const sparkline = Object.entries(dailyMap).map(([date, count]) => ({ date, count }));
+      const logins7d = sparkline.reduce((s, d) => s + d.count, 0);
+
+      return { orgId: org.id, orgName: org.name, logins7d, logins30d, lastLogin, sparkline };
+    }));
+
+    res.json(results);
+  } catch (error) {
+    console.error('[superadmin] usage error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/superadmin/storage — per-org record counts and file storage
+router.get('/storage', async (req, res) => {
+  try {
+    const orgs = await prisma.user.findMany({
+      where: { accountOwnerId: null, role: 'user' },
+      select: { id: true, name: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const results = await Promise.all(orgs.map(async (org) => {
+      const [contacts, tasks, transactions, notes, contactsWithDocs] = await Promise.all([
+        prisma.contact.count({ where: { userId: org.id } }),
+        prisma.task.count({ where: { userId: org.id } }),
+        prisma.transaction.count({ where: { userId: org.id, deleted: false } }),
+        prisma.contactNote.count({ where: { contact: { userId: org.id } } }),
+        prisma.contact.findMany({ where: { userId: org.id }, select: { documents: true } }),
+      ]);
+
+      let fileCount = 0;
+      let fileSizeBytes = 0;
+      for (const c of contactsWithDocs) {
+        try {
+          const docs = JSON.parse(c.documents || '[]');
+          if (Array.isArray(docs)) {
+            fileCount += docs.length;
+            fileSizeBytes += docs.reduce((s, d) => s + (typeof d.size === 'number' ? d.size : 0), 0);
+          }
+        } catch { /* skip malformed JSON */ }
+      }
+
+      return { orgId: org.id, orgName: org.name, contacts, tasks, transactions, notes, fileCount, fileSizeBytes };
+    }));
+
+    res.json(results);
+  } catch (error) {
+    console.error('[superadmin] storage error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
