@@ -144,7 +144,7 @@ function ConfiguracoesContent() {
   const addMemberMutation = useMutation({
     mutationFn: () => addTeamMember(memberForm),
     onSuccess: () => {
-      refetchTeam();
+      qc.invalidateQueries({ queryKey: ['team-members'] });
       setShowAddMember(false);
       setMemberForm({ name: '', email: '', password: '' });
       setMemberError('');
@@ -156,7 +156,7 @@ function ConfiguracoesContent() {
     if (!confirm('Tem a certeza que quer remover este membro?')) return;
     try {
       await removeTeamMember(memberId);
-      refetchTeam();
+      qc.invalidateQueries({ queryKey: ['team-members'] });
     } catch (err: any) {
       setMemberError(err.response?.data?.error || 'Erro ao remover membro');
     }

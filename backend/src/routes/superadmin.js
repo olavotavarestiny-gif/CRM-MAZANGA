@@ -19,7 +19,7 @@ function getSupabaseAdmin() {
 router.get('/orgs', async (req, res) => {
   try {
     const orgs = await prisma.user.findMany({
-      where: { accountOwnerId: null, role: 'user' },
+      where: { accountOwnerId: null },
       select: {
         id: true, name: true, email: true, active: true, plan: true,
         permissions: true, createdAt: true,

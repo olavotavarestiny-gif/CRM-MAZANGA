@@ -52,6 +52,18 @@ function LayoutInner({ children }: { children: ReactNode }) {
     pathname === '/manutencao' ||
     pathname.startsWith('/f/');
 
+  // Detect Supabase password recovery flow — fires when user clicks a reset-password email link
+  // The link lands on / with hash tokens; Supabase fires PASSWORD_RECOVERY so we redirect.
+  useEffect(() => {
+    const supabase = createClient();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        router.push('/reset-password');
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Reset auth cache when Supabase session changes (e.g. after login/logout)
   useEffect(() => {
     if (isPublicPage) return;
