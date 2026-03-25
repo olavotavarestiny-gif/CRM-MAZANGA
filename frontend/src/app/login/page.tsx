@@ -24,6 +24,10 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('impersonation_token');
+      }
+
       const supabase = createClient();
 
       // 1. Authenticate with Supabase
