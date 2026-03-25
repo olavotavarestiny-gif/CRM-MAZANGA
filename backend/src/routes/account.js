@@ -29,7 +29,7 @@ router.get('/team', requireAccountOwner, async (req, res) => {
         name: true,
         email: true,
         active: true,
-        allowedPages: true,
+        permissions: true,
         createdAt: true,
         loginLogs: {
           take: 1,
@@ -42,7 +42,7 @@ router.get('/team', requireAccountOwner, async (req, res) => {
 
     const membersWithLastLogin = members.map((m) => ({
       ...m,
-      allowedPages: m.allowedPages ? JSON.parse(m.allowedPages) : null,
+      permissions: m.permissions ? JSON.parse(m.permissions) : null,
       lastLogin: m.loginLogs[0]?.createdAt || null,
       loginLogs: undefined,
     }));

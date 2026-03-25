@@ -27,7 +27,7 @@ router.get('/users', async (req, res) => {
         role: true,
         active: true,
         plan: true,
-        allowedPages: true,
+        permissions: true,
         accountOwnerId: true,
         createdAt: true,
         loginLogs: {
@@ -49,7 +49,7 @@ router.get('/users', async (req, res) => {
       role: u.role,
       active: u.active,
       plan: u.plan,
-      allowedPages: u.allowedPages ? JSON.parse(u.allowedPages) : null,
+      permissions: u.permissions ? JSON.parse(u.permissions) : null,
       accountOwnerId: u.accountOwnerId,
       accountOwnerName: u.accountOwner?.name || null,
       createdAt: u.createdAt,
@@ -139,7 +139,7 @@ router.patch('/accounts/:id', async (req, res) => {
 // POST /api/admin/users - Criar novo utilizador (admin pode criar contas independentes; só super-admin cria outros admins)
 router.post('/users', async (req, res) => {
   try {
-    const { name, email, password, role, accountOwnerId, plan, allowedPages } = req.body;
+    const { name, email, password, role, accountOwnerId, plan, permissions } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email e password são obrigatórios' });
@@ -193,7 +193,7 @@ router.post('/users', async (req, res) => {
         active: true,
         mustChangePassword: true,
         plan: plan || 'essencial',
-        allowedPages: allowedPages ? JSON.stringify(allowedPages) : null,
+        permissions: permissions ? JSON.stringify(permissions) : null,
         accountOwnerId: accountOwnerId ? parseInt(accountOwnerId) : null,
       },
     });
@@ -205,7 +205,7 @@ router.post('/users', async (req, res) => {
       role: user.role,
       active: user.active,
       plan: user.plan,
-      allowedPages: user.allowedPages ? JSON.parse(user.allowedPages) : null,
+      permissions: user.permissions ? JSON.parse(user.permissions) : null,
       accountOwnerId: user.accountOwnerId,
       createdAt: user.createdAt,
     });
@@ -219,7 +219,7 @@ router.post('/users', async (req, res) => {
 router.patch('/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, active, role, plan, allowedPages } = req.body;
+    const { name, active, role, plan, permissions } = req.body;
     const userId = parseInt(id);
 
     const updateData = {};
@@ -229,8 +229,8 @@ router.patch('/users/:id', async (req, res) => {
       updateData.role = role;
     }
     if (plan !== undefined) updateData.plan = plan;
-    if (allowedPages !== undefined) {
-      updateData.allowedPages = allowedPages ? JSON.stringify(allowedPages) : null;
+    if (permissions !== undefined) {
+      updateData.permissions = permissions ? JSON.stringify(permissions) : null;
     }
 
     const user = await prisma.user.update({
@@ -238,11 +238,11 @@ router.patch('/users/:id', async (req, res) => {
       data: updateData,
       select: {
         id: true, name: true, email: true, role: true, active: true,
-        plan: true, allowedPages: true, createdAt: true,
+        plan: true, permissions: true, createdAt: true,
       },
     });
 
-    res.json({ ...user, allowedPages: user.allowedPages ? JSON.parse(user.allowedPages) : null });
+    res.json({ ...user, permissions: user.permissions ? JSON.parse(user.permissions) : null });
   } catch (error) {
     console.error('Error updating user:', error);
     if (error.code === 'P2025') {
