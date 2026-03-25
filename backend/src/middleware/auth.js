@@ -134,7 +134,11 @@ async function requireAuth(req, res, next) {
       }
     }
 
-    if (!user || !user.active) {
+    if (!user) {
+      return res.status(403).json({ error: 'Utilizador autenticado no Supabase, mas sem registo interno no CRM.' });
+    }
+
+    if (!user.active) {
       return res.status(403).json({ error: 'Conta desactivada. Contacte o administrador.' });
     }
 
