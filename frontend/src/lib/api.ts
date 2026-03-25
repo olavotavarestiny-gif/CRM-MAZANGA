@@ -523,9 +523,11 @@ export async function disconnectCalendar(): Promise<void> {
   await api.delete('/api/calendar/disconnect');
 }
 
-export function getCalendarAuthUrl(): string {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
-  return `${API_URL}/api/calendar/auth?token=${token || ''}`;
+export async function getCalendarAuthUrl(): Promise<string> {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? '';
+  return `${API_URL}/api/calendar/auth?token=${encodeURIComponent(token)}`;
 }
 
 // ============================================
@@ -678,9 +680,11 @@ export async function generateSaft(periodo: string): Promise<SaftPeriodo> {
   return res.data;
 }
 
-export function getSaftDownloadUrl(id: string): string {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
-  return `${API_URL}/api/faturacao/saft/${id}/download?token=${token || ''}`;
+export async function getSaftDownloadUrl(id: string): Promise<string> {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? '';
+  return `${API_URL}/api/faturacao/saft/${id}/download?token=${encodeURIComponent(token)}`;
 }
 
 // Faturas Recorrentes

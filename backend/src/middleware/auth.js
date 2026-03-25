@@ -178,3 +178,4 @@ module.exports.requireAccountOwner = requireAccountOwner;
 module.exports.requireAccountOwnerOrAdmin = requireAccountOwnerOrAdmin;
 module.exports.requireSuperAdmin = requireSuperAdmin;
 module.exports.SUPER_ADMIN_EMAIL = SUPER_ADMIN_EMAIL;
+module.exports.verifySupabaseJwt = verifySupabaseJwt;

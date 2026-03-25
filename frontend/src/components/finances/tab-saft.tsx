@@ -109,11 +109,13 @@ export function TabSaft() {
                 {new Date(p.generatedAt).toLocaleString('pt-PT')}
               </span>
               <div className="col-span-2 flex justify-end">
-                <a href={getSaftDownloadUrl(p.id)} download={`saft-${p.periodo}.xml`}>
-                  <Button variant="outline" size="sm" className="border-gray-200 text-gray-600 hover:bg-gray-100">
-                    <Download className="w-3.5 h-3.5 mr-1" /> XML
-                  </Button>
-                </a>
+                <Button
+                  variant="outline" size="sm"
+                  className="border-gray-200 text-gray-600 hover:bg-gray-100"
+                  onClick={async () => { window.location.href = await getSaftDownloadUrl(p.id); }}
+                >
+                  <Download className="w-3.5 h-3.5 mr-1" /> XML
+                </Button>
               </div>
             </div>
           ))}

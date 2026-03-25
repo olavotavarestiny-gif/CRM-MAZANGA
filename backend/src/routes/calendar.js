@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { google } = require('googleapis');
-const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 const requireAuth = require('../middleware/auth');
+const { verifySupabaseJwt } = require('../middleware/auth');
 
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar.readonly',
@@ -19,7 +19,7 @@ function getOAuth2Client() {
 }
 
 // GET /api/calendar/auth — redireciona para OAuth Google
-// Aceita token JWT via query string (necessário para redirects de browser)
+// Aceita token Supabase JWT via query string (necessário para redirects de browser)
 router.get('/auth', async (req, res) => {
   if (!process.env.GOOGLE_CLIENT_ID) {
     return res.status(503).send('Google Calendar não configurado no servidor');
@@ -27,20 +27,25 @@ router.get('/auth', async (req, res) => {
 
   // Extrair token do query param ou do header Authorization
   const authHeader = req.headers.authorization;
-  const token = req.query.token || (authHeader && authHeader.split(' ')[1]);
+  const rawToken = req.query.token || (authHeader && authHeader.split(' ')[1]);
+  const token = rawToken ? decodeURIComponent(String(rawToken)) : null;
 
   if (!token) {
     return res.status(401).send('Não autenticado');
   }
 
-  let decoded;
+  let userId;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = await verifySupabaseJwt(token);
+    const user = await prisma.user.findUnique({
+      where: { supabaseUid: payload.sub },
+      select: { id: true, accountOwnerId: true },
+    });
+    if (!user) return res.status(401).send('Utilizador não encontrado');
+    userId = user.accountOwnerId || user.id;
   } catch {
     return res.status(401).send('Token inválido');
   }
-
-  const userId = decoded.accountOwnerId || decoded.id;
   const oauth2Client = getOAuth2Client();
   const state = Buffer.from(JSON.stringify({ userId })).toString('base64');
   const url = oauth2Client.generateAuthUrl({

@@ -35,6 +35,11 @@ export default function LoginPage() {
         return;
       }
 
+      // Debug: confirm session was created
+      const { data: { session: dbgSession } } = await supabase.auth.getSession();
+      console.log('[LOGIN] session:', dbgSession ? 'OK' : 'NULL');
+      if (dbgSession) console.log('[LOGIN] access_token prefix:', dbgSession.access_token.slice(0, 20) + '...');
+
       // 2. Load user from our backend (middleware auto-links supabaseUid on first login)
       const user = await getCurrentUser();
       if (user.mustChangePassword) {
