@@ -531,7 +531,20 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const saveCustom = (key: string, value: string) =>
     patchContact.mutate({ customFields: { ...(contact.customFields ?? {}), [key]: value } });
 
-  const visibleSystem = systemConfigs.filter(c => c.visible).sort((a, b) => a.order - b.order);
+  const clienteType: 'empresa' | 'particular' = (contact as any).clienteType || 'particular';
+  const isEmpresa = clienteType === 'empresa';
+
+  const visibleSystem = systemConfigs
+    .filter(c => c.visible)
+    .filter(c => {
+      // For particulares, hide company and sector
+      if (!isEmpresa && (c.fieldKey === 'company' || c.fieldKey === 'sector')) return false;
+      return true;
+    })
+    .sort((a, b) => a.order - b.order);
+
+  const companyConfig = systemConfigs.find(c => c.fieldKey === 'company');
+  const sectorConfig = systemConfigs.find(c => c.fieldKey === 'sector');
 
   const waNum = formatWA(contact.phone);
   const isAtivo = (contact as any).status !== 'inativo';
@@ -581,6 +594,19 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-3xl font-bold text-[#0A2540] flex-1 min-w-0">{contact.name}</h1>
 
+        {/* Tipo de cliente badge */}
+        <button
+          onClick={() => save('clienteType', isEmpresa ? 'particular' : 'empresa')}
+          title="Clique para alternar tipo"
+          className={`text-xs font-semibold px-3 py-1 rounded-full border transition-colors ${
+            isEmpresa
+              ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+              : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+          }`}
+        >
+          {isEmpresa ? 'Empresa' : 'Particular'}
+        </button>
+
         {/* Status badge */}
         <button
           onClick={() => save('status', isAtivo ? 'inativo' : 'ativo')}
@@ -626,7 +652,15 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
             </CardHeader>
             <CardContent className="space-y-4">
               <InlineField label="Nome" value={contact.name} onSave={v => save('name', v)} />
-              {visibleSystem.map(cfg => renderSystemField(cfg))}
+              {/* Force company + sector for Empresa regardless of visibility config */}
+              {isEmpresa && companyConfig && (
+                <InlineField label={companyConfig.label} value={contact.company ?? ''} onSave={v => save('company', v)} />
+              )}
+              {isEmpresa && sectorConfig && (
+                <ComboField label={sectorConfig.label} value={contact.sector ?? ''} onSave={v => save('sector', v)} suggestions={SECTOR_SUGGESTIONS} />
+              )}
+              {/* Other visible system fields (company/sector excluded above) */}
+              {visibleSystem.filter(c => c.fieldKey !== 'company' && c.fieldKey !== 'sector').map(cfg => renderSystemField(cfg))}
 
               <div>
                 <p className="text-xs text-[#6b7e9a] mb-1">Etapa</p>

@@ -126,6 +126,9 @@ export default function ContactForm({
   // Core values (always present)
   const [name, setName] = useState(contact?.name ?? '');
   const [stage, setStage] = useState(contact?.stage ?? 'Novo');
+  const [tipoCliente, setTipoCliente] = useState<'empresa' | 'particular'>(
+    contact?.clienteType || 'particular'
+  );
 
   // Dynamic values keyed by field.key
   const [values, setValues] = useState<Record<string, string | string[]>>(() => {
@@ -145,6 +148,7 @@ export default function ContactForm({
     if (contact) {
       setName(contact.name);
       setStage(contact.stage);
+      setTipoCliente(contact.clienteType || 'particular');
       setValues({
         email: contact.email ?? '',
         phone: contact.phone ?? '',
@@ -173,9 +177,16 @@ export default function ContactForm({
   });
 
   // Only show visible system fields, sorted by order
-  const visibleSystemFields = systemConfigs
-    .filter(c => c.visible)
-    .sort((a, b) => a.order - b.order);
+  const allSystemFieldsSorted = systemConfigs.sort((a, b) => a.order - b.order);
+  const visibleSystemFields = allSystemFieldsSorted.filter(c => {
+    if (!c.visible) return false;
+    // For particulares, hide company and sector
+    if (tipoCliente === 'particular' && (c.fieldKey === 'company' || c.fieldKey === 'sector')) return false;
+    return true;
+  });
+  // Company and sector configs for forced rendering in empresa mode
+  const companyConfig = allSystemFieldsSorted.find(c => c.fieldKey === 'company');
+  const sectorConfig = allSystemFieldsSorted.find(c => c.fieldKey === 'sector');
 
   const setValue = (key: string, val: string | string[]) =>
     setValues((prev) => ({ ...prev, [key]: val }));
@@ -192,11 +203,12 @@ export default function ContactForm({
       const payload = {
         name,
         stage,
+        clienteType: tipoCliente,
         email: (values.email as string) || '',
         phone: (values.phone as string) || '',
-        company: (values.company as string) || '',
+        company: tipoCliente === 'empresa' ? (values.company as string) || '' : '',
         revenue: (values.revenue as string) || null,
-        sector: (values.sector as string) || null,
+        sector: tipoCliente === 'empresa' ? (values.sector as string) || null : null,
         tags: Array.isArray(values.tags) ? values.tags : [],
         customFields,
       };
@@ -220,6 +232,35 @@ export default function ContactForm({
   return (
     <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4">
 
+      {/* Tipo de Cliente toggle */}
+      <div>
+        <Label>Tipo de Cliente</Label>
+        <div className="flex gap-2 mt-1">
+          <button
+            type="button"
+            onClick={() => setTipoCliente('particular')}
+            className={`flex-1 py-2 rounded-lg border text-sm font-medium transition ${
+              tipoCliente === 'particular'
+                ? 'bg-[#0A2540] text-white border-[#0A2540]'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            Particular
+          </button>
+          <button
+            type="button"
+            onClick={() => setTipoCliente('empresa')}
+            className={`flex-1 py-2 rounded-lg border text-sm font-medium transition ${
+              tipoCliente === 'empresa'
+                ? 'bg-[#0A2540] text-white border-[#0A2540]'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            Empresa
+          </button>
+        </div>
+      </div>
+
       {/* Name — always shown */}
       <div>
         <Label>Nome *</Label>
@@ -231,34 +272,67 @@ export default function ContactForm({
         />
       </div>
 
-      {/* System fields — driven by ContactFieldConfig visibility */}
-      {visibleSystemFields.map((cfg) => (
-        <div key={cfg.fieldKey}>
-          <Label>
-            {cfg.label}
-            {cfg.required && <span className="text-red-500 ml-0.5">*</span>}
-          </Label>
-          <div className="mt-1">
-            <FieldInput
-              fieldKey={cfg.fieldKey}
-              type={cfg.fieldKey === 'tags' ? 'tags'
-                : cfg.fieldKey === 'revenue' ? 'select'
-                : cfg.fieldKey === 'sector'  ? 'select'
-                : 'text'}
-              options={
-                cfg.fieldKey === 'revenue'
-                  ? ['- 50 Milhões De Kwanzas','Entre 50 - 100 Milhões','Entre 100 Milhões - 500 Milhões','+ 500 M']
-                  : cfg.fieldKey === 'sector'
-                  ? ['Serviços','Construção','Retalho','Energia','Oil & Gas','Logística','E-commerce','Telecomunicações']
-                  : undefined
-              }
-              value={values[cfg.fieldKey] ?? (cfg.fieldKey === 'tags' ? [] : '')}
-              onChange={(v) => setValue(cfg.fieldKey, v)}
-              required={cfg.required}
-            />
+      {/* Company + Sector — always shown for Empresa (regardless of visibility config) */}
+      {tipoCliente === 'empresa' && (
+        <>
+          {companyConfig && (
+            <div key="company-forced">
+              <Label>{companyConfig.label} <span className="text-red-500 ml-0.5">*</span></Label>
+              <div className="mt-1">
+                <FieldInput
+                  fieldKey="company"
+                  type="text"
+                  value={values['company'] ?? ''}
+                  onChange={(v) => setValue('company', v)}
+                  required
+                />
+              </div>
+            </div>
+          )}
+          {sectorConfig && (
+            <div key="sector-forced">
+              <Label>{sectorConfig.label}</Label>
+              <div className="mt-1">
+                <FieldInput
+                  fieldKey="sector"
+                  type="select"
+                  options={['Serviços','Construção','Retalho','Energia','Oil & Gas','Logística','E-commerce','Telecomunicações']}
+                  value={values['sector'] ?? ''}
+                  onChange={(v) => setValue('sector', v)}
+                />
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Other system fields — driven by ContactFieldConfig visibility, excluding company/sector (handled above) */}
+      {visibleSystemFields
+        .filter(cfg => cfg.fieldKey !== 'company' && cfg.fieldKey !== 'sector')
+        .map((cfg) => (
+          <div key={cfg.fieldKey}>
+            <Label>
+              {cfg.label}
+              {cfg.required && <span className="text-red-500 ml-0.5">*</span>}
+            </Label>
+            <div className="mt-1">
+              <FieldInput
+                fieldKey={cfg.fieldKey}
+                type={cfg.fieldKey === 'tags' ? 'tags'
+                  : cfg.fieldKey === 'revenue' ? 'select'
+                  : 'text'}
+                options={
+                  cfg.fieldKey === 'revenue'
+                    ? ['- 50 Milhões De Kwanzas','Entre 50 - 100 Milhões','Entre 100 Milhões - 500 Milhões','+ 500 M']
+                    : undefined
+                }
+                value={values[cfg.fieldKey] ?? (cfg.fieldKey === 'tags' ? [] : '')}
+                onChange={(v) => setValue(cfg.fieldKey, v)}
+                required={cfg.required}
+              />
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
 
       {/* Stage — always shown */}
       <div>
