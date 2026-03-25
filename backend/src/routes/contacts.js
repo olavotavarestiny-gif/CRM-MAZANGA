@@ -7,15 +7,13 @@ const { requirePermission, requireDeletePermission } = require('../lib/permissio
 const VALID_STAGES = ['Novo', 'Contactado', 'Qualificado', 'Proposta Enviada', 'Fechado', 'Perdido'];
 const VALID_FIELD_TYPES = ['text', 'number', 'date', 'select', 'url'];
 
-// Built-in system field defaults (name, phone and stage are never configurable core fields)
-// visible: false by default — only shown when explicitly enabled in field config settings
+// Built-in system field defaults exposed in contact field customization.
 const SYSTEM_FIELD_DEFAULTS = [
-  { key: 'email',   label: 'Email',            required: false, order: 0, visibleDefault: false },
-  { key: 'phone',   label: 'Telefone',          required: true,  order: 1, visibleDefault: true  },
-  { key: 'company', label: 'Empresa',           required: false, order: 2, visibleDefault: false },
-  { key: 'revenue', label: 'Faturamento Anual', required: false, order: 3, visibleDefault: false },
-  { key: 'sector',  label: 'Setor',             required: false, order: 4, visibleDefault: false },
-  { key: 'tags',    label: 'Tags',              required: false, order: 5, visibleDefault: false },
+  { key: 'name',        label: 'Nome',            required: true,  order: 0, visibleDefault: true },
+  { key: 'phone',       label: 'Número',          required: true,  order: 1, visibleDefault: true },
+  { key: 'email',       label: 'Email',           required: false, order: 2, visibleDefault: true },
+  { key: 'company',     label: 'Empresa',         required: false, order: 3, visibleDefault: true },
+  { key: 'clienteType', label: 'Tipo de Cliente', required: true,  order: 4, visibleDefault: true },
 ];
 
 // Slugify a label into a unique key

@@ -64,7 +64,15 @@ export interface ContactFieldDef {
 }
 
 // Config override for a built-in system field
-export type SystemFieldKey = 'email' | 'phone' | 'company' | 'revenue' | 'sector' | 'tags';
+export type SystemFieldKey =
+  | 'name'
+  | 'phone'
+  | 'email'
+  | 'company'
+  | 'clienteType'
+  | 'revenue'
+  | 'sector'
+  | 'tags';
 
 export interface ContactFieldConfig {
   fieldKey: SystemFieldKey;

@@ -178,7 +178,7 @@ export async function reorderPipelineStages(order: { id: string; order: number }
   return response.data;
 }
 
-// System field config (built-in fields: email, phone, company, revenue, sector, tags)
+// System field config for contact built-ins shown in customization
 export async function getContactFieldConfigs() {
   const response = await api.get<ContactFieldConfig[]>('/api/contacts/field-config');
   return response.data;

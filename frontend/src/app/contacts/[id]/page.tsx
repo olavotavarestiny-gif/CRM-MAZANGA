@@ -554,8 +554,8 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const visibleSystem = systemConfigs
     .filter(c => c.visible)
     .filter(c => {
-      if (c.fieldKey === 'phone') return false; // rendered separately
-      if (!isEmpresa && (c.fieldKey === 'company' || c.fieldKey === 'sector')) return false;
+      if (['name', 'phone', 'company', 'clienteType'].includes(c.fieldKey)) return false;
+      if (!isEmpresa && c.fieldKey === 'sector') return false;
       return true;
     })
     .sort((a, b) => a.order - b.order);

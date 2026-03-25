@@ -75,9 +75,9 @@ export default function ContactsPage() {
     staleTime: 0,
   });
 
-  // System columns to show (excluding phone which is always shown hardcoded)
+  // System columns to show (excluding fields already rendered in dedicated columns/UI)
   const visibleSystemCols = systemConfigs
-    .filter(c => c.visible && c.fieldKey !== 'phone')
+    .filter(c => c.visible && !['name', 'phone'].includes(c.fieldKey))
     .sort((a, b) => a.order - b.order);
 
   const { data: pipelineStages = [] } = useQuery({

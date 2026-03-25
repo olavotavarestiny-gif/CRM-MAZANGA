@@ -66,7 +66,7 @@ function OptionsEditor({ options, onChange }: { options: string[]; onChange: (v:
   );
 }
 
-// ── System field row (built-in: email, phone, company, etc.) ───────────────────
+// ── System field row (built-in contact fields) ─────────────────────────────────
 function SystemFieldRow({ config }: { config: ContactFieldConfig }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);

@@ -16,9 +16,6 @@ import {
 } from '@/components/ui/select';
 import { X } from 'lucide-react';
 
-// System field keys that are always shown (non-configurable core)
-const CORE_FIELDS = ['name', 'stage'];
-
 // Renders a single field based on its type
 function FieldInput({
   fieldKey,
@@ -177,19 +174,19 @@ export default function ContactForm({
     queryFn: getPipelineStages,
   });
 
-  // phone is hardcoded (always shown), exclude from config-driven loop
-  const ALWAYS_SHOWN = new Set(['phone']);
+  const nameConfig = systemConfigs.find(c => c.fieldKey === 'name');
+  const phoneConfig = systemConfigs.find(c => c.fieldKey === 'phone');
+  const companyConfig = systemConfigs.find(c => c.fieldKey === 'company');
+  const clienteTypeConfig = systemConfigs.find(c => c.fieldKey === 'clienteType');
+
+  // Core fields are rendered with dedicated UI, so they should not repeat below.
+  const ALWAYS_SHOWN = new Set(['name', 'phone', 'company', 'clienteType']);
   const allSystemFieldsSorted = systemConfigs.sort((a, b) => a.order - b.order);
   const visibleSystemFields = allSystemFieldsSorted.filter(c => {
     if (ALWAYS_SHOWN.has(c.fieldKey)) return false; // rendered separately
     if (!c.visible) return false;
-    // For particulares, hide company and sector
-    if (tipoCliente === 'particular' && (c.fieldKey === 'company' || c.fieldKey === 'sector')) return false;
     return true;
   });
-  // Company and sector configs for forced rendering in empresa mode
-  const companyConfig = allSystemFieldsSorted.find(c => c.fieldKey === 'company');
-  const sectorConfig = allSystemFieldsSorted.find(c => c.fieldKey === 'sector');
 
   const setValue = (key: string, val: string | string[]) =>
     setValues((prev) => ({ ...prev, [key]: val }));
@@ -235,9 +232,9 @@ export default function ContactForm({
   return (
     <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4">
 
-      {/* Tipo de Cliente toggle */}
+      {/* Tipo de Cliente */}
       <div>
-        <Label>Tipo de Cliente</Label>
+        <Label>{clienteTypeConfig?.label || 'Tipo de Cliente'}{clienteTypeConfig?.required && <span className="text-red-500 ml-0.5">*</span>}</Label>
         <div className="flex gap-2 mt-1">
           <button
             type="button"
@@ -266,63 +263,45 @@ export default function ContactForm({
 
       {/* Name — always shown */}
       <div>
-        <Label>Nome *</Label>
+        <Label>{nameConfig?.label || 'Nome'}{(nameConfig?.required ?? true) && <span className="text-red-500 ml-0.5">*</span>}</Label>
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          required
+          required={nameConfig?.required ?? true}
           className="mt-1"
         />
       </div>
 
       {/* Phone — always shown */}
       <div>
-        <Label>Telefone</Label>
+        <Label>{phoneConfig?.label || 'Número'}{phoneConfig?.required && <span className="text-red-500 ml-0.5">*</span>}</Label>
         <Input
           value={values['phone'] as string}
           onChange={(e) => setValue('phone', e.target.value)}
           placeholder="+244 9xx xxx xxx"
+          required={phoneConfig?.required}
           className="mt-1"
         />
       </div>
 
-      {/* Company + Sector — always shown for Empresa (regardless of visibility config) */}
-      {tipoCliente === 'empresa' && (
-        <>
-          {companyConfig && (
-            <div key="company-forced">
-              <Label>{companyConfig.label} <span className="text-red-500 ml-0.5">*</span></Label>
-              <div className="mt-1">
-                <FieldInput
-                  fieldKey="company"
-                  type="text"
-                  value={values['company'] ?? ''}
-                  onChange={(v) => setValue('company', v)}
-                  required
-                />
-              </div>
-            </div>
-          )}
-          {sectorConfig && (
-            <div key="sector-forced">
-              <Label>{sectorConfig.label}</Label>
-              <div className="mt-1">
-                <FieldInput
-                  fieldKey="sector"
-                  type="select"
-                  options={['Serviços','Construção','Retalho','Energia','Oil & Gas','Logística','E-commerce','Telecomunicações']}
-                  value={values['sector'] ?? ''}
-                  onChange={(v) => setValue('sector', v)}
-                />
-              </div>
-            </div>
-          )}
-        </>
+      {/* Company — shown for company-type contacts */}
+      {tipoCliente === 'empresa' && companyConfig && companyConfig.visible !== false && (
+        <div key="company-forced">
+          <Label>{companyConfig.label}{companyConfig.required && <span className="text-red-500 ml-0.5">*</span>}</Label>
+          <div className="mt-1">
+            <FieldInput
+              fieldKey="company"
+              type="text"
+              value={values['company'] ?? ''}
+              onChange={(v) => setValue('company', v)}
+              required={companyConfig.required}
+            />
+          </div>
+        </div>
       )}
 
-      {/* Other system fields — driven by ContactFieldConfig visibility, excluding company/sector (handled above) */}
+      {/* Other system fields — driven by ContactFieldConfig visibility */}
       {visibleSystemFields
-        .filter(cfg => cfg.fieldKey !== 'company' && cfg.fieldKey !== 'sector')
         .map((cfg) => (
           <div key={cfg.fieldKey}>
             <Label>
@@ -332,15 +311,8 @@ export default function ContactForm({
             <div className="mt-1">
               <FieldInput
                 fieldKey={cfg.fieldKey}
-                type={cfg.fieldKey === 'tags' ? 'tags'
-                  : cfg.fieldKey === 'revenue' ? 'select'
-                  : 'text'}
-                options={
-                  cfg.fieldKey === 'revenue'
-                    ? ['- 50 Milhões De Kwanzas','Entre 50 - 100 Milhões','Entre 100 Milhões - 500 Milhões','+ 500 M']
-                    : undefined
-                }
-                value={values[cfg.fieldKey] ?? (cfg.fieldKey === 'tags' ? [] : '')}
+                type="text"
+                value={values[cfg.fieldKey] ?? ''}
                 onChange={(v) => setValue(cfg.fieldKey, v)}
                 required={cfg.required}
               />
