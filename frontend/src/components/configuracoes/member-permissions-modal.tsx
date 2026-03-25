@@ -16,12 +16,13 @@ interface Props {
 type SimpleLevel = 'none' | 'view' | 'edit';
 
 const SIMPLE_MODULES: { key: keyof Omit<UserPermissions, 'finances'>; label: string }[] = [
-  { key: 'contacts',    label: 'Contactos' },
-  { key: 'pipeline',   label: 'Negociações' },
-  { key: 'tasks',      label: 'Tarefas' },
-  { key: 'calendario', label: 'Calendário' },
-  { key: 'automations',label: 'Automações' },
-  { key: 'forms',      label: 'Formulários' },
+  { key: 'contacts',    label: 'Clientes' },
+  { key: 'pipeline',    label: 'Processos' },
+  { key: 'tasks',       label: 'Tarefas' },
+  { key: 'vendas',      label: 'Vendas' },
+  { key: 'calendario',  label: 'Calendário' },
+  { key: 'automations', label: 'Automações' },
+  { key: 'forms',       label: 'Formulários' },
 ];
 
 const LEVEL_LABELS: Record<SimpleLevel, string> = {
@@ -35,6 +36,7 @@ function initPerms(user: User): UserPermissions {
     // full access → convert to explicit edit for all
     const perms: UserPermissions = {};
     SIMPLE_MODULES.forEach(m => { perms[m.key] = 'edit'; });
+    perms.vendas = 'edit';
     perms.finances = {
       transactions: 'edit',
       view_invoices: true,

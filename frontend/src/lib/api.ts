@@ -48,7 +48,7 @@ api.interceptors.response.use(
 );
 
 // Contacts
-export async function getContacts(params?: { stage?: string; search?: string; revenue?: string; inPipeline?: string }) {
+export async function getContacts(params?: { stage?: string; search?: string; revenue?: string; inPipeline?: string; contactType?: string }) {
   const response = await api.get<Contact[]>('/api/contacts', { params });
   return response.data;
 }
@@ -72,6 +72,35 @@ export async function updateContact(id: string, data: Partial<Contact>) {
 
 export async function deleteContact(id: string) {
   await api.delete(`/api/contacts/${id}`);
+}
+
+export async function getContactNotes(contactId: number, skip = 0) {
+  const res = await api.get(`/api/contacts/${contactId}/notes?skip=${skip}`);
+  return res.data as import('./types').ContactNote[];
+}
+
+export async function createContactNote(contactId: number, content: string) {
+  const res = await api.post(`/api/contacts/${contactId}/notes`, { content });
+  return res.data as import('./types').ContactNote;
+}
+
+export async function updateContactNote(noteId: number, content: string) {
+  const res = await api.put(`/api/notes/${noteId}`, { content });
+  return res.data as import('./types').ContactNote;
+}
+
+export async function deleteContactNote(noteId: number) {
+  await api.delete(`/api/notes/${noteId}`);
+}
+
+export async function getContactSummary(contactId: number) {
+  const res = await api.get(`/api/contacts/${contactId}/summary`);
+  return res.data as {
+    totalComprado: number;
+    ultimoServico: { data: string; descricao: string; valor: number } | null;
+    transacoes: any[];
+    faturas: any[];
+  };
 }
 
 export interface ImportContactData {
@@ -322,6 +351,7 @@ export interface UserPermissions {
   calendario?:  'none' | 'view' | 'edit';
   automations?: 'none' | 'view' | 'edit';
   forms?:       'none' | 'view' | 'edit';
+  vendas?:      'none' | 'view' | 'edit';
   finances?: {
     transactions?:  'none' | 'view' | 'edit';
     view_invoices?: boolean;

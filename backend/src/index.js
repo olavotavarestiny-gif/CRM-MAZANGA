@@ -27,6 +27,7 @@ const faturacaoFacturasRouter = require('./routes/faturacao-facturas');
 const faturacaoSaftRouter = require('./routes/faturacao-saft');
 const faturacaoRecorrentesRouter = require('./routes/faturacao-recorrentes');
 const chatRouter = require('./routes/chat');
+const notesRouter = require('./routes/notes');
 const requireAuth = require('./middleware/auth');
 const { requireAdmin, requireAccountOwnerOrAdmin, requireSuperAdmin } = require('./middleware/auth');
 
@@ -119,6 +120,7 @@ app.use('/api/faturacao', requireAuth, faturacaoFacturasRouter);
 app.use('/api/faturacao', requireAuth, faturacaoSaftRouter);
 app.use('/api/faturacao', requireAuth, faturacaoRecorrentesRouter);
 app.use('/api/chat', requireAuth, chatRouter);
+app.use('/api', requireAuth, notesRouter);
 
 // Scheduler: process recurring invoices daily at 00:05
 try {

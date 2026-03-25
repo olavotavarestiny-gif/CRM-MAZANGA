@@ -22,9 +22,6 @@ import {
 } from '@/components/ui/select';
 import TransactionForm from '@/components/finances/transaction-form';
 import ClientProfitabilityModal from '@/components/finances/client-profitability-modal';
-import { TabFacturas } from '@/components/finances/tab-facturas';
-import { TabSaft } from '@/components/finances/tab-saft';
-import { RecorrentesTab } from '@/components/faturacao/recorrentes-tab';
 import { TrendingUp, TrendingDown, DollarSign, Percent, RefreshCw, Plus, Download, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 
 function fmt(n: number | null | undefined) {
@@ -62,7 +59,7 @@ export default function FinancesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editTransaction, setEditTransaction] = useState<Transaction | undefined>();
   const [profitabilityClient, setProfitabilityClient] = useState<ClientProfitability | null>(null);
-  const [activeTab, setActiveTab] = useState<'transacoes' | 'facturas' | 'recorrentes' | 'saft'>('transacoes');
+  const [activeTab, setActiveTab] = useState<'transacoes' | 'rentabilidade'>('transacoes');
 
   const { data: dashboard } = useQuery({
     queryKey: ['finance-dashboard', dashYear, dashMonth],
@@ -141,10 +138,8 @@ export default function FinancesPage() {
     pct >= 50 ? 'text-emerald-600' : pct >= 20 ? 'text-yellow-600' : 'text-red-600';
 
   const TABS = [
-    { id: 'transacoes',  label: 'Transações' },
-    { id: 'facturas',    label: 'Facturas' },
-    { id: 'recorrentes', label: 'Recorrentes' },
-    { id: 'saft',        label: 'SAF-T' },
+    { id: 'transacoes',    label: 'Transações' },
+    { id: 'rentabilidade', label: 'Rentabilidade' },
   ] as const;
 
   return (
@@ -153,7 +148,7 @@ export default function FinancesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#0A2540]">Finanças</h1>
-          <p className="text-gray-500 text-sm mt-1">Receitas, despesas, facturas e relatórios fiscais</p>
+          <p className="text-gray-500 text-sm mt-1">Receitas, despesas e rentabilidade por cliente</p>
         </div>
         {activeTab === 'transacoes' && (
           <Button
@@ -183,10 +178,71 @@ export default function FinancesPage() {
         ))}
       </div>
 
+      {/* Link to vendas */}
+      <p className="text-xs text-gray-400 mt-2">
+        Faturas e documentos fiscais →{' '}
+        <a href="/vendas" className="text-[#0A2540] underline hover:text-orange-500 transition-colors">
+          /vendas
+        </a>
+      </p>
+
       {/* Tab content */}
-      {activeTab === 'facturas' && <TabFacturas />}
-      {activeTab === 'recorrentes' && <RecorrentesTab />}
-      {activeTab === 'saft' && <TabSaft />}
+      {activeTab === 'rentabilidade' && (
+        <div className="space-y-4 mt-6">
+          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
+            Rentabilidade por Cliente
+          </h2>
+          {profitability.length === 0 ? (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl py-12 text-center text-gray-400">
+              Sem dados de rentabilidade disponíveis.
+            </div>
+          ) : (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium">Cliente</th>
+                      <th className="text-right py-3 px-4 text-gray-500 font-medium">Receita</th>
+                      <th className="text-right py-3 px-4 text-gray-500 font-medium">Custos</th>
+                      <th className="text-right py-3 px-4 text-gray-500 font-medium">Margem Líquida</th>
+                      <th className="text-right py-3 px-4 text-gray-500 font-medium">%</th>
+                      <th className="py-3 px-4 text-gray-500 font-medium text-center">Detalhes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {profitability.map((p) => (
+                      <tr key={p.clientId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 px-4 text-[#0A2540] font-medium">{p.clientName}</td>
+                        <td className="py-3 px-4 text-right text-emerald-600">{fmt(p.totalRevenue)}</td>
+                        <td className="py-3 px-4 text-right text-red-600">-{fmt(p.totalCosts)}</td>
+                        <td className={`py-3 px-4 text-right font-medium ${marginColor(p.marginPercent)}`}>
+                          {fmt(p.netMargin)}
+                        </td>
+                        <td className={`py-3 px-4 text-right font-medium ${marginColor(p.marginPercent)}`}>
+                          {p.marginPercent.toFixed(1)}%
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            onClick={() => setProfitabilityClient(p)}
+                            className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                          >
+                            Detalhes
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          <ClientProfitabilityModal
+            client={profitabilityClient}
+            onClose={() => setProfitabilityClient(null)}
+          />
+        </div>
+      )}
       {activeTab === 'transacoes' && <div className="space-y-8">
 
       {/* ── SECÇÃO 1: Dashboard ─────────────────────────────────────── */}
@@ -429,68 +485,11 @@ export default function FinancesPage() {
         </div>
       </section>
 
-      {/* ── SECÇÃO 3: Rentabilidade por Cliente ──────────────────────── */}
-      <section>
-        <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-4">
-          Rentabilidade por Cliente
-        </h2>
-
-        {profitability.length === 0 ? (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl py-12 text-center text-gray-400">
-            Sem dados de rentabilidade disponíveis.
-          </div>
-        ) : (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 text-gray-500 font-medium">Cliente</th>
-                    <th className="text-right py-3 px-4 text-gray-500 font-medium">Receita</th>
-                    <th className="text-right py-3 px-4 text-gray-500 font-medium">Custos</th>
-                    <th className="text-right py-3 px-4 text-gray-500 font-medium">Margem Líquida</th>
-                    <th className="text-right py-3 px-4 text-gray-500 font-medium">%</th>
-                    <th className="py-3 px-4 text-gray-500 font-medium text-center">Detalhes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {profitability.map((p) => (
-                    <tr key={p.clientId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="py-3 px-4 text-[#0A2540] font-medium">{p.clientName}</td>
-                      <td className="py-3 px-4 text-right text-emerald-600">{fmt(p.totalRevenue)}</td>
-                      <td className="py-3 px-4 text-right text-red-600">-{fmt(p.totalCosts)}</td>
-                      <td className={`py-3 px-4 text-right font-medium ${marginColor(p.marginPercent)}`}>
-                        {fmt(p.netMargin)}
-                      </td>
-                      <td className={`py-3 px-4 text-right font-medium ${marginColor(p.marginPercent)}`}>
-                        {p.marginPercent.toFixed(1)}%
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() => setProfitabilityClient(p)}
-                          className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-                        >
-                          Detalhes
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </section>
-
       {/* Modals */}
       <TransactionForm
         open={formOpen}
         onClose={handleFormClose}
         transaction={editTransaction}
-      />
-      <ClientProfitabilityModal
-        client={profitabilityClient}
-        onClose={() => setProfitabilityClient(null)}
       />
       </div>}
     </div>

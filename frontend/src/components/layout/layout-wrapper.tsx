@@ -20,6 +20,7 @@ const PATH_MODULE_MAP: Record<string, Parameters<typeof canView>[1]> = {
   '/contacts':   'contacts',
   '/pipeline':   'pipeline',
   '/tasks':      'tasks',
+  '/vendas':     'vendas',
   '/calendario': 'calendario',
   '/chat':       'chat',
   '/automations':'automations',

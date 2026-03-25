@@ -43,8 +43,15 @@ import ContactForm from '@/components/contacts/contact-form';
 import ImportCSVModal from '@/components/contacts/import-csv-modal';
 import ContactFieldsManager from '@/components/contacts/contact-fields-manager';
 import Link from 'next/link';
-import { Trash2, MessageCircle, Upload, Settings2 } from 'lucide-react';
+import { Trash2, MessageCircle, Upload, Settings2, Phone } from 'lucide-react';
 import { getContactFieldDefs } from '@/lib/api';
+
+function formatWA(phone: string): string | null {
+  if (!phone) return null;
+  let n = phone.replace(/[\s\-\(\)\+]/g, '');
+  if (n.length <= 9 && !n.startsWith('244')) n = '244' + n;
+  return n.length >= 9 ? n : null;
+}
 
 export default function ContactsPage() {
   const [search, setSearch] = useState('');
@@ -54,6 +61,7 @@ export default function ContactsPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isFieldsOpen, setIsFieldsOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [contactTypeTab, setContactTypeTab] = useState<'interessado' | 'cliente'>('interessado');
 
   const { data: fieldDefs = [] } = useQuery({
     queryKey: ['contactFieldDefs'],
@@ -72,12 +80,13 @@ export default function ContactsPage() {
   }, []);
 
   const { data: contacts = [] } = useQuery({
-    queryKey: ['contacts', search, stageFilter, revenueFilter],
+    queryKey: ['contacts', search, stageFilter, revenueFilter, contactTypeTab],
     queryFn: () =>
       getContacts({
         search: search || undefined,
         stage: stageFilter === 'ALL' ? undefined : stageFilter,
         revenue: revenueFilter === 'ALL' ? undefined : revenueFilter,
+        contactType: contactTypeTab,
       }),
   });
 
@@ -130,6 +139,22 @@ export default function ContactsPage() {
 
       <ImportCSVModal open={isImportOpen} onOpenChange={setIsImportOpen} />
       <ContactFieldsManager open={isFieldsOpen} onOpenChange={setIsFieldsOpen} />
+
+      <div className="flex gap-1 mb-4 border-b border-[#dde3ec]">
+        {(['interessado', 'cliente'] as const).map(type => (
+          <button
+            key={type}
+            onClick={() => setContactTypeTab(type)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              contactTypeTab === type
+                ? 'border-[#0A2540] text-[#0A2540]'
+                : 'border-transparent text-[#6b7e9a] hover:text-[#0A2540]'
+            }`}
+          >
+            {type === 'interessado' ? 'Interessados' : 'Clientes'}
+          </button>
+        ))}
+      </div>
 
       <Card data-tour="contacts-filters" className="mb-6">
         <div className="p-4 flex flex-col sm:flex-row gap-4">
@@ -216,6 +241,31 @@ export default function ContactsPage() {
                         <MessageCircle className="w-4 h-4" />
                       </Button>
                     </Link>
+                    {(() => {
+                      const waNum = formatWA(contact.phone ?? '');
+                      return waNum ? (
+                        <a href={`https://wa.me/${waNum}`} target="_blank" rel="noopener noreferrer">
+                          <Button variant="outline" size="sm" className="text-green-600 border-green-200 hover:bg-green-50" title="WhatsApp">
+                            <Phone className="w-4 h-4" />
+                          </Button>
+                        </a>
+                      ) : (
+                        <Button variant="outline" size="sm" disabled className="opacity-40" title="Sem telefone">
+                          <Phone className="w-4 h-4" />
+                        </Button>
+                      );
+                    })()}
+                    {contactTypeTab === 'interessado' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                        title="Converter para Cliente"
+                        onClick={() => updateContact(String(contact.id), { contactType: 'cliente' } as any).then(() => queryClient.invalidateQueries({ queryKey: ['contacts'] }))}
+                      >
+                        → Cliente
+                      </Button>
+                    )}
                     {!currentUser?.accountOwnerId && (
                       <Button
                         variant="destructive"

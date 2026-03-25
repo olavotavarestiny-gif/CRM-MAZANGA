@@ -47,6 +47,7 @@ model User {
   accountMembers       User[]     @relation("AccountMembers")
   chatChannelMemberships ChatChannelMember[] @relation("ChatMemberUser")
   chatMessagesSent       ChatMessage[]       @relation("ChatSenderUser")
+  contactNotes           ContactNote[]       @relation("NoteAuthor")
 }
 
 model LoginLog {
@@ -71,6 +72,10 @@ model Contact {
   inPipeline    Boolean       @default(false)
   tags          String        @default("[]") // JSON array stored as string: ["tag1", "tag2"]
   customFields  String        @default("{}") // JSON object: { "fieldKey": "value" }
+  contactType   String        @default("interessado")
+  status        String        @default("ativo")
+  documents     String        @default("[]")
+  notes         ContactNote[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   user          User?         @relation("ContactUser", fields: [userId], references: [id], onDelete: SetNull)
@@ -79,6 +84,17 @@ model Contact {
   transactions  Transaction[]
 
   @@unique([userId, phone], name: "user_phone_unique")
+}
+
+model ContactNote {
+  id        Int      @id @default(autoincrement())
+  contactId Int
+  userId    Int?
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user      User?    @relation("NoteAuthor", fields: [userId], references: [id], onDelete: SetNull)
 }
 
 model ContactFieldDef {

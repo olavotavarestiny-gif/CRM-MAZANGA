@@ -221,7 +221,7 @@ function parseCustomFields(raw) {
 // GET all contacts with optional filters
 router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
   try {
-    const { stage, search, inPipeline, revenue } = req.query;
+    const { stage, search, inPipeline, revenue, contactType } = req.query;
     const where = { userId: req.user.effectiveUserId };
 
     if (stage && VALID_STAGES.includes(stage)) {
@@ -236,6 +236,10 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
 
     if (revenue && VALID_REVENUES.includes(revenue)) {
       where.revenue = revenue;
+    }
+
+    if (contactType && ['interessado', 'cliente'].includes(contactType)) {
+      where.contactType = contactType;
     }
 
     if (search) {
@@ -265,7 +269,7 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
 // POST create new contact
 router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
-    const { name, email, phone, company, revenue, sector, stage, tags, customFields } = req.body;
+    const { name, email, phone, company, revenue, sector, stage, tags, customFields, contactType, status } = req.body;
 
     if (!name || !phone) {
       return res.status(400).json({ error: 'Name and phone are required' });
@@ -289,6 +293,8 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
         tags: Array.isArray(tags) ? JSON.stringify(tags) : '[]',
         stage: finalStage,
         customFields: customFields && typeof customFields === 'object' ? JSON.stringify(customFields) : '{}',
+        contactType: ['interessado', 'cliente'].includes(contactType) ? contactType : 'interessado',
+        status: ['ativo', 'inativo'].includes(status) ? status : 'ativo',
       },
     });
 
@@ -388,6 +394,48 @@ router.post('/import', requirePermission('contacts', 'edit'), async (req, res) =
   }
 });
 
+// GET /:id/summary — contact history summary
+router.get('/:id/summary', requirePermission('contacts', 'view'), async (req, res) => {
+  try {
+    const contactId = parseInt(req.params.id);
+    const userId = req.user.effectiveUserId;
+
+    // Verify contact belongs to user
+    const contact = await prisma.contact.findFirst({ where: { id: contactId, userId } });
+    if (!contact) return res.status(404).json({ error: 'Contacto não encontrado' });
+
+    // Total purchased (sum of income transactions)
+    const agg = await prisma.transaction.aggregate({
+      where: { clientId: contactId, userId, type: 'entrada' },
+      _sum: { amountKz: true },
+    });
+
+    // Last 5 transactions
+    const transacoes = await prisma.transaction.findMany({
+      where: { clientId: contactId, userId },
+      orderBy: { date: 'desc' },
+      take: 5,
+    });
+
+    // Last service (last entrada transaction)
+    const ultimaTransacao = transacoes.find(t => t.type === 'entrada') || null;
+
+    res.json({
+      totalComprado: agg._sum.amountKz || 0,
+      ultimoServico: ultimaTransacao ? {
+        data: ultimaTransacao.date,
+        descricao: ultimaTransacao.description,
+        valor: ultimaTransacao.amountKz,
+      } : null,
+      transacoes,
+      faturas: [], // placeholder — faturas not directly linked to contacts by id yet
+    });
+  } catch (error) {
+    console.error('Error fetching contact summary:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET contact by id with messages and tasks
 router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
   try {
@@ -421,7 +469,7 @@ router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
 // PUT update contact
 router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
-    const { name, email, phone, company, revenue, sector, stage, inPipeline, tags, customFields } = req.body;
+    const { name, email, phone, company, revenue, sector, stage, inPipeline, tags, customFields, contactType, status, documents } = req.body;
     const updateData = {};
     const contactId = parseInt(req.params.id);
 
@@ -451,6 +499,11 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
       const existing2 = await prisma.contact.findUnique({ where: { id: contactId }, select: { customFields: true } });
       const merged = { ...parseCustomFields(existing2?.customFields), ...customFields };
       updateData.customFields = JSON.stringify(merged);
+    }
+    if (contactType !== undefined && ['interessado', 'cliente'].includes(contactType)) updateData.contactType = contactType;
+    if (status !== undefined && ['ativo', 'inativo'].includes(status)) updateData.status = status;
+    if (documents !== undefined) {
+      try { JSON.parse(documents); updateData.documents = documents; } catch {}
     }
 
     const contact = await prisma.contact.update({

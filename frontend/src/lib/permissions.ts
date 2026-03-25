@@ -8,7 +8,8 @@ export type ModuleKey =
   | 'calendario'
   | 'automations'
   | 'forms'
-  | 'finances';
+  | 'finances'
+  | 'vendas';
 
 /** Returns true if user can view the given module */
 export function canView(user: User, module: ModuleKey): boolean {
@@ -85,7 +86,7 @@ export function canEmitInvoices(user: User): boolean {
 export function getVisibleModules(user: User): ModuleKey[] {
   const all: ModuleKey[] = [
     'contacts', 'pipeline', 'tasks', 'chat', 'calendario',
-    'automations', 'forms', 'finances',
+    'automations', 'forms', 'finances', 'vendas',
   ];
   if (user.isSuperAdmin || user.role === 'admin' || !user.accountOwnerId) return all;
   return all.filter((m) => canView(user, m));

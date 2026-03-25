@@ -39,6 +39,9 @@ export interface Contact {
   inPipeline: boolean;
   tags?: string[];
   customFields?: Record<string, string>;
+  contactType: 'interessado' | 'cliente';
+  status: 'ativo' | 'inativo';
+  documents: { name: string; url: string; size?: number; uploadedAt: string }[];
   createdAt: string;
   updatedAt: string;
   tasks?: Task[];
@@ -439,3 +442,11 @@ export interface ClientAccount {
   _count: { accountMembers: number };
 }
 
+export interface ContactNote {
+  id: number;
+  contactId: number;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  user?: { id: number; name: string };
+}

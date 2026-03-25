@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3, Users, MessageSquare, Zap, Kanban,
   CheckSquare, FileText, LogOut, X, DollarSign, CalendarDays,
-  Package, Settings, HelpCircle, ShieldAlert,
+  Package, Settings, HelpCircle, ShieldAlert, ShoppingBag,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
@@ -65,15 +65,23 @@ export default function Sidebar({
   // Map href to module key for permission checks
   const hrefToModule: Record<string, ModuleKey | null> = {
     '/':           null, // always visible
-    '/pipeline':   'pipeline',
     '/contacts':   'contacts',
+    '/pipeline':   'pipeline',
     '/tasks':      'tasks',
+    '/vendas':     'vendas',
     '/calendario': 'calendario',
     '/chat':       'chat',
     '/automations':'automations',
     '/forms':      'forms',
     '/finances':   'finances',
-    '/produtos':   'finances',
+  };
+
+  // Advanced modules only show for SuperAdmin or users with explicit permission set
+  const isAdvancedVisible = (module: ModuleKey) => {
+    if (!currentUser) return false;
+    if (currentUser.isSuperAdmin) return true;
+    if (currentUser.permissions && canView(currentUser, module)) return true;
+    return false;
   };
 
   const isVisible = (href: string) => {
@@ -86,21 +94,26 @@ export default function Sidebar({
 
   const allMainLinks = [
     { href: '/', label: 'Painel', icon: BarChart3 },
-    { href: '/pipeline', label: 'Negociações', icon: Kanban },
-    { href: '/contacts', label: 'Contactos', icon: Users },
-    { href: '/tasks', label: 'Tarefas', icon: CheckSquare },
-    { href: '/calendario', label: 'Calendário', icon: CalendarDays },
-    { href: '/chat', label: 'Conversas', icon: MessageSquare },
-    { href: '/automations', label: 'Automações', icon: Zap },
-    { href: '/forms', label: 'Formulários', icon: FileText },
+    { href: '/contacts', label: 'Clientes', icon: Users, module: 'contacts' as const },
+    { href: '/pipeline', label: 'Processos', icon: Kanban, module: 'pipeline' as const },
+    { href: '/tasks', label: 'Tarefas', icon: CheckSquare, module: 'tasks' as const },
+    { href: '/vendas', label: 'Vendas', icon: ShoppingBag, module: 'vendas' as const },
+    { href: '/chat', label: 'Conversas', icon: MessageSquare, module: 'chat' as const, advanced: true },
+    { href: '/calendario', label: 'Calendário', icon: CalendarDays, module: 'calendario' as const, advanced: true },
+    { href: '/automations', label: 'Automações', icon: Zap, module: 'automations' as const, advanced: true },
+    { href: '/forms', label: 'Formulários', icon: FileText, module: 'forms' as const, advanced: true },
   ];
 
   const allGestaoLinks = (isOwner || isAdmin) ? [
     { href: '/finances', label: 'Finanças', icon: DollarSign },
-    { href: '/produtos', label: 'Produtos', icon: Package },
   ] : [];
 
-  const mainLinks = allMainLinks.filter(l => isVisible(l.href));
+  const mainLinks = allMainLinks.filter(l => {
+    if ((l as any).advanced) {
+      return isAdvancedVisible((l as any).module as ModuleKey);
+    }
+    return isVisible(l.href);
+  });
   const gestaoLinks = allGestaoLinks.filter(l => isVisible(l.href));
 
   const adminLinks: { href: string; label: string; icon: React.ElementType }[] = currentUser?.isSuperAdmin
