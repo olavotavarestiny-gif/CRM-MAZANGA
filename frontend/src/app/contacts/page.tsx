@@ -9,6 +9,7 @@ import {
   deleteContact,
   getCurrentUser,
   getPipelineStages,
+  getContactFieldConfigs,
 } from '@/lib/api';
 import type { User } from '@/lib/api';
 import { Contact } from '@/lib/types';
@@ -67,6 +68,17 @@ export default function ContactsPage() {
     queryKey: ['contactFieldDefs'],
     queryFn: getContactFieldDefs,
   });
+
+  const { data: systemConfigs = [] } = useQuery({
+    queryKey: ['contactFieldConfigs'],
+    queryFn: getContactFieldConfigs,
+    staleTime: 0,
+  });
+
+  // System columns to show (excluding phone which is always shown hardcoded)
+  const visibleSystemCols = systemConfigs
+    .filter(c => c.visible && c.fieldKey !== 'phone')
+    .sort((a, b) => a.order - b.order);
 
   const { data: pipelineStages = [] } = useQuery({
     queryKey: ['pipeline-stages'],
@@ -199,10 +211,10 @@ export default function ContactsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
-                <TableHead className="hidden sm:table-cell">Empresa</TableHead>
                 <TableHead className="hidden sm:table-cell">Telefone</TableHead>
-                <TableHead className="hidden md:table-cell">Setor</TableHead>
-                <TableHead className="hidden md:table-cell">Faturamento</TableHead>
+                {visibleSystemCols.map(cfg => (
+                  <TableHead key={cfg.fieldKey} className="hidden md:table-cell">{cfg.label}</TableHead>
+                ))}
                 {fieldDefs.map((f) => (
                   <TableHead key={f.id} className="hidden lg:table-cell">{f.label}</TableHead>
                 ))}
@@ -214,10 +226,14 @@ export default function ContactsPage() {
             {contacts.map((contact) => (
               <TableRow key={contact.id}>
                 <TableCell className="font-medium">{contact.name}</TableCell>
-                <TableCell className="hidden sm:table-cell">{contact.company}</TableCell>
-                <TableCell className="hidden sm:table-cell">{contact.phone}</TableCell>
-                <TableCell className="hidden md:table-cell text-sm">{contact.sector || '-'}</TableCell>
-                <TableCell className="hidden md:table-cell text-sm">{contact.revenue || '-'}</TableCell>
+                <TableCell className="hidden sm:table-cell">{contact.phone || '-'}</TableCell>
+                {visibleSystemCols.map(cfg => (
+                  <TableCell key={cfg.fieldKey} className="hidden md:table-cell text-sm">
+                    {cfg.fieldKey === 'tags'
+                      ? ((contact.tags ?? []).join(', ') || '-')
+                      : ((contact as any)[cfg.fieldKey] || '-')}
+                  </TableCell>
+                ))}
                 {fieldDefs.map((f) => (
                   <TableCell key={f.id} className="hidden lg:table-cell text-sm">
                     {contact.customFields?.[f.key] || '-'}
