@@ -1,212 +1,103 @@
-# 🗄️ Database Setup — SQLite Local + PostgreSQL Produção
+# Database Setup
 
-## O Problema
+## Estado real do projeto
 
-Quando tenta rodar `npx prisma db push` com DATABASE_URL do Supabase, recebe:
-```
-Error: P1001: Can't reach database server at `db.zvpywxfwtkciakyurrcp.supabase.co:5432`
-```
+O backend usa Prisma com `provider = "postgresql"` em `backend/prisma/schema.prisma`. Isso significa:
 
-**Isto é NORMAL e ESPERADO!** ✅
+- PostgreSQL é obrigatório em desenvolvimento e produção
+- `backend/dev.db` não faz parte do fluxo atual
+- qualquer documentação antiga que mencionava SQLite deixou de ser válida
 
----
+## Estratégia recomendada
 
-## A Solução
+Use um destes cenários para desenvolvimento:
 
-Use **SQLite em desenvolvimento local** e **PostgreSQL em produção (Render)**.
+1. PostgreSQL local com Docker
+2. PostgreSQL remoto de desenvolvimento
+3. A mesma instância usada pela equipa, se o acesso estiver controlado
 
-### Arquitectura
+## Configuração mínima
 
-```
-┌─────────────────────────────┐
-│     Seu Computador Local    │
-│  - Backend + SQLite (dev.db)│
-│  - Frontend (localhost:3000)│
-│  - Testa localmente         │
-└─────────────────────────────┘
-             ↓
-      Git push para GitHub
-             ↓
-┌─────────────────────────────┐
-│     Cloud em Produção       │
-│  - Render (Backend)         │
-│    └─ PostgreSQL (Supabase) │
-│  - Vercel (Frontend)        │
-│  - Acessível públicamente   │
-└─────────────────────────────┘
+Em `backend/.env`:
+
+```env
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DB_NAME
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+JWT_SECRET=generate-a-long-random-secret
+FRONTEND_URL=http://localhost:3000
 ```
 
----
+Se a base remota exigir SSL, acrescente `?sslmode=require` ao `DATABASE_URL`.
 
-## Como Funciona Agora
+## Fluxo local recomendado
 
-### 1️⃣ Desenvolvimento Local
 ```bash
 cd backend
-
-# Usa SQLite (backend/.env aponta para file:./dev.db)
-npm start
-# ✓ Backend roda em localhost:3001
-# ✓ Dados guardados em backend/dev.db
-```
-
-**Ficheiro**: `backend/.env`
-```
-DATABASE_URL=file:./dev.db
-```
-
-### 2️⃣ Deploy em Produção (Render)
-```
-Render detecta build commands:
-npm install && npx prisma generate && npx prisma db push
-```
-
-**O que acontece**:
-1. Render lê variáveis de ambiente (definidas no painel Render)
-2. `DATABASE_URL` aponta para Supabase PostgreSQL
-3. `npx prisma db push` cria as tabelas em PostgreSQL
-4. Backend roda contra PostgreSQL em vez de SQLite
-
-**Ficheiro**: Render Environment → `DATABASE_URL`
-```
-postgresql://postgres:Mazangacrm2026@db.zvpywxfwtkciakyurrcp.supabase.co:5432/postgres
-```
-
----
-
-## Por Que Não Consegue Conectar Localmente?
-
-### ❌ O que tenta
-```bash
-DATABASE_URL="postgresql://postgres:Mazangacrm2026@db.zvpywxfwtkciakyurrcp.supabase.co:5432/postgres" \
-npx prisma db push
-# Erro: Can't reach database server...
-```
-
-### ✅ Por que falha
-1. **Firewall**: Máquina local tem IP privado/restrito
-2. **Supabase Security**: Por padrão, bloqueia IPs desconhecidos
-3. **Network**: Sua rede pode não permitir conexões externas
-
-### ✅ Por que funciona no Render
-1. **IP Público**: Render tem servidor cloud com IP fixo
-2. **Whitelisted**: Supabase conhece IPs de data centers (Render)
-3. **Cloud-to-Cloud**: Ambos estão na internet pública
-
----
-
-## Workflow de Desenvolvimento
-
-### ✅ Dia a Dia (Desenvolvimento)
-
-```bash
-# 1. Inicia o backend (usa SQLite localmente)
-cd backend
-npm start
-# ✓ Roda em localhost:3001, dados em dev.db
-
-# 2. Inicia o frontend (noutra aba)
-cd frontend
+npm install
+npm run db:push
 npm run dev
-# ✓ Roda em localhost:3000
-
-# 3. Testa localmente
-# - Cria contactos, formulários, automações
-# - Tudo funciona contra SQLite
-
-# 4. Faz commit
-git add .
-git commit -m "Add feature X"
-git push origin main
 ```
 
----
+Comandos úteis:
 
-## Deploy para Produção
-
-### 📋 Checklist
-1. **GitHub**: Código no branch `main` ✓
-2. **Render**: Painel → New Web Service → Connect `mazanga-crm`
-3. **Render**: Root Directory = `backend`
-4. **Render**: Environment Variables (ver `DEPLOYMENT.md` para lista completa)
-   ```
-   DATABASE_URL=postgresql://postgres:Mazangacrm2026@...
-   JWT_SECRET=87c2c9ae...
-   FRONTEND_URL=(será preenchido após Vercel)
-   ```
-5. **Render**: Build Command = `npm install && npx prisma generate && npx prisma db push`
-6. **Deploy** → Backend roda com PostgreSQL 🎉
-
----
-
-## Ficheiros Importantes
-
-| Ficheiro | Ambiente | Descrição |
-|----------|----------|-----------|
-| `backend/.env` | 📱 Local | SQLite, credenciais de teste |
-| `backend/.env.production` | ☁️ Produção | Exemplo de vars (referência) |
-| `backend/prisma/schema.prisma` | Ambos | SQLite localmente (comentário sobre prod) |
-| `DEPLOYMENT.md` | Documentação | Instruções de deploy |
-
----
-
-## Se Quiser Testar PostgreSQL Localmente
-
-Se realmente precisar testar PostgreSQL antes de deploy:
-
-### Opção 1: Docker (mais fácil)
 ```bash
-# Instale Docker primeiro, depois:
-docker run --name mazanga-postgres \
-  -e POSTGRES_PASSWORD=mazanga_test \
-  -e POSTGRES_DB=mazanga_crm \
+npm run db:push
+npm run db:studio
+```
+
+## Exemplo com Docker
+
+```bash
+docker run --name kukugest-postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=kukugest \
   -p 5432:5432 \
-  -d postgres:latest
-
-# Crie um .env.local
-DATABASE_URL="postgresql://postgres:mazanga_test@localhost:5432/mazanga_crm"
-
-# Execute
-npx prisma db push
-npx prisma generate
-npm start
+  -d postgres:16
 ```
 
-### Opção 2: Supabase (requerer acesso remoto)
-Contacte Supabase Support para adicionar seu IP à whitelist.
+Depois configure:
 
----
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/kukugest
+```
 
-## Troubleshooting
+## Boas práticas
 
-### ❓ Questão: "Perco dados ao mudar de SQLite para PostgreSQL?"
-✅ **Não!** Porque:
-- SQLite é apenas para desenvolvimento local
-- Dados de produção entram em PostgreSQL (Supabase) directo
-- Quando o Render deploy, começa com BD vazia (que é normal)
+- não comitar `backend/.env`
+- não usar credenciais reais em documentação
+- não assumir que `prisma db push` em produção substitui um processo de migração formal para sempre
+- confirmar sempre que a base local é diferente da base de produção
 
-### ❓ Questão: "E se mudar código e tiver de fazer migration?"
-✅ **Fácil!** Prisma adapta-se automaticamente:
+## Problemas comuns
+
+### `P1001: Can't reach database server`
+
+Verifique:
+
+- host, porta e credenciais no `DATABASE_URL`
+- VPN, firewall ou whitelist de IP
+- se a instância remota aceita conexões externas
+
+### `relation does not exist`
+
+Sincronize o schema:
+
 ```bash
-# Localmente com SQLite
-npx prisma db push
-# Render com PostgreSQL (automático no build)
+cd backend
+npm run db:push
 ```
 
-### ❓ Questão: "Dados de teste local afectam produção?"
-✅ **Não!** São BDs separadas:
-- `backend/dev.db` — apenas local
-- Supabase PostgreSQL — apenas produção
+### `PrismaClientInitializationError`
 
----
+Quase sempre é uma destas causas:
+
+- `DATABASE_URL` inválido
+- base de dados desligada
+- SSL exigido mas ausente na connection string
 
 ## Resumo
 
-| Ambiente | Database | Como Acede | Configuração |
-|----------|----------|-----------|-------------|
-| 📱 Local | SQLite | `backend/dev.db` | `backend/.env` |
-| ☁️ Render | PostgreSQL | Supabase | `Render Environment Variables` |
-
-**Uma única base de código, dois ambientes diferentes!** 🎯
-
-Agora pode desenvolver localmente sem problemas, e a produção roda contra PostgreSQL. ✅
+- o projeto já não usa SQLite
+- o ficheiro `backend/dev.db` pode ser tratado como legado
+- a fonte de verdade é o `schema.prisma`, e ele está configurado para PostgreSQL

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { getCurrentUser } from '@/lib/api';
+import { getCurrentUserWithToken } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -27,7 +27,7 @@ export default function LoginPage() {
       const supabase = createClient();
 
       // 1. Authenticate with Supabase
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) {
         setError(authError.message === 'Invalid login credentials'
           ? 'Email ou password incorretos'
@@ -35,20 +35,21 @@ export default function LoginPage() {
         return;
       }
 
-      // Debug: confirm session was created
-      const { data: { session: dbgSession } } = await supabase.auth.getSession();
-      console.log('[LOGIN] session:', dbgSession ? 'OK' : 'NULL');
-      if (dbgSession) console.log('[LOGIN] access_token prefix:', dbgSession.access_token.slice(0, 20) + '...');
+      const accessToken = data.session?.access_token;
+      if (!accessToken) {
+        setError('Sessão criada sem access token. Tente novamente.');
+        return;
+      }
 
-      // 2. Load user from our backend (middleware auto-links supabaseUid on first login)
-      const user = await getCurrentUser();
+      // 2. Load user from our backend using the fresh token returned by Supabase
+      const user = await getCurrentUserWithToken(accessToken);
       if (user.mustChangePassword) {
         router.push('/change-password');
       } else {
         router.push('/');
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao ligar ao servidor. Tente novamente.');
+      setError(err?.response?.data?.error || err?.message || 'Erro ao ligar ao servidor. Tente novamente.');
     } finally {
       setLoading(false);
     }

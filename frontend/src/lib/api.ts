@@ -331,6 +331,15 @@ export async function getCurrentUser() {
   return response.data;
 }
 
+export async function getCurrentUserWithToken(accessToken: string) {
+  const response = await api.get<User>('/api/auth/me', {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  return response.data;
+}
+
 export async function changePassword(newPassword: string) {
   const response = await api.post<{ message: string }>('/api/auth/change-password', {
     newPassword,

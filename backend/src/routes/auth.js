@@ -3,7 +3,7 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
 const requireAuth = require('../middleware/auth');
-const { createLocalJWKSet, createRemoteJWKSet, jwtVerify } = require('jose');
+const { verifySupabaseJwt } = require('../middleware/auth');
 const { intersectPermissions, parsePermissions } = require('../lib/permissions');
 
 // Lazy Supabase admin client
@@ -17,38 +17,6 @@ function getSupabaseAdmin() {
   }
   return _supabaseAdmin;
 }
-
-let _remoteJwks = null;
-function getRemoteJwks() {
-  if (!_remoteJwks && process.env.SUPABASE_URL) {
-    _remoteJwks = createRemoteJWKSet(
-      new URL(`${process.env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`)
-    );
-  }
-  return _remoteJwks;
-}
-
-const LOCAL_JWKS = createLocalJWKSet({
-  keys: [
-    { alg: 'ES256', crv: 'P-256', kty: 'EC',
-      kid: 'ad8dfdb2-0ce9-49d3-b9f8-6e889a76b6a0',
-      x: 'fMN9KiM8utsDfKKFeOD1rhiXSmkXcx-546QJBgIL4Cg',
-      y: 'PdmdVOzbsZYEtGGpw9hs02bkH0qBsTSOVAQHEHYEthc' },
-    { alg: 'ES256', crv: 'P-256', kty: 'EC',
-      kid: 'bb424079-cb99-41be-97ee-ebd44cbd72d3',
-      x: 'zHF8awnfE8CwkcTnZrTpetP8TOzQ-Nvnp6tTtHwcnyQ',
-      y: 'sG2mdRZeicP-BLn1G8jXln1t1xNU50wRD6qNftFMRhc' },
-  ],
-});
-
-async function verifySupabaseJwt(token) {
-  const remoteJwks = getRemoteJwks();
-  const jwks = remoteJwks ?? LOCAL_JWKS;
-  const issuer = process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL}/auth/v1` : undefined;
-  const { payload } = await jwtVerify(token, jwks, { issuer, audience: 'authenticated' });
-  return payload;
-}
-
 
 // POST /api/auth/sync
 // Called by the frontend after Supabase login to link supabaseUid → User record.

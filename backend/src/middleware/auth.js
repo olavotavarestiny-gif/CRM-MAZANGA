@@ -34,11 +34,26 @@ const LOCAL_JWKS = createLocalJWKSet({
 });
 
 async function verifySupabaseJwt(token) {
-  const remoteJwks = getRemoteJwks();
-  const jwks = remoteJwks ?? LOCAL_JWKS;
   const issuer = process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL}/auth/v1` : undefined;
-  const { payload } = await jwtVerify(token, jwks, { issuer, audience: 'authenticated' });
-  return payload;
+  const options = { issuer, audience: 'authenticated' };
+
+  // Prefer local known keys for stability and speed.
+  // If Supabase rotates to a new key, fall back to remote JWKS.
+  try {
+    const { payload } = await jwtVerify(token, LOCAL_JWKS, options);
+    return payload;
+  } catch (localError) {
+    const remoteJwks = getRemoteJwks();
+    if (!remoteJwks) throw localError;
+
+    try {
+      const { payload } = await jwtVerify(token, remoteJwks, options);
+      return payload;
+    } catch (remoteError) {
+      // Preserve the original local verification error when both strategies fail.
+      throw localError.code === 'ERR_JWKS_NO_MATCHING_KEY' ? remoteError : localError;
+    }
+  }
 }
 
 const USER_SELECT = {
