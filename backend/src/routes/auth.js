@@ -144,8 +144,18 @@ router.post('/change-password', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Nova password deve ter pelo menos 6 caracteres' });
     }
 
+    // Resolve supabaseUid — may be null for impersonated users whose UID wasn't in req.user
+    let supabaseUid = req.user.supabaseUid;
+    if (!supabaseUid) {
+      const dbUser = await prisma.user.findUnique({ where: { id: req.user.id }, select: { supabaseUid: true } });
+      supabaseUid = dbUser?.supabaseUid;
+    }
+    if (!supabaseUid) {
+      return res.status(400).json({ error: 'Utilizador não tem conta Supabase associada. Contacte o suporte.' });
+    }
+
     // Update password in Supabase Auth
-    const { error } = await getSupabaseAdmin().auth.admin.updateUserById(req.user.supabaseUid, {
+    const { error } = await getSupabaseAdmin().auth.admin.updateUserById(supabaseUid, {
       password: newPassword,
     });
 

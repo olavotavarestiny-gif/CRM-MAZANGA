@@ -24,7 +24,7 @@ async function getPublicKey() {
 const USER_SELECT = {
   id: true, name: true, email: true, role: true,
   active: true, accountOwnerId: true, mustChangePassword: true,
-  isSuperAdmin: true, permissions: true,
+  isSuperAdmin: true, permissions: true, supabaseUid: true,
 };
 
 // Bootstrap: email that always gets superadmin regardless of DB field value
@@ -59,6 +59,7 @@ async function requireAuth(req, res, next) {
         isSuperAdmin: targetUser.isSuperAdmin || targetUser.email === SUPER_ADMIN_EMAIL,
         permissionsJson: targetUser.permissions,
         accountOwnerId: targetUser.accountOwnerId || null,
+        supabaseUid: targetUser.supabaseUid || null,
         effectiveUserId: targetUser.accountOwnerId || targetUser.id,
         isAccountOwner: !targetUser.accountOwnerId,
         mustChangePassword: targetUser.mustChangePassword,
