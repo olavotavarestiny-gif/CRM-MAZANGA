@@ -419,6 +419,7 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const { data: systemConfigs = [] } = useQuery({
     queryKey: ['contactFieldConfigs'],
     queryFn: getContactFieldConfigs,
+    staleTime: 0,
   });
 
   const { data: customFieldDefs = [] } = useQuery({

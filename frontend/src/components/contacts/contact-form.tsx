@@ -169,6 +169,7 @@ export default function ContactForm({
   const { data: systemConfigs = [] } = useQuery({
     queryKey: ['contactFieldConfigs'],
     queryFn: getContactFieldConfigs,
+    staleTime: 0,
   });
 
   const { data: pipelineStages = [] } = useQuery({
