@@ -63,6 +63,21 @@ function formatFileSize(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
+function normalizeDocuments(
+  value: unknown
+): { name: string; url: string; size?: number; uploadedAt: string }[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 // ── Inline text field ──────────────────────────────────────────────────────────
 function InlineField({
   label,
@@ -514,7 +529,7 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
     const result = await upload(file, 'attachments');
     if (!result) return;
     const existing: { name: string; url: string; size?: number; uploadedAt: string }[] =
-      contact.documents ?? [];
+      normalizeDocuments((contact as any).documents);
     const updated = [...existing, { name: file.name, url: result.url, size: result.size, uploadedAt: new Date().toISOString() }];
     patchContact.mutate({ documents: updated });
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -522,7 +537,7 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
 
   const deleteDocument = useCallback((url: string) => {
     if (!contact) return;
-    const updated = (contact.documents ?? []).filter(d => d.url !== url);
+    const updated = normalizeDocuments((contact as any).documents).filter(d => d.url !== url);
     patchContact.mutate({ documents: updated });
   }, [contact, patchContact]);
 
@@ -551,7 +566,7 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const waNum = formatWA(contact.phone);
   const isAtivo = (contact as any).status !== 'inativo';
   const documents: { name: string; url: string; size?: number; uploadedAt: string }[] =
-    (contact as any).documents ?? [];
+    normalizeDocuments((contact as any).documents);
 
   const renderSystemField = (cfg: ContactFieldConfig) => {
     const key = cfg.fieldKey;

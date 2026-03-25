@@ -219,6 +219,15 @@ function parseCustomFields(raw) {
   try { return JSON.parse(raw || '{}'); } catch { return {}; }
 }
 
+function parseDocuments(raw) {
+  try {
+    const parsed = JSON.parse(raw || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 // GET all contacts with optional filters
 router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
   try {
@@ -260,6 +269,7 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
       ...c,
       tags: (() => { try { return JSON.parse(c.tags); } catch { return []; } })(),
       customFields: parseCustomFields(c.customFields),
+      documents: parseDocuments(c.documents),
     })));
   } catch (error) {
     console.error('Error fetching contacts:', error);
@@ -329,6 +339,7 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
       ...contact,
       tags: (() => { try { return JSON.parse(contact.tags); } catch { return []; } })(),
       customFields: parseCustomFields(contact.customFields),
+      documents: parseDocuments(contact.documents),
     });
   } catch (error) {
     if (error.code === 'P2002') {
@@ -461,6 +472,7 @@ router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
       ...contact,
       tags: (() => { try { return JSON.parse(contact.tags); } catch { return []; } })(),
       customFields: parseCustomFields(contact.customFields),
+      documents: parseDocuments(contact.documents),
     });
   } catch (error) {
     console.error('Error fetching contact:', error);
@@ -506,7 +518,14 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
     if (status !== undefined && ['ativo', 'inativo'].includes(status)) updateData.status = status;
     if (clienteType !== undefined && ['empresa', 'particular'].includes(clienteType)) updateData.clienteType = clienteType;
     if (documents !== undefined) {
-      try { JSON.parse(documents); updateData.documents = documents; } catch {}
+      if (Array.isArray(documents)) {
+        updateData.documents = JSON.stringify(documents);
+      } else if (typeof documents === 'string') {
+        try {
+          const parsed = JSON.parse(documents);
+          if (Array.isArray(parsed)) updateData.documents = documents;
+        } catch {}
+      }
     }
 
     const contact = await prisma.contact.update({
@@ -537,6 +556,7 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
       ...contact,
       tags: (() => { try { return JSON.parse(contact.tags); } catch { return []; } })(),
       customFields: parseCustomFields(contact.customFields),
+      documents: parseDocuments(contact.documents),
     });
   } catch (error) {
     if (error.code === 'P2002') {
