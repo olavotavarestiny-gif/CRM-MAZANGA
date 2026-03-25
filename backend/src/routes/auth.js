@@ -3,11 +3,10 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
 const requireAuth = require('../middleware/auth');
-const { importJWK, jwtVerify } = require('jose');
+const { createLocalJWKSet, createRemoteJWKSet, jwtVerify } = require('jose');
 const { intersectPermissions, parsePermissions } = require('../lib/permissions');
 
-// Lazy Supabase admin client — only created when first used so missing env vars
-// don't crash the server on startup
+// Lazy Supabase admin client
 let _supabaseAdmin = null;
 function getSupabaseAdmin() {
   if (!_supabaseAdmin) {
@@ -19,9 +18,6 @@ function getSupabaseAdmin() {
   return _supabaseAdmin;
 }
 
-// Re-use the same dynamic JWKS logic from the auth middleware
-const { createRemoteJWKSet } = require('jose');
-
 let _remoteJwks = null;
 function getRemoteJwks() {
   if (!_remoteJwks && process.env.SUPABASE_URL) {
@@ -32,30 +28,27 @@ function getRemoteJwks() {
   return _remoteJwks;
 }
 
-const SUPABASE_JWK_FALLBACK = {
-  alg: 'ES256', crv: 'P-256',
-  kid: 'bb424079-cb99-41be-97ee-ebd44cbd72d3',
-  kty: 'EC',
-  x: 'zHF8awnfE8CwkcTnZrTpetP8TOzQ-Nvnp6tTtHwcnyQ',
-  y: 'sG2mdRZeicP-BLn1G8jXln1t1xNU50wRD6qNftFMRhc',
-};
-let _fallbackKey = null;
-async function getFallbackKey() {
-  if (!_fallbackKey) _fallbackKey = await importJWK(SUPABASE_JWK_FALLBACK, 'ES256');
-  return _fallbackKey;
-}
+const LOCAL_JWKS = createLocalJWKSet({
+  keys: [
+    { alg: 'ES256', crv: 'P-256', kty: 'EC',
+      kid: 'ad8dfdb2-0ce9-49d3-b9f8-6e889a76b6a0',
+      x: 'fMN9KiM8utsDfKKFeOD1rhiXSmkXcx-546QJBgIL4Cg',
+      y: 'PdmdVOzbsZYEtGGpw9hs02bkH0qBsTSOVAQHEHYEthc' },
+    { alg: 'ES256', crv: 'P-256', kty: 'EC',
+      kid: 'bb424079-cb99-41be-97ee-ebd44cbd72d3',
+      x: 'zHF8awnfE8CwkcTnZrTpetP8TOzQ-Nvnp6tTtHwcnyQ',
+      y: 'sG2mdRZeicP-BLn1G8jXln1t1xNU50wRD6qNftFMRhc' },
+  ],
+});
 
 async function verifySupabaseJwt(token) {
-  const issuer = process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL}/auth/v1` : undefined;
   const remoteJwks = getRemoteJwks();
-  if (remoteJwks) {
-    const { payload } = await jwtVerify(token, remoteJwks, { issuer, audience: 'authenticated' });
-    return payload;
-  }
-  const fallbackKey = await getFallbackKey();
-  const { payload } = await jwtVerify(token, fallbackKey, { audience: 'authenticated' });
+  const jwks = remoteJwks ?? LOCAL_JWKS;
+  const issuer = process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL}/auth/v1` : undefined;
+  const { payload } = await jwtVerify(token, jwks, { issuer, audience: 'authenticated' });
   return payload;
 }
+
 
 // POST /api/auth/sync
 // Called by the frontend after Supabase login to link supabaseUid → User record.
