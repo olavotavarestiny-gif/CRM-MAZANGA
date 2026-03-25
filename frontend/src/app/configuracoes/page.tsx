@@ -249,9 +249,8 @@ function ConfiguracoesContent() {
   // ── Tab config ───────────────────────────────────────────
   const tabs = [
     { id: 'perfil' as TabId, label: 'Perfil', icon: UserIcon, show: true },
-    { id: 'empresa' as TabId, label: 'Empresa & AGT', icon: Building2, show: !!isOwner },
+    { id: 'empresa' as TabId, label: 'Empresa', icon: Building2, show: !!isOwner },
     { id: 'equipa' as TabId, label: 'Equipa', icon: Users, show: !!isOwner },
-    { id: 'admin' as TabId, label: 'Admin', icon: Shield, show: !!isAdmin },
   ].filter(t => t.show);
 
   const tabBtn = (id: TabId) =>
@@ -270,7 +269,7 @@ function ConfiguracoesContent() {
     <div className="p-6 max-w-4xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#0A2540]">Configurações</h1>
-        <p className="text-gray-500 text-sm mt-1">Perfil, empresa, equipa e administração</p>
+        <p className="text-gray-500 text-sm mt-1">Perfil, empresa e equipa</p>
       </div>
 
       {/* Tab Navigation */}
