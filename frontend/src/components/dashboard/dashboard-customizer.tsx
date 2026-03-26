@@ -109,8 +109,16 @@ function WidgetEditor({ initial, onSave, onCancel }: WidgetEditorProps) {
   );
 }
 
-export default function DashboardCustomizer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { widgets, addWidget, removeWidget, updateWidget, reorder, reset } = useDashboardConfig();
+export default function DashboardCustomizer({
+  open,
+  onClose,
+  storageScope,
+}: {
+  open: boolean;
+  onClose: () => void;
+  storageScope?: string | number | null;
+}) {
+  const { widgets, addWidget, removeWidget, updateWidget, reorder, reset } = useDashboardConfig(storageScope);
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [dragging, setDragging] = useState<string | null>(null);

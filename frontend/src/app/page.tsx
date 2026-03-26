@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getContacts, getTasks, getFinanceDashboard } from '@/lib/api';
+import { getContacts, getTasks, getFinanceDashboard, getCurrentUser } from '@/lib/api';
 import { useDashboardConfig } from '@/components/dashboard/use-dashboard-config';
 import StatWidget from '@/components/dashboard/stat-widget';
 import GoalWidget from '@/components/dashboard/goal-widget';
@@ -17,7 +17,12 @@ import { isSameDay, parseISO } from 'date-fns';
 
 export default function Dashboard() {
   const [customizerOpen, setCustomizerOpen] = useState(false);
-  const { widgets, loaded } = useDashboardConfig();
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+  });
+  const dashboardScope = currentUser?.id ?? null;
+  const { widgets, loaded } = useDashboardConfig(dashboardScope);
 
   const { data: contacts = [] } = useQuery({ queryKey: ['contacts'], queryFn: () => getContacts() });
   const { data: tasks = [] } = useQuery({ queryKey: ['tasks', 'pending'], queryFn: () => getTasks({ done: false }) });
@@ -112,7 +117,11 @@ export default function Dashboard() {
         </div>
       )}
 
-      <DashboardCustomizer open={customizerOpen} onClose={() => setCustomizerOpen(false)} />
+      <DashboardCustomizer
+        open={customizerOpen}
+        onClose={() => setCustomizerOpen(false)}
+        storageScope={dashboardScope}
+      />
     </div>
   );
 }
