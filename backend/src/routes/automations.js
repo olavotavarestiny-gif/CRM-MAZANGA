@@ -108,7 +108,7 @@ router.put('/:id', requirePermission('automations', 'edit'), async (req, res) =>
       where: { id: req.params.id },
       select: { userId: true },
     });
-    if (!automation || automation.userId !== req.user.id) {
+    if (!automation || automation.userId !== req.user.effectiveUserId) {
       return res.status(404).json({ error: 'Automation not found' });
     }
 

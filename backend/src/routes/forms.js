@@ -74,7 +74,7 @@ router.put('/:id', requireAuth, requirePermission('forms', 'edit'), async (req, 
       where: { id: req.params.id },
       select: { userId: true },
     });
-    if (!form || form.userId !== req.user.id) {
+    if (!form || form.userId !== req.user.effectiveUserId) {
       return res.status(404).json({ error: 'Form not found' });
     }
 
@@ -132,7 +132,7 @@ router.post('/:id/fields', requireAuth, requirePermission('forms', 'edit'), asyn
       where: { id: req.params.id },
       select: { userId: true },
     });
-    if (!form || form.userId !== req.user.id) {
+    if (!form || form.userId !== req.user.effectiveUserId) {
       return res.status(404).json({ error: 'Form not found' });
     }
 
@@ -166,7 +166,7 @@ router.put('/:id/fields/:fieldId', requireAuth, requirePermission('forms', 'edit
       where: { id: req.params.id },
       select: { userId: true },
     });
-    if (!form || form.userId !== req.user.id) {
+    if (!form || form.userId !== req.user.effectiveUserId) {
       return res.status(404).json({ error: 'Form not found' });
     }
 
@@ -200,7 +200,7 @@ router.delete('/:id/fields/:fieldId', requireAuth, requireDeletePermission, asyn
       where: { id: req.params.id },
       select: { userId: true },
     });
-    if (!form || form.userId !== req.user.id) {
+    if (!form || form.userId !== req.user.effectiveUserId) {
       return res.status(404).json({ error: 'Form not found' });
     }
 
@@ -222,7 +222,7 @@ router.post('/:id/fields/reorder', requireAuth, requirePermission('forms', 'edit
       where: { id: req.params.id },
       select: { userId: true },
     });
-    if (!form || form.userId !== req.user.id) {
+    if (!form || form.userId !== req.user.effectiveUserId) {
       return res.status(404).json({ error: 'Form not found' });
     }
 
@@ -314,7 +314,7 @@ router.get('/:id/submissions', requireAuth, async (req, res) => {
       where: { id: req.params.id },
       select: { userId: true },
     });
-    if (!form || form.userId !== req.user.id) {
+    if (!form || form.userId !== req.user.effectiveUserId) {
       return res.status(404).json({ error: 'Form not found' });
     }
 

@@ -462,7 +462,7 @@ router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
       },
     });
 
-    if (!contact || contact.userId !== req.user.id) {
+    if (!contact || contact.userId !== req.user.effectiveUserId) {
       return res.status(404).json({ error: 'Contact not found' });
     }
 
@@ -487,7 +487,7 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
 
     // Verify ownership
     const existing = await prisma.contact.findUnique({ where: { id: contactId } });
-    if (!existing || existing.userId !== req.user.id) {
+    if (!existing || existing.userId !== req.user.effectiveUserId) {
       return res.status(404).json({ error: 'Contact not found' });
     }
 
