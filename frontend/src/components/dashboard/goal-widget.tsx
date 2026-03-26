@@ -29,29 +29,29 @@ export default function GoalWidget({
     '#6b7e9a';
 
   return (
-    <Card className="col-span-2">
+    <Card className="col-span-2 rounded-xl">
       <CardContent className="py-5 px-5">
         <div className="flex items-start justify-between mb-3">
           <div>
-            <p className="text-xs font-medium text-[#6b7e9a] uppercase tracking-wide mb-0.5">{title}</p>
-            <p className="text-2xl font-bold text-[#0A2540]">{fmt(current, unit)}</p>
+            <p className="text-xs font-medium text-[#595c5e] uppercase tracking-wide mb-0.5">{title}</p>
+            <p className="text-2xl font-bold text-[#2c2f31]">{fmt(current, unit)}</p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-[#6b7e9a]">Objetivo</p>
-            <p className="text-sm font-semibold text-[#0A2540]">{fmt(target, unit)}</p>
+            <p className="text-xs text-[#595c5e]">Objetivo</p>
+            <p className="text-sm font-semibold text-[#2c2f31]">{fmt(target, unit)}</p>
           </div>
         </div>
 
         {/* Progress bar */}
-        <div className="w-full h-3 rounded-full overflow-hidden bg-[#E2E8F0]">
+        <div className="w-full h-3 rounded-full overflow-hidden bg-slate-200">
           <div
-            className="h-full rounded-full transition-all duration-700"
+            className="h-full rounded-full transition-all duration-500"
             style={{ width: `${pct}%`, background: statusColor }}
           />
         </div>
 
         <div className="flex items-center justify-between mt-2">
-          <p className="text-xs text-[#6b7e9a]">
+          <p className="text-xs text-[#595c5e]">
             {over ? '🎉 Meta atingida!' : `Falta ${fmt(Math.max(target - current, 0), unit)}`}
           </p>
           <p className="text-sm font-bold" style={{ color: statusColor }}>

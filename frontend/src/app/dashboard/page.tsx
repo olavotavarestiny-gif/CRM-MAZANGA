@@ -51,10 +51,10 @@ export default function Dashboard() {
   const inPipelineCount = contacts.filter((c) => c.inPipeline).length;
 
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6 text-[#0A2540]">Painel</h1>
+    <div className="p-8">
+      <h1 className="text-3xl font-extrabold mb-6 text-[#2c2f31] tracking-tight">Painel</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-500">

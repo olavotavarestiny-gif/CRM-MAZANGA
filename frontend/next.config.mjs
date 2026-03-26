@@ -40,6 +40,15 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  async redirects() {
+    return [
+      {
+        source: '/auth/signout',
+        destination: '/api/auth/signout',
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {

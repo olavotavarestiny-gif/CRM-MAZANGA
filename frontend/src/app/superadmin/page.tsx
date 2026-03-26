@@ -1,337 +1,932 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
-  getSuperAdminOrgs, updateSuperAdminOrg, deleteSuperAdminOrg,
-  impersonateUser, createClientAccount,
+  createClientAccount,
+  createUser,
+  deleteSuperAdminOrg,
+  deleteUser,
+  getClientAccounts,
+  getCurrentUser,
+  getLoginLogs,
+  getSuperAdminOrgs,
+  getSuperAdminStorage,
+  getSuperAdminUsage,
+  getUsers,
+  impersonateUser,
+  updateClientAccount,
+  updateSuperAdminOrg,
+  updateUser,
 } from '@/lib/api';
-import type { SuperAdminOrg, UserPermissions } from '@/lib/api';
+import type {
+  LoginLog,
+  SuperAdminOrg,
+  SuperAdminStorageStat,
+  SuperAdminUsageStat,
+  User,
+} from '@/lib/api';
+import type { ClientAccount } from '@/lib/types';
 import {
-  Users, Trash2, Eye, Plus, Search, ChevronDown, ChevronRight,
-  Shield, RefreshCw, UserCheck,
+  BarChart3,
+  Building2,
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  HardDrive,
+  History,
+  Plus,
+  RefreshCw,
+  Search,
+  Shield,
+  ShieldCheck,
+  Trash2,
+  UserCheck,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog';
 
-const PLANS = ['essencial', 'profissional', 'enterprise'];
 const PLAN_LABELS: Record<string, string> = {
   essencial: 'Essencial',
   profissional: 'Profissional',
-  enterprise: 'Enterprise',
 };
 
+const ADMIN_SECTIONS = [
+  { id: 'users', label: 'Utilizadores', icon: Users },
+  { id: 'accounts', label: 'Contas', icon: Building2 },
+  { id: 'logins', label: 'Logins', icon: History },
+] as const;
+
+const SUPERADMIN_SECTIONS = [
+  { id: 'organizations', label: 'Organizações', icon: ShieldCheck },
+  { id: 'usage', label: 'Utilização', icon: BarChart3 },
+  { id: 'storage', label: 'Armazenamento', icon: HardDrive },
+] as const;
+
+type SectionId =
+  | (typeof ADMIN_SECTIONS)[number]['id']
+  | (typeof SUPERADMIN_SECTIONS)[number]['id'];
+
 export default function SuperAdminPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const qc = useQueryClient();
+
+  const { data: currentUser, isLoading: userLoading } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+    retry: false,
+  });
+
+  const isSuperAdmin = !!currentUser?.isSuperAdmin;
+  const hasAdminAccess = !!(isSuperAdmin || currentUser?.role === 'admin');
+
+  const requestedSection = searchParams?.get('section');
+  const allowedSections = useMemo(
+    () => [
+      ...ADMIN_SECTIONS.map((section) => section.id),
+      ...(isSuperAdmin ? SUPERADMIN_SECTIONS.map((section) => section.id) : []),
+    ],
+    [isSuperAdmin]
+  );
+
+  const fallbackSection: SectionId = isSuperAdmin ? 'organizations' : 'users';
+  const currentSection: SectionId =
+    requestedSection && allowedSections.includes(requestedSection as SectionId)
+      ? (requestedSection as SectionId)
+      : fallbackSection;
+
+  useEffect(() => {
+    if (userLoading) return;
+    if (!hasAdminAccess) {
+      router.replace('/');
+      return;
+    }
+    if (requestedSection !== currentSection) {
+      router.replace(`${pathname}?section=${currentSection}`);
+    }
+  }, [currentSection, hasAdminAccess, pathname, requestedSection, router, userLoading]);
+
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
-  const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: '', email: '', password: '', plan: 'essencial' });
-  const [createError, setCreateError] = useState('');
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [accountError, setAccountError] = useState('');
+  const [userError, setUserError] = useState('');
+  const [orgError, setOrgError] = useState('');
+  const [createAccountForm, setCreateAccountForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    plan: 'essencial',
+  });
+  const [createUserForm, setCreateUserForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'user',
+    accountOwnerId: '',
+  });
 
-  const { data: orgs = [], isLoading } = useQuery({
+  const { data: users = [] } = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: getUsers,
+    enabled: hasAdminAccess && currentSection === 'users',
+  });
+
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['admin-accounts'],
+    queryFn: getClientAccounts,
+    enabled: hasAdminAccess && currentSection === 'accounts',
+  });
+
+  const { data: loginLogs = [] } = useQuery({
+    queryKey: ['admin-logins'],
+    queryFn: getLoginLogs,
+    enabled: hasAdminAccess && currentSection === 'logins',
+  });
+
+  const { data: orgs = [], isLoading: orgsLoading } = useQuery({
     queryKey: ['superadmin-orgs'],
     queryFn: getSuperAdminOrgs,
+    enabled: isSuperAdmin && currentSection === 'organizations',
   });
 
-  const updateMut = useMutation({
+  const { data: usage = [] } = useQuery({
+    queryKey: ['superadmin-usage'],
+    queryFn: getSuperAdminUsage,
+    enabled: isSuperAdmin && currentSection === 'usage',
+  });
+
+  const { data: storage = [] } = useQuery({
+    queryKey: ['superadmin-storage'],
+    queryFn: getSuperAdminStorage,
+    enabled: isSuperAdmin && currentSection === 'storage',
+  });
+
+  const createUserMutation = useMutation({
+    mutationFn: () => {
+      const payload: any = {
+        name: createUserForm.name,
+        email: createUserForm.email,
+        password: createUserForm.password,
+        role: createUserForm.role,
+      };
+      if (createUserForm.accountOwnerId) {
+        payload.accountOwnerId = createUserForm.accountOwnerId;
+      }
+      return createUser(payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-users'] });
+      setShowCreateUser(false);
+      setCreateUserForm({ name: '', email: '', password: '', role: 'user', accountOwnerId: '' });
+      setUserError('');
+    },
+    onError: (err: Error) => setUserError(err.message || 'Erro ao criar utilizador'),
+  });
+
+  const createAccountMutation = useMutation({
+    mutationFn: createClientAccount,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-accounts'] });
+      qc.invalidateQueries({ queryKey: ['superadmin-orgs'] });
+      setShowCreateAccount(false);
+      setCreateAccountForm({ name: '', email: '', password: '', plan: 'essencial' });
+      setAccountError('');
+    },
+    onError: (err: Error) => setAccountError(err.message || 'Erro ao criar conta'),
+  });
+
+  const orgUpdateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Parameters<typeof updateSuperAdminOrg>[1] }) =>
       updateSuperAdminOrg(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['superadmin-orgs'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['superadmin-orgs'] });
+      qc.invalidateQueries({ queryKey: ['admin-accounts'] });
+    },
+    onError: (err: Error) => setOrgError(err.message || 'Erro ao atualizar organização'),
   });
 
-  const deleteMut = useMutation({
+  const orgDeleteMutation = useMutation({
     mutationFn: deleteSuperAdminOrg,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['superadmin-orgs'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['superadmin-orgs'] });
+      qc.invalidateQueries({ queryKey: ['admin-accounts'] });
+      qc.invalidateQueries({ queryKey: ['superadmin-usage'] });
+      qc.invalidateQueries({ queryKey: ['superadmin-storage'] });
+    },
+    onError: (err: Error) => setOrgError(err.message || 'Erro ao eliminar organização'),
   });
 
-  const impersonateMut = useMutation({
+  const impersonateMutation = useMutation({
     mutationFn: impersonateUser,
     onSuccess: ({ token }) => {
       localStorage.setItem('impersonation_token', token);
       window.location.href = '/';
     },
+    onError: (err: Error) => setOrgError(err.message || 'Erro ao entrar como utilizador'),
   });
 
-  const createMut = useMutation({
-    mutationFn: createClientAccount,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['superadmin-orgs'] });
-      setShowCreate(false);
-      setCreateForm({ name: '', email: '', password: '', plan: 'essencial' });
-      setCreateError('');
-    },
-    onError: (err: Error) => setCreateError(err.message),
-  });
-
-  const filtered = orgs.filter(
-    (o) =>
-      o.name.toLowerCase().includes(search.toLowerCase()) ||
-      o.email.toLowerCase().includes(search.toLowerCase()) ||
-      (o.accountMembers || []).some(
-        (m) =>
-          m.name.toLowerCase().includes(search.toLowerCase()) ||
-          m.email.toLowerCase().includes(search.toLowerCase())
-      )
-  );
+  const goToSection = (section: SectionId) => {
+    router.replace(`${pathname}?section=${section}`);
+  };
 
   const toggleExpand = (id: number) => {
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
-  const handleDelete = (org: SuperAdminOrg) => {
-    if (!confirm(`Apagar organização "${org.name}" e todos os seus dados? Esta ação é irreversível.`)) return;
-    deleteMut.mutate(org.id);
-  };
+  const filteredOrgs = useMemo(
+    () =>
+      orgs.filter(
+        (org) =>
+          org.name.toLowerCase().includes(search.toLowerCase()) ||
+          org.email.toLowerCase().includes(search.toLowerCase()) ||
+          (org.accountMembers || []).some(
+            (member) =>
+              member.name.toLowerCase().includes(search.toLowerCase()) ||
+              member.email.toLowerCase().includes(search.toLowerCase())
+          )
+      ),
+    [orgs, search]
+  );
 
-  // total users across all orgs
-  const totalUsers = orgs.reduce((sum, o) => sum + 1 + (o._count?.accountMembers ?? 0), 0);
+  const totalUsers = orgs.reduce((sum, org) => sum + 1 + (org._count?.accountMembers ?? 0), 0);
+
+  if (userLoading || !currentUser) {
+    return <div className="min-h-screen bg-[#f5f7f9]" />;
+  }
+
+  if (!hasAdminAccess) {
+    return null;
+  }
+
+  const sectionTitle = isSuperAdmin ? 'Administração da Plataforma' : 'Administração';
+  const sectionDescription = isSuperAdmin
+    ? 'Superfície canónica para utilizadores, contas, organizações, utilização e impersonation.'
+    : 'Superfície canónica para utilizadores, contas e histórico de logins.';
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center">
-            <Shield className="w-5 h-5 text-purple-600" />
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
+            <Shield className="h-5 w-5 text-[#0A2540]" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-[#0A2540]">SuperAdmin</h1>
-            <p className="text-sm text-[#6b7e9a]">
-              {orgs.length} organizações · {totalUsers} utilizadores no total
-            </p>
+            <h1 className="text-2xl font-bold text-[#0A2540]">{sectionTitle}</h1>
+            <p className="mt-1 text-sm text-[#6b7e9a]">{sectionDescription}</p>
           </div>
         </div>
-        <Button onClick={() => setShowCreate(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Nova Conta
-        </Button>
-      </div>
 
-      {/* Search */}
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b7e9a]" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Pesquisar organizações ou utilizadores..."
-          className="pl-9"
-        />
-      </div>
+        {isSuperAdmin && (currentSection === 'organizations' || currentSection === 'accounts') && (
+          <Button onClick={() => setShowCreateAccount(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nova Conta
+          </Button>
+        )}
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-[#dde3ec] overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16 text-[#6b7e9a]">
-            <RefreshCw className="w-5 h-5 animate-spin mr-2" />
-            A carregar...
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-16 text-[#6b7e9a]">Nenhuma organização encontrada</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[#dde3ec] bg-[#f8fafc]">
-                <th className="text-left px-4 py-3 font-semibold text-[#0A2540] w-8"></th>
-                <th className="text-left px-4 py-3 font-semibold text-[#0A2540]">Organização / Utilizador</th>
-                <th className="text-left px-4 py-3 font-semibold text-[#0A2540]">Plano</th>
-                <th className="text-center px-4 py-3 font-semibold text-[#0A2540]">Membros</th>
-                <th className="text-center px-4 py-3 font-semibold text-[#0A2540]">Estado</th>
-                <th className="text-left px-4 py-3 font-semibold text-[#0A2540]">Criado</th>
-                <th className="text-center px-4 py-3 font-semibold text-[#0A2540]">Acções</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((org) => {
-                const isOpen = expanded.has(org.id);
-                const members = org.accountMembers || [];
-                return (
-                  <>
-                    {/* Org row */}
-                    <tr
-                      key={org.id}
-                      className="border-b border-[#dde3ec] hover:bg-[#f8fafc] transition-colors cursor-pointer"
-                      onClick={() => members.length > 0 && toggleExpand(org.id)}
-                    >
-                      <td className="px-4 py-3 text-[#6b7e9a]">
-                        {members.length > 0 ? (
-                          isOpen
-                            ? <ChevronDown className="w-4 h-4" />
-                            : <ChevronRight className="w-4 h-4" />
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-[#0A2540]">{org.name}</div>
-                        <div className="text-xs text-[#6b7e9a]">{org.email}</div>
-                      </td>
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <div className="relative inline-block">
-                          <select
-                            value={org.plan || 'essencial'}
-                            onChange={(e) => updateMut.mutate({ id: org.id, data: { plan: e.target.value } })}
-                            className="appearance-none pl-2 pr-6 py-1 text-xs border border-[#dde3ec] rounded-lg bg-white text-[#0A2540] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          >
-                            {PLANS.map((p) => (
-                              <option key={p} value={p}>{PLAN_LABELS[p]}</option>
-                            ))}
-                          </select>
-                          <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[#6b7e9a] pointer-events-none" />
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-1 text-[#6b7e9a]">
-                          <Users className="w-3.5 h-3.5" />
-                          <span>{org._count.accountMembers}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => updateMut.mutate({ id: org.id, data: { active: !org.active } })}
-                          className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-colors ${
-                            org.active
-                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                              : 'bg-red-100 text-red-600 hover:bg-red-200'
-                          }`}
-                        >
-                          {org.active ? 'Activo' : 'Inactivo'}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 text-[#6b7e9a] text-xs">
-                        {new Date(org.createdAt).toLocaleDateString('pt-PT')}
-                      </td>
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => impersonateMut.mutate(org.id)}
-                            disabled={impersonateMut.isPending}
-                            title="Login como este utilizador"
-                            className="p-1.5 rounded-lg hover:bg-blue-50 text-[#6b7e9a] hover:text-blue-600 transition-colors"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(org)}
-                            disabled={deleteMut.isPending}
-                            title="Apagar organização"
-                            className="p-1.5 rounded-lg hover:bg-red-50 text-[#6b7e9a] hover:text-red-600 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    {/* Members rows (expanded) */}
-                    {isOpen && members.map((member) => (
-                      <tr
-                        key={`member-${member.id}`}
-                        className="border-b border-[#dde3ec] bg-[#f8fafc] last:border-0"
-                      >
-                        <td className="px-4 py-2"></td>
-                        <td className="px-4 py-2 pl-8">
-                          <div className="flex items-center gap-2">
-                            <UserCheck className="w-3.5 h-3.5 text-[#6b7e9a] shrink-0" />
-                            <div>
-                              <div className="text-sm text-[#0A2540]">{member.name}</div>
-                              <div className="text-xs text-[#6b7e9a]">{member.email}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-xs text-[#6b7e9a]">Membro</td>
-                        <td className="px-4 py-2"></td>
-                        <td className="px-4 py-2 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                            member.active
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-600'
-                          }`}>
-                            {member.active ? 'Activo' : 'Inactivo'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2"></td>
-                        <td className="px-4 py-2 text-center">
-                          <button
-                            onClick={() => impersonateMut.mutate(member.id)}
-                            disabled={impersonateMut.isPending}
-                            title="Login como este utilizador"
-                            className="p-1.5 rounded-lg hover:bg-blue-50 text-[#6b7e9a] hover:text-blue-600 transition-colors"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </>
-                );
-              })}
-            </tbody>
-          </table>
+        {currentSection === 'users' && (
+          <Button onClick={() => setShowCreateUser(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Novo Utilizador
+          </Button>
         )}
       </div>
 
-      {/* Create Account Dialog */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap gap-2">
+            {ADMIN_SECTIONS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => goToSection(id)}
+                className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                  currentSection === id
+                    ? 'bg-[#0A2540] text-white'
+                    : 'bg-slate-50 text-[#516173] hover:bg-slate-100'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {isSuperAdmin && (
+            <>
+              <div className="my-4 border-t border-slate-100" />
+              <div className="flex flex-wrap gap-2">
+                {SUPERADMIN_SECTIONS.map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => goToSection(id)}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      currentSection === id
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {currentSection === 'users' && (
+          <Card>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Nome</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Email</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Função</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Conta</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Estado</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Último Login</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((user) => (
+                    <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                      <td className="px-4 py-3 text-sm text-gray-900">{user.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{user.email}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded px-2 py-1 text-xs font-medium ${user.role === 'admin' ? 'bg-red-50 text-[#0A2540]' : 'bg-zinc-500/20 text-gray-600'}`}>
+                          {user.role === 'admin' ? 'Admin' : 'Utilizador'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {user.accountOwnerId ? user.accountOwnerName || 'Membro' : <span className="text-gray-400">Independente</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={async () => {
+                            try {
+                              await updateUser(user.id, { active: !user.active });
+                              qc.invalidateQueries({ queryKey: ['admin-users'] });
+                            } catch (err: any) {
+                              setUserError(err.message || 'Erro ao atualizar utilizador');
+                            }
+                          }}
+                          className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition ${
+                            user.active
+                              ? 'bg-green-50 text-green-700 hover:bg-green-500/30'
+                              : 'bg-red-50 text-red-600 hover:bg-red-500/30'
+                          }`}
+                        >
+                          {user.active ? <><Eye className="h-3 w-3" /> Ativo</> : <><EyeOff className="h-3 w-3" /> Inativo</>}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {user.lastLogin ? new Date(user.lastLogin).toLocaleString('pt-PT') : 'Nunca'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={async () => {
+                            if (!confirm('Tem a certeza que quer eliminar este utilizador?')) return;
+                            try {
+                              await deleteUser(user.id);
+                              qc.invalidateQueries({ queryKey: ['admin-users'] });
+                            } catch (err: any) {
+                              setUserError(err.message || 'Erro ao eliminar utilizador');
+                            }
+                          }}
+                          className="text-red-400 hover:text-red-600 transition"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {users.length === 0 && (
+                <div className="py-8 text-center text-sm text-gray-400">Nenhum utilizador encontrado.</div>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {currentSection === 'accounts' && (
+          <Card>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Nome</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Email</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Plano</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Membros</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Criado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(accounts as ClientAccount[]).map((account) => (
+                    <tr key={account.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{account.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{account.email}</td>
+                      <td className="px-4 py-3">
+                        <select
+                          value={account.plan}
+                          onChange={async (event) => {
+                            await updateClientAccount(account.id, { plan: event.target.value });
+                            qc.invalidateQueries({ queryKey: ['admin-accounts'] });
+                            qc.invalidateQueries({ queryKey: ['superadmin-orgs'] });
+                          }}
+                          className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:border-[#0A2540]"
+                        >
+                          <option value="essencial">Essencial</option>
+                          <option value="profissional">Profissional</option>
+                        </select>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {account._count.accountMembers} membro{account._count.accountMembers !== 1 ? 's' : ''}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {new Date(account.createdAt).toLocaleDateString('pt-PT')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {accounts.length === 0 && (
+                <div className="py-8 text-center text-sm text-gray-400">Nenhuma conta de cliente criada ainda.</div>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {currentSection === 'logins' && (
+          <Card>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Utilizador</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Email</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Data/Hora</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">IP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(loginLogs as LoginLog[]).map((log) => (
+                    <tr key={log.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                      <td className="px-4 py-3 text-sm text-gray-900">{log.user.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{log.user.email}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{new Date(log.createdAt).toLocaleString('pt-PT')}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{log.ip || 'N/A'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {loginLogs.length === 0 && (
+                <div className="py-8 text-center text-sm text-gray-400">Sem registos de login.</div>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {currentSection === 'organizations' && isSuperAdmin && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-[#0A2540]">Organizações</h2>
+                  <p className="text-sm text-[#6b7e9a]">
+                    {orgs.length} organizações · {totalUsers} utilizadores no total
+                  </p>
+                </div>
+                <div className="relative w-full md:w-80">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7e9a]" />
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Pesquisar organizações ou utilizadores..."
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              {orgError && (
+                <div className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+                  <span>{orgError}</span>
+                  <button onClick={() => setOrgError('')} className="ml-4 text-red-400 hover:text-red-600">✕</button>
+                </div>
+              )}
+
+              <div className="overflow-hidden rounded-xl border border-[#dde3ec]">
+                {orgsLoading ? (
+                  <div className="flex items-center justify-center py-16 text-[#6b7e9a]">
+                    <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                    A carregar...
+                  </div>
+                ) : filteredOrgs.length === 0 ? (
+                  <div className="py-16 text-center text-[#6b7e9a]">Nenhuma organização encontrada</div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[#dde3ec] bg-[#f8fafc]">
+                        <th className="w-8 px-4 py-3 text-left font-semibold text-[#0A2540]" />
+                        <th className="px-4 py-3 text-left font-semibold text-[#0A2540]">Organização / Utilizador</th>
+                        <th className="px-4 py-3 text-left font-semibold text-[#0A2540]">Plano</th>
+                        <th className="px-4 py-3 text-center font-semibold text-[#0A2540]">Membros</th>
+                        <th className="px-4 py-3 text-center font-semibold text-[#0A2540]">Estado</th>
+                        <th className="px-4 py-3 text-left font-semibold text-[#0A2540]">Criado</th>
+                        <th className="px-4 py-3 text-center font-semibold text-[#0A2540]">Acções</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredOrgs.map((org) => {
+                        const members = org.accountMembers || [];
+                        const isOpen = expanded.has(org.id);
+                        return (
+                          <Fragment key={org.id}>
+                            <tr
+                              className="cursor-pointer border-b border-[#dde3ec] transition-colors hover:bg-[#f8fafc]"
+                              onClick={() => members.length > 0 && toggleExpand(org.id)}
+                            >
+                              <td className="px-4 py-3 text-[#6b7e9a]">
+                                {members.length > 0 ? (
+                                  isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+                                ) : null}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-[#0A2540]">{org.name}</div>
+                                <div className="text-xs text-[#6b7e9a]">{org.email}</div>
+                              </td>
+                              <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+                                <div className="relative inline-block">
+                                  <select
+                                    value={org.plan || 'essencial'}
+                                    onChange={(event) =>
+                                      orgUpdateMutation.mutate({ id: org.id, data: { plan: event.target.value } })
+                                    }
+                                    className="appearance-none rounded-lg border border-[#dde3ec] bg-white py-1 pl-2 pr-6 text-xs font-medium text-[#0A2540] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  >
+                                    <option value="essencial">Essencial</option>
+                                    <option value="profissional">Profissional</option>
+                                  </select>
+                                  <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[#6b7e9a]" />
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <div className="flex items-center justify-center gap-1 text-[#6b7e9a]">
+                                  <Users className="h-3.5 w-3.5" />
+                                  <span>{org._count.accountMembers}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-center" onClick={(event) => event.stopPropagation()}>
+                                <button
+                                  onClick={() => orgUpdateMutation.mutate({ id: org.id, data: { active: !org.active } })}
+                                  className={`rounded-full px-2 py-0.5 text-xs font-semibold transition-colors ${
+                                    org.active
+                                      ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                      : 'bg-red-100 text-red-600 hover:bg-red-200'
+                                  }`}
+                                >
+                                  {org.active ? 'Activo' : 'Inactivo'}
+                                </button>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-[#6b7e9a]">
+                                {new Date(org.createdAt).toLocaleDateString('pt-PT')}
+                              </td>
+                              <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    onClick={() => impersonateMutation.mutate(org.id)}
+                                    disabled={impersonateMutation.isPending}
+                                    title="Entrar como este utilizador"
+                                    className="rounded-lg p-1.5 text-[#6b7e9a] transition-colors hover:bg-blue-50 hover:text-blue-600"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (!confirm(`Apagar organização "${org.name}" e todos os seus dados? Esta ação é irreversível.`)) return;
+                                      orgDeleteMutation.mutate(org.id);
+                                    }}
+                                    disabled={orgDeleteMutation.isPending}
+                                    title="Apagar organização"
+                                    className="rounded-lg p-1.5 text-[#6b7e9a] transition-colors hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+
+                            {isOpen &&
+                              members.map((member) => (
+                                <tr key={`member-${member.id}`} className="border-b border-[#dde3ec] bg-[#f8fafc] last:border-0">
+                                  <td className="px-4 py-2" />
+                                  <td className="px-4 py-2 pl-8">
+                                    <div className="flex items-center gap-2">
+                                      <UserCheck className="h-3.5 w-3.5 shrink-0 text-[#6b7e9a]" />
+                                      <div>
+                                        <div className="text-sm text-[#0A2540]">{member.name}</div>
+                                        <div className="text-xs text-[#6b7e9a]">{member.email}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-2 text-xs text-[#6b7e9a]">Membro</td>
+                                  <td className="px-4 py-2" />
+                                  <td className="px-4 py-2 text-center">
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                      member.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                                    }`}>
+                                      {member.active ? 'Activo' : 'Inactivo'}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-2" />
+                                  <td className="px-4 py-2 text-center">
+                                    <button
+                                      onClick={() => impersonateMutation.mutate(member.id)}
+                                      disabled={impersonateMutation.isPending}
+                                      title="Entrar como este utilizador"
+                                      className="rounded-lg p-1.5 text-[#6b7e9a] transition-colors hover:bg-blue-50 hover:text-blue-600"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                          </Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {currentSection === 'usage' && isSuperAdmin && (
+          <Card>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Conta</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Logins (7d)</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Logins (30d)</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Último Acesso</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Atividade (7d)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(usage as SuperAdminUsageStat[]).map((stat) => (
+                    <tr key={stat.orgId} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{stat.orgName}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{stat.logins7d}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{stat.logins30d}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {stat.lastLogin ? new Date(stat.lastLogin).toLocaleString('pt-PT') : <span className="text-gray-300">Nunca</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex h-6 items-end gap-0.5">
+                          {stat.sparkline.map((day) => {
+                            const max = Math.max(...stat.sparkline.map((entry) => entry.count), 1);
+                            const pct = Math.round((day.count / max) * 100);
+                            return (
+                              <div
+                                key={day.date}
+                                title={`${day.date}: ${day.count}`}
+                                style={{ height: `${Math.max(pct, 8)}%` }}
+                                className={`w-3 flex-shrink-0 rounded-sm ${day.count > 0 ? 'bg-[#0A2540]' : 'bg-gray-100'}`}
+                              />
+                            );
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {usage.length === 0 && (
+                <div className="py-8 text-center text-sm text-gray-400">Sem dados de utilização.</div>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {currentSection === 'storage' && isSuperAdmin && (
+          <Card>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Conta</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Clientes</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Tarefas</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Transações</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Notas</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Ficheiros</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Armazenamento</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Peso</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(storage as SuperAdminStorageStat[]).map((stat) => {
+                    const totalRecords = stat.contacts + stat.tasks + stat.transactions + stat.notes;
+                    const storageMb = (stat.fileSizeBytes / (1024 * 1024)).toFixed(1);
+                    const barPct = Math.min((stat.fileSizeBytes / (100 * 1024 * 1024)) * 100, 100);
+                    return (
+                      <tr key={stat.orgId} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{stat.orgName}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{stat.contacts}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{stat.tasks}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{stat.transactions}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{stat.notes}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{stat.fileCount}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{storageMb} MB</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-20 overflow-hidden rounded-full bg-gray-100">
+                              <div className="h-full rounded-full bg-[#0A2540]" style={{ width: `${barPct}%` }} />
+                            </div>
+                            <span className="text-xs text-gray-400">{totalRecords} reg.</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {storage.length === 0 && (
+                <div className="py-8 text-center text-sm text-gray-400">Sem dados de armazenamento.</div>
+              )}
+            </div>
+          </Card>
+        )}
+      </div>
+
+      <Dialog open={showCreateAccount} onOpenChange={setShowCreateAccount}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Nova Conta Cliente</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            {createError && (
-              <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{createError}</p>
+            {accountError && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{accountError}</p>
             )}
             <div>
-              <label className="text-sm font-medium text-[#0A2540] mb-1 block">Nome</label>
+              <label className="mb-1 block text-sm font-medium text-[#0A2540]">Nome</label>
               <Input
-                value={createForm.name}
-                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                value={createAccountForm.name}
+                onChange={(event) => setCreateAccountForm({ ...createAccountForm, name: event.target.value })}
                 placeholder="Nome da empresa ou pessoa"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-[#0A2540] mb-1 block">Email</label>
+              <label className="mb-1 block text-sm font-medium text-[#0A2540]">Email</label>
               <Input
                 type="email"
-                value={createForm.email}
-                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                value={createAccountForm.email}
+                onChange={(event) => setCreateAccountForm({ ...createAccountForm, email: event.target.value })}
                 placeholder="email@exemplo.com"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-[#0A2540] mb-1 block">Password inicial</label>
+              <label className="mb-1 block text-sm font-medium text-[#0A2540]">Password inicial</label>
               <Input
                 type="password"
-                value={createForm.password}
-                onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                value={createAccountForm.password}
+                onChange={(event) => setCreateAccountForm({ ...createAccountForm, password: event.target.value })}
                 placeholder="Mínimo 6 caracteres"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-[#0A2540] mb-1 block">Plano</label>
+              <label className="mb-1 block text-sm font-medium text-[#0A2540]">Plano</label>
               <select
-                value={createForm.plan}
-                onChange={(e) => setCreateForm({ ...createForm, plan: e.target.value })}
-                className="w-full px-3 py-2 border border-[#dde3ec] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                value={createAccountForm.plan}
+                onChange={(event) => setCreateAccountForm({ ...createAccountForm, plan: event.target.value })}
+                className="w-full rounded-lg border border-[#dde3ec] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {PLANS.map((p) => (
-                  <option key={p} value={p}>{PLAN_LABELS[p]}</option>
-                ))}
+                <option value="essencial">Essencial</option>
+                <option value="profissional">Profissional</option>
               </select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setShowCreateAccount(false)}>Cancelar</Button>
             <Button
-              onClick={() => createMut.mutate(createForm)}
-              disabled={createMut.isPending || !createForm.name || !createForm.email || !createForm.password}
+              onClick={() => createAccountMutation.mutate(createAccountForm)}
+              disabled={
+                createAccountMutation.isPending ||
+                !createAccountForm.name ||
+                !createAccountForm.email ||
+                !createAccountForm.password
+              }
             >
-              {createMut.isPending ? 'A criar...' : 'Criar Conta'}
+              {createAccountMutation.isPending ? 'A criar...' : 'Criar Conta'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCreateUser} onOpenChange={setShowCreateUser}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo Utilizador</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {userError && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{userError}</p>
+            )}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0A2540]">Nome</label>
+              <Input
+                value={createUserForm.name}
+                onChange={(event) => setCreateUserForm({ ...createUserForm, name: event.target.value })}
+                placeholder="Nome completo"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0A2540]">Email</label>
+              <Input
+                type="email"
+                value={createUserForm.email}
+                onChange={(event) => setCreateUserForm({ ...createUserForm, email: event.target.value })}
+                placeholder="email@example.com"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0A2540]">Password</label>
+              <Input
+                type="password"
+                value={createUserForm.password}
+                onChange={(event) => setCreateUserForm({ ...createUserForm, password: event.target.value })}
+                placeholder="Mínimo 6 caracteres"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0A2540]">Role</label>
+              <select
+                value={createUserForm.role}
+                onChange={(event) => setCreateUserForm({ ...createUserForm, role: event.target.value })}
+                className="w-full rounded-lg border border-[#dde3ec] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="user">Utilizador</option>
+                {isSuperAdmin && <option value="admin">Admin</option>}
+              </select>
+            </div>
+            {isSuperAdmin && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-[#0A2540]">Atribuir a Conta (Opcional)</label>
+                <select
+                  value={createUserForm.accountOwnerId}
+                  onChange={(event) => setCreateUserForm({ ...createUserForm, accountOwnerId: event.target.value })}
+                  className="w-full rounded-lg border border-[#dde3ec] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Nenhuma (Independente)</option>
+                  {users
+                    .filter((user) => !user.accountOwnerId && user.role !== 'admin')
+                    .map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateUser(false)}>Cancelar</Button>
+            <Button
+              onClick={() => createUserMutation.mutate()}
+              disabled={
+                createUserMutation.isPending ||
+                !createUserForm.name ||
+                !createUserForm.email ||
+                !createUserForm.password
+              }
+            >
+              {createUserMutation.isPending ? 'A criar...' : 'Criar'}
             </Button>
           </DialogFooter>
         </DialogContent>

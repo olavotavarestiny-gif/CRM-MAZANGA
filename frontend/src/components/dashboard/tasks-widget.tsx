@@ -44,14 +44,14 @@ export default function TasksWidget() {
 
   return (
     <>
-      <Card className="col-span-full">
+      <Card className="col-span-full rounded-xl">
         <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <CardTitle className="text-base">Tarefas Pendentes</CardTitle>
-          <Link href="/tasks" className="text-xs text-[#635BFF] hover:underline">Ver todas</Link>
+          <CardTitle className="text-base font-bold">Tarefas Pendentes</CardTitle>
+          <Link href="/tasks" className="text-xs text-[#0049e6] font-semibold hover:text-[#0049e6]/80 transition-colors">Ver todas</Link>
         </CardHeader>
-        <CardContent>
+        <CardContent className="divide-y divide-slate-100">
           {tasks.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-0">
               {tasks.slice(0, 8).map((task) => (
                 <TaskItem
                   key={task.id}
@@ -63,13 +63,13 @@ export default function TasksWidget() {
                 />
               ))}
               {tasks.length > 8 && (
-                <Link href="/tasks" className="text-xs text-[#635BFF] hover:underline block pt-1">
+                <Link href="/tasks" className="text-xs text-[#0049e6] font-semibold hover:text-[#0049e6]/80 transition-colors block pt-2">
                   + {tasks.length - 8} mais tarefas
                 </Link>
               )}
             </div>
           ) : (
-            <p className="text-center text-[#6b7e9a] py-6">Nenhuma tarefa pendente 🎉</p>
+            <p className="text-center text-[#595c5e] py-6">Nenhuma tarefa pendente 🎉</p>
           )}
         </CardContent>
       </Card>

@@ -69,7 +69,7 @@ router.put('/notes/:id', async (req, res) => {
     if (!note) return res.status(404).json({ error: 'Nota não encontrada' });
 
     // Only author or admin can edit
-    if (note.userId !== req.user.id && !req.user.isAccountOwner && req.user.role !== 'admin') {
+    if (note.userId !== req.user.id && !req.user.isAccountOwner && !req.user.isSuperAdmin && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Sem permissão para editar esta nota' });
     }
 
@@ -93,7 +93,7 @@ router.delete('/notes/:id', async (req, res) => {
     const note = await prisma.contactNote.findUnique({ where: { id: noteId } });
     if (!note) return res.status(404).json({ error: 'Nota não encontrada' });
 
-    if (note.userId !== req.user.id && !req.user.isAccountOwner && req.user.role !== 'admin') {
+    if (note.userId !== req.user.id && !req.user.isAccountOwner && !req.user.isSuperAdmin && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Sem permissão para apagar esta nota' });
     }
 

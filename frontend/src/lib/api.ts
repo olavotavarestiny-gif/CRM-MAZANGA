@@ -331,6 +331,11 @@ export async function getCurrentUser() {
   return response.data;
 }
 
+export async function updateCurrentUserProfile(data: { name?: string; jobTitle?: string | null }) {
+  const response = await api.patch<User>('/api/auth/me', data);
+  return response.data;
+}
+
 export async function getCurrentUserWithToken(accessToken: string) {
   const response = await api.get<User>('/api/auth/me', {
     headers: {
@@ -376,6 +381,7 @@ export interface User {
   name: string;
   email: string;
   role: string;
+  jobTitle?: string | null;
   active: boolean;
   plan?: string;
   isSuperAdmin?: boolean;

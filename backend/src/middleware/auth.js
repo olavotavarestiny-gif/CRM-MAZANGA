@@ -164,7 +164,7 @@ async function requireAuth(req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  if (req.user?.role !== 'admin') {
+  if (!req.user?.isSuperAdmin && req.user?.role !== 'admin') {
     return res.status(403).json({ error: 'Acesso restrito a administradores' });
   }
   next();
@@ -178,7 +178,7 @@ function requireAccountOwner(req, res, next) {
 }
 
 function requireAccountOwnerOrAdmin(req, res, next) {
-  if (req.user?.role === 'admin' || req.user?.isAccountOwner) {
+  if (req.user?.isSuperAdmin || req.user?.role === 'admin' || req.user?.isAccountOwner) {
     return next();
   }
   return res.status(403).json({ error: 'Acesso não autorizado' });

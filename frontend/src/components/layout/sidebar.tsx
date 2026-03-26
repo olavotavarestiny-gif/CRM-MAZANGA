@@ -56,10 +56,10 @@ export default function Sidebar({
   });
 
   const navItemClass = (active: boolean) => cn(
-    'flex items-center gap-3 px-3 py-2 transition-all text-sm font-medium rounded-lg',
+    'flex items-center gap-3 px-3 py-2 transition-all text-sm font-medium rounded-xl',
     active
-      ? 'bg-[#0A2540]/8 text-[#0A2540] font-semibold'
-      : 'text-[#6b7e9a] hover:text-[#0A2540] hover:bg-[#0A2540]/5'
+      ? 'bg-blue-50 text-[#0049e6] font-semibold'
+      : 'text-[#6b7e9a] hover:text-[#0049e6] hover:bg-blue-50/60'
   );
 
   // Map href to module key for permission checks
@@ -123,21 +123,21 @@ export default function Sidebar({
   return (
     <div
       data-tour="sidebar"
-      className={`w-56 min-h-screen flex flex-col fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:static border-r border-[#dde3ec] bg-white ${
+      className={`w-64 min-h-screen flex flex-col fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:static border-r border-slate-100 bg-white ${
         open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
       }`}
     >
       {/* Logo */}
-      <div className="px-5 py-5 flex items-center justify-between flex-shrink-0 border-b border-[#dde3ec]">
+      <div className="px-5 py-5 flex items-center justify-between flex-shrink-0 border-b border-slate-100">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-[#0A2540] flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-black text-xs" style={{ fontFamily: "'Montserrat', sans-serif" }}>K</span>
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0049e6] to-[#829bff] flex items-center justify-center flex-shrink-0">
+            <BarChart3 className="w-5 h-5 text-white" />
           </div>
-          <span className="text-[#0A2540] font-bold text-base leading-none" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-            Kuku<span className="font-medium text-[#6b7e9a]">Gest</span>
+          <span className="text-[#2c2f31] font-bold text-base leading-none" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+            Kuku<span className="font-medium text-[#595c5e]">Gest</span>
           </span>
         </div>
-        <button onClick={onClose} className="md:hidden p-1 hover:bg-[#f5f7fa] rounded transition-colors">
+        <button onClick={onClose} className="md:hidden p-1 hover:bg-slate-100 rounded transition-colors">
           <X className="w-4 h-4 text-[#6b7e9a]" />
         </button>
       </div>
@@ -152,10 +152,10 @@ export default function Sidebar({
             className={navItemClass(isActive(href))}
             onClick={onClose}
           >
-            <Icon className="w-4 h-4 flex-shrink-0" />
+            <Icon className="w-[18px] h-[18px] flex-shrink-0" />
             <span className="flex-1">{label}</span>
             {href === '/chat' && chatUnread > 0 && (
-              <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">
+              <span className="ml-auto bg-[#b31b25] text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">
                 {chatUnread > 99 ? '99+' : chatUnread}
               </span>
             )}
@@ -163,13 +163,13 @@ export default function Sidebar({
         ))}
 
         {gestaoLinks.length > 0 && (
-          <div className="pt-3 mt-2 border-t border-[#dde3ec]">
+          <div className="pt-3 mt-2 border-t border-slate-100">
             <p className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/60">
               Gestão
             </p>
             {gestaoLinks.map(({ href, label, icon: Icon }) => (
               <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose}>
-                <Icon className="w-4 h-4 flex-shrink-0" />
+                <Icon className="w-[18px] h-[18px] flex-shrink-0" />
                 <span>{label}</span>
               </Link>
             ))}
@@ -177,13 +177,13 @@ export default function Sidebar({
         )}
 
         {adminLinks.length > 0 && (
-          <div className="pt-3 mt-2 border-t border-[#dde3ec]">
+          <div className="pt-3 mt-2 border-t border-slate-100">
             <p className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/60">
               Admin
             </p>
             {adminLinks.map(({ href, label, icon: Icon }) => (
               <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose}>
-                <Icon className="w-4 h-4 flex-shrink-0" />
+                <Icon className="w-[18px] h-[18px] flex-shrink-0" />
                 <span>{label}</span>
               </Link>
             ))}
@@ -192,9 +192,9 @@ export default function Sidebar({
       </nav>
 
       {/* Footer */}
-      <div className="px-3 py-4 border-t border-[#dde3ec] space-y-0.5">
+      <div className="px-3 py-4 border-t border-slate-100 space-y-0.5">
         <Link href="/configuracoes" className={navItemClass(isActive('/configuracoes'))} onClick={onClose}>
-          <Settings className="w-4 h-4 flex-shrink-0" />
+          <Settings className="w-[18px] h-[18px] flex-shrink-0" />
           <span>Configurações</span>
         </Link>
         <button
@@ -206,14 +206,14 @@ export default function Sidebar({
           }}
           className={navItemClass(false)}
         >
-          <HelpCircle className="w-4 h-4 flex-shrink-0" />
+          <HelpCircle className="w-[18px] h-[18px] flex-shrink-0" />
           <span>Ajuda</span>
         </button>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 text-[#6b7e9a] hover:text-red-500 hover:bg-red-50 transition-all text-left text-sm font-medium rounded-lg"
+          className="w-full flex items-center gap-3 px-3 py-2 text-[#6b7e9a] hover:text-[#b31b25] hover:bg-[#b31b25]/5 transition-all text-left text-sm font-medium rounded-xl"
         >
-          <LogOut className="w-4 h-4 flex-shrink-0" />
+          <LogOut className="w-[18px] h-[18px] flex-shrink-0" />
           <span>Sair</span>
         </button>
       </div>

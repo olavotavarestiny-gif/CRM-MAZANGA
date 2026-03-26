@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
+const { DEFAULT_PLAN, isSupportedPlan, normalizePlan } = require('../lib/plans');
 
 let _supabaseAdmin = null;
 function getSupabaseAdmin() {
@@ -35,6 +36,7 @@ router.get('/orgs', async (req, res) => {
 
     res.json(orgs.map(o => ({
       ...o,
+      plan: normalizePlan(o.plan),
       permissions: o.permissions ? JSON.parse(o.permissions) : null,
       lastLogin: o.loginLogs[0]?.createdAt || null,
       loginLogs: undefined,
@@ -52,7 +54,12 @@ router.patch('/orgs/:id', async (req, res) => {
     const { plan, active, permissions } = req.body;
 
     const data = {};
-    if (plan !== undefined) data.plan = plan;
+    if (plan !== undefined) {
+      if (!isSupportedPlan(plan)) {
+        return res.status(400).json({ error: 'Plano inválido. Use essencial ou profissional.' });
+      }
+      data.plan = plan;
+    }
     if (active !== undefined) data.active = active;
     if (permissions !== undefined) {
       data.permissions = permissions ? JSON.stringify(permissions) : null;
@@ -66,6 +73,7 @@ router.patch('/orgs/:id', async (req, res) => {
 
     res.json({
       ...updated,
+      plan: normalizePlan(updated.plan),
       permissions: updated.permissions ? JSON.parse(updated.permissions) : null,
     });
   } catch (error) {
@@ -165,6 +173,10 @@ router.post('/users', async (req, res) => {
       return res.status(400).json({ error: 'Password deve ter pelo menos 6 caracteres' });
     }
 
+    if (plan !== undefined && !isSupportedPlan(plan)) {
+      return res.status(400).json({ error: 'Plano inválido. Use essencial ou profissional.' });
+    }
+
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(400).json({ error: 'Email já está registado' });
 
@@ -180,14 +192,14 @@ router.post('/users', async (req, res) => {
         role: 'user',
         active: true,
         mustChangePassword: true,
-        plan: plan || 'essencial',
+        plan: plan || DEFAULT_PLAN,
         permissions: permissions ? JSON.stringify(permissions) : null,
       },
     });
 
     res.status(201).json({
       id: user.id, name: user.name, email: user.email,
-      plan: user.plan, active: user.active, createdAt: user.createdAt,
+      plan: normalizePlan(user.plan), active: user.active, createdAt: user.createdAt,
     });
   } catch (error) {
     console.error('Error creating user:', error);

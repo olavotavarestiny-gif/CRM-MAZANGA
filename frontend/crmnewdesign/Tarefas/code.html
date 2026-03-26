@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Tarefas | KukuGest CRM</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "tertiary-dim": "#7f2d7e",
+                        "secondary-container": "#5af8fb",
+                        "surface-container-high": "#dfe3e6",
+                        "on-primary-fixed-variant": "#002278",
+                        "error-dim": "#9f0519",
+                        "tertiary": "#8d3a8b",
+                        "inverse-surface": "#0b0f10",
+                        "surface-bright": "#f5f7f9",
+                        "on-tertiary-fixed-variant": "#6c1a6c",
+                        "secondary-fixed-dim": "#46eaed",
+                        "on-secondary-fixed-variant": "#006668",
+                        "primary": "#0049e6",
+                        "on-error": "#ffefee",
+                        "on-surface-variant": "#595c5e",
+                        "primary-container": "#829bff",
+                        "surface": "#f5f7f9",
+                        "tertiary-fixed-dim": "#e88ae1",
+                        "surface-container-highest": "#d9dde0",
+                        "surface-container-low": "#eef1f3",
+                        "secondary-fixed": "#5af8fb",
+                        "primary-fixed-dim": "#6e8cff",
+                        "on-secondary": "#befeff",
+                        "on-primary-fixed": "#000000",
+                        "on-background": "#2c2f31",
+                        "primary-fixed": "#829bff",
+                        "surface-container": "#e5e9eb",
+                        "inverse-on-surface": "#9a9d9f",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed": "#004748",
+                        "secondary-dim": "#00595b",
+                        "surface-variant": "#d9dde0",
+                        "on-tertiary": "#ffeef8",
+                        "on-tertiary-fixed": "#400042",
+                        "on-primary": "#f2f1ff",
+                        "error": "#b31b25",
+                        "on-error-container": "#570008",
+                        "outline-variant": "#abadaf",
+                        "error-container": "#fb5151",
+                        "tertiary-container": "#f797f0",
+                        "primary-dim": "#0040cb",
+                        "on-secondary-container": "#005b5d",
+                        "inverse-primary": "#6a89ff",
+                        "secondary": "#006668",
+                        "surface-tint": "#0049e6",
+                        "surface-dim": "#d0d5d8",
+                        "on-surface": "#2c2f31",
+                        "on-tertiary-container": "#610e63",
+                        "on-primary-container": "#001a63",
+                        "tertiary-fixed": "#f797f0",
+                        "background": "#f5f7f9",
+                        "outline": "#747779"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "1.5rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, .headline { font-family: 'Manrope', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface text-on-background min-h-screen">
+<!-- SideNavBar -->
+<aside class="flex flex-col h-screen fixed left-0 top-0 border-r border-slate-100 bg-white w-64 z-50">
+<div class="p-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-lg" data-icon="account_tree">account_tree</span>
+</div>
+<div>
+<h1 class="text-xl font-bold text-slate-900 tracking-tight">KukuGest</h1>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-widest font-semibold">CRM Management</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 px-4 overflow-y-auto space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all duration-200 ease-in-out group" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-medium text-sm">Painel</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-medium text-sm">Clientes</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
+<span class="font-medium text-sm">Processos</span>
+</a>
+<!-- Active State: Tarefas -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-blue-600 bg-blue-50/50 font-semibold transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="checklist" style="font-variation-settings: 'FILL' 1;">checklist</span>
+<span class="font-medium text-sm">Tarefas</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-medium text-sm">Vendas</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="forum">forum</span>
+<span class="font-medium text-sm">Conversas</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="calendar_today">calendar_today</span>
+<span class="font-medium text-sm">Calendário</span>
+</a>
+</nav>
+<div class="p-4 mt-auto border-t border-slate-50">
+<button class="w-full bg-gradient-to-br from-primary to-primary-container text-white py-3 px-4 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+                Novo Registro
+            </button>
+<div class="mt-4 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-50 transition-all text-sm" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="settings">settings</span>
+                    Configurações
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-50 transition-all text-sm" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="logout">logout</span>
+                    Sair
+                </a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen">
+<!-- TopNavBar -->
+<header class="flex justify-between items-center w-full px-8 py-4 bg-surface/80 backdrop-blur-xl sticky top-0 z-40">
+<div class="flex items-center gap-4">
+<h2 class="text-2xl font-extrabold tracking-tight text-blue-600">Tarefas</h2>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg" data-icon="search">search</span>
+<input class="bg-surface-container-low border-none rounded-full pl-10 pr-4 py-2 text-sm w-64 focus:ring-2 focus:ring-primary/20 placeholder:text-slate-400" placeholder="Buscar tarefas..." type="text"/>
+</div>
+<div class="flex items-center gap-4 text-slate-500">
+<button class="hover:bg-slate-100 p-2 rounded-full transition-colors relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="hover:bg-slate-100 p-2 rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+<div class="h-8 w-8 rounded-full overflow-hidden bg-slate-200 border-2 border-white shadow-sm">
+<img alt="User profile" data-alt="Close up portrait of a professional businessman with a friendly expression in a bright studio setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGeNkqb1IhNxSgh88XJWTXKW_rIZLiDMJU0030KaFsP7rSSbRQcTQAdQ5hRR1LEN0_me0Npgn0_G1QK4oSS_XFpjZAA0SWh-xRw25AErmXUPjFL_9g_1XjrpGushU-KOwDSw9hz0oeS7n0nG0ypSfVEti9z2Cw6YsjsnoavH5jeG2hLtIZXpJF-BYM0w0CRzJ39jcJ7iTlO8KrxBxX_PEt5hJniktsjPiMNDOxISvynw5CllsFo3KoKI6ntoTCk3jDnwFdXYpXogg"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Content Canvas -->
+<div class="px-10 py-8 space-y-12">
+<!-- Summary Bento Grid -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-surface-container-lowest p-6 rounded-xl border-l-4 border-blue-600 shadow-sm flex items-center justify-between group hover:translate-y-[-2px] transition-all">
+<div>
+<p class="text-sm font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Pendentes</p>
+<h3 class="text-3xl font-extrabold text-on-surface">1</h3>
+</div>
+<div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+<span class="material-symbols-outlined text-2xl" data-icon="pending_actions">pending_actions</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl border-l-4 border-secondary shadow-sm flex items-center justify-between group hover:translate-y-[-2px] transition-all">
+<div>
+<p class="text-sm font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Para Hoje</p>
+<h3 class="text-3xl font-extrabold text-on-surface">0</h3>
+</div>
+<div class="w-12 h-12 rounded-full bg-secondary-container/20 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-2xl" data-icon="today">today</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl border-l-4 border-error shadow-sm flex items-center justify-between group hover:translate-y-[-2px] transition-all">
+<div>
+<p class="text-sm font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Atrasadas</p>
+<h3 class="text-3xl font-extrabold text-on-surface">0</h3>
+</div>
+<div class="w-12 h-12 rounded-full bg-error-container/10 flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-2xl" data-icon="priority_high">priority_high</span>
+</div>
+</div>
+</section>
+<!-- Task List Section -->
+<section class="space-y-6">
+<div class="flex items-center justify-between">
+<h3 class="text-xl font-bold text-on-surface flex items-center gap-2">
+                        Próximas Atividades
+                        <span class="px-2 py-0.5 bg-surface-container rounded-md text-xs font-bold text-on-surface-variant">1</span>
+</h3>
+<div class="flex gap-2">
+<button class="text-xs font-semibold px-4 py-2 rounded-full bg-surface-container-high text-on-surface-variant hover:bg-slate-200 transition-colors">Filtros</button>
+<button class="text-xs font-semibold px-4 py-2 rounded-full bg-surface-container-high text-on-surface-variant hover:bg-slate-200 transition-colors">Ordenar</button>
+</div>
+</div>
+<!-- Focused Task List -->
+<div class="space-y-4">
+<!-- Task Item Card -->
+<div class="bg-surface-container-lowest p-1 rounded-xl shadow-sm hover:shadow-md transition-shadow group">
+<div class="flex items-center p-4 gap-6">
+<!-- Checkbox/Status -->
+<div class="flex-shrink-0">
+<button class="w-6 h-6 rounded-full border-2 border-slate-200 flex items-center justify-center hover:border-primary transition-colors text-transparent hover:text-primary">
+<span class="material-symbols-outlined text-sm" data-icon="check">check</span>
+</button>
+</div>
+<!-- Task Body -->
+<div class="flex-1">
+<div class="flex items-center gap-3 mb-1">
+<h4 class="font-bold text-on-surface text-lg">Enviar novos conteúdos e plano de ação</h4>
+<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-orange-100 text-orange-700">Média</span>
+</div>
+<div class="flex items-center gap-6 text-sm text-on-surface-variant font-medium">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-base" data-icon="person">person</span>
+                                        Pedro Dos Santos
+                                    </div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-base" data-icon="calendar_month">calendar_month</span>
+                                        Amanhã
+                                    </div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-base" data-icon="link">link</span>
+                                        Processo #829
+                                    </div>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar">
+<span class="material-symbols-outlined" data-icon="edit">edit</span>
+</button>
+<button class="p-2 text-slate-400 hover:text-error hover:bg-error-container/10 rounded-lg transition-all" title="Excluir">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Empty State Inspiration / Motivation -->
+<div class="py-12 flex flex-col items-center justify-center text-center space-y-4 opacity-40">
+<div class="w-20 h-20 bg-surface-container rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-4xl text-outline" data-icon="auto_awesome">auto_awesome</span>
+</div>
+<div>
+<p class="font-headline font-bold text-lg">Tudo sob controle por enquanto</p>
+<p class="text-sm max-w-xs mx-auto">Sua lista de tarefas está organizada e seu plano de ação para amanhã já está definido.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Insight Section (Modern Card) -->
+<section class="mt-16">
+<div class="bg-gradient-to-r from-slate-900 to-blue-900 rounded-xl p-8 text-white relative overflow-hidden shadow-xl">
+<div class="relative z-10 max-w-md space-y-4">
+<div class="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full backdrop-blur-md">
+<span class="material-symbols-outlined text-sm text-secondary-container" data-icon="insights" style="font-variation-settings: 'FILL' 1;">insights</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Dica de Produtividade</span>
+</div>
+<h3 class="text-2xl font-bold headline leading-tight">Você costuma fechar mais vendas às quartas-feiras.</h3>
+<p class="text-blue-100/80 text-sm leading-relaxed">Organize suas tarefas de follow-up mais importantes para amanhã de manhã para maximizar sua taxa de conversão.</p>
+<button class="text-sm font-bold bg-white text-blue-900 px-6 py-2.5 rounded-full hover:bg-blue-50 transition-colors shadow-lg active:scale-95">Ver Estatísticas</button>
+</div>
+<!-- Decorative Element -->
+<div class="absolute right-[-10%] top-[-50%] w-96 h-96 bg-blue-500/20 rounded-full blur-[100px]"></div>
+<div class="absolute right-[10%] bottom-[-20%] w-64 h-64 bg-secondary/10 rounded-full blur-[60px]"></div>
+</div>
+</section>
+</div>
+</main>
+<!-- Contextual FAB -->
+<button class="fixed bottom-8 right-8 bg-gradient-to-br from-primary to-primary-container text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-50 group">
+<span class="material-symbols-outlined text-3xl" data-icon="add">add</span>
+<span class="absolute right-16 bg-on-background text-white px-3 py-1.5 rounded-lg text-xs font-bold opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity shadow-lg">Nova Tarefa</span>
+</button>
+</body></html>

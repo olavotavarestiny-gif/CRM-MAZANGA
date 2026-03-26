@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +15,7 @@ import {
 } from 'lucide-react';
 import {
   getFaturacaoConfig, updateFaturacaoConfig, getEstabelecimentos, createEstabelecimento,
-  getCurrentUser, changePassword,
+  getCurrentUser, updateCurrentUserProfile, changePassword,
   getTeamMembers, addTeamMember, removeTeamMember,
   getUsers, createUser, updateUser, deleteUser, getLoginLogs,
   getClientAccounts, updateClientAccount, createClientAccount,
@@ -27,11 +28,16 @@ import MemberPermissionsModal from '@/components/configuracoes/member-permission
 
 function ConfiguracoesContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const qc = useQueryClient();
 
   type TabId = 'perfil' | 'empresa' | 'equipa' | 'admin' | 'superadmin';
+  type ConfigTabId = Extract<TabId, 'perfil' | 'empresa' | 'equipa'>;
+  const requestedTab = searchParams?.get('tab') as TabId | null;
+  const isConfigTab = (tab: string | null): tab is ConfigTabId =>
+    tab === 'perfil' || tab === 'empresa' || tab === 'equipa';
   const [activeTab, setActiveTab] = useState<TabId>(
-    (searchParams?.get('tab') as TabId) || 'perfil'
+    isConfigTab(requestedTab) ? requestedTab : 'perfil'
   );
 
   // ── Current User ─────────────────────────────────────────
@@ -43,12 +49,56 @@ function ConfiguracoesContent() {
   const isOwner = currentUser && !currentUser.accountOwnerId;
   const isAdmin = currentUser?.role === 'admin';
   const isSuperAdmin = !!(currentUser?.isSuperAdmin || currentUser?.email === 'olavo@mazanga.digital');
+  const hasAdminAccess = !!(isAdmin || isSuperAdmin);
+  const platformAdminHref = isSuperAdmin ? '/superadmin?section=organizations' : hasAdminAccess ? '/superadmin?section=users' : null;
+
+  useEffect(() => {
+    if (isConfigTab(requestedTab)) {
+      setActiveTab(requestedTab);
+      return;
+    }
+    setActiveTab('perfil');
+  }, [requestedTab]);
+
+  useEffect(() => {
+    if (requestedTab === 'admin' && hasAdminAccess) {
+      router.replace('/superadmin?section=users');
+      return;
+    }
+    if (requestedTab === 'superadmin' && isSuperAdmin) {
+      router.replace('/superadmin?section=organizations');
+    }
+  }, [hasAdminAccess, isSuperAdmin, requestedTab, router]);
 
   // ── Perfil ───────────────────────────────────────────────
+  const [profileForm, setProfileForm] = useState({ jobTitle: '' });
+  const [profileError, setProfileError] = useState('');
+  const [profileSaved, setProfileSaved] = useState(false);
   const [pwForm, setPwForm] = useState({ current: '', new: '', confirm: '' });
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState('');
   const [pwSubmitting, setPwSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    setProfileForm({ jobTitle: currentUser.jobTitle || '' });
+  }, [currentUser]);
+
+  const profileMutation = useMutation({
+    mutationFn: () => updateCurrentUserProfile({
+      jobTitle: profileForm.jobTitle.trim() || null,
+    }),
+    onSuccess: (updatedUser) => {
+      qc.invalidateQueries({ queryKey: ['currentUser'] });
+      setProfileError('');
+      setProfileSaved(true);
+      window.dispatchEvent(new CustomEvent('kukugest:user-updated', { detail: updatedUser }));
+      setTimeout(() => setProfileSaved(false), 2500);
+    },
+    onError: (err: Error) => {
+      setProfileError(err.message || 'Erro ao guardar o perfil. Tente novamente.');
+    },
+  });
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,21 +224,21 @@ function ConfiguracoesContent() {
   const [userError, setUserError] = useState('');
 
   const { data: allUsers = [], refetch: refetchUsers } = useQuery({
-    queryKey: ['all-users'],
+    queryKey: ['admin-users'],
     queryFn: getUsers,
-    enabled: activeTab === 'admin' && !!isAdmin,
+    enabled: activeTab === 'admin' && hasAdminAccess,
   });
 
   const { data: loginLogs = [] } = useQuery({
-    queryKey: ['login-logs'],
+    queryKey: ['admin-logins'],
     queryFn: getLoginLogs,
-    enabled: activeTab === 'admin' && !!isAdmin && adminSubTab === 'logins',
+    enabled: activeTab === 'admin' && hasAdminAccess && adminSubTab === 'logins',
   });
 
   const { data: clientAccounts = [], refetch: refetchAccounts } = useQuery({
-    queryKey: ['client-accounts'],
+    queryKey: ['admin-accounts'],
     queryFn: getClientAccounts,
-    enabled: activeTab === 'admin' && !!isAdmin && adminSubTab === 'accounts',
+    enabled: activeTab === 'admin' && hasAdminAccess && adminSubTab === 'accounts',
   });
 
   const [showCreateAccount, setShowCreateAccount] = useState(false);
@@ -199,7 +249,7 @@ function ConfiguracoesContent() {
     mutationFn: () => createClientAccount({ ...accountForm }),
     onSuccess: () => {
       refetchAccounts();
-      qc.invalidateQueries({ queryKey: ['sa-orgs'] });
+      qc.invalidateQueries({ queryKey: ['superadmin-orgs'] });
       setShowCreateAccount(false);
       setAccountForm({ name: '', email: '', password: '', plan: 'essencial' });
       setAccountError('');
@@ -257,19 +307,19 @@ function ConfiguracoesContent() {
   const [saDeleteConfirm, setSaDeleteConfirm] = useState<number | null>(null);
 
   const { data: saOrgs = [], refetch: refetchSaOrgs } = useQuery({
-    queryKey: ['sa-orgs'],
+    queryKey: ['superadmin-orgs'],
     queryFn: getSuperAdminOrgs,
     enabled: activeTab === 'superadmin' && isSuperAdmin,
   });
 
   const { data: saUsage = [] } = useQuery({
-    queryKey: ['sa-usage'],
+    queryKey: ['superadmin-usage'],
     queryFn: getSuperAdminUsage,
     enabled: activeTab === 'superadmin' && saSubTab === 'utilizacao' && isSuperAdmin,
   });
 
   const { data: saStorage = [] } = useQuery({
-    queryKey: ['sa-storage'],
+    queryKey: ['superadmin-storage'],
     queryFn: getSuperAdminStorage,
     enabled: activeTab === 'superadmin' && saSubTab === 'armazenamento' && isSuperAdmin,
   });
@@ -279,7 +329,6 @@ function ConfiguracoesContent() {
     { id: 'perfil' as TabId, label: 'Perfil', icon: UserIcon, show: true },
     { id: 'empresa' as TabId, label: 'Empresa', icon: Building2, show: !!isOwner },
     { id: 'equipa' as TabId, label: 'Equipa', icon: Users, show: !!isOwner },
-    { id: 'superadmin' as TabId, label: 'Super Admin', icon: ShieldCheck, show: isSuperAdmin },
   ].filter(t => t.show);
 
   const tabBtn = (id: TabId) =>
@@ -311,11 +360,30 @@ function ConfiguracoesContent() {
         ))}
       </div>
 
+      {platformAdminHref && (
+        <Card className="mb-6 border-slate-200 bg-slate-50/80">
+          <div className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="flex items-center gap-2 text-base font-semibold text-[#0A2540]">
+                <Shield className="h-4 w-4" />
+                Administração da Plataforma
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Utilizadores, contas, organizações e ferramentas globais passaram para uma superfície única.
+              </p>
+            </div>
+            <Button asChild className="gap-2">
+              <Link href={platformAdminHref}>Abrir Administração</Link>
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {/* ── PERFIL ──────────────────────────────────────────── */}
       {activeTab === 'perfil' && (
         <div className="space-y-4 max-w-lg">
           <Card>
-            <div className="p-6 space-y-3">
+            <div className="p-6 space-y-4">
               <h2 className="text-base font-semibold text-[#0A2540] flex items-center gap-2">
                 <UserIcon className="w-4 h-4 text-gray-500" />
                 Informações Pessoais
@@ -332,9 +400,31 @@ function ConfiguracoesContent() {
                   {currentUser?.email || '—'}
                 </div>
               </div>
-              {currentUser?.role === 'admin' && (
+              <div>
+                <Label className="text-gray-500 text-xs uppercase tracking-wide">Função na Empresa</Label>
+                <Input
+                  value={profileForm.jobTitle}
+                  onChange={e => setProfileForm({ jobTitle: e.target.value })}
+                  placeholder="Ex: Diretora Comercial"
+                  className="mt-1"
+                />
+                <p className="mt-1 text-xs text-gray-400">Este campo aparece no widget do utilizador no topo da aplicação.</p>
+              </div>
+              {profileError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+                  {profileError}
+                </div>
+              )}
+              <Button
+                onClick={() => { setProfileError(''); profileMutation.mutate(); }}
+                disabled={profileMutation.isPending}
+                className="w-full bg-[#0A2540] text-white hover:bg-[#0A2540]/90"
+              >
+                {profileSaved ? 'Perfil guardado' : profileMutation.isPending ? 'A guardar...' : 'Guardar Perfil'}
+              </Button>
+              {(currentUser?.role === 'admin' || currentUser?.isSuperAdmin) && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                  <Shield className="w-3 h-3" /> Administrador
+                  <Shield className="w-3 h-3" /> {currentUser?.isSuperAdmin ? 'Super Admin' : 'Administrador'}
                 </span>
               )}
             </div>

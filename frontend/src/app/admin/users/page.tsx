@@ -1,2 +1,2 @@
 import { redirect } from 'next/navigation';
-export default function Page() { redirect('/configuracoes?tab=admin'); }
+export default function Page() { redirect('/superadmin?section=users'); }

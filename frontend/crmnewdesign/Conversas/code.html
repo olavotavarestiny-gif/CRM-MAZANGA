@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Conversations | KukuGest Executive CRM</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=Montserrat:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "outline-variant": "#abadaf",
+                        "on-primary-fixed-variant": "#002278",
+                        "on-primary-fixed": "#000000",
+                        "error-dim": "#9f0519",
+                        "on-tertiary-fixed": "#400042",
+                        "on-secondary-fixed": "#004748",
+                        "outline": "#747779",
+                        "on-tertiary-fixed-variant": "#6c1a6c",
+                        "secondary-fixed": "#5af8fb",
+                        "secondary-dim": "#00595b",
+                        "tertiary-fixed-dim": "#e88ae1",
+                        "primary-container": "#829bff",
+                        "on-tertiary-container": "#610e63",
+                        "tertiary-container": "#f797f0",
+                        "on-secondary-fixed-variant": "#006668",
+                        "on-primary": "#f2f1ff",
+                        "tertiary": "#8d3a8b",
+                        "primary-dim": "#0040cb",
+                        "surface-container": "#e5e9eb",
+                        "on-tertiary": "#ffeef8",
+                        "surface-tint": "#0049e6",
+                        "primary": "#0049e6",
+                        "surface-container-highest": "#d9dde0",
+                        "background": "#f5f7f9",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-dim": "#d0d5d8",
+                        "tertiary-dim": "#7f2d7e",
+                        "surface-container-low": "#eef1f3",
+                        "primary-fixed": "#829bff",
+                        "inverse-on-surface": "#9a9d9f",
+                        "surface-variant": "#d9dde0",
+                        "error-container": "#fb5151",
+                        "inverse-surface": "#0b0f10",
+                        "on-secondary": "#befeff",
+                        "error": "#b31b25",
+                        "on-error-container": "#570008",
+                        "surface-bright": "#f5f7f9",
+                        "on-surface": "#2c2f31",
+                        "on-secondary-container": "#005b5d",
+                        "secondary-container": "#5af8fb",
+                        "secondary": "#006668",
+                        "on-error": "#ffefee",
+                        "surface": "#f5f7f9",
+                        "on-background": "#2c2f31",
+                        "secondary-fixed-dim": "#46eaed",
+                        "on-primary-container": "#001a63",
+                        "on-surface-variant": "#595c5e",
+                        "inverse-primary": "#6a89ff",
+                        "tertiary-fixed": "#f797f0",
+                        "surface-container-high": "#dfe3e6",
+                        "primary-fixed-dim": "#6e8cff"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope", "Montserrat", "sans-serif"],
+                        "body": ["Inter", "Montserrat", "sans-serif"],
+                        "label": ["Montserrat", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "1.5rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #f5f7f9;
+            color: #2c2f31;
+            overflow: hidden;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background antialiased">
+<aside class="fixed left-0 top-0 h-full flex flex-col z-40 bg-[#f5f7f9] dark:bg-slate-950 w-64 border-r-0">
+<div class="px-6 py-8">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">bubble_chart</span>
+</div>
+<div>
+<h1 class="text-xl font-bold tracking-tight text-[#2c2f31] dark:text-slate-100">KukuGest</h1>
+<p class="text-[10px] uppercase tracking-[0.2em] font-bold text-on-surface-variant/60">Executive CRM</p>
+</div>
+</div>
+</div>
+<div class="px-4 mb-6">
+<button class="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-xl font-semibold shadow-lg shadow-primary/20 hover:scale-[0.98] active:opacity-80 transition-all">
+<span class="material-symbols-outlined text-lg">add_comment</span>
+<span class="font-label">New Message</span>
+</button>
+</div>
+<nav class="flex-1 px-4 space-y-1 overflow-y-auto hide-scrollbar">
+<a class="flex items-center gap-3 px-4 py-3 text-[#595c5e] dark:text-slate-400 hover:bg-[#e5e9eb] dark:hover:bg-slate-900 transition-colors duration-200 rounded-lg group" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 text-[#0066FF] dark:text-[#4d94ff] font-semibold rounded-l-none border-l-4 border-[#0066FF] transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">forum</span>
+<span class="font-label">Conversations</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#595c5e] dark:text-slate-400 hover:bg-[#e5e9eb] dark:hover:bg-slate-900 transition-colors duration-200 rounded-lg group" href="#">
+<span class="material-symbols-outlined">person_add</span>
+<span class="font-label font-medium">Leads</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#595c5e] dark:text-slate-400 hover:bg-[#e5e9eb] dark:hover:bg-slate-900 transition-colors duration-200 rounded-lg group" href="#">
+<span class="material-symbols-outlined">handshake</span>
+<span class="font-label font-medium">Deals</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#595c5e] dark:text-slate-400 hover:bg-[#e5e9eb] dark:hover:bg-slate-900 transition-colors duration-200 rounded-lg group" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+<span class="font-label font-medium">Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#595c5e] dark:text-slate-400 hover:bg-[#e5e9eb] dark:hover:bg-slate-900 transition-colors duration-200 rounded-lg group" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label font-medium">Settings</span>
+</a>
+</nav>
+<div class="p-4 border-t-0 bg-surface-container-low/30">
+<a class="flex items-center gap-3 px-4 py-2 text-[#595c5e] dark:text-slate-400 hover:text-[#2c2f31] transition-colors" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label text-sm">Help</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-[#595c5e] dark:text-slate-400 hover:text-error transition-colors mt-1" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label text-sm">Logout</span>
+</a>
+</div>
+</aside>
+<main class="ml-64 min-h-screen flex flex-col relative">
+<header class="flex justify-between items-center w-full px-8 h-20 sticky top-0 z-30 bg-[#f5f7f9]/70 dark:bg-slate-950/70 backdrop-blur-xl">
+<div class="flex items-center gap-8">
+<h2 class="text-2xl font-bold font-headline tracking-tight text-on-surface">Conversations</h2>
+<div class="flex items-center gap-6">
+<a class="text-[#0066FF] dark:text-[#4d94ff] border-b-2 border-[#0066FF] pb-2 font-Montserrat font-medium tracking-tight" href="#">All</a>
+<a class="text-[#595c5e] dark:text-slate-400 hover:text-[#2c2f31] font-Montserrat font-medium tracking-tight hover:opacity-70 transition-opacity" href="#">Unread</a>
+<a class="text-[#595c5e] dark:text-slate-400 hover:text-[#2c2f31] font-Montserrat font-medium tracking-tight hover:opacity-70 transition-opacity" href="#">Archived</a>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative group">
+<div class="absolute inset-y-0 left-3 flex items-center pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined text-xl">search</span>
+</div>
+<input class="bg-surface-container-low border-0 rounded-full pl-10 pr-4 py-2 text-sm w-64 focus:ring-2 focus:ring-[#0066FF]/20 transition-all outline-none" placeholder="Search discussions..." type="text"/>
+</div>
+<div class="flex items-center gap-3">
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">apps</span>
+</button>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="close-up portrait of a professional male executive with a confident smile and neat hair in bright studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrF8XsYX-qIWhHvkM8LWe01auXT4p1X1Bztg_OKPvmyntU_SgIK_36Sxbp4l778LU7_FoicskL4BmnBXFCr3qjEooVtwNbwl2fYJT818Z0JXTB54jXYBHnpqVHBC7F8_J-2s3guPp5FhQ6zHolLsu1SDz0lZ0g2q5mxcAnDrxbpTw1cpUDDo6twC_NunQQcfhdGjwG8TMPzR8BpF9gCXFcPDgC1CVlkf0jbCsV5weK12eIsq7Mz_KB2qo749U0Rq1844wFd7s_Odg"/>
+</div>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden p-8 gap-8">
+<div class="w-72 flex flex-col gap-8 h-full overflow-y-auto hide-scrollbar">
+<section>
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-headline font-bold text-xs uppercase tracking-widest text-on-surface-variant">Canais</h3>
+<button class="text-primary hover:opacity-70 transition-opacity"><span class="material-symbols-outlined text-lg">add_circle</span></button>
+</div>
+<div class="space-y-1">
+<button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-surface-container-low text-on-surface font-medium text-sm transition-all hover:bg-surface-container-highest">
+<span class="text-on-surface-variant/50 font-mono">#</span>
+<span>Design</span>
+</button>
+<button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant font-medium text-sm transition-all hover:bg-surface-container-low">
+<span class="text-on-surface-variant/50 font-mono">#</span>
+<span>Marketing</span>
+</button>
+<button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant font-medium text-sm transition-all hover:bg-surface-container-low">
+<span class="text-on-surface-variant/50 font-mono">#</span>
+<span>Dev-ops</span>
+</button>
+</div>
+</section>
+<section>
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-headline font-bold text-xs uppercase tracking-widest text-on-surface-variant">Mensagens Directas</h3>
+<button class="text-primary hover:opacity-70 transition-opacity"><span class="material-symbols-outlined text-lg">settings</span></button>
+</div>
+<div class="space-y-1">
+<button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant font-medium text-sm transition-all hover:bg-surface-container-low">
+<div class="relative">
+<img class="w-8 h-8 rounded-full object-cover" data-alt="smiling woman with glasses and professional attire in a bright modern office setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBejc6jYgVBDtamLKy3eeo6Ig_KQ0CKLiDo50MA7K4gYV0hJwAEtxl5FAXlxzrezVsOYm5D6IRuGh9WP7mKDSpuP336z-pimInD_Bbid-IIMXZrNta1M_JOTGsHBvC10_TrzJKvYwDcyKF65e_-T3QaEfKzFjSqvuTUXDGemKPFGIm1TFDz6FBZT6cDDfjVOFsrKCm2bnlcu4HEBmeVuNxJBf1SMZ4IHkiBWN3kiW9IwA61NtxKE2Jd0AV9YIIL6xtALPR76IoITw4"/>
+<div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-background rounded-full"></div>
+</div>
+<span>Ana Silva</span>
+</button>
+<button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/5 text-primary font-semibold text-sm transition-all border-r-4 border-primary">
+<div class="relative">
+<img class="w-8 h-8 rounded-full object-cover" data-alt="mid-adult man with light beard and friendly expression in neutral lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCIH2ipnv9WFn3pjt_Hhk04iR5Y9LpHs37Qz9dD_pFnq8lS4JcZgCX6Eq4aVivC628_TKPsUol_4INqBICn9NxUb6mHHp991nrhCVcfXk7jsotO2eby5sYra1lxSCucGXdCI_Hra1e20U5_X1vEs8m2PM0hGDTouSjIVPl4z5RRASlJlBd2IfrBjksjJ9kP1yMkMa1d3d2p4QwjiKlmRTypWF52fM_floV7_pgXbXexVurdv6cMvflYABirfQZSZyMVw8R8jNHOqtA"/>
+<div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-background rounded-full"></div>
+</div>
+<span>Teste</span>
+</button>
+<button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant font-medium text-sm transition-all hover:bg-surface-container-low">
+<div class="relative">
+<img class="w-8 h-8 rounded-full object-cover" data-alt="professional man in a blue suit with soft background blur" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlqj8EqkMK7z19oyi3KzXUOSA_l4Q0N3wP6yqnNhVntnN8VDU-p-cQ68dugZBVDUePH1bXTqIpyxWff91PgxIGV5QB1STTZIe608JO1u4UtN1nDjZ8OtV-sDRrtVKsx48dz3XhqC0hW3FclELVLPrcNePPVp7D-A8AoLX1avGXUvmfkTuNMwFul4f6tbDcbrIxPzqTB-AtDF-amOEH3EkhNTTfeO6tYcXsWcFzqIgV9RADDNtpW7olkHkifs3GXawWL6JT40JJ00Y"/>
+<div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-surface-container-highest border-2 border-background rounded-full"></div>
+</div>
+<span>Carlos Mendes</span>
+</button>
+</div>
+</section>
+</div>
+<div class="flex-1 flex flex-col bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm">
+<div class="h-16 px-6 flex items-center justify-between bg-white border-b-0">
+<div class="flex items-center gap-3">
+<div class="w-2.5 h-2.5 bg-emerald-500 rounded-full"></div>
+<h4 class="font-headline font-bold text-on-surface">Teste</h4>
+<span class="text-xs text-on-surface-variant font-medium ml-2">Active now</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">call</span></button>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">videocam</span></button>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">info</span></button>
+</div>
+</div>
+<div class="flex-1 flex flex-col items-center justify-center p-8 bg-surface-container-low/20 overflow-y-auto">
+<div class="max-w-md w-full text-center space-y-6 animate-fade-in">
+<div class="w-32 h-32 mx-auto bg-white rounded-full flex items-center justify-center shadow-xl shadow-surface-container/40">
+<div class="w-24 h-24 bg-surface-container-low rounded-full flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined text-5xl" style="font-variation-settings: 'FILL' 1;">chat_bubble</span>
+</div>
+</div>
+<div class="space-y-2">
+<h3 class="text-2xl font-headline font-extrabold text-on-surface">Sem mensagens ainda</h3>
+<p class="text-on-surface-variant font-body">Comece uma conversa com <span class="font-semibold text-primary">Teste</span> para visualizar o histórico aqui.</p>
+</div>
+<div class="pt-4 flex flex-wrap justify-center gap-2">
+<button class="px-4 py-2 bg-white border border-surface-container text-xs font-semibold rounded-full hover:bg-surface-container-low transition-colors">Diga "Olá" 👋</button>
+<button class="px-4 py-2 bg-white border border-surface-container text-xs font-semibold rounded-full hover:bg-surface-container-low transition-colors">Enviar um ficheiro</button>
+<button class="px-4 py-2 bg-white border border-surface-container text-xs font-semibold rounded-full hover:bg-surface-container-low transition-colors">Marcar reunião</button>
+</div>
+</div>
+</div>
+<div class="p-6 bg-white">
+<div class="relative flex items-end gap-3 p-2 bg-surface-container-low rounded-2xl border-0 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">add_circle</span>
+</button>
+<textarea class="flex-1 bg-transparent border-0 focus:ring-0 resize-none py-2 text-sm text-on-surface placeholder:text-on-surface-variant/50 hide-scrollbar" placeholder="Escreva uma mensagem para Teste..." rows="1"></textarea>
+<div class="flex items-center gap-1">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">mood</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">attach_file</span>
+</button>
+<button class="ml-2 w-10 h-10 bg-primary text-on-primary rounded-xl flex items-center justify-center shadow-md shadow-primary/20 hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</div>
+<div class="mt-3 flex justify-between items-center px-2">
+<div class="flex gap-4">
+<span class="text-[10px] text-on-surface-variant flex items-center gap-1 font-semibold uppercase tracking-wider">
+<span class="material-symbols-outlined text-xs">keyboard_command_key</span> Enter to send
+                            </span>
+</div>
+<div class="flex gap-2">
+<span class="w-2 h-2 rounded-full bg-primary/20 animate-pulse"></span>
+<span class="w-2 h-2 rounded-full bg-primary/20 animate-pulse delay-75"></span>
+<span class="w-2 h-2 rounded-full bg-primary/20 animate-pulse delay-150"></span>
+</div>
+</div>
+</div>
+</div>
+<div class="w-80 hidden xl:flex flex-col gap-6 h-full">
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm space-y-4">
+<div class="relative w-20 h-20 mx-auto">
+<img class="w-full h-full rounded-2xl object-cover shadow-lg" data-alt="portrait of a man in professional casual wear looking at the camera" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdT7jnCG-f5m3KSao1hL0IDfrYjuGIUxwSJHtLsaQF-xafIrBXMCiigUy4yG3cYWAzcPdKMjmfniX9HmPfOx54Zk5ouPP7z-yOBqg3oHGfcAoOHx3yZOFQzOV8pq0w4wdcREhuHjDV3ZGNRf80pMq9yndVKRaeKu-DGvqoX2pDkUaTCRjALsEEhOHsgTKlpPHcCBA-zmjLGo-kA5vg802yZiCRYR7b7k8DEZcDSlgHt1zqz7oQGkOiNSzSRC8H6AajPKaub6ct3wc"/>
+<div class="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full"></div>
+</div>
+<div class="text-center">
+<h4 class="font-headline font-bold text-lg text-on-surface">Teste Account</h4>
+<p class="text-sm text-on-surface-variant font-medium">Senior Lead Developer</p>
+</div>
+<div class="flex justify-center gap-3 pt-2">
+<button class="w-10 h-10 rounded-full bg-surface-container-low text-on-surface hover:bg-primary hover:text-white transition-all"><span class="material-symbols-outlined text-lg">mail</span></button>
+<button class="w-10 h-10 rounded-full bg-surface-container-low text-on-surface hover:bg-primary hover:text-white transition-all"><span class="material-symbols-outlined text-lg">person</span></button>
+<button class="w-10 h-10 rounded-full bg-surface-container-low text-on-surface hover:bg-primary hover:text-white transition-all"><span class="material-symbols-outlined text-lg">more_horiz</span></button>
+</div>
+</div>
+<div class="space-y-4 p-2">
+<h3 class="font-headline font-bold text-xs uppercase tracking-[0.15em] text-on-surface-variant/80 border-b border-surface-container-high pb-3">Key Contact Data</h3>
+<div class="space-y-5">
+<div class="flex flex-col gap-1">
+<span class="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant/60">Last Contact:</span>
+<span class="text-sm font-semibold text-on-surface">Oct 24, 2023 · 14:32</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant/60">Associated Deal:</span>
+<span class="text-sm font-semibold text-primary underline underline-offset-4 cursor-pointer hover:text-primary-dim transition-colors">Enterprise API Expansion</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant/60">Status:</span>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span class="text-sm font-bold text-on-surface">High Priority Lead</span>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<span class="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant/60">Account Value:</span>
+<span class="text-sm font-semibold text-on-surface">$42,500.00</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>

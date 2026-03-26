@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Executive CRM - Março 2026</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "surface": "#f5f7f9",
+                "primary-dim": "#0040cb",
+                "primary-fixed": "#829bff",
+                "on-tertiary": "#ffeef8",
+                "on-secondary-fixed": "#004748",
+                "on-tertiary-container": "#610e63",
+                "on-primary-container": "#001a63",
+                "tertiary-container": "#f797f0",
+                "tertiary": "#8d3a8b",
+                "surface-container-low": "#eef1f3",
+                "tertiary-fixed-dim": "#e88ae1",
+                "tertiary-fixed": "#f797f0",
+                "on-error": "#ffefee",
+                "inverse-surface": "#0b0f10",
+                "on-secondary-fixed-variant": "#006668",
+                "surface-variant": "#d9dde0",
+                "background": "#f5f7f9",
+                "primary-fixed-dim": "#6e8cff",
+                "surface-tint": "#0049e6",
+                "surface-container": "#e5e9eb",
+                "tertiary-dim": "#7f2d7e",
+                "on-error-container": "#570008",
+                "on-secondary-container": "#005b5d",
+                "secondary-container": "#5af8fb",
+                "surface-container-high": "#dfe3e6",
+                "surface-container-highest": "#d9dde0",
+                "primary": "#0049e6",
+                "secondary-fixed-dim": "#46eaed",
+                "on-tertiary-fixed": "#400042",
+                "on-surface-variant": "#595c5e",
+                "error-dim": "#9f0519",
+                "surface-container-lowest": "#ffffff",
+                "secondary-dim": "#00595b",
+                "error-container": "#fb5151",
+                "on-primary-fixed-variant": "#002278",
+                "on-primary-fixed": "#000000",
+                "surface-dim": "#d0d5d8",
+                "on-secondary": "#befeff",
+                "surface-bright": "#f5f7f9",
+                "outline": "#747779",
+                "inverse-on-surface": "#9a9d9f",
+                "on-background": "#2c2f31",
+                "inverse-primary": "#6a89ff",
+                "on-surface": "#2c2f31",
+                "secondary": "#006668",
+                "primary-container": "#829bff",
+                "error": "#b31b25",
+                "on-tertiary-fixed-variant": "#6c1a6c",
+                "on-primary": "#f2f1ff",
+                "outline-variant": "#abadaf",
+                "secondary-fixed": "#5af8fb"
+              },
+              fontFamily: {
+                "headline": ["Montserrat"],
+                "body": ["Montserrat"],
+                "label": ["Montserrat"]
+              },
+              borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "1.5rem", "full": "9999px"},
+            },
+          },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Montserrat', sans-serif; }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+        }
+        .tonal-shift-bg-surface-container { background-color: #e5e9eb; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen">
+<!-- SideNavBar Component (Shared Anchor) -->
+<aside class="fixed left-0 top-0 h-full w-64 border-r border-slate-200/50 bg-slate-50 flex flex-col h-full py-6 z-40 hidden md:flex">
+<div class="px-6 mb-10 flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+</div>
+<div>
+<h1 class="text-lg font-bold text-slate-900 tracking-tight">Executive</h1>
+<p class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Premium Tier</p>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 ml-2 mr-2 hover:bg-slate-100 rounded-xl transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-medium text-sm">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 bg-white text-blue-600 rounded-xl shadow-sm px-4 py-3 ml-2 mr-2 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">calendar_today</span>
+<span class="font-medium text-sm">Schedule</span>
+</a>
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 ml-2 mr-2 hover:bg-slate-100 rounded-xl transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-medium text-sm">Clients</span>
+</a>
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 ml-2 mr-2 hover:bg-slate-100 rounded-xl transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined">handshake</span>
+<span class="font-medium text-sm">Deals</span>
+</a>
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 ml-2 mr-2 hover:bg-slate-100 rounded-xl transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined">insert_chart</span>
+<span class="font-medium text-sm">Analytics</span>
+</a>
+</nav>
+<div class="px-4 mt-auto space-y-1">
+<button class="w-full bg-gradient-to-br from-primary to-primary-container text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all mb-6">
+<span class="material-symbols-outlined">add</span>
+<span>New Event</span>
+</button>
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-100 rounded-xl transition-all duration-300" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-medium text-sm">Support</span>
+</a>
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-100 rounded-xl transition-all duration-300" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-medium text-sm">Sign Out</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="md:ml-64 min-h-screen relative">
+<!-- TopNavBar Component (Shared Anchor) -->
+<header class="fixed top-0 right-0 left-0 md:left-64 z-30 bg-white/70 backdrop-blur-xl shadow-sm px-8 py-4 flex justify-between items-center">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black text-slate-900 tracking-tighter">Executive CRM</span>
+<nav class="hidden lg:flex items-center gap-6">
+<a class="text-slate-500 hover:text-slate-900 font-semibold tracking-tight text-sm" href="#">Calendar</a>
+<a class="text-slate-500 hover:text-slate-900 font-semibold tracking-tight text-sm" href="#">Insights</a>
+<a class="text-slate-500 hover:text-slate-900 font-semibold tracking-tight text-sm" href="#">Network</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group">
+<span class="material-symbols-outlined text-slate-400 cursor-pointer hover:text-primary transition-colors">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>
+</div>
+<span class="material-symbols-outlined text-slate-400 cursor-pointer hover:text-primary transition-colors">settings</span>
+<div class="w-10 h-10 rounded-full bg-surface-container-high overflow-hidden border-2 border-white shadow-sm">
+<img class="w-full h-full object-cover" data-alt="professional portrait of an executive male in his 40s with a confident expression and clean corporate attire" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCuJzIHjgzotE7En7tM4tJoioYxnsV6ee_AQQ_7KxW11Qnznt_p2xelyXykBBZdeYdXdZzWxjR7TwG3U3zeSKaV2Q8pc9gFydZFeUKQadO4-SO_lgszb8oG88GA26-chwHJilJbmPtOv7bIncGkag9DzAfuvNISe9McjLvy7ofYVr6Me2kkOB_OGZf1vQQzKxzGv-5FQAGjxcwKcym-xVEImGRjm4jFnb8_J6mhidbDidqyDZDavd2m9Y0GJ1ZyCCS9IOZZSnUomY0"/>
+</div>
+</div>
+</header>
+<!-- Calendar Container -->
+<div class="pt-24 px-8 pb-12">
+<!-- Executive Header Section -->
+<section class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+<div>
+<span class="text-xs font-bold text-primary tracking-widest uppercase mb-2 block">Executive Planner</span>
+<div class="flex items-center gap-6">
+<h2 class="text-5xl font-extrabold text-on-background tracking-tighter">Março 2026</h2>
+<div class="flex items-center gap-2 bg-surface-container-low p-1 rounded-xl">
+<button class="p-2 hover:bg-white rounded-lg transition-all text-slate-600 active:scale-90">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="px-4 py-1.5 bg-white text-xs font-bold text-slate-900 rounded-lg shadow-sm">Hoje</button>
+<button class="p-2 hover:bg-white rounded-lg transition-all text-slate-600 active:scale-90">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex bg-surface-container-low rounded-xl p-1">
+<button class="px-4 py-2 text-xs font-bold rounded-lg transition-all bg-white shadow-sm text-primary">Mês</button>
+<button class="px-4 py-2 text-xs font-bold rounded-lg transition-all text-slate-500 hover:text-slate-800">Semana</button>
+<button class="px-4 py-2 text-xs font-bold rounded-lg transition-all text-slate-500 hover:text-slate-800">Dia</button>
+</div>
+<button class="w-12 h-12 flex items-center justify-center bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+<span class="material-symbols-outlined text-slate-600">tune</span>
+</button>
+</div>
+</section>
+<!-- Main Grid Section -->
+<div class="bg-surface-container-lowest rounded-[2rem] shadow-xl shadow-slate-200/40 overflow-hidden border border-white">
+<!-- Day Headers -->
+<div class="grid grid-cols-7 border-b border-surface-container">
+<div class="py-4 text-center text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Dom</div>
+<div class="py-4 text-center text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Seg</div>
+<div class="py-4 text-center text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Ter</div>
+<div class="py-4 text-center text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Qua</div>
+<div class="py-4 text-center text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Qui</div>
+<div class="py-4 text-center text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Sex</div>
+<div class="py-4 text-center text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Sáb</div>
+</div>
+<!-- Days Grid -->
+<div class="grid grid-cols-7 auto-rows-[140px]">
+<!-- Feb Dates (Inactive) -->
+<div class="p-4 border-r border-b border-surface-container-low bg-slate-50/50">
+<span class="text-sm font-semibold text-slate-300">24</span>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low bg-slate-50/50">
+<span class="text-sm font-semibold text-slate-300">25</span>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low bg-slate-50/50">
+<span class="text-sm font-semibold text-slate-300">26</span>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low bg-slate-50/50">
+<span class="text-sm font-semibold text-slate-300">27</span>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low bg-slate-50/50">
+<span class="text-sm font-semibold text-slate-300">28</span>
+</div>
+<!-- March Dates -->
+<div class="p-4 border-r border-b border-surface-container-low relative group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">01</span>
+</div>
+<div class="p-4 border-b border-surface-container-low relative group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">02</span>
+<div class="mt-2 space-y-1">
+<div class="bg-blue-50 text-blue-600 text-[10px] font-bold py-1.5 px-3 rounded-full border border-blue-100/50 truncate">Reunião de fechamento</div>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">03</span>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">04</span>
+<div class="mt-2">
+<div class="bg-purple-50 text-purple-600 text-[10px] font-bold py-1.5 px-3 rounded-full border border-purple-100/50 truncate">Workshop Estratégia</div>
+</div>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">05</span>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low bg-blue-50/20 group hover:bg-blue-50 transition-colors">
+<span class="text-sm font-black text-primary">06</span>
+<div class="mt-2">
+<div class="bg-primary text-white text-[10px] font-bold py-1.5 px-3 rounded-full shadow-md shadow-primary/20 truncate">Apresentação Q1</div>
+</div>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">07</span>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">08</span>
+</div>
+<div class="p-4 border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">09</span>
+</div>
+<!-- Row 3 -->
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">10</span>
+<div class="mt-2 space-y-1">
+<div class="bg-emerald-50 text-emerald-600 text-[10px] font-bold py-1.5 px-3 rounded-full border border-emerald-100/50 truncate">Falar com Paula</div>
+</div>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">11</span>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">12</span>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">13</span>
+<div class="mt-2">
+<div class="bg-orange-50 text-orange-600 text-[10px] font-bold py-1.5 px-3 rounded-full border border-orange-100/50 truncate">Voo para NYC</div>
+</div>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">14</span>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">15</span>
+</div>
+<div class="p-4 border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">16</span>
+</div>
+<!-- Repeating Empty Rows for Layout -->
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">17</span>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">18</span>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">19</span>
+<div class="mt-2">
+<div class="bg-blue-50 text-blue-600 text-[10px] font-bold py-1.5 px-3 rounded-full border border-blue-100/50 truncate">Almoço Investidores</div>
+</div>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">20</span>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">21</span>
+</div>
+<div class="p-4 border-r border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">22</span>
+</div>
+<div class="p-4 border-b border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">23</span>
+</div>
+<!-- Row 5 -->
+<div class="p-4 border-r border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">24</span>
+</div>
+<div class="p-4 border-r border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">25</span>
+</div>
+<div class="p-4 border-r border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">26</span>
+</div>
+<div class="p-4 border-r border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">27</span>
+</div>
+<div class="p-4 border-r border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">28</span>
+</div>
+<div class="p-4 border-r border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">29</span>
+</div>
+<div class="p-4 border-surface-container-low group hover:bg-slate-50 transition-colors">
+<span class="text-sm font-bold text-slate-900">30</span>
+</div>
+</div>
+</div>
+<!-- Contextual Insights Bento Grid -->
+<div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="bg-white p-8 rounded-[2rem] border border-slate-100 flex items-center gap-6">
+<div class="w-16 h-16 rounded-full bg-primary/5 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-3xl">event_available</span>
+</div>
+<div>
+<p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Compromissos</p>
+<h4 class="text-2xl font-black text-slate-900">12 Ativos</h4>
+</div>
+</div>
+<div class="bg-white p-8 rounded-[2rem] border border-slate-100 flex items-center gap-6">
+<div class="w-16 h-16 rounded-full bg-secondary/5 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary text-3xl">groups</span>
+</div>
+<div>
+<p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Pessoas</p>
+<h4 class="text-2xl font-black text-slate-900">08 Reuniões</h4>
+</div>
+</div>
+<div class="bg-white p-8 rounded-[2rem] border border-slate-100 flex items-center gap-6">
+<div class="w-16 h-16 rounded-full bg-tertiary/5 flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary text-3xl">auto_awesome</span>
+</div>
+<div>
+<p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Foco IA</p>
+<h4 class="text-2xl font-black text-slate-900">24h Livres</h4>
+</div>
+</div>
+</div>
+</div>
+<!-- Mobile Floating Action Button -->
+<button class="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center z-50">
+<span class="material-symbols-outlined">add</span>
+</button>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-xl border-t border-slate-100 flex justify-around items-center py-4 z-40">
+<div class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">dashboard</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">calendar_today</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">group</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">insert_chart</span>
+</div>
+</nav>
+</main>
+</body></html>

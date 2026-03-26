@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>KukuGest CRM - Negociações</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-dim": "#7f2d7e",
+              "secondary-container": "#5af8fb",
+              "surface-container-high": "#dfe3e6",
+              "on-primary-fixed-variant": "#002278",
+              "error-dim": "#9f0519",
+              "tertiary": "#8d3a8b",
+              "inverse-surface": "#0b0f10",
+              "surface-bright": "#f5f7f9",
+              "on-tertiary-fixed-variant": "#6c1a6c",
+              "secondary-fixed-dim": "#46eaed",
+              "on-secondary-fixed-variant": "#006668",
+              "primary": "#0049e6",
+              "on-error": "#ffefee",
+              "on-surface-variant": "#595c5e",
+              "primary-container": "#829bff",
+              "surface": "#f5f7f9",
+              "tertiary-fixed-dim": "#e88ae1",
+              "surface-container-highest": "#d9dde0",
+              "surface-container-low": "#eef1f3",
+              "secondary-fixed": "#5af8fb",
+              "primary-fixed-dim": "#6e8cff",
+              "on-secondary": "#befeff",
+              "on-primary-fixed": "#000000",
+              "on-background": "#2c2f31",
+              "primary-fixed": "#829bff",
+              "surface-container": "#e5e9eb",
+              "inverse-on-surface": "#9a9d9f",
+              "surface-container-lowest": "#ffffff",
+              "on-secondary-fixed": "#004748",
+              "secondary-dim": "#00595b",
+              "surface-variant": "#d9dde0",
+              "on-tertiary": "#ffeef8",
+              "on-tertiary-fixed": "#400042",
+              "on-primary": "#f2f1ff",
+              "error": "#b31b25",
+              "on-error-container": "#570008",
+              "outline-variant": "#abadaf",
+              "error-container": "#fb5151",
+              "tertiary-container": "#f797f0",
+              "primary-dim": "#0040cb",
+              "on-secondary-container": "#005b5d",
+              "inverse-primary": "#6a89ff",
+              "secondary": "#006668",
+              "surface-tint": "#0049e6",
+              "surface-dim": "#d0d5d8",
+              "on-surface": "#2c2f31",
+              "on-tertiary-container": "#610e63",
+              "on-primary-container": "#001a63",
+              "tertiary-fixed": "#f797f0",
+              "background": "#f5f7f9",
+              "outline": "#747779"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "1.5rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, .font-headline { font-family: 'Manrope', sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-surface text-on-background selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar -->
+<aside class="flex flex-col h-screen fixed left-0 top-0 border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 w-64 z-50">
+<div class="p-6">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-container flex items-center justify-center text-white">
+<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
+</div>
+<div>
+<h2 class="text-xl font-bold text-slate-900 dark:text-slate-50 leading-none">KukuGest</h2>
+<p class="text-xs text-on-surface-variant font-medium mt-1 uppercase tracking-wider">CRM Management</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 px-4 space-y-1 overflow-y-auto no-scrollbar">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-blue-600 transition-all duration-200 ease-in-out font-headline font-medium" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="dashboard">dashboard</span>
+<span>Painel</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-blue-600 transition-all duration-200 ease-in-out font-headline font-medium" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="group">group</span>
+<span>Clientes</span>
+</a>
+<!-- Active State: Processos/Negociações -->
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20 font-semibold transition-all duration-200 ease-in-out font-headline" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="account_tree">account_tree</span>
+<span>Processos</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-blue-600 transition-all duration-200 ease-in-out font-headline font-medium" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="checklist">checklist</span>
+<span>Tarefas</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-blue-600 transition-all duration-200 ease-in-out font-headline font-medium" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="payments">payments</span>
+<span>Vendas</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-blue-600 transition-all duration-200 ease-in-out font-headline font-medium" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="forum">forum</span>
+<span>Conversas</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-blue-600 transition-all duration-200 ease-in-out font-headline font-medium" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="calendar_today">calendar_today</span>
+<span>Calendário</span>
+</a>
+</nav>
+<div class="p-4 border-t border-slate-100 dark:border-slate-800 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-blue-600 transition-all duration-200 ease-in-out font-headline font-medium" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="settings">settings</span>
+<span>Configurações</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-blue-600 transition-all duration-200 ease-in-out font-headline font-medium" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="logout">logout</span>
+<span>Sair</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-8 py-4 bg-surface dark:bg-slate-900 sticky top-0 z-40">
+<div class="flex items-center gap-8">
+<h1 class="text-2xl font-extrabold tracking-tight text-blue-600 dark:text-blue-400 font-headline">Negociações</h1>
+<div class="relative group">
+<span class="absolute inset-y-0 left-3 flex items-center text-slate-400">
+<span class="material-symbols-outlined text-xl" data-icon="search">search</span>
+</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-full w-80 text-sm focus:ring-2 focus:ring-primary/20 transition-all" placeholder="Buscar deal ou empresa..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+<div class="h-8 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+<div class="flex items-center gap-3 pl-2">
+<div class="text-right">
+<p class="text-xs font-semibold text-on-surface">Admin User</p>
+<p class="text-[10px] text-on-surface-variant font-medium">Gestor Comercial</p>
+</div>
+<img alt="User profile" class="w-9 h-9 rounded-full object-cover ring-2 ring-primary/10" data-alt="Close-up portrait of a professional businessman in a studio with soft neutral lighting and corporate attire" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3OTDnlv1Vt2IItRGrMWaUA9OvW7nQ19IKYV0rdh6JAUH5Rd0NvviMCAKKeTML_0WgTll4Jw8gVxAPneKENAueZtEVMpJ7knh0matkJj5AvnH3CaPfSiI_nJsVVRiqOmsMVTHd4RyqDlFbXWpJzQdnf18BqiKDlpTyGK6MNvKDBSteoehpQYqupnS6yCwAed4ppGKwXFU2HEiUuhwJ3SMn38lSnIeekG3ZlWU8rxEbHFQUM6n9L39kAxbka6DwiB4P6u8anY4-YFE"/>
+</div>
+</div>
+</header>
+<!-- Pipeline Controls -->
+<section class="px-8 py-6 flex justify-between items-end">
+<div>
+<nav class="flex gap-4 text-sm font-medium mb-2">
+<button class="text-primary border-b-2 border-primary pb-1">Pipeline Principal</button>
+<button class="text-on-surface-variant hover:text-on-surface pb-1 transition-colors">Novos Clientes</button>
+<button class="text-on-surface-variant hover:text-on-surface pb-1 transition-colors">Up-selling</button>
+</nav>
+<h2 class="text-slate-500 text-sm font-medium">7 Negociações em andamento • <span class="text-secondary font-bold">R$ 142.500,00</span></h2>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center gap-2 px-4 py-2 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-sm font-semibold text-on-surface hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="filter_list">filter_list</span>
+                    Filtrar
+                </button>
+<button class="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-br from-primary to-primary-container text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="add">add</span>
+                    Novo Registro
+                </button>
+</div>
+</section>
+<!-- Kanban Board Area -->
+<section class="flex-1 px-8 pb-12 overflow-x-auto no-scrollbar">
+<div class="flex gap-6 h-full min-w-max">
+<!-- Column: Novo -->
+<div class="w-80 flex flex-col rounded-2xl bg-surface-container-low/50 p-2">
+<div class="flex items-center justify-between p-3 mb-2">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-slate-400"></span>
+<h3 class="font-headline font-bold text-on-surface text-sm uppercase tracking-wide">Novo</h3>
+<span class="bg-surface-container-highest px-2 py-0.5 rounded text-[10px] font-bold text-on-surface-variant">1</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="more_horiz">more_horiz</span>
+</button>
+</div>
+<div class="space-y-3 px-1 overflow-y-auto no-scrollbar flex-1">
+<!-- Card 1 -->
+<div class="group bg-surface-container-lowest p-4 rounded-xl shadow-sm hover:shadow-md transition-all border-l-4 border-slate-300">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold text-primary uppercase tracking-tighter">#2044</span>
+<span class="text-xs font-bold text-on-surface">R$ 12.000</span>
+</div>
+<h4 class="font-headline font-bold text-on-surface mb-1 group-hover:text-primary transition-colors">Marcos Oliveira</h4>
+<p class="text-xs text-on-surface-variant mb-3">Transportes S.A.</p>
+<div class="flex flex-wrap gap-2 mb-4">
+<span class="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded uppercase">Logística</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="call">call</span>
+<span class="text-[10px] font-medium">(11) 98722-0012</span>
+</div>
+<div class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
+<span class="material-symbols-outlined text-xs" data-icon="person">person</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Column: Contactado -->
+<div class="w-80 flex flex-col rounded-2xl bg-surface-container-low/50 p-2">
+<div class="flex items-center justify-between p-3 mb-2">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<h3 class="font-headline font-bold text-on-surface text-sm uppercase tracking-wide">Contactado</h3>
+<span class="bg-surface-container-highest px-2 py-0.5 rounded text-[10px] font-bold text-on-surface-variant">1</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="more_horiz">more_horiz</span>
+</button>
+</div>
+<div class="space-y-3 px-1 overflow-y-auto no-scrollbar flex-1">
+<!-- Card 2 -->
+<div class="group bg-surface-container-lowest p-4 rounded-xl shadow-sm hover:shadow-md transition-all border-l-4 border-secondary">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold text-primary uppercase tracking-tighter">#2039</span>
+<span class="text-xs font-bold text-on-surface">R$ 8.500</span>
+</div>
+<h4 class="font-headline font-bold text-on-surface mb-1 group-hover:text-primary transition-colors">Ana Paula Lima</h4>
+<p class="text-xs text-on-surface-variant mb-3">EcoSolutions Ltda.</p>
+<div class="flex flex-wrap gap-2 mb-4">
+<span class="px-2 py-0.5 bg-tertiary/10 text-tertiary text-[10px] font-bold rounded uppercase">Serviços</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="call">call</span>
+<span class="text-[10px] font-medium">(21) 99823-4511</span>
+</div>
+<img alt="Assignee" class="w-6 h-6 rounded-full object-cover" data-alt="Small round avatar profile picture of a cheerful professional woman with long hair" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCCxKyDO2oFgU6rVdh_LScDY36QQmLxKg3a19vPE28XMdOoys6qe3WgYkBRI81lIHKWGcCDd8hGC2wT6GitBt8-Qad42zPHLA25uKx0rUda8Ewpu6y6ekwBx0NN2Yr7JNZS6YMjacW4AGK57D50g604w3DFjfBdbdVfRBjKgjCUIX7GQ6QmXBKrxVXeeuyynUYk-13eJ8tdR-f9rBplCHhzt1v3yOt0N3lWaK6Db4afPYUWS9YNTDlFEdt5c9xd7EN-DY07xhT4P_w"/>
+</div>
+</div>
+</div>
+</div>
+<!-- Column: Reunião Marcada -->
+<div class="w-80 flex flex-col rounded-2xl bg-surface-container-low/50 p-2">
+<div class="flex items-center justify-between p-3 mb-2">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+<h3 class="font-headline font-bold text-on-surface text-sm uppercase tracking-wide">Reunião Marcada</h3>
+<span class="bg-surface-container-highest px-2 py-0.5 rounded text-[10px] font-bold text-on-surface-variant">0</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="more_horiz">more_horiz</span>
+</button>
+</div>
+<div class="flex-1 flex flex-col items-center justify-center text-on-surface-variant p-8 text-center opacity-40">
+<span class="material-symbols-outlined text-4xl mb-2" data-icon="event_busy">event_busy</span>
+<p class="text-xs font-medium">Nenhum agendamento para este período</p>
+</div>
+</div>
+<!-- Column: Proposta Enviada (The focus column) -->
+<div class="w-80 flex flex-col rounded-2xl bg-blue-50/30 border border-blue-100/50 p-2">
+<div class="flex items-center justify-between p-3 mb-2">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<h3 class="font-headline font-bold text-on-surface text-sm uppercase tracking-wide">Proposta Enviada</h3>
+<span class="bg-primary text-white px-2 py-0.5 rounded text-[10px] font-extrabold">5</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="more_horiz">more_horiz</span>
+</button>
+</div>
+<div class="space-y-3 px-1 overflow-y-auto no-scrollbar flex-1">
+<!-- Card 3 -->
+<div class="group bg-surface-container-lowest p-4 rounded-xl shadow-sm hover:shadow-lg transition-all border-l-4 border-primary">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold text-primary uppercase tracking-tighter">#1988</span>
+<span class="text-xs font-bold text-on-surface">R$ 45.000</span>
+</div>
+<h4 class="font-headline font-bold text-on-surface mb-1 group-hover:text-primary transition-colors">Ricardo Arantes</h4>
+<p class="text-xs text-on-surface-variant mb-3">Global Tech Ventures</p>
+<div class="flex flex-wrap gap-2 mb-4">
+<span class="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded uppercase">SaaS</span>
+<span class="px-2 py-0.5 bg-secondary/10 text-secondary text-[10px] font-bold rounded uppercase">Enterprise</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="call">call</span>
+<span class="text-[10px] font-medium">(11) 97100-2233</span>
+</div>
+<div class="flex -space-x-2">
+<img class="w-6 h-6 rounded-full ring-2 ring-white object-cover" data-alt="Avatar of a male professional" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdrG9M_Eqrke-W6w7wKK20ooiLWex_-N9DuDQ4yKElNR1HNwSqVCGdr_q07BeNn26wesfPxEF990jG21fa_RZeXzaUM4teh7HO82Qf227fJDfYTPn2NzV9o7czSwE3W5FFo3COK7HeGz8-zBHlXFDflGY9fJ5FoRfS-14ZE4Hhe1kYbasEoA9p_rsaQJ2N6cupz4KmNUs-D5WNiLLllnVnplr2idyXgWXvLLyk8hNRkzx1omzXmk4DZC15pcDzjKaghQj_OaFTU4U"/>
+<div class="w-6 h-6 rounded-full ring-2 ring-white bg-slate-100 flex items-center justify-center text-[8px] font-bold">+1</div>
+</div>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="group bg-surface-container-lowest p-4 rounded-xl shadow-sm hover:shadow-lg transition-all border-l-4 border-primary">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold text-primary uppercase tracking-tighter">#1992</span>
+<span class="text-xs font-bold text-on-surface">R$ 18.000</span>
+</div>
+<h4 class="font-headline font-bold text-on-surface mb-1 group-hover:text-primary transition-colors">Fernanda Costa</h4>
+<p class="text-xs text-on-surface-variant mb-3">Móveis Design Ltda.</p>
+<div class="flex flex-wrap gap-2 mb-4">
+<span class="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded uppercase">E-commerce</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="call">call</span>
+<span class="text-[10px] font-medium">(31) 98822-4411</span>
+</div>
+<span class="text-[10px] font-bold text-on-error bg-error-dim/10 px-1.5 py-0.5 rounded">Prioritário</span>
+</div>
+</div>
+<!-- Card 5 -->
+<div class="group bg-surface-container-lowest p-4 rounded-xl shadow-sm hover:shadow-lg transition-all border-l-4 border-primary">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold text-primary uppercase tracking-tighter">#2001</span>
+<span class="text-xs font-bold text-on-surface">R$ 27.000</span>
+</div>
+<h4 class="font-headline font-bold text-on-surface mb-1 group-hover:text-primary transition-colors">Juliana Sales</h4>
+<p class="text-xs text-on-surface-variant mb-3">Logística Express</p>
+<div class="flex flex-wrap gap-2 mb-4">
+<span class="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded uppercase">Logística</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="call">call</span>
+<span class="text-[10px] font-medium">(11) 94433-2211</span>
+</div>
+<div class="flex items-center gap-1 text-[10px] font-medium text-secondary">
+<span class="material-symbols-outlined text-xs" data-icon="history">history</span>
+<span>2d atrás</span>
+</div>
+</div>
+</div>
+<!-- Card 6 -->
+<div class="group bg-surface-container-lowest p-4 rounded-xl shadow-sm hover:shadow-lg transition-all border-l-4 border-primary">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold text-primary uppercase tracking-tighter">#2015</span>
+<span class="text-xs font-bold text-on-surface">R$ 32.000</span>
+</div>
+<h4 class="font-headline font-bold text-on-surface mb-1 group-hover:text-primary transition-colors">Carlos Mendes</h4>
+<p class="text-xs text-on-surface-variant mb-3">Consultoria Prime</p>
+<div class="flex flex-wrap gap-2 mb-4">
+<span class="px-2 py-0.5 bg-tertiary/10 text-tertiary text-[10px] font-bold rounded uppercase">Serviços</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="call">call</span>
+<span class="text-[10px] font-medium">(41) 97766-5544</span>
+</div>
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="attach_file">attach_file</span>
+</div>
+</div>
+<!-- Card 7 -->
+<div class="group bg-surface-container-lowest p-4 rounded-xl shadow-sm hover:shadow-lg transition-all border-l-4 border-primary">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold text-primary uppercase tracking-tighter">#2022</span>
+<span class="text-xs font-bold text-on-surface">R$ 14.500</span>
+</div>
+<h4 class="font-headline font-bold text-on-surface mb-1 group-hover:text-primary transition-colors">Roberto Silva</h4>
+<p class="text-xs text-on-surface-variant mb-3">RS Distribuidora</p>
+<div class="flex flex-wrap gap-2 mb-4">
+<span class="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded uppercase">Varejo</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="call">call</span>
+<span class="text-[10px] font-medium">(51) 95544-3322</span>
+</div>
+<div class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
+<span class="material-symbols-outlined text-xs" data-icon="person">person</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Column: Empty State For UI Balance -->
+<div class="w-80 flex flex-col rounded-2xl bg-surface-container-low/20 p-2 border border-dashed border-outline-variant/30">
+<div class="flex items-center justify-between p-3 mb-2 opacity-50">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-slate-300"></span>
+<h3 class="font-headline font-bold text-on-surface text-sm uppercase tracking-wide">Ganho / Fechado</h3>
+</div>
+</div>
+<div class="flex-1 border-2 border-dashed border-outline-variant/10 rounded-xl m-2"></div>
+</div>
+</div>
+</section>
+</main>
+<!-- Floating Quick Action (Mobile Only logic handled by suppression in rules, but kept here as a discrete UI element) -->
+<button class="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center z-50">
+<span class="material-symbols-outlined text-2xl" data-icon="add">add</span>
+</button>
+</body></html>

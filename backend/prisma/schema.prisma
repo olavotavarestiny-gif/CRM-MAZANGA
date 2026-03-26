@@ -13,6 +13,7 @@ model User {
   id                   Int        @id @default(autoincrement())
   name                 String
   email                String     @unique
+  jobTitle             String?
   supabaseUid          String?    @unique  // UUID from Supabase auth.users
   passwordHash         String     @default("SUPABASE_AUTH")  // legacy; not used after Supabase auth
   resetToken           String?

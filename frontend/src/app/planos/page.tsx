@@ -32,6 +32,11 @@ const USAGE_LABELS: Record<string, string> = {
   customFields: 'Campos personalizados',
 };
 
+function normalizePlan(plan?: string | null) {
+  if (plan === 'profissional' || plan === 'enterprise') return 'profissional';
+  return 'essencial';
+}
+
 export default function PlanosPage() {
   const { data: usageData } = useQuery({
     queryKey: ['plan-usage'],
@@ -43,7 +48,7 @@ export default function PlanosPage() {
     queryFn: getCurrentUser,
   });
 
-  const currentPlan = usageData?.plan || currentUser?.plan || 'essencial';
+  const currentPlan = normalizePlan(usageData?.plan || currentUser?.plan);
   const isEssencial = currentPlan === 'essencial';
 
   return (

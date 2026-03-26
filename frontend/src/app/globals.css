@@ -6,28 +6,28 @@
 @tailwind utilities;
 
 :root {
-  /* ULU Gestão — 2 cores: #0A2540 navy + #FFFFFF white */
+  /* MD3 Surface Palette — Electric Blue + Light Surfaces */
   --background: 0 0% 100%;
-  --foreground: 210 73% 15%;           /* #0A2540 */
+  --foreground: 210 15% 17%;          /* #2c2f31 */
   --card: 0 0% 100%;
-  --card-foreground: 210 73% 15%;
+  --card-foreground: 210 15% 17%;
   --popover: 0 0% 100%;
-  --popover-foreground: 210 73% 15%;
-  --primary: 210 73% 15%;             /* #0A2540 */
+  --popover-foreground: 210 15% 17%;
+  --primary: 210 100% 48%;            /* #0049e6 electric blue */
   --primary-foreground: 0 0% 100%;
   --secondary: 210 30% 97%;           /* near-white surface */
-  --secondary-foreground: 210 73% 15%;
+  --secondary-foreground: 210 15% 17%;
   --muted: 210 20% 96%;
-  --muted-foreground: 210 30% 40%;    /* #0A2540 at ~40% lightness */
-  --accent: 210 73% 15%;
+  --muted-foreground: 210 8% 35%;     /* #595c5e */
+  --accent: 210 100% 48%;             /* #0049e6 */
   --accent-foreground: 0 0% 100%;
-  --destructive: 0 84% 60%;
+  --destructive: 0 82% 45%;           /* #b31b25 */
   --destructive-foreground: 0 0% 100%;
-  --border: 210 20% 90%;              /* very light navy tint */
-  --input: 210 20% 90%;
-  --ring: 210 73% 15%;               /* #0A2540 */
+  --border: 210 10% 92%;              /* softer border */
+  --input: 210 10% 92%;
+  --ring: 210 100% 48%;               /* #0049e6 */
   --ring-offset-background: 0 0% 100%;
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 }
 
 * {
@@ -35,8 +35,8 @@
 }
 
 body {
-  background: #f0f4f9;
-  color: #0A2540;
+  background: #f5f7f9;
+  color: #2c2f31;
   font-family: 'Montserrat', sans-serif;
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
@@ -45,12 +45,12 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Montserrat', sans-serif;
-  color: #0A2540;
+  color: #2c2f31;
 }
 
-h1 { font-weight: 700; }
+h1 { font-weight: 800; }
 h2 { font-weight: 700; }
-h3 { font-weight: 600; }
+h3 { font-weight: 700; }
 h4, h5, h6 { font-weight: 600; }
 
 @layer utilities {
@@ -60,6 +60,9 @@ h4, h5, h6 { font-weight: 600; }
   .font-display {
     font-family: 'Montserrat', sans-serif;
     font-weight: 800;
+  }
+  .ambient-shadow {
+    box-shadow: 0 2px 12px -2px rgba(44, 47, 49, 0.08);
   }
 }
 

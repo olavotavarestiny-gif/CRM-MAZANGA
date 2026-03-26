@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
-const { SUPER_ADMIN_EMAIL } = require('../middleware/auth');
+const { DEFAULT_PLAN, isSupportedPlan, normalizePlan } = require('../lib/plans');
 
 // Lazy Supabase admin client — created on first use, not at startup
 let _supabaseAdmin = null;
@@ -48,7 +48,7 @@ router.get('/users', async (req, res) => {
       email: u.email,
       role: u.role,
       active: u.active,
-      plan: u.plan,
+      plan: normalizePlan(u.plan),
       permissions: u.permissions ? JSON.parse(u.permissions) : null,
       accountOwnerId: u.accountOwnerId,
       accountOwnerName: u.accountOwner?.name || null,
@@ -93,6 +93,7 @@ router.get('/accounts', async (req, res) => {
 
     res.json(accounts.map(a => ({
       ...a,
+      plan: normalizePlan(a.plan),
       permissions: a.permissions ? JSON.parse(a.permissions) : null,
       accountMembers: a.accountMembers.map(m => ({
         ...m,
@@ -112,7 +113,12 @@ router.patch('/accounts/:id', async (req, res) => {
     const { plan, permissions } = req.body;
 
     const data = {};
-    if (plan !== undefined) data.plan = plan;
+    if (plan !== undefined) {
+      if (!isSupportedPlan(plan)) {
+        return res.status(400).json({ error: 'Plano inválido. Use essencial ou profissional.' });
+      }
+      data.plan = plan;
+    }
     if (permissions !== undefined) {
       data.permissions = permissions ? JSON.stringify(permissions) : null;
     }
@@ -125,6 +131,7 @@ router.patch('/accounts/:id', async (req, res) => {
 
     res.json({
       ...updated,
+      plan: normalizePlan(updated.plan),
       permissions: updated.permissions ? JSON.parse(updated.permissions) : null,
     });
   } catch (error) {
@@ -149,6 +156,10 @@ router.post('/users', async (req, res) => {
       return res.status(400).json({ error: 'Password deve ter pelo menos 6 caracteres' });
     }
 
+    if (plan !== undefined && !isSupportedPlan(plan)) {
+      return res.status(400).json({ error: 'Plano inválido. Use essencial ou profissional.' });
+    }
+
     // Verificar se email já existe no PostgreSQL
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -164,7 +175,7 @@ router.post('/users', async (req, res) => {
     }
 
     // Só super-admin pode criar outros admins
-    const isSuperAdmin = req.user && req.user.email === SUPER_ADMIN_EMAIL;
+    const isSuperAdmin = !!req.user?.isSuperAdmin;
     if (!isSuperAdmin && role === 'admin') {
       return res.status(403).json({
         error: 'Só o super-administrador pode atribuir papel admin',
@@ -192,7 +203,7 @@ router.post('/users', async (req, res) => {
         role: role === 'admin' ? 'admin' : 'user',
         active: true,
         mustChangePassword: true,
-        plan: plan || 'essencial',
+        plan: plan || DEFAULT_PLAN,
         permissions: permissions ? JSON.stringify(permissions) : null,
         accountOwnerId: accountOwnerId ? parseInt(accountOwnerId) : null,
       },
@@ -204,7 +215,7 @@ router.post('/users', async (req, res) => {
       email: user.email,
       role: user.role,
       active: user.active,
-      plan: user.plan,
+      plan: normalizePlan(user.plan),
       permissions: user.permissions ? JSON.parse(user.permissions) : null,
       accountOwnerId: user.accountOwnerId,
       createdAt: user.createdAt,
@@ -228,7 +239,12 @@ router.patch('/users/:id', async (req, res) => {
     if (role !== undefined && ['admin', 'user'].includes(role)) {
       updateData.role = role;
     }
-    if (plan !== undefined) updateData.plan = plan;
+    if (plan !== undefined) {
+      if (!isSupportedPlan(plan)) {
+        return res.status(400).json({ error: 'Plano inválido. Use essencial ou profissional.' });
+      }
+      updateData.plan = plan;
+    }
     if (permissions !== undefined) {
       updateData.permissions = permissions ? JSON.stringify(permissions) : null;
     }
@@ -242,7 +258,11 @@ router.patch('/users/:id', async (req, res) => {
       },
     });
 
-    res.json({ ...user, permissions: user.permissions ? JSON.parse(user.permissions) : null });
+    res.json({
+      ...user,
+      plan: normalizePlan(user.plan),
+      permissions: user.permissions ? JSON.parse(user.permissions) : null,
+    });
   } catch (error) {
     console.error('Error updating user:', error);
     if (error.code === 'P2025') {

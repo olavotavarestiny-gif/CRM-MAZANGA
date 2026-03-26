@@ -4,11 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { getCurrentUserWithToken } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import Link from 'next/link';
+import { Mail, Lock } from 'lucide-react';
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
 
 export default function LoginPage() {
@@ -60,66 +57,84 @@ export default function LoginPage() {
   };
 
   return (
-    <BackgroundGradientAnimation containerClassName="min-h-screen">
-      <div className="absolute inset-0 flex items-center justify-center p-4 z-10">
-      <Card className="w-full max-w-md shadow-xl bg-white/90 backdrop-blur-sm">
-        <div className="p-8">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#0A2540] mb-4">
-              <span className="text-white font-black text-lg" style={{ fontFamily: "'Montserrat', sans-serif" }}>K</span>
-            </div>
-            <h1 className="text-2xl font-bold text-[#0A2540]" style={{ fontFamily: "'Montserrat', sans-serif" }}>KukuGest</h1>
-            <p className="text-[#6b7e9a] text-sm mt-1">Bem-vindo de volta</p>
-          </div>
+    <BackgroundGradientAnimation
+      containerClassName="min-h-screen"
+      interactive={false}
+      size="110%"
+      blendingValue="soft-light"
+    >
+      <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(140,169,255,0.28),transparent_28%),radial-gradient(circle_at_top_right,rgba(114,141,229,0.22),transparent_24%),linear-gradient(180deg,rgba(6,16,36,0.08),rgba(6,16,36,0.38))]" />
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
-              {error}
-            </div>
-          )}
+      <div className="absolute inset-0 z-10 flex items-center justify-center px-4 py-10 sm:px-6">
+        <div className="relative w-full max-w-[28.5rem]">
+          <div className="absolute inset-x-10 -top-10 h-20 rounded-full bg-white/15 blur-3xl" />
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <Label className="text-[#0A2540]">Email</Label>
-              <Input
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label className="text-[#0A2540]">Password</Label>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="mt-1"
-              />
-            </div>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full"
-            >
-              {loading ? 'Entrando...' : 'Entrar'}
-            </Button>
+          <div className="relative overflow-hidden rounded-[2rem] border border-white/35 bg-[linear-gradient(180deg,rgba(181,191,205,0.42),rgba(111,124,141,0.52))] p-6 shadow-[0_30px_80px_rgba(6,16,36,0.38),inset_0_1px_0_rgba(255,255,255,0.3)] backdrop-blur-[22px] sm:p-8">
+            <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.22),transparent_32%,transparent_68%,rgba(255,255,255,0.08))]" />
 
-            <div className="pt-2 text-center">
-              <Link
-                href="/forgot-password"
-                className="text-sm text-[#0A2540] hover:text-[#0d3060] transition"
+            <div className="relative text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-white/25 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.28),rgba(255,255,255,0.06)_58%,rgba(18,32,59,0.4))] shadow-[inset_0_1px_8px_rgba(255,255,255,0.18),0_10px_25px_rgba(6,16,36,0.22)]">
+                <span className="text-[2rem] font-black text-white/95" style={{ fontFamily: "'Montserrat', sans-serif" }}>K</span>
+              </div>
+              <h1 className="text-[2rem] font-extrabold tracking-tight text-white" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+                KukuGest
+              </h1>
+              <p className="mt-1.5 text-sm text-white/80 sm:text-base">Bem-vindo de volta</p>
+            </div>
+
+            {error && (
+              <div className="relative mt-7 rounded-2xl border border-[#ffb3bc]/40 bg-[#811b27]/22 px-4 py-3 text-sm text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="relative mt-7 space-y-5">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-white/88">Email</label>
+                <div className="group relative">
+                  <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/55 transition-colors group-focus-within:text-white/80" />
+                  <input
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-14 w-full rounded-[0.95rem] border border-white/55 bg-white/[0.06] pl-11 pr-4 text-[0.95rem] text-white placeholder:text-white/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] outline-none transition focus:border-white/80 focus:bg-white/[0.09] focus:ring-2 focus:ring-white/20"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-white/88">Password</label>
+                <div className="group relative">
+                  <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/55 transition-colors group-focus-within:text-white/80" />
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="h-14 w-full rounded-[0.95rem] border border-white/55 bg-white/[0.06] pl-11 pr-4 text-[0.95rem] text-white placeholder:text-white/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] outline-none transition focus:border-white/80 focus:bg-white/[0.09] focus:ring-2 focus:ring-white/20"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-1 h-12 w-full rounded-[0.95rem] bg-[linear-gradient(180deg,#12356b,#071a36)] text-sm font-semibold text-white shadow-[0_12px_30px_rgba(4,16,38,0.35),inset_0_1px_0_rgba(255,255,255,0.12)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Esqueci a password
-              </Link>
-            </div>
-          </form>
+                {loading ? 'Entrando...' : 'Entrar'}
+              </button>
+
+              <div className="pt-1 text-center">
+                <Link href="/forgot-password" className="text-sm text-white/78 transition hover:text-white">
+                  Esqueci a password
+                </Link>
+              </div>
+            </form>
+          </div>
         </div>
-      </Card>
       </div>
     </BackgroundGradientAnimation>
   );

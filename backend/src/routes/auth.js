@@ -5,6 +5,7 @@ const prisma = require('../lib/prisma');
 const requireAuth = require('../middleware/auth');
 const { verifySupabaseJwt } = require('../middleware/auth');
 const { intersectPermissions, parsePermissions } = require('../lib/permissions');
+const { normalizePlan } = require('../lib/plans');
 
 // Lazy Supabase admin client
 let _supabaseAdmin = null;
@@ -16,6 +17,80 @@ function getSupabaseAdmin() {
     );
   }
   return _supabaseAdmin;
+}
+
+const CURRENT_USER_BASE_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  role: true,
+  active: true,
+  plan: true,
+  permissions: true,
+  mustChangePassword: true,
+  accountOwnerId: true,
+  createdAt: true,
+  isSuperAdmin: true,
+};
+
+function isMissingJobTitleColumn(error) {
+  const message = error?.message || '';
+  return message.includes('User.jobTitle') && message.includes('does not exist');
+}
+
+async function getCurrentUserPayload(userId, impersonatedBy = null) {
+  let user;
+  try {
+    user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        ...CURRENT_USER_BASE_SELECT,
+        jobTitle: true,
+      },
+    });
+  } catch (error) {
+    if (!isMissingJobTitleColumn(error)) {
+      throw error;
+    }
+
+    user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: CURRENT_USER_BASE_SELECT,
+    });
+
+    if (user) {
+      user = { ...user, jobTitle: null };
+    }
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  let effectivePermissions = parsePermissions(user.permissions);
+  let effectivePlan = normalizePlan(user.plan);
+  let accountOwnerName = null;
+
+  if (user.accountOwnerId) {
+    const owner = await prisma.user.findUnique({
+      where: { id: user.accountOwnerId },
+      select: { plan: true, permissions: true, name: true },
+    });
+    if (owner) {
+      effectivePlan = normalizePlan(owner.plan);
+      accountOwnerName = owner.name;
+      const orgPerms = parsePermissions(owner.permissions);
+      effectivePermissions = intersectPermissions(orgPerms, effectivePermissions);
+    }
+  }
+
+  return {
+    ...user,
+    plan: effectivePlan,
+    permissions: effectivePermissions,
+    accountOwnerName,
+    impersonatedBy,
+  };
 }
 
 // POST /api/auth/sync
@@ -68,49 +143,58 @@ router.post('/sync', async (req, res) => {
 // GET /api/auth/me - Dados do utilizador autenticado
 router.get('/me', requireAuth, async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: {
-        id: true, name: true, email: true, role: true, active: true,
-        plan: true, permissions: true, mustChangePassword: true,
-        accountOwnerId: true, createdAt: true, isSuperAdmin: true,
-      },
-    });
-
-    if (!user) {
+    const payload = await getCurrentUserPayload(req.user.id, req.user.impersonatedBy || null);
+    if (!payload) {
       return res.status(404).json({ error: 'Utilizador não encontrado' });
     }
-
-    let effectivePermissions = parsePermissions(user.permissions);
-    let effectivePlan = user.plan;
-    let accountOwnerName = null;
-
-    if (user.accountOwnerId) {
-      // Team member — inherit plan and compute effective permissions (intersection)
-      const owner = await prisma.user.findUnique({
-        where: { id: user.accountOwnerId },
-        select: { plan: true, permissions: true, name: true },
-      });
-      if (owner) {
-        effectivePlan = owner.plan || 'essencial';
-        accountOwnerName = owner.name;
-        const orgPerms = parsePermissions(owner.permissions);
-        effectivePermissions = intersectPermissions(orgPerms, effectivePermissions);
-      }
-    }
-
-    // Include impersonatedBy if this request is via impersonation
-    const impersonatedBy = req.user.impersonatedBy || null;
-
-    res.json({
-      ...user,
-      plan: effectivePlan,
-      permissions: effectivePermissions,
-      accountOwnerName,
-      impersonatedBy,
-    });
+    res.json(payload);
   } catch (error) {
     console.error('Error fetching user:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.patch('/me', requireAuth, async (req, res) => {
+  try {
+    const { name, jobTitle } = req.body || {};
+    const data = {};
+
+    if (name !== undefined) {
+      if (typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ error: 'Nome inválido' });
+      }
+      data.name = name.trim();
+    }
+
+    if (jobTitle !== undefined) {
+      if (jobTitle !== null && typeof jobTitle !== 'string') {
+        return res.status(400).json({ error: 'Função inválida' });
+      }
+      data.jobTitle = jobTitle && typeof jobTitle === 'string' ? jobTitle.trim() || null : null;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'Nenhum campo para atualizar' });
+    }
+
+    try {
+      await prisma.user.update({
+        where: { id: req.user.id },
+        data,
+      });
+    } catch (error) {
+      if (isMissingJobTitleColumn(error) && Object.prototype.hasOwnProperty.call(data, 'jobTitle')) {
+        return res.status(409).json({
+          error: 'A função do utilizador ainda não está disponível nesta base de dados. Execute a atualização da base antes de editar este campo.',
+        });
+      }
+      throw error;
+    }
+
+    const payload = await getCurrentUserPayload(req.user.id, req.user.impersonatedBy || null);
+    res.json(payload);
+  } catch (error) {
+    console.error('Error updating current user:', error);
     res.status(500).json({ error: error.message });
   }
 });

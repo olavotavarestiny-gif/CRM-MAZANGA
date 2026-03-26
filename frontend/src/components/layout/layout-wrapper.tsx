@@ -51,7 +51,8 @@ function LayoutInner({ children }: { children: ReactNode }) {
     pathname === '/termos' ||
     pathname === '/privacidade' ||
     pathname === '/manutencao' ||
-    pathname.startsWith('/f/');
+    pathname.startsWith('/f/') ||
+    pathname.startsWith('/preview');
 
   // Detect Supabase password recovery flow — fires when user clicks a reset-password email link
   // The link lands on / with hash tokens; Supabase fires PASSWORD_RECOVERY so we redirect.
@@ -81,6 +82,17 @@ function LayoutInner({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const handleUserUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<User>).detail;
+      if (!detail) return;
+      setCurrentUser((prev) => (prev ? { ...prev, ...detail } : detail));
+    };
+
+    window.addEventListener('kukugest:user-updated', handleUserUpdated);
+    return () => window.removeEventListener('kukugest:user-updated', handleUserUpdated);
+  }, []);
+
   // Keep-alive: ping backend every 14 minutes to prevent Render free tier cold starts
   useEffect(() => {
     if (isPublicPage) return;
@@ -99,12 +111,12 @@ function LayoutInner({ children }: { children: ReactNode }) {
 
     const enforceAccess = (user: User) => {
       // SuperAdmin can access /superadmin
-      if (pathname.startsWith('/superadmin') && !user.isSuperAdmin) {
+      if (pathname.startsWith('/superadmin') && !user.isSuperAdmin && user.role !== 'admin') {
         router.push('/');
         return;
       }
       // Platform admin routes
-      if (pathname.startsWith('/admin') && user.role !== 'admin') {
+      if (pathname.startsWith('/admin') && !user.isSuperAdmin && user.role !== 'admin') {
         router.push('/');
         return;
       }
@@ -148,8 +160,14 @@ function LayoutInner({ children }: { children: ReactNode }) {
         // Show welcome modal on first visit
         if (!localStorage.getItem('kukugest_guide_seen')) setShowWelcome(true);
       } catch (err: any) {
-        if (err?.response?.status === 401) {
+        if (err?.response?.status === 401 || err?.response?.status === 403) {
           router.push('/login');
+          return;
+        }
+
+        if (err?.response?.status >= 400) {
+          router.push('/login');
+          return;
         }
       } finally {
         setIsLoading(false);
@@ -168,7 +186,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
   };
 
   if (isLoading && !isPublicPage) {
-    return <div className="min-h-screen" style={{ background: 'linear-gradient(145deg, #f0f4f9 0%, #e4edf7 50%, #dce8f5 100%)' }} />;
+    return <div className="min-h-screen bg-[#f5f7f9]" />;
   }
 
   if (isPublicPage) {
@@ -176,7 +194,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen" style={{ background: 'linear-gradient(145deg, #f0f4f9 0%, #e4edf7 50%, #dce8f5 100%)' }}>
+    <div className="flex h-screen bg-[#f5f7f9]">
       {/* Sidebar Desktop */}
       <div className="hidden md:flex">
         <Sidebar
@@ -205,15 +223,25 @@ function LayoutInner({ children }: { children: ReactNode }) {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-screen">
+        {/* Top Bar Desktop */}
+        <div className="hidden md:flex items-center justify-between h-16 px-8 bg-white border-b border-slate-100 sticky top-0 z-40 flex-shrink-0">
+          <div />
+          <UserWidget user={currentUser} />
+        </div>
+
         {/* Top Bar Mobile */}
-        <div className="md:hidden flex items-center gap-3 h-14 px-4 border-b border-[#dde3ec] bg-white">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 hover:bg-[#F8FAFC] rounded-lg transition-colors"
-          >
-            <Menu className="w-6 h-6 text-[#0A2540]" />
-          </button>
-          <h1 className="text-lg font-semibold text-[#0A2540]">KukuGest</h1>
+        <div className="md:hidden flex items-center justify-between gap-3 h-14 px-4 border-b border-slate-100 bg-white">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="flex items-center gap-2 rounded-lg px-2.5 py-2 hover:bg-slate-100 transition-colors"
+            >
+              <Menu className="w-5 h-5 text-[#2c2f31]" />
+              <span className="text-sm font-medium text-[#2c2f31]">Menu</span>
+            </button>
+            <h1 className="truncate text-lg font-semibold text-[#2c2f31]">KukuGest</h1>
+          </div>
+          <UserWidget user={currentUser} compact />
         </div>
 
         {/* Impersonation Banner */}
@@ -237,7 +265,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
         )}
 
         {/* Main Scrollable Area */}
-        <main className="flex-1 overflow-y-auto" style={{ background: 'transparent' }}>
+        <main className="flex-1 overflow-y-auto bg-[#f5f7f9]">
           {children}
         </main>
       </div>
@@ -248,6 +276,40 @@ function LayoutInner({ children }: { children: ReactNode }) {
         onStartTour={handleStartChecklist}
       />
       <OnboardingChecklist />
+    </div>
+  );
+}
+
+// ── User Widget Component ─────────────────────────────────────
+
+function UserWidget({ user, compact = false }: { user: User | null; compact?: boolean }) {
+  if (!user) return null;
+  const initials = user.name
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  const secondaryLabel =
+    user.jobTitle?.trim() ||
+    (user.isSuperAdmin ? 'Super Admin' : user.role === 'admin' ? 'Administrador' : 'Utilizador');
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex flex-col items-end min-w-0">
+        <span className={`font-semibold text-[#2c2f31] leading-tight truncate ${compact ? 'max-w-[7.5rem] text-xs' : 'text-sm'}`}>
+          {user.name}
+        </span>
+        <span
+          className={`truncate text-[#595c5e] ${compact ? 'max-w-[7.5rem] text-[11px]' : 'max-w-[14rem] text-xs'}`}
+          title={secondaryLabel}
+        >
+          {secondaryLabel}
+        </span>
+      </div>
+      <div className={`rounded-full bg-gradient-to-br from-[#0049e6] to-[#829bff] flex items-center justify-center flex-shrink-0 ${compact ? 'h-8 w-8' : 'w-9 h-9'}`}>
+        <span className={`text-white font-bold ${compact ? 'text-[11px]' : 'text-xs'}`}>{initials}</span>
+      </div>
     </div>
   );
 }

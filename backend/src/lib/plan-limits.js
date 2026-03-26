@@ -1,5 +1,6 @@
 'use strict';
 const prisma = require('./prisma');
+const { DEFAULT_PLAN, normalizePlan } = require('./plans');
 
 const PLAN_LIMITS = {
   essencial: {
@@ -43,7 +44,7 @@ async function getPlan(effectiveUserId) {
     where: { id: effectiveUserId },
     select: { plan: true },
   });
-  return owner?.plan || 'essencial';
+  return normalizePlan(owner?.plan || DEFAULT_PLAN);
 }
 
 async function getUsage(orgId, key) {
@@ -83,15 +84,15 @@ async function getUsage(orgId, key) {
 
 async function checkLimit(effectiveUserId, limitKey) {
   const plan = await getPlan(effectiveUserId);
-  const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.essencial;
-  const limit = limits[limitKey] ?? PLAN_LIMITS.essencial[limitKey] ?? Infinity;
+  const limits = PLAN_LIMITS[plan] || PLAN_LIMITS[DEFAULT_PLAN];
+  const limit = limits[limitKey] ?? PLAN_LIMITS[DEFAULT_PLAN][limitKey] ?? Infinity;
   const current = await getUsage(effectiveUserId, limitKey);
   return { allowed: current < limit, current, limit, plan };
 }
 
 async function getAllUsage(orgId) {
   const plan = await getPlan(orgId);
-  const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.essencial;
+  const limits = PLAN_LIMITS[plan] || PLAN_LIMITS[DEFAULT_PLAN];
   const keys = Object.keys(limits);
   const usages = await Promise.all(keys.map((k) => getUsage(orgId, k)));
   return {
