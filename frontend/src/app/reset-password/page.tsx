@@ -26,13 +26,46 @@ function ResetPasswordForm() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    // The /auth/callback route already exchanged the code and set the session.
-    // We just need to verify a session exists.
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
+
+    const resolveRecoverySession = async () => {
+      const hash = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
+      const hashParams = new URLSearchParams(hash);
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      const type = hashParams.get('type');
+
+      if (type === 'recovery' && accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (!error) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
       setHasSession(!!session);
       setChecking(false);
+    };
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || !!session) {
+        setHasSession(true);
+        setChecking(false);
+      }
     });
+
+    resolveRecoverySession().catch(() => {
+      setHasSession(false);
+      setChecking(false);
+    });
+
+    return () => {
+      subscription.subscription.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

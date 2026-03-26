@@ -23,9 +23,10 @@ export default function ForgotPasswordPage() {
     try {
       const supabase = createClient();
 
-      // redirectTo points to our server-side callback route
-      // which exchanges the code and redirects to /reset-password
-      const redirectTo = `${window.location.origin}/auth/callback?next=/reset-password`;
+      // Password recovery should land directly on /reset-password.
+      // Supabase may return recovery credentials in the URL fragment,
+      // which server routes cannot read.
+      const redirectTo = `${window.location.origin}/reset-password`;
 
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo,
