@@ -19,7 +19,7 @@ function getSupabaseAdmin() {
 router.get('/orgs', async (req, res) => {
   try {
     const orgs = await prisma.user.findMany({
-      where: { accountOwnerId: null, role: 'user', isSuperAdmin: false },
+      where: { accountOwnerId: null, isSuperAdmin: false },
       select: {
         id: true, name: true, email: true, active: true, plan: true,
         permissions: true, createdAt: true,
@@ -202,7 +202,7 @@ router.get('/usage', async (req, res) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const orgs = await prisma.user.findMany({
-      where: { accountOwnerId: null, role: 'user', isSuperAdmin: false },
+      where: { accountOwnerId: null, isSuperAdmin: false },
       select: { id: true, name: true, accountMembers: { select: { id: true } } },
       orderBy: { createdAt: 'desc' },
     });
@@ -251,7 +251,7 @@ router.get('/usage', async (req, res) => {
 router.get('/storage', async (req, res) => {
   try {
     const orgs = await prisma.user.findMany({
-      where: { accountOwnerId: null, role: 'user', isSuperAdmin: false },
+      where: { accountOwnerId: null, isSuperAdmin: false },
       select: { id: true, name: true },
       orderBy: { createdAt: 'desc' },
     });
