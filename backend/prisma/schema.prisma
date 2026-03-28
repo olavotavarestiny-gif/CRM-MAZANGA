@@ -32,6 +32,7 @@ model User {
   contactFieldConfigs  ContactFieldConfig[] @relation("ContactFieldConfigUser")
   pipelineStages       PipelineStage[]     @relation("PipelineStageUser")
   tasks                Task[]     @relation("TaskUser")
+  assignedTasks        Task[]     @relation("TaskAssignee")
   transactions         Transaction[] @relation("TransactionUser")
   automations          Automation[] @relation("AutomationUser")
   forms                Form[]     @relation("FormUser")
@@ -156,6 +157,7 @@ model Message {
 model Task {
   id        Int       @id @default(autoincrement())
   userId    Int?
+  assignedToUserId Int?
   contactId Int?
   title     String
   notes     String?
@@ -165,7 +167,10 @@ model Task {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   user      User?     @relation("TaskUser", fields: [userId], references: [id], onDelete: SetNull)
+  assignedTo User?    @relation("TaskAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
   contact   Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@index([assignedToUserId])
 }
 
 model Automation {

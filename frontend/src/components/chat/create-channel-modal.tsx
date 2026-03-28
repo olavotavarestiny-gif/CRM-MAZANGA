@@ -1,25 +1,33 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Hash } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { createChatChannel, getChatUsers } from '@/lib/api';
+import { createChatChannel, getChatUsers, updateChatChannel } from '@/lib/api';
+import type { ChatChannel } from '@/lib/types';
 import { PlanLimitModal } from './plan-limit-modal';
+import { ErrorState } from '@/components/ui/error-state';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/toast-provider';
 
 interface CreateChannelModalProps {
   onClose: () => void;
   onCreated: (channelId: string) => void;
+  channel?: ChatChannel | null;
 }
 
-export function CreateChannelModal({ onClose, onCreated }: CreateChannelModalProps) {
+export function CreateChannelModal({ onClose, onCreated, channel = null }: CreateChannelModalProps) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const isEdit = !!channel;
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [search, setSearch] = useState('');
+  const [formError, setFormError] = useState('');
   const [limitError, setLimitError] = useState<{
     feature: string; featureLabel: string; current: number; limit: number; plan: string;
   } | null>(null);
@@ -29,10 +37,41 @@ export function CreateChannelModal({ onClose, onCreated }: CreateChannelModalPro
     queryFn: getChatUsers,
   });
 
+  useEffect(() => {
+    if (channel) {
+      setName(channel.name);
+      setDescription(channel.description || '');
+      setSelectedIds(channel.members.map((member) => member.userId));
+    } else {
+      setName('');
+      setDescription('');
+      setSelectedIds([]);
+    }
+  }, [channel]);
+
   const mutation = useMutation({
-    mutationFn: () => createChatChannel({ name: name.trim(), description: description.trim() || undefined, memberIds: selectedIds }),
+    mutationFn: () => (
+      isEdit
+        ? updateChatChannel(channel.id, {
+            name: name.trim(),
+            description: description.trim() || undefined,
+            memberIds: selectedIds,
+          })
+        : createChatChannel({
+            name: name.trim(),
+            description: description.trim() || undefined,
+            memberIds: selectedIds,
+          })
+    ),
     onSuccess: (channel) => {
       queryClient.invalidateQueries({ queryKey: ['chat-channels'] });
+      queryClient.invalidateQueries({ queryKey: ['chat-unread'] });
+      setFormError('');
+      toast({
+        variant: 'success',
+        title: isEdit ? 'Canal atualizado' : 'Canal criado',
+        description: isEdit ? 'As alterações ao canal foram guardadas.' : 'O novo canal já está disponível para a equipa.',
+      });
       onCreated(channel.id);
       onClose();
     },
@@ -40,7 +79,15 @@ export function CreateChannelModal({ onClose, onCreated }: CreateChannelModalPro
       if (err?.response?.status === 429) {
         const d = err.response.data;
         setLimitError({ feature: d.feature, featureLabel: 'canais', current: d.current, limit: d.limit, plan: d.plan });
+        return;
       }
+      const message = err?.response?.data?.error || err?.message || 'Não foi possível guardar o canal.';
+      setFormError(message);
+      toast({
+        variant: 'error',
+        title: isEdit ? 'Falha ao atualizar canal' : 'Falha ao criar canal',
+        description: message,
+      });
     },
   });
 
@@ -63,12 +110,12 @@ export function CreateChannelModal({ onClose, onCreated }: CreateChannelModalPro
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0]">
           <div className="flex items-center gap-2">
             <Hash className="w-5 h-5 text-[#0A2540]" />
-            <h2 className="text-[#0A2540] font-semibold text-lg">Criar Canal</h2>
+            <h2 className="text-[#0A2540] font-semibold text-lg">{isEdit ? 'Gerir Canal' : 'Criar Canal'}</h2>
           </div>
           <button onClick={onClose} className="text-[#6b7e9a] hover:text-[#0A2540] transition-colors">
             <X className="w-5 h-5" />
@@ -76,6 +123,16 @@ export function CreateChannelModal({ onClose, onCreated }: CreateChannelModalPro
         </div>
 
         <div className="px-6 py-4 space-y-4">
+          {formError && (
+            <ErrorState
+              compact
+              title={isEdit ? 'Não foi possível guardar o canal' : 'Não foi possível criar o canal'}
+              message={formError}
+              onRetry={() => mutation.mutate()}
+              secondaryAction={{ label: 'Fechar', onClick: () => setFormError('') }}
+            />
+          )}
+
           <div>
             <Label htmlFor="channel-name">Nome *</Label>
             <Input
@@ -135,13 +192,15 @@ export function CreateChannelModal({ onClose, onCreated }: CreateChannelModalPro
           <Button variant="outline" className="flex-1" onClick={onClose}>
             Cancelar
           </Button>
-          <Button
+          <LoadingButton
             className="flex-1 bg-[#0A2540] hover:bg-[#0A2540]/90 text-white"
             disabled={!name.trim() || mutation.isPending}
+            loading={mutation.isPending}
+            loadingLabel={isEdit ? 'A guardar...' : 'A criar...'}
             onClick={() => mutation.mutate()}
           >
-            {mutation.isPending ? 'Criando...' : 'Criar Canal'}
-          </Button>
+            {isEdit ? 'Guardar Alterações' : 'Criar Canal'}
+          </LoadingButton>
         </div>
       </div>
     </div>

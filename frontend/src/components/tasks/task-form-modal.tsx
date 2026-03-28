@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createTask, updateTask, getContacts } from '@/lib/api';
+import { createTask, updateTask, getContacts, getChatUsers, getCurrentUser } from '@/lib/api';
 import { Task } from '@/lib/types';
 import {
   Dialog,
@@ -21,6 +21,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { ErrorState } from '@/components/ui/error-state';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { useToast } from '@/components/ui/toast-provider';
 import { Search, X } from 'lucide-react';
 
 interface TaskFormModalProps {
@@ -34,14 +37,32 @@ interface TaskFormModalProps {
 export default function TaskFormModal({ open, onClose, task, defaultContactId, defaultDate }: TaskFormModalProps) {
   const queryClient = useQueryClient();
   const isEdit = !!task;
+  const { toast } = useToast();
 
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState<'Alta' | 'Media' | 'Baixa'>('Media');
+  const [assignedToUserId, setAssignedToUserId] = useState<string>('');
   const [contactSearch, setContactSearch] = useState('');
   const [selectedContact, setSelectedContact] = useState<{ id: number; name: string; company: string } | null>(null);
   const [showContactList, setShowContactList] = useState(false);
+
+  const { data: currentUser } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: getCurrentUser,
+  });
+
+  const { data: teamUsers = [] } = useQuery({
+    queryKey: ['chat-users'],
+    queryFn: getChatUsers,
+    enabled: open,
+  });
+
+  const canAssignOthers = !!(currentUser?.isSuperAdmin || currentUser?.role === 'admin' || !currentUser?.accountOwnerId);
+  const assignableUsers = canAssignOthers
+    ? teamUsers
+    : teamUsers.filter((user) => user.id === currentUser?.id);
 
   // Populate form when editing
   useEffect(() => {
@@ -51,6 +72,7 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
         setNotes(task.notes ?? '');
         setDueDate(task.dueDate ? task.dueDate.slice(0, 10) : '');
         setPriority(task.priority as 'Alta' | 'Media' | 'Baixa');
+        setAssignedToUserId(task.assignedToUserId ? String(task.assignedToUserId) : currentUser?.id ? String(currentUser.id) : '');
         setSelectedContact(task.contact ?? null);
         setContactSearch(task.contact ? task.contact.name : '');
       } else {
@@ -58,11 +80,12 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
         setNotes('');
         setDueDate(defaultDate || '');
         setPriority('Media');
+        setAssignedToUserId(currentUser?.id ? String(currentUser.id) : '');
         setContactSearch('');
         setSelectedContact(null);
       }
     }
-  }, [open, task]);
+  }, [open, task, currentUser?.id]);
 
   // Search contacts
   const { data: contacts = [] } = useQuery({
@@ -86,18 +109,31 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
         dueDate: dueDate || undefined,
         priority,
         contactId: selectedContact?.id ?? null,
+        assignedToUserId: assignedToUserId ? Number(assignedToUserId) : null,
       };
       return isEdit ? updateTask(task!.id, data) : createTask(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast({
+        variant: 'success',
+        title: isEdit ? 'Tarefa atualizada' : 'Tarefa criada',
+        description: isEdit ? 'As alterações foram guardadas.' : 'A nova tarefa já está disponível.',
+      });
       onClose();
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'error',
+        title: 'Não foi possível guardar a tarefa',
+        description: error?.response?.data?.error || error?.message || 'Tenta novamente.',
+      });
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || !assignedToUserId) return;
     mutation.mutate();
   };
 
@@ -164,6 +200,27 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div>
+            <Label className="text-[#0A2540]">Responsável *</Label>
+            <Select value={assignedToUserId} onValueChange={setAssignedToUserId}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Selecionar responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                {assignableUsers.map((user) => (
+                  <SelectItem key={user.id} value={String(user.id)}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!canAssignOthers && (
+              <p className="mt-1 text-xs text-[#6b7e9a]">
+                Nesta conta, só podes atribuir tarefas a ti mesmo.
+              </p>
+            )}
           </div>
 
           {/* Notas */}
@@ -233,13 +290,28 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
           </div>
 
           {/* Botões */}
+          {mutation.isError && (
+            <ErrorState
+              compact
+              title="Não foi possível guardar a tarefa"
+              message={(mutation.error as any)?.response?.data?.error || (mutation.error as Error)?.message || 'Verifica os dados e tenta novamente.'}
+              onRetry={() => mutation.mutate()}
+              secondaryAction={{ label: 'Fechar', onClick: onClose }}
+            />
+          )}
+
           <div className="flex gap-2 justify-end pt-2">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={!title.trim() || mutation.isPending}>
+            <LoadingButton
+              type="submit"
+              disabled={!title.trim() || !assignedToUserId}
+              loading={mutation.isPending}
+              loadingLabel={isEdit ? 'A guardar...' : 'A criar...'}
+            >
               {isEdit ? 'Guardar' : 'Criar Tarefa'}
-            </Button>
+            </LoadingButton>
           </div>
         </form>
       </DialogContent>

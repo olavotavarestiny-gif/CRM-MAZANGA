@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { checkLimit, getAllUsage } = require('../lib/plan-limits');
+const { requirePermission } = require('../lib/permissions');
 
 // Helper: resolve orgId for the current user
 function getOrgId(req) {
@@ -54,8 +55,36 @@ async function buildChannelResponse(channel, userId) {
   };
 }
 
+async function getChannelWithMembers(channelId, orgId) {
+  return prisma.chatChannel.findFirst({
+    where: { id: channelId, orgId },
+    include: {
+      members: { include: { user: { select: { name: true, email: true } } } },
+    },
+  });
+}
+
+function canManageChannel(req, channel) {
+  if (!channel || channel.type !== 'channel') return false;
+  if (req.user.isSuperAdmin || req.user.role === 'admin' || req.user.isAccountOwner) return true;
+  return channel.createdById === req.user.id && channel.members.some((member) => member.userId === req.user.id);
+}
+
+async function getValidOrgMemberIds(orgId, memberIds) {
+  const members = await prisma.user.findMany({
+    where: {
+      active: true,
+      OR: [{ id: orgId }, { accountOwnerId: orgId }],
+      id: { in: memberIds },
+    },
+    select: { id: true },
+  });
+
+  return members.map((member) => member.id);
+}
+
 // GET /api/chat/channels
-router.get('/channels', async (req, res) => {
+router.get('/channels', requirePermission('chat', 'view'), async (req, res) => {
   try {
     const orgId = getOrgId(req);
     const userId = req.user.id;
@@ -80,7 +109,7 @@ router.get('/channels', async (req, res) => {
 });
 
 // POST /api/chat/channels
-router.post('/channels', async (req, res) => {
+router.post('/channels', requirePermission('chat', 'edit'), async (req, res) => {
   try {
     const orgId = getOrgId(req);
     const userId = req.user.id;
@@ -127,7 +156,7 @@ router.post('/channels', async (req, res) => {
 });
 
 // POST /api/chat/dm
-router.post('/dm', async (req, res) => {
+router.post('/dm', requirePermission('chat', 'edit'), async (req, res) => {
   try {
     const orgId = getOrgId(req);
     const userId = req.user.id;
@@ -185,7 +214,7 @@ router.post('/dm', async (req, res) => {
 });
 
 // GET /api/chat/channels/:id/messages
-router.get('/channels/:id/messages', async (req, res) => {
+router.get('/channels/:id/messages', requirePermission('chat', 'view'), async (req, res) => {
   try {
     const orgId = getOrgId(req);
     const userId = req.user.id;
@@ -231,7 +260,7 @@ router.get('/channels/:id/messages', async (req, res) => {
 });
 
 // POST /api/chat/channels/:id/messages
-router.post('/channels/:id/messages', async (req, res) => {
+router.post('/channels/:id/messages', requirePermission('chat', 'edit'), async (req, res) => {
   try {
     const orgId = getOrgId(req);
     const userId = req.user.id;
@@ -295,7 +324,7 @@ router.post('/channels/:id/messages', async (req, res) => {
 });
 
 // POST /api/chat/channels/:id/read
-router.post('/channels/:id/read', async (req, res) => {
+router.post('/channels/:id/read', requirePermission('chat', 'view'), async (req, res) => {
   try {
     const userId = req.user.id;
     const { id: channelId } = req.params;
@@ -313,7 +342,7 @@ router.post('/channels/:id/read', async (req, res) => {
 });
 
 // GET /api/chat/unread
-router.get('/unread', async (req, res) => {
+router.get('/unread', requirePermission('chat', 'view'), async (req, res) => {
   try {
     const orgId = getOrgId(req);
     const userId = req.user.id;
@@ -342,7 +371,7 @@ router.get('/unread', async (req, res) => {
   }
 });
 
-// GET /api/chat/users — list org members for @mentions and channel creation
+// GET /api/chat/users — list org members for @mentions, channel creation, and task assignment
 router.get('/users', async (req, res) => {
   try {
     const orgId = getOrgId(req);
@@ -369,13 +398,103 @@ router.get('/users', async (req, res) => {
 });
 
 // GET /api/chat/limits
-router.get('/limits', async (req, res) => {
+router.get('/limits', requirePermission('chat', 'view'), async (req, res) => {
   try {
     const orgId = getOrgId(req);
     const data = await getAllUsage(orgId);
     res.json(data);
   } catch (err) {
     console.error('GET /chat/limits error:', err);
+    res.status(500).json({ error: 'Erro interno' });
+  }
+});
+
+// PATCH /api/chat/channels/:id
+router.patch('/channels/:id', requirePermission('chat', 'edit'), async (req, res) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = req.user.id;
+    const { id: channelId } = req.params;
+    const { name, description, memberIds } = req.body;
+
+    const channel = await getChannelWithMembers(channelId, orgId);
+    if (!channel) return res.status(404).json({ error: 'Canal não encontrado' });
+    if (channel.type !== 'channel') return res.status(400).json({ error: 'Só canais de grupo podem ser geridos' });
+    if (!canManageChannel(req, channel)) return res.status(403).json({ error: 'Sem permissão para gerir este canal' });
+
+    const updateData = {};
+    if (name !== undefined) {
+      if (!String(name).trim()) return res.status(400).json({ error: 'Nome é obrigatório' });
+      updateData.name = String(name).trim();
+    }
+    if (description !== undefined) {
+      updateData.description = String(description).trim() || null;
+    }
+
+    let finalMemberIds;
+    if (memberIds !== undefined) {
+      if (!Array.isArray(memberIds)) {
+        return res.status(400).json({ error: 'memberIds deve ser uma lista' });
+      }
+
+      finalMemberIds = Array.from(new Set(memberIds.map((memberId) => parseInt(memberId, 10)).filter(Number.isInteger)));
+      if (finalMemberIds.length === 0) {
+        return res.status(400).json({ error: 'O canal precisa de pelo menos um membro' });
+      }
+
+      const validMemberIds = await getValidOrgMemberIds(orgId, finalMemberIds);
+      if (validMemberIds.length !== finalMemberIds.length) {
+        return res.status(400).json({ error: 'Existem membros inválidos para esta conta' });
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (Object.keys(updateData).length > 0) {
+        await tx.chatChannel.update({
+          where: { id: channelId },
+          data: updateData,
+        });
+      }
+
+      if (finalMemberIds) {
+        await tx.chatChannelMember.deleteMany({
+          where: {
+            channelId,
+            userId: { notIn: finalMemberIds },
+          },
+        });
+
+        await tx.chatChannelMember.createMany({
+          data: finalMemberIds.map((memberId) => ({ channelId, userId: memberId })),
+          skipDuplicates: true,
+        });
+      }
+    });
+
+    const updatedChannel = await getChannelWithMembers(channelId, orgId);
+    const result = await buildChannelResponse(updatedChannel, userId);
+    res.json(result);
+  } catch (err) {
+    console.error('PATCH /chat/channels/:id error:', err);
+    res.status(500).json({ error: 'Erro interno' });
+  }
+});
+
+// DELETE /api/chat/channels/:id
+router.delete('/channels/:id', requirePermission('chat', 'edit'), async (req, res) => {
+  try {
+    const orgId = getOrgId(req);
+    const { id: channelId } = req.params;
+
+    const channel = await getChannelWithMembers(channelId, orgId);
+    if (!channel) return res.status(404).json({ error: 'Canal não encontrado' });
+    if (channel.type !== 'channel') return res.status(400).json({ error: 'Só canais de grupo podem ser eliminados' });
+    if (!canManageChannel(req, channel)) return res.status(403).json({ error: 'Sem permissão para gerir este canal' });
+
+    await prisma.chatChannel.delete({ where: { id: channelId } });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /chat/channels/:id error:', err);
     res.status(500).json({ error: 'Erro interno' });
   }
 });
