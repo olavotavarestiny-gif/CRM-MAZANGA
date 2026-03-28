@@ -3,6 +3,7 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
 const { DEFAULT_PLAN, isSupportedPlan, normalizePlan } = require('../lib/plans');
+const { canCreateUser, buildLimitErrorPayload } = require('../lib/plan-limits');
 
 // Lazy Supabase admin client — created on first use, not at startup
 let _supabaseAdmin = null;
@@ -115,7 +116,7 @@ router.patch('/accounts/:id', async (req, res) => {
     const data = {};
     if (plan !== undefined) {
       if (!isSupportedPlan(plan)) {
-        return res.status(400).json({ error: 'Plano inválido. Use essencial ou profissional.' });
+        return res.status(400).json({ error: 'Plano inválido. Use essencial, profissional ou enterprise.' });
       }
       data.plan = plan;
     }
@@ -147,6 +148,7 @@ router.patch('/accounts/:id', async (req, res) => {
 router.post('/users', async (req, res) => {
   try {
     const { name, email, password, role, accountOwnerId, plan, permissions } = req.body;
+    let targetAccountOwnerId = null;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email e password são obrigatórios' });
@@ -157,20 +159,32 @@ router.post('/users', async (req, res) => {
     }
 
     if (plan !== undefined && !isSupportedPlan(plan)) {
-      return res.status(400).json({ error: 'Plano inválido. Use essencial ou profissional.' });
+      return res.status(400).json({ error: 'Plano inválido. Use essencial, profissional ou enterprise.' });
     }
 
     // Verificar se email já existe no PostgreSQL
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
     if (existingUser) {
       return res.status(400).json({ error: 'Email já está registado' });
     }
 
     // Validar accountOwnerId se fornecido
     if (accountOwnerId) {
-      const accountOwner = await prisma.user.findUnique({ where: { id: parseInt(accountOwnerId) } });
+      targetAccountOwnerId = parseInt(accountOwnerId);
+      const accountOwner = await prisma.user.findUnique({
+        where: { id: targetAccountOwnerId },
+        select: { id: true },
+      });
       if (!accountOwner) {
         return res.status(400).json({ error: 'Account owner não encontrado' });
+      }
+
+      const limitState = await canCreateUser(targetAccountOwnerId);
+      if (!limitState.allowed) {
+        return res.status(403).json(buildLimitErrorPayload(limitState));
       }
     }
 
@@ -205,7 +219,7 @@ router.post('/users', async (req, res) => {
         mustChangePassword: true,
         plan: plan || DEFAULT_PLAN,
         permissions: permissions ? JSON.stringify(permissions) : null,
-        accountOwnerId: accountOwnerId ? parseInt(accountOwnerId) : null,
+        accountOwnerId: targetAccountOwnerId,
       },
     });
 
@@ -241,7 +255,7 @@ router.patch('/users/:id', async (req, res) => {
     }
     if (plan !== undefined) {
       if (!isSupportedPlan(plan)) {
-        return res.status(400).json({ error: 'Plano inválido. Use essencial ou profissional.' });
+        return res.status(400).json({ error: 'Plano inválido. Use essencial, profissional ou enterprise.' });
       }
       updateData.plan = plan;
     }

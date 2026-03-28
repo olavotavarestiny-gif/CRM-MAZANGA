@@ -4,9 +4,10 @@ const prisma = require('../lib/prisma');
 const automationRunner = require('../services/automationRunner');
 const requireAuth = require('../middleware/auth');
 const { requirePermission, requireDeletePermission } = require('../lib/permissions');
+const { requirePlanFeature, canCreateContact, getPlan, hasPlanFeature } = require('../lib/plan-limits');
 
 // GET /api/forms - lista todos os formulários com contagem de submissões
-router.get('/', requireAuth, requirePermission('forms', 'view'), async (req, res) => {
+router.get('/', requireAuth, requirePlanFeature('formularios'), requirePermission('forms', 'view'), async (req, res) => {
   try {
     const forms = await prisma.form.findMany({
       where: { userId: req.user.effectiveUserId },
@@ -24,7 +25,7 @@ router.get('/', requireAuth, requirePermission('forms', 'view'), async (req, res
 });
 
 // POST /api/forms - criar novo formulário
-router.post('/', requireAuth, requirePermission('forms', 'edit'), async (req, res) => {
+router.post('/', requireAuth, requirePlanFeature('formularios'), requirePermission('forms', 'edit'), async (req, res) => {
   try {
     const { title, description, mode, thankYouUrl } = req.body;
     const form = await prisma.form.create({
@@ -55,6 +56,13 @@ router.get('/:id', async (req, res) => {
     if (!form) {
       return res.status(404).json({ error: 'Form not found' });
     }
+    if (!form.userId) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+    const plan = await getPlan(form.userId);
+    if (!hasPlanFeature(plan, 'formularios')) {
+      return res.status(403).json({ error: 'Funcionalidade não disponível no seu plano' });
+    }
     // Parse options JSON para campos de múltipla escolha
     const fieldsWithParsedOptions = form.fields.map((field) => ({
       ...field,
@@ -68,7 +76,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PUT /api/forms/:id - atualizar metadados do formulário
-router.put('/:id', requireAuth, requirePermission('forms', 'edit'), async (req, res) => {
+router.put('/:id', requireAuth, requirePlanFeature('formularios'), requirePermission('forms', 'edit'), async (req, res) => {
   try {
     const form = await prisma.form.findUnique({
       where: { id: req.params.id },
@@ -99,7 +107,7 @@ router.put('/:id', requireAuth, requirePermission('forms', 'edit'), async (req, 
 });
 
 // DELETE /api/forms/:id - eliminar formulário (cascata)
-router.delete('/:id', requireAuth, requireDeletePermission, async (req, res) => {
+router.delete('/:id', requireAuth, requirePlanFeature('formularios'), requireDeletePermission, async (req, res) => {
   try {
     // Only account owners can delete
     if (!req.user.isAccountOwner) {
@@ -125,7 +133,7 @@ router.delete('/:id', requireAuth, requireDeletePermission, async (req, res) => 
 });
 
 // POST /api/forms/:id/fields - adicionar campo ao formulário
-router.post('/:id/fields', requireAuth, requirePermission('forms', 'edit'), async (req, res) => {
+router.post('/:id/fields', requireAuth, requirePlanFeature('formularios'), requirePermission('forms', 'edit'), async (req, res) => {
   try {
     // Verify form ownership
     const form = await prisma.form.findUnique({
@@ -159,7 +167,7 @@ router.post('/:id/fields', requireAuth, requirePermission('forms', 'edit'), asyn
 });
 
 // PUT /api/forms/:id/fields/:fieldId - atualizar campo
-router.put('/:id/fields/:fieldId', requireAuth, requirePermission('forms', 'edit'), async (req, res) => {
+router.put('/:id/fields/:fieldId', requireAuth, requirePlanFeature('formularios'), requirePermission('forms', 'edit'), async (req, res) => {
   try {
     // Verify form ownership
     const form = await prisma.form.findUnique({
@@ -193,7 +201,7 @@ router.put('/:id/fields/:fieldId', requireAuth, requirePermission('forms', 'edit
 });
 
 // DELETE /api/forms/:id/fields/:fieldId - eliminar campo
-router.delete('/:id/fields/:fieldId', requireAuth, requireDeletePermission, async (req, res) => {
+router.delete('/:id/fields/:fieldId', requireAuth, requirePlanFeature('formularios'), requireDeletePermission, async (req, res) => {
   try {
     // Verify form ownership
     const form = await prisma.form.findUnique({
@@ -215,7 +223,7 @@ router.delete('/:id/fields/:fieldId', requireAuth, requireDeletePermission, asyn
 });
 
 // POST /api/forms/:id/fields/reorder - reordenar campos
-router.post('/:id/fields/reorder', requireAuth, requirePermission('forms', 'edit'), async (req, res) => {
+router.post('/:id/fields/reorder', requireAuth, requirePlanFeature('formularios'), requirePermission('forms', 'edit'), async (req, res) => {
   try {
     // Verify form ownership
     const form = await prisma.form.findUnique({
@@ -243,6 +251,21 @@ router.post('/:id/fields/reorder', requireAuth, requirePermission('forms', 'edit
 // POST /api/forms/:id/submit - submeter formulário (pública)
 router.post('/:id/submit', async (req, res) => {
   try {
+    const form = await prisma.form.findUnique({
+      where: { id: req.params.id },
+      select: { userId: true },
+    });
+    if (!form) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+    if (!form.userId) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+    const plan = await getPlan(form.userId);
+    if (!hasPlanFeature(plan, 'formularios')) {
+      return res.status(403).json({ error: 'Funcionalidade não disponível no seu plano' });
+    }
+
     const { answers } = req.body; // [{fieldId, value}, ...]
     const submission = await prisma.formSubmission.create({
       data: {
@@ -258,9 +281,15 @@ router.post('/:id/submit', async (req, res) => {
     try {
       const formWithFields = await prisma.form.findUnique({
         where: { id: req.params.id },
-        include: { fields: true },
         select: { fields: true, userId: true },
       });
+
+      if (!formWithFields) {
+        return;
+      }
+      if (!formWithFields.userId) {
+        return;
+      }
 
       const contactData = {};
       for (const answer of answers) {
@@ -273,6 +302,11 @@ router.post('/:id/submit', async (req, res) => {
       // Só criar se tiver phone (campo único obrigatório)
       if (contactData.phone) {
         try {
+          const contactLimit = await canCreateContact(formWithFields.userId);
+          if (!contactLimit.allowed) {
+            return;
+          }
+
           const newContact = await prisma.contact.create({
             data: {
               userId: formWithFields.userId,
@@ -307,7 +341,7 @@ router.post('/:id/submit', async (req, res) => {
 });
 
 // GET /api/forms/:id/submissions - obter submissões do formulário
-router.get('/:id/submissions', requireAuth, async (req, res) => {
+router.get('/:id/submissions', requireAuth, requirePlanFeature('formularios'), async (req, res) => {
   try {
     // Verify form ownership
     const form = await prisma.form.findUnique({

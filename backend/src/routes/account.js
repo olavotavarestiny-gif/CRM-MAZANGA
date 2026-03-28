@@ -4,6 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
 const { requireAccountOwner } = require('../middleware/auth');
 const { parsePermissions, intersectPermissions } = require('../lib/permissions');
+const { canCreateUser, buildLimitErrorPayload } = require('../lib/plan-limits');
 
 // Lazy Supabase admin client
 let _supabaseAdmin = null;
@@ -68,8 +69,16 @@ router.post('/team', requireAccountOwner, async (req, res) => {
       return res.status(400).json({ error: 'Password deve ter pelo menos 6 caracteres' });
     }
 
+    const limitState = await canCreateUser(accountOwnerId);
+    if (!limitState.allowed) {
+      return res.status(403).json(buildLimitErrorPayload(limitState));
+    }
+
     // Verificar se email já existe
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
     if (existingUser) {
       return res.status(400).json({ error: 'Email já está registado' });
     }

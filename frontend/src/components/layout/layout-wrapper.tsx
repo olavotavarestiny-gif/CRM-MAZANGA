@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { useIsFetching } from '@tanstack/react-query';
 import { getCurrentUser } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
 import Sidebar from './sidebar';
@@ -11,9 +12,11 @@ import OnboardingChecklist from '@/components/help/onboarding-checklist';
 import { ONBOARDING_OPEN } from '@/lib/onboarding-tasks';
 import ProductTourProvider, { useTour } from '@/components/help/product-tour';
 import { ReactNode } from 'react';
-import { Menu, Eye, LogOut } from 'lucide-react';
+import { Menu, Eye, Info, LogOut, X } from 'lucide-react';
 import type { User } from '@/lib/api';
-import { canView, getVisibleModules } from '@/lib/permissions';
+import { canView, getVisibleModules, hasFeature } from '@/lib/permissions';
+
+const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
 
 // Map route prefix → module key (for permission redirect checks)
 const PATH_MODULE_MAP: Record<string, Parameters<typeof canView>[1]> = {
@@ -21,12 +24,44 @@ const PATH_MODULE_MAP: Record<string, Parameters<typeof canView>[1]> = {
   '/pipeline':   'pipeline',
   '/tasks':      'tasks',
   '/vendas':     'vendas',
+  '/faturacao':  'vendas',
   '/calendario': 'calendario',
   '/chat':       'chat',
   '/automations':'automations',
   '/forms':      'forms',
   '/finances':   'finances',
-  '/produtos':   'finances',
+  '/produtos':   'vendas',
+};
+
+const MODULE_LABELS: Record<string, string> = {
+  '/contacts': 'Clientes',
+  '/pipeline': 'Processos',
+  '/tasks': 'Tarefas',
+  '/vendas': 'Vendas',
+  '/faturacao': 'Vendas',
+  '/calendario': 'Calendário',
+  '/chat': 'Conversas',
+  '/automations': 'Automações',
+  '/forms': 'Formulários',
+  '/finances': 'Finanças',
+  '/produtos': 'Vendas',
+};
+
+const MODULE_TO_PLAN_FEATURE = {
+  contacts: 'clientes',
+  pipeline: 'processos',
+  tasks: 'tarefas',
+  chat: 'conversas',
+  calendario: 'calendario',
+  automations: 'automacoes',
+  forms: 'formularios',
+  finances: 'financas',
+  vendas: 'vendas',
+} as const;
+
+type AccessNotice = {
+  title: string;
+  message: string;
 };
 
 // ── Inner layout — consumes TourContext ──────────────────────────────────────
@@ -35,10 +70,14 @@ function LayoutInner({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { startTour } = useTour();
+  const fetchingCount = useIsFetching();
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [accessNotice, setAccessNotice] = useState<AccessNotice | null>(null);
+  const [routeTransitioning, setRouteTransitioning] = useState(false);
+  const [showTopProgress, setShowTopProgress] = useState(false);
   const authChecked = useRef(false);
   const currentSessionRef = useRef<string | null>(null);
 
@@ -93,6 +132,33 @@ function LayoutInner({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('kukugest:user-updated', handleUserUpdated);
   }, []);
 
+  useEffect(() => {
+    setRouteTransitioning(true);
+    const timer = window.setTimeout(() => setRouteTransitioning(false), 350);
+    return () => window.clearTimeout(timer);
+  }, [pathname]);
+
+  useEffect(() => {
+    const active = routeTransitioning || fetchingCount > 0;
+    if (active) {
+      setShowTopProgress(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setShowTopProgress(false), 220);
+    return () => window.clearTimeout(timer);
+  }, [fetchingCount, routeTransitioning]);
+
+  useEffect(() => {
+    try {
+      const rawNotice = sessionStorage.getItem(ACCESS_NOTICE_STORAGE_KEY);
+      if (!rawNotice) return;
+      setAccessNotice(JSON.parse(rawNotice) as AccessNotice);
+      sessionStorage.removeItem(ACCESS_NOTICE_STORAGE_KEY);
+    } catch {
+      sessionStorage.removeItem(ACCESS_NOTICE_STORAGE_KEY);
+    }
+  }, [pathname]);
+
   // Keep-alive: ping backend every 14 minutes to prevent Render free tier cold starts
   useEffect(() => {
     if (isPublicPage) return;
@@ -120,21 +186,32 @@ function LayoutInner({ children }: { children: ReactNode }) {
         router.push('/');
         return;
       }
-      // Permission-based redirect for team members
-      if (user.accountOwnerId) {
-        const firstSegment = '/' + pathname.split('/')[1];
-        const module = PATH_MODULE_MAP[firstSegment];
-        if (module && !canView(user, module)) {
-          // Redirect to first visible module
-          const visible = getVisibleModules(user);
-          const moduleToPath: Record<string, string> = {
-            contacts: '/contacts', pipeline: '/pipeline', tasks: '/tasks',
-            chat: '/chat', calendario: '/calendario', automations: '/automations',
-            forms: '/forms', finances: '/finances',
-          };
-          const fallback = visible.map(m => moduleToPath[m]).find(Boolean) ?? '/';
-          router.push(fallback);
-        }
+
+      const firstSegment = '/' + pathname.split('/')[1];
+      const module = PATH_MODULE_MAP[firstSegment];
+      if (module && !canView(user, module)) {
+        const visible = getVisibleModules(user);
+        const moduleToPath: Record<string, string> = {
+          contacts: '/contacts', pipeline: '/pipeline', tasks: '/tasks',
+          chat: '/chat', calendario: '/calendario', automations: '/automations',
+          forms: '/forms', finances: '/finances', vendas: '/vendas',
+        };
+        const fallback = visible.map(m => moduleToPath[m]).find(Boolean) ?? '/';
+        const blockedByPlan = !hasFeature(user, MODULE_TO_PLAN_FEATURE[module]);
+
+        try {
+          sessionStorage.setItem(
+            ACCESS_NOTICE_STORAGE_KEY,
+            JSON.stringify({
+              title: blockedByPlan ? 'Funcionalidade indisponível no seu plano' : 'Acesso restrito',
+              message: blockedByPlan
+                ? `${MODULE_LABELS[firstSegment] || 'Esta funcionalidade'} não está disponível no plano atual da sua conta.`
+                : 'Não tem permissão para aceder a esta área com a configuração atual da sua conta.',
+            } satisfies AccessNotice)
+          );
+        } catch {}
+
+        router.push(fallback);
       }
     };
 
@@ -195,6 +272,13 @@ function LayoutInner({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen bg-[#f5f7f9]">
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-[80]">
+        <div
+          className={`h-1 origin-left bg-[#0A2540] transition-all duration-300 ease-out ${
+            showTopProgress ? 'opacity-100' : 'opacity-0'
+          } ${routeTransitioning || fetchingCount > 0 ? 'w-2/3' : 'w-full'}`}
+        />
+      </div>
       {/* Sidebar Desktop */}
       <div className="hidden md:flex">
         <Sidebar
@@ -266,6 +350,29 @@ function LayoutInner({ children }: { children: ReactNode }) {
 
         {/* Main Scrollable Area */}
         <main className="flex-1 overflow-y-auto bg-[#f5f7f9]">
+          {accessNotice && (
+            <div className="px-4 pt-4 md:px-6">
+              <div className="flex items-start justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-full bg-white p-1 text-amber-600">
+                    <Info className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">{accessNotice.title}</p>
+                    <p className="mt-1 text-amber-800/90">{accessNotice.message}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAccessNotice(null)}
+                  className="rounded-full p-1 text-amber-700 transition-colors hover:bg-amber-100"
+                  aria-label="Fechar aviso"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
           {children}
         </main>
       </div>

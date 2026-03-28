@@ -30,6 +30,7 @@ const chatRouter = require('./routes/chat');
 const notesRouter = require('./routes/notes');
 const requireAuth = require('./middleware/auth');
 const { requireAdmin, requireAccountOwnerOrAdmin, requireSuperAdmin } = require('./middleware/auth');
+const { requirePlanFeature } = require('./lib/plan-limits');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -95,7 +96,7 @@ app.use('/api/setup', setupRouter);
 app.use('/api/contacts', requireAuth, contactsRouter);
 app.use('/api/messages', requireAuth, messagesRouter);
 app.use('/api/send', requireAuth, sendRouter);
-app.use('/api/automations', requireAuth, automationsRouter);
+app.use('/api/automations', requireAuth, requirePlanFeature('automacoes'), automationsRouter);
 app.use('/api/whatsapp', requireAuth, whatsappRouter);
 app.use('/api/tasks', requireAuth, tasksRouter);
 app.use('/api/inbox', requireAuth, inboxRouter);
@@ -107,19 +108,19 @@ app.use('/api/admin', requireAuth, requireAdmin, adminRouter);
 app.use('/api/superadmin', requireAuth, requireSuperAdmin, superadminRouter);
 
 // Account owner or admin routes
-app.use('/api/finances', requireAuth, financesRouter);
+app.use('/api/finances', requireAuth, requirePlanFeature('financas'), financesRouter);
 app.use('/api/account', requireAuth, accountRouter);
 app.use('/api/pipeline-stages', requireAuth, pipelineStagesRouter);
 app.use('/api/calendar', calendarRouter);
 // Faturação AGT
-app.use('/api/faturacao', requireAuth, faturacaoConfigRouter);
-app.use('/api/faturacao', requireAuth, faturacaoSeriesRouter);
-app.use('/api/faturacao', requireAuth, faturacaoClientesRouter);
-app.use('/api/faturacao', requireAuth, faturacaoProdutosRouter);
-app.use('/api/faturacao', requireAuth, faturacaoFacturasRouter);
-app.use('/api/faturacao', requireAuth, faturacaoSaftRouter);
-app.use('/api/faturacao', requireAuth, faturacaoRecorrentesRouter);
-app.use('/api/chat', requireAuth, chatRouter);
+app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoConfigRouter);
+app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoSeriesRouter);
+app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoClientesRouter);
+app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoProdutosRouter);
+app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoFacturasRouter);
+app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoSaftRouter);
+app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoRecorrentesRouter);
+app.use('/api/chat', requireAuth, requirePlanFeature('conversas'), chatRouter);
 app.use('/api', requireAuth, notesRouter);
 
 // Scheduler: process recurring invoices daily at 00:05

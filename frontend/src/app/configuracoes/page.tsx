@@ -11,31 +11,40 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   CheckCircle2, Plus, Building2, Settings, User as UserIcon,
-  Users, Shield, Eye, EyeOff, Trash2, Pencil, ShieldCheck,
+  Users, Shield, Trash2, Pencil,
 } from 'lucide-react';
 import {
   getFaturacaoConfig, updateFaturacaoConfig, getEstabelecimentos, createEstabelecimento,
   getCurrentUser, updateCurrentUserProfile, changePassword,
   getTeamMembers, addTeamMember, removeTeamMember,
-  getUsers, createUser, updateUser, deleteUser, getLoginLogs,
-  getClientAccounts, updateClientAccount, createClientAccount,
-  getSuperAdminOrgs, updateSuperAdminOrg, deleteSuperAdminOrg, impersonateUser,
-  getSuperAdminUsage, getSuperAdminStorage,
 } from '@/lib/api';
-import type { User, LoginLog, SuperAdminOrg, SuperAdminUsageStat, SuperAdminStorageStat } from '@/lib/api';
-import type { IBANEntry, ClientAccount } from '@/lib/types';
+import type { PlanName, User } from '@/lib/api';
+import type { IBANEntry } from '@/lib/types';
 import MemberPermissionsModal from '@/components/configuracoes/member-permissions-modal';
+import { PlanComparisonGrid } from '@/components/plans/plan-comparison-grid';
+import { ErrorState } from '@/components/ui/error-state';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { useToast } from '@/components/ui/toast-provider';
+import {
+  PLAN_FEATURE_LABELS,
+  buildWhatsAppPlanLink,
+  formatLimitValue,
+  getPlanBadgeClasses,
+  getPlanBillingOptions,
+  getSortedPlanEntries,
+} from '@/lib/plan-utils';
 
 function ConfiguracoesContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const qc = useQueryClient();
+  const { toast } = useToast();
 
-  type TabId = 'perfil' | 'empresa' | 'equipa' | 'admin' | 'superadmin';
-  type ConfigTabId = Extract<TabId, 'perfil' | 'empresa' | 'equipa'>;
-  const requestedTab = searchParams?.get('tab') as TabId | null;
-  const isConfigTab = (tab: string | null): tab is ConfigTabId =>
-    tab === 'perfil' || tab === 'empresa' || tab === 'equipa';
+  type TabId = 'perfil' | 'plano' | 'empresa' | 'equipa';
+  type RedirectTabId = TabId | 'admin' | 'superadmin';
+  const requestedTab = searchParams?.get('tab') as RedirectTabId | null;
+  const isConfigTab = (tab: string | null): tab is TabId =>
+    tab === 'perfil' || tab === 'plano' || tab === 'empresa' || tab === 'equipa';
   const [activeTab, setActiveTab] = useState<TabId>(
     isConfigTab(requestedTab) ? requestedTab : 'perfil'
   );
@@ -51,6 +60,14 @@ function ConfiguracoesContent() {
   const isSuperAdmin = !!(currentUser?.isSuperAdmin || currentUser?.email === 'olavo@mazanga.digital');
   const hasAdminAccess = !!(isAdmin || isSuperAdmin);
   const platformAdminHref = isSuperAdmin ? '/superadmin?section=organizations' : hasAdminAccess ? '/superadmin?section=users' : null;
+  const currentPlan = (currentUser?.plan || 'essencial') as PlanName;
+  const currentPlanCatalog = currentUser?.availablePlans?.[currentPlan];
+  const planEntries = getSortedPlanEntries(currentUser?.availablePlans);
+  const [selectedBilling, setSelectedBilling] = useState<Record<PlanName, string>>({
+    essencial: 'Mensal',
+    profissional: '6 meses',
+    enterprise: 'Personalizado',
+  });
 
   useEffect(() => {
     if (isConfigTab(requestedTab)) {
@@ -92,30 +109,58 @@ function ConfiguracoesContent() {
       qc.invalidateQueries({ queryKey: ['currentUser'] });
       setProfileError('');
       setProfileSaved(true);
+      toast({
+        variant: 'success',
+        title: 'Perfil guardado',
+        description: 'As alterações do teu perfil já estão ativas.',
+      });
       window.dispatchEvent(new CustomEvent('kukugest:user-updated', { detail: updatedUser }));
       setTimeout(() => setProfileSaved(false), 2500);
     },
     onError: (err: Error) => {
-      setProfileError(err.message || 'Erro ao guardar o perfil. Tente novamente.');
+      const message = err.message || 'Erro ao guardar o perfil. Tente novamente.';
+      setProfileError(message);
+      toast({
+        variant: 'error',
+        title: 'Falha ao guardar perfil',
+        description: message,
+      });
     },
   });
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitPasswordChange = async () => {
     setPwError('');
     setPwSuccess('');
-    if (pwForm.new !== pwForm.confirm) { setPwError('As passwords não correspondem'); return; }
-    if (pwForm.new.length < 6) { setPwError('A password deve ter pelo menos 6 caracteres'); return; }
+    if (pwForm.new !== pwForm.confirm) { setPwError('As passwords não correspondem'); return false; }
+    if (pwForm.new.length < 6) { setPwError('A password deve ter pelo menos 6 caracteres'); return false; }
     setPwSubmitting(true);
     try {
       await changePassword(pwForm.new);
       setPwSuccess('Password alterada com sucesso!');
       setPwForm({ current: '', new: '', confirm: '' });
+      toast({
+        variant: 'success',
+        title: 'Password atualizada',
+        description: 'A tua password foi alterada com sucesso.',
+      });
+      return true;
     } catch (err: any) {
-      setPwError(err.message || 'Erro ao alterar a password. Tente novamente.');
+      const message = err.message || 'Erro ao alterar a password. Tente novamente.';
+      setPwError(message);
+      toast({
+        variant: 'error',
+        title: 'Falha ao alterar password',
+        description: message,
+      });
+      return false;
     } finally {
       setPwSubmitting(false);
     }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitPasswordChange();
   };
 
   // ── Empresa & AGT ────────────────────────────────────────
@@ -127,12 +172,15 @@ function ConfiguracoesContent() {
   const [configSaved, setConfigSaved] = useState(false);
   const [configError, setConfigError] = useState('');
   const [showEstab, setShowEstab] = useState(false);
+  const [estabError, setEstabError] = useState('');
   const [estabForm, setEstabForm] = useState({ nome: '', nif: '', morada: '', telefone: '', email: '', isPrincipal: false });
+  const companyNameForPlan =
+    (isOwner ? configForm.nomeEmpresa : currentUser?.accountOwnerName) || currentUser?.accountOwnerName || null;
 
   const { data: config } = useQuery({
     queryKey: ['faturacao-config'],
     queryFn: getFaturacaoConfig,
-    enabled: activeTab === 'empresa' && !!isOwner,
+    enabled: (activeTab === 'empresa' || activeTab === 'plano') && !!isOwner,
   });
 
   const { data: estabs = [] } = useQuery({
@@ -166,10 +214,21 @@ function ConfiguracoesContent() {
       qc.invalidateQueries({ queryKey: ['faturacao-config'] });
       setConfigError('');
       setConfigSaved(true);
+      toast({
+        variant: 'success',
+        title: 'Configurações guardadas',
+        description: 'Os dados da empresa foram atualizados.',
+      });
       setTimeout(() => setConfigSaved(false), 2500);
     },
     onError: (err: Error) => {
-      setConfigError(err.message || 'Erro ao guardar as configurações. Tente novamente.');
+      const message = err.message || 'Erro ao guardar as configurações. Tente novamente.';
+      setConfigError(message);
+      toast({
+        variant: 'error',
+        title: 'Falha ao guardar configurações',
+        description: message,
+      });
     },
   });
 
@@ -178,7 +237,22 @@ function ConfiguracoesContent() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['estabelecimentos'] });
       setShowEstab(false);
+      setEstabError('');
       setEstabForm({ nome: '', nif: '', morada: '', telefone: '', email: '', isPrincipal: false });
+      toast({
+        variant: 'success',
+        title: 'Estabelecimento criado',
+        description: 'O novo estabelecimento já está disponível.',
+      });
+    },
+    onError: (err: any) => {
+      const message = err?.response?.data?.error || err?.message || 'Erro ao criar estabelecimento.';
+      setEstabError(message);
+      toast({
+        variant: 'error',
+        title: 'Falha ao criar estabelecimento',
+        description: message,
+      });
     },
   });
 
@@ -200,8 +274,21 @@ function ConfiguracoesContent() {
       setShowAddMember(false);
       setMemberForm({ name: '', email: '', password: '' });
       setMemberError('');
+      toast({
+        variant: 'success',
+        title: 'Membro adicionado',
+        description: 'O novo membro já faz parte da equipa.',
+      });
     },
-    onError: (err: any) => setMemberError(err.response?.data?.error || 'Erro ao adicionar membro'),
+    onError: (err: any) => {
+      const message = err.response?.data?.error || 'Erro ao adicionar membro';
+      setMemberError(message);
+      toast({
+        variant: 'error',
+        title: 'Falha ao adicionar membro',
+        description: message,
+      });
+    },
   });
 
   const removeMember = async (memberId: number) => {
@@ -209,149 +296,48 @@ function ConfiguracoesContent() {
     try {
       await removeTeamMember(memberId);
       qc.invalidateQueries({ queryKey: ['team-members'] });
+      toast({
+        variant: 'success',
+        title: 'Membro removido',
+        description: 'A equipa foi atualizada.',
+      });
     } catch (err: any) {
-      setMemberError(err.response?.data?.error || 'Erro ao remover membro');
+      const message = err.response?.data?.error || 'Erro ao remover membro';
+      setMemberError(message);
+      toast({
+        variant: 'error',
+        title: 'Falha ao remover membro',
+        description: message,
+      });
     }
   };
 
   // ── Equipa: member permissions modal ──────────────────────
   const [permMember, setPermMember] = useState<User | null>(null);
 
-  // ── Admin ────────────────────────────────────────────────
-  const [adminSubTab, setAdminSubTab] = useState<'users' | 'accounts' | 'logins'>('users');
-  const [showCreateUser, setShowCreateUser] = useState(false);
-  const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'user', accountOwnerId: '' });
-  const [userError, setUserError] = useState('');
-
-  const { data: allUsers = [], refetch: refetchUsers } = useQuery({
-    queryKey: ['admin-users'],
-    queryFn: getUsers,
-    enabled: activeTab === 'admin' && hasAdminAccess,
-  });
-
-  const { data: loginLogs = [] } = useQuery({
-    queryKey: ['admin-logins'],
-    queryFn: getLoginLogs,
-    enabled: activeTab === 'admin' && hasAdminAccess && adminSubTab === 'logins',
-  });
-
-  const { data: clientAccounts = [], refetch: refetchAccounts } = useQuery({
-    queryKey: ['admin-accounts'],
-    queryFn: getClientAccounts,
-    enabled: activeTab === 'admin' && hasAdminAccess && adminSubTab === 'accounts',
-  });
-
-  const [showCreateAccount, setShowCreateAccount] = useState(false);
-  const [accountForm, setAccountForm] = useState({ name: '', email: '', password: '', plan: 'essencial' });
-  const [accountError, setAccountError] = useState('');
-
-  const createAccountMutation = useMutation({
-    mutationFn: () => createClientAccount({ ...accountForm }),
-    onSuccess: () => {
-      refetchAccounts();
-      qc.invalidateQueries({ queryKey: ['superadmin-orgs'] });
-      setShowCreateAccount(false);
-      setAccountForm({ name: '', email: '', password: '', plan: 'essencial' });
-      setAccountError('');
-    },
-    onError: (err: any) => setAccountError(err.response?.data?.error || 'Erro ao criar conta'),
-  });
-
-  const updateAccountPlan = async (accountId: number, plan: string) => {
-    try {
-      await updateClientAccount(accountId, { plan });
-      refetchAccounts();
-    } catch { /* ignore */ }
-  };
-
-  const createUserMutation = useMutation({
-    mutationFn: () => {
-      const data: any = { name: userForm.name, email: userForm.email, password: userForm.password };
-      if (userForm.role) data.role = userForm.role;
-      if (userForm.accountOwnerId) data.accountOwnerId = userForm.accountOwnerId;
-      return createUser(data);
-    },
-    onSuccess: () => {
-      refetchUsers();
-      setShowCreateUser(false);
-      setUserForm({ name: '', email: '', password: '', role: 'user', accountOwnerId: '' });
-      setUserError('');
-    },
-    onError: (err: any) => setUserError(err.response?.data?.error || 'Erro ao criar utilizador'),
-  });
-
-  const toggleUserActive = async (userId: number, currentActive: boolean) => {
-    try {
-      await updateUser(userId, { active: !currentActive });
-      refetchUsers();
-    } catch (err: any) {
-      setUserError(err.response?.data?.error || 'Erro ao atualizar utilizador');
-    }
-  };
-
-  const deleteUserAccount = async (userId: number) => {
-    if (!confirm('Tem a certeza que quer eliminar este utilizador?')) return;
-    try {
-      await deleteUser(userId);
-      refetchUsers();
-    } catch (err: any) {
-      setUserError(err.response?.data?.error || 'Erro ao eliminar utilizador');
-    }
-  };
-
-  // ── Super Admin ──────────────────────────────────────────
-  const [saSubTab, setSaSubTab] = useState<'contas' | 'utilizacao' | 'armazenamento'>('contas');
-  const [expandedOrg, setExpandedOrg] = useState<number | null>(null);
-  const [saError, setSaError] = useState('');
-  const [saModuleUpdating, setSaModuleUpdating] = useState<number | null>(null);
-  const [saDeleteConfirm, setSaDeleteConfirm] = useState<number | null>(null);
-
-  const { data: saOrgs = [], refetch: refetchSaOrgs } = useQuery({
-    queryKey: ['superadmin-orgs'],
-    queryFn: getSuperAdminOrgs,
-    enabled: activeTab === 'superadmin' && isSuperAdmin,
-  });
-
-  const { data: saUsage = [] } = useQuery({
-    queryKey: ['superadmin-usage'],
-    queryFn: getSuperAdminUsage,
-    enabled: activeTab === 'superadmin' && saSubTab === 'utilizacao' && isSuperAdmin,
-  });
-
-  const { data: saStorage = [] } = useQuery({
-    queryKey: ['superadmin-storage'],
-    queryFn: getSuperAdminStorage,
-    enabled: activeTab === 'superadmin' && saSubTab === 'armazenamento' && isSuperAdmin,
-  });
-
   // ── Tab config ───────────────────────────────────────────
   const tabs = [
     { id: 'perfil' as TabId, label: 'Perfil', icon: UserIcon, show: true },
+    { id: 'plano' as TabId, label: 'Plano', icon: Shield, show: true },
     { id: 'empresa' as TabId, label: 'Empresa', icon: Building2, show: !!isOwner },
     { id: 'equipa' as TabId, label: 'Equipa', icon: Users, show: !!isOwner },
   ].filter(t => t.show);
 
   const tabBtn = (id: TabId) =>
-    `flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+    `flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
       activeTab === id
-        ? 'text-[#0A2540] border-[#0A2540]'
-        : 'text-gray-500 border-transparent hover:text-[#0A2540]'
-    }`;
-
-  const subTabBtn = (id: string, current: string) =>
-    `pb-2 px-1 text-sm font-medium transition border-b-2 -mb-px ${
-      current === id ? 'text-[#0A2540] border-[#0A2540]' : 'text-gray-500 border-transparent hover:text-[#0A2540]'
+        ? 'bg-[#0A2540] text-white shadow-sm'
+        : 'text-gray-500 hover:bg-slate-50 hover:text-[#0A2540]'
     }`;
 
   return (
-    <div className="p-6 max-w-4xl">
+    <div className="mx-auto max-w-6xl p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#0A2540]">Configurações</h1>
-        <p className="text-gray-500 text-sm mt-1">Perfil, empresa e equipa</p>
+        <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Configurações</h1>
+        <p className="mt-1 text-sm text-gray-500">Perfil, plano, empresa, equipa e administração de conta.</p>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div className="mb-6 inline-flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setActiveTab(id)} className={tabBtn(id)}>
             <Icon className="w-4 h-4" />
@@ -361,7 +347,7 @@ function ConfiguracoesContent() {
       </div>
 
       {platformAdminHref && (
-        <Card className="mb-6 border-slate-200 bg-slate-50/80">
+        <Card className="mb-6 border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="flex items-center gap-2 text-base font-semibold text-[#0A2540]">
@@ -382,7 +368,7 @@ function ConfiguracoesContent() {
       {/* ── PERFIL ──────────────────────────────────────────── */}
       {activeTab === 'perfil' && (
         <div className="space-y-4 max-w-lg">
-          <Card>
+          <Card className="border-slate-200 shadow-sm">
             <div className="p-6 space-y-4">
               <h2 className="text-base font-semibold text-[#0A2540] flex items-center gap-2">
                 <UserIcon className="w-4 h-4 text-gray-500" />
@@ -411,17 +397,23 @@ function ConfiguracoesContent() {
                 <p className="mt-1 text-xs text-gray-400">Este campo aparece no widget do utilizador no topo da aplicação.</p>
               </div>
               {profileError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-                  {profileError}
-                </div>
+                <ErrorState
+                  compact
+                  title="Não foi possível guardar o perfil"
+                  message={profileError}
+                  onRetry={() => { setProfileError(''); profileMutation.mutate(); }}
+                  secondaryAction={{ label: 'Fechar', onClick: () => setProfileError('') }}
+                />
               )}
-              <Button
+              <LoadingButton
                 onClick={() => { setProfileError(''); profileMutation.mutate(); }}
                 disabled={profileMutation.isPending}
+                loading={profileMutation.isPending}
+                loadingLabel="A guardar..."
                 className="w-full bg-[#0A2540] text-white hover:bg-[#0A2540]/90"
               >
-                {profileSaved ? 'Perfil guardado' : profileMutation.isPending ? 'A guardar...' : 'Guardar Perfil'}
-              </Button>
+                {profileSaved ? 'Perfil guardado' : 'Guardar Perfil'}
+              </LoadingButton>
               {(currentUser?.role === 'admin' || currentUser?.isSuperAdmin) && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
                   <Shield className="w-3 h-3" /> {currentUser?.isSuperAdmin ? 'Super Admin' : 'Administrador'}
@@ -430,10 +422,18 @@ function ConfiguracoesContent() {
             </div>
           </Card>
 
-          <Card>
+          <Card className="border-slate-200 shadow-sm">
             <div className="p-6 space-y-4">
               <h2 className="text-base font-semibold text-[#0A2540]">Alterar Password</h2>
-              {pwError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">{pwError}</div>}
+              {pwError && (
+                <ErrorState
+                  compact
+                  title="Não foi possível alterar a password"
+                  message={pwError}
+                  onRetry={() => void submitPasswordChange()}
+                  secondaryAction={{ label: 'Fechar', onClick: () => setPwError('') }}
+                />
+              )}
               {pwSuccess && <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">{pwSuccess}</div>}
               <form onSubmit={handleChangePassword} className="space-y-3">
                 <div>
@@ -448,19 +448,156 @@ function ConfiguracoesContent() {
                   <Label className="text-gray-700">Confirmar Password</Label>
                   <Input type="password" placeholder="••••••••" value={pwForm.confirm} onChange={e => setPwForm(p => ({ ...p, confirm: e.target.value }))} required className="mt-1" />
                 </div>
-                <Button type="submit" disabled={pwSubmitting} className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90">
-                  {pwSubmitting ? 'A alterar...' : 'Alterar Password'}
-                </Button>
+                <LoadingButton type="submit" disabled={pwSubmitting} loading={pwSubmitting} loadingLabel="A alterar..." className="w-full bg-[#0A2540] text-white hover:bg-[#0A2540]/90">
+                  Alterar Password
+                </LoadingButton>
               </form>
             </div>
           </Card>
         </div>
       )}
 
+      {activeTab === 'plano' && currentPlanCatalog && (
+        <div className="space-y-4 max-w-4xl">
+          <Card className="border-slate-200 shadow-sm">
+            <div className="p-6 space-y-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Plano Atual</p>
+                  <h2 className="mt-2 text-2xl font-bold text-[#0A2540]">{currentPlanCatalog.label}</h2>
+                  <p className="mt-2 max-w-2xl text-sm text-gray-500">{currentPlanCatalog.description}</p>
+                </div>
+                <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getPlanBadgeClasses(currentPlan)}`}>
+                  {currentPlan.toUpperCase()}
+                </span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { key: 'users', label: 'Utilizadores' },
+                  { key: 'contacts', label: 'Contactos' },
+                  { key: 'tasks', label: 'Tarefas' },
+                  { key: 'automations', label: 'Automações' },
+                ].map(({ key, label }) => (
+                  <div key={key} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">{label}</p>
+                    <p className="mt-2 text-lg font-bold text-[#0A2540]">
+                      {formatLimitValue(currentPlanCatalog.limits[key as keyof typeof currentPlanCatalog.limits])}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+
+          <Card className="border-slate-200 shadow-sm">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-[#0A2540]">Funcionalidades incluídas</h2>
+                  <p className="mt-1 text-sm text-gray-500">O acesso final na aplicação cruza plano e permissões da conta.</p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                {Object.entries(currentPlanCatalog.features).map(([feature, enabled]) => (
+                  <div
+                    key={feature}
+                    className={`flex items-center justify-between rounded-xl border px-4 py-3 ${
+                      enabled
+                        ? 'border-emerald-200 bg-emerald-50/60'
+                        : 'border-slate-200 bg-slate-50'
+                    }`}
+                  >
+                    <span className="text-sm font-medium text-[#0A2540]">
+                      {PLAN_FEATURE_LABELS[feature as keyof typeof PLAN_FEATURE_LABELS]}
+                    </span>
+                    <span className={`text-xs font-semibold ${enabled ? 'text-emerald-700' : 'text-slate-500'}`}>
+                      {enabled ? 'Ativo' : 'Indisponível'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+
+          <Card className="border-slate-200 shadow-sm">
+            <div className="p-6 space-y-4">
+              <div>
+                <h2 className="text-base font-semibold text-[#0A2540]">Upgrade e ativação</h2>
+                <p className="mt-1 text-sm text-gray-500">Ativação manual via WhatsApp. Escolhe a modalidade pretendida e fala connosco.</p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {getPlanBillingOptions(currentPlan).map((billing) => (
+                  <button
+                    key={billing}
+                    type="button"
+                    onClick={() => setSelectedBilling((prev) => ({ ...prev, [currentPlan]: billing }))}
+                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                      (selectedBilling[currentPlan] || getPlanBillingOptions(currentPlan)[0]) === billing
+                        ? 'border-[#0A2540] bg-[#0A2540] text-white'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-[#0A2540]'
+                    }`}
+                  >
+                    {billing}
+                  </button>
+                ))}
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <p className="text-sm text-gray-500">
+                  Pedido preparado para <strong>{currentPlanCatalog.label}</strong> ({selectedBilling[currentPlan] || getPlanBillingOptions(currentPlan)[0]}).
+                </p>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Button asChild className="gap-2">
+                    <a
+                      href={buildWhatsAppPlanLink({
+                        plan: currentPlan,
+                        billing: selectedBilling[currentPlan] || getPlanBillingOptions(currentPlan)[0],
+                        name: currentUser?.name,
+                        company: companyNameForPlan,
+                      })}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Falar no WhatsApp
+                    </a>
+                  </Button>
+                  <p className="text-xs text-gray-400">Ativação manual via WhatsApp</p>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {planEntries.length > 0 && (
+            <div className="space-y-3">
+              <div>
+                <h2 className="text-base font-semibold text-[#0A2540]">Comparar planos</h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  A mesma grelha de comparação usada em <Link href="/planos" className="font-medium text-[#0A2540] hover:underline">/planos</Link>, com ativação manual via WhatsApp.
+                </p>
+              </div>
+
+              <PlanComparisonGrid
+                planEntries={planEntries}
+                currentPlan={currentPlan}
+                selectedBilling={selectedBilling}
+                onBillingChange={(plan, billing) =>
+                  setSelectedBilling((prev) => ({ ...prev, [plan]: billing }))
+                }
+                name={currentUser?.name}
+                company={companyNameForPlan}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── EMPRESA & AGT ───────────────────────────────────── */}
       {activeTab === 'empresa' && (
         <div className="space-y-4 max-w-2xl">
-          <Card>
+          <Card className="border-slate-200 shadow-sm">
             <div className="p-6 space-y-4">
               <h2 className="text-base font-semibold text-[#0A2540] flex items-center gap-2">
                 <Settings className="w-4 h-4 text-gray-500" />
@@ -590,24 +727,28 @@ function ConfiguracoesContent() {
                 {configForm.agtMockMode && <span className="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700 border border-amber-200">ATIVO</span>}
               </div>
               {configError && (
-                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-                  {configError}
-                </div>
+                <ErrorState
+                  compact
+                  title="Não foi possível guardar as configurações"
+                  message={configError}
+                  onRetry={() => { setConfigError(''); saveMutation.mutate(); }}
+                  secondaryAction={{ label: 'Fechar', onClick: () => setConfigError('') }}
+                />
               )}
-              <Button onClick={() => { setConfigError(''); saveMutation.mutate(); }} disabled={saveMutation.isPending} className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90">
-                {configSaved ? <><CheckCircle2 className="w-4 h-4 mr-2" /> Guardado!</> : saveMutation.isPending ? 'A guardar...' : 'Guardar Configurações'}
-              </Button>
+              <LoadingButton onClick={() => { setConfigError(''); saveMutation.mutate(); }} disabled={saveMutation.isPending} loading={saveMutation.isPending} loadingLabel="A guardar..." className="w-full bg-[#0A2540] text-white hover:bg-[#0A2540]/90">
+                {configSaved ? <><CheckCircle2 className="w-4 h-4 mr-2" /> Guardado!</> : 'Guardar Configurações'}
+              </LoadingButton>
             </div>
           </Card>
 
-          <Card>
+          <Card className="border-slate-200 shadow-sm">
             <div className="p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-[#0A2540] flex items-center gap-2">
                   <Building2 className="w-4 h-4 text-gray-500" />
                   Estabelecimentos
                 </h2>
-                <Button size="sm" variant="outline" onClick={() => setShowEstab(true)} className="border-gray-200 text-gray-600 hover:bg-gray-50 gap-1">
+                <Button size="sm" variant="outline" onClick={() => { setEstabError(''); setShowEstab(true); }} className="border-gray-200 text-gray-600 hover:bg-gray-50 gap-1">
                   <Plus className="w-3.5 h-3.5" /> Novo
                 </Button>
               </div>
@@ -638,13 +779,21 @@ function ConfiguracoesContent() {
       {/* ── EQUIPA ──────────────────────────────────────────── */}
       {activeTab === 'equipa' && (
         <div className="space-y-4">
-          {memberError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">{memberError}</div>}
+          {memberError && (
+            <ErrorState
+              compact
+              title="Falha na gestão da equipa"
+              message={memberError}
+              onRetry={() => refetchTeam()}
+              secondaryAction={{ label: 'Fechar', onClick: () => setMemberError('') }}
+            />
+          )}
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold text-[#0A2540]">Membros da Equipa</h2>
               <p className="text-gray-500 text-sm">Gerencie os membros da sua conta</p>
             </div>
-            <Button onClick={() => setShowAddMember(true)} className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90 gap-1.5">
+            <Button onClick={() => { setMemberError(''); setShowAddMember(true); }} className="gap-1.5">
               <Plus className="w-4 h-4" /> Adicionar Membro
             </Button>
           </div>
@@ -713,487 +862,21 @@ function ConfiguracoesContent() {
         />
       )}
 
-      {/* ── ADMIN ───────────────────────────────────────────── */}
-      {activeTab === 'admin' && (
-        <div className="space-y-4">
-          {userError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">{userError}</div>}
-
-          <div className="flex gap-4 border-b border-gray-200">
-            <button onClick={() => setAdminSubTab('users')} className={subTabBtn('users', adminSubTab)}>
-              Utilizadores ({(allUsers as User[]).length})
-            </button>
-            <button onClick={() => setAdminSubTab('accounts')} className={subTabBtn('accounts', adminSubTab)}>
-              Contas
-            </button>
-            <button onClick={() => setAdminSubTab('logins')} className={subTabBtn('logins', adminSubTab)}>
-              Histórico de Logins
-            </button>
-          </div>
-
-          {adminSubTab === 'users' && (
-            <div className="space-y-4">
-              <div className="flex justify-end">
-                <Button onClick={() => setShowCreateUser(true)} className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90 gap-1.5">
-                  <Plus className="w-4 h-4" /> Novo Utilizador
-                </Button>
-              </div>
-              <Card>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Nome</th>
-                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Email</th>
-                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Função</th>
-                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Conta</th>
-                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Estado</th>
-                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Último Login</th>
-                        <th className="py-3 px-4" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(allUsers as User[]).map(user => (
-                        <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                          <td className="py-3 px-4 text-gray-900 text-sm">{user.name}</td>
-                          <td className="py-3 px-4 text-gray-500 text-sm">{user.email}</td>
-                          <td className="py-3 px-4">
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${user.role === 'admin' ? 'bg-red-50 text-[#0A2540]' : 'bg-zinc-500/20 text-gray-600'}`}>
-                              {user.role === 'admin' ? 'Admin' : 'Utilizador'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-gray-500 text-sm">
-                            {user.accountOwnerId ? (user.accountOwnerName || 'Membro') : <span className="text-gray-400">Independente</span>}
-                          </td>
-                          <td className="py-3 px-4">
-                            <button onClick={() => toggleUserActive(user.id, user.active)} className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition ${user.active ? 'bg-green-50 text-green-700 hover:bg-green-500/30' : 'bg-red-50 text-red-600 hover:bg-red-500/30'}`}>
-                              {user.active ? <><Eye className="w-3 h-3" /> Ativo</> : <><EyeOff className="w-3 h-3" /> Inativo</>}
-                            </button>
-                          </td>
-                          <td className="py-3 px-4 text-gray-500 text-sm">
-                            {user.lastLogin ? new Date(user.lastLogin).toLocaleString('pt-PT') : 'Nunca'}
-                          </td>
-                          <td className="py-3 px-4">
-                            <button onClick={() => deleteUserAccount(user.id)} className="text-red-400 hover:text-red-600 transition" title="Eliminar">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {adminSubTab === 'accounts' && (
-            <div className="space-y-4">
-              <div className="flex justify-end">
-                <Button onClick={() => setShowCreateAccount(true)} className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90 gap-1.5">
-                  <Plus className="w-4 h-4" /> Nova Conta
-                </Button>
-              </div>
-              <Card>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Nome</th>
-                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Email</th>
-                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Plano</th>
-                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Membros</th>
-                        <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Criado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(clientAccounts as ClientAccount[]).map(account => (
-                        <tr key={account.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                          <td className="py-3 px-4 text-gray-900 text-sm font-medium">{account.name}</td>
-                          <td className="py-3 px-4 text-gray-500 text-sm">{account.email}</td>
-                          <td className="py-3 px-4">
-                            <select
-                              value={account.plan}
-                              onChange={e => updateAccountPlan(account.id, e.target.value)}
-                              className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:border-[#0A2540]"
-                            >
-                              <option value="essencial">Essencial</option>
-                              <option value="profissional">Profissional</option>
-                            </select>
-                          </td>
-                          <td className="py-3 px-4 text-gray-500 text-sm">
-                            {account._count.accountMembers} membro{account._count.accountMembers !== 1 ? 's' : ''}
-                          </td>
-                          <td className="py-3 px-4 text-gray-500 text-sm">
-                            {new Date(account.createdAt).toLocaleDateString('pt-PT')}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {(clientAccounts as ClientAccount[]).length === 0 && (
-                    <div className="text-center py-8 text-gray-400 text-sm">Nenhuma conta de cliente criada ainda.</div>
-                  )}
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {adminSubTab === 'logins' && (
-            <Card>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Utilizador</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Email</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Data/Hora</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">IP</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(loginLogs as LoginLog[]).map(log => (
-                      <tr key={log.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                        <td className="py-3 px-4 text-gray-900 text-sm">{log.user.name}</td>
-                        <td className="py-3 px-4 text-gray-500 text-sm">{log.user.email}</td>
-                        <td className="py-3 px-4 text-gray-500 text-sm">{new Date(log.createdAt).toLocaleString('pt-PT')}</td>
-                        <td className="py-3 px-4 text-gray-500 font-mono text-xs">{log.ip || 'N/A'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* ── SUPER ADMIN ─────────────────────────────────────── */}
-      {activeTab === 'superadmin' && (
-        <div className="space-y-4">
-          {saError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center justify-between">
-              <span>{saError}</span>
-              <button onClick={() => setSaError('')} className="text-red-400 hover:text-red-600 ml-4">✕</button>
-            </div>
-          )}
-
-          {/* Sub-tab navigation */}
-          <div className="flex gap-4 border-b border-gray-200">
-            <button onClick={() => setSaSubTab('contas')} className={subTabBtn('contas', saSubTab)}>
-              Contas ({(saOrgs as SuperAdminOrg[]).length})
-            </button>
-            <button onClick={() => setSaSubTab('utilizacao')} className={subTabBtn('utilizacao', saSubTab)}>
-              Utilização
-            </button>
-            <button onClick={() => setSaSubTab('armazenamento')} className={subTabBtn('armazenamento', saSubTab)}>
-              Armazenamento
-            </button>
-          </div>
-
-          {/* ── Contas ── */}
-          {saSubTab === 'contas' && (
-            <div className="space-y-3">
-              <div className="flex justify-end">
-                <Button
-                  onClick={() => setShowCreateAccount(true)}
-                  className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90 gap-1.5"
-                >
-                  <Plus className="w-4 h-4" /> Nova Conta
-                </Button>
-              </div>
-
-              {(saOrgs as SuperAdminOrg[]).map(org => (
-                <Card key={org.id}>
-                  <div className="p-4">
-                    {/* Header row */}
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 text-sm truncate">{org.name}</div>
-                        <div className="text-gray-400 text-xs truncate">{org.email}</div>
-                      </div>
-                      {/* Badges */}
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${org.plan === 'profissional' ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
-                        {org.plan}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${org.active ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-                        {org.active ? 'Ativo' : 'Bloqueado'}
-                      </span>
-                      <span className="text-xs text-gray-400 flex-shrink-0">
-                        {org._count.accountMembers} membro{org._count.accountMembers !== 1 ? 's' : ''}
-                      </span>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {/* Impersonate */}
-                        <button
-                          onClick={async () => {
-                            try {
-                              const { token } = await impersonateUser(org.id);
-                              localStorage.setItem('impersonation_token', token);
-                              window.location.href = '/';
-                            } catch (e: any) {
-                              setSaError(e.response?.data?.error || e.message || 'Erro ao entrar');
-                            }
-                          }}
-                          className="text-xs px-2 py-1 border border-gray-200 rounded text-gray-600 hover:bg-gray-50 transition"
-                        >
-                          Entrar
-                        </button>
-
-                        {/* Block/Unblock */}
-                        <button
-                          onClick={async () => {
-                            try {
-                              await updateSuperAdminOrg(org.id, { active: !org.active });
-                              refetchSaOrgs();
-                            } catch (e: any) {
-                              setSaError(e.response?.data?.error || 'Erro ao atualizar estado');
-                            }
-                          }}
-                          className={`text-xs px-2 py-1 border rounded transition ${org.active ? 'border-orange-200 text-orange-600 hover:bg-orange-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}
-                        >
-                          {org.active ? 'Bloquear' : 'Desbloquear'}
-                        </button>
-
-                        {/* Plan select */}
-                        <select
-                          value={org.plan}
-                          onChange={async (e) => {
-                            try {
-                              await updateSuperAdminOrg(org.id, { plan: e.target.value });
-                              refetchSaOrgs();
-                            } catch (e: any) {
-                              setSaError(e.response?.data?.error || 'Erro ao atualizar plano');
-                            }
-                          }}
-                          className="text-xs border border-gray-200 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none"
-                        >
-                          <option value="essencial">Essencial</option>
-                          <option value="profissional">Profissional</option>
-                        </select>
-
-                        {/* Delete */}
-                        {saDeleteConfirm === org.id ? (
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-red-600">Confirmar?</span>
-                            <button
-                              onClick={async () => {
-                                try {
-                                  await deleteSuperAdminOrg(org.id);
-                                  setSaDeleteConfirm(null);
-                                  refetchSaOrgs();
-                                } catch (e: any) {
-                                  setSaError(e.response?.data?.error || 'Erro ao eliminar');
-                                  setSaDeleteConfirm(null);
-                                }
-                              }}
-                              className="text-xs px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                            >Sim</button>
-                            <button onClick={() => setSaDeleteConfirm(null)} className="text-xs px-2 py-1 border border-gray-200 rounded hover:bg-gray-50">Não</button>
-                          </div>
-                        ) : (
-                          <button onClick={() => setSaDeleteConfirm(org.id)} className="text-red-400 hover:text-red-600 transition" title="Eliminar conta">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-
-                        {/* Toggle modules panel */}
-                        <button
-                          onClick={() => setExpandedOrg(expandedOrg === org.id ? null : org.id)}
-                          className="text-xs px-2 py-1 border border-gray-200 rounded text-gray-600 hover:bg-gray-50"
-                        >
-                          {expandedOrg === org.id ? '▲ Fechar' : '▼ Módulos'}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Expandable module toggles */}
-                    {expandedOrg === org.id && (
-                      <div className="mt-4 pt-4 border-t border-gray-100">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Módulos da conta</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                          {/* Standard modules — always on */}
-                          {[
-                            { key: 'contacts', label: 'Clientes' },
-                            { key: 'pipeline', label: 'Processos' },
-                            { key: 'tasks', label: 'Tarefas' },
-                            { key: 'vendas', label: 'Vendas' },
-                            { key: 'finances', label: 'Finanças' },
-                          ].map(mod => (
-                            <div key={mod.key} className="flex items-center gap-2">
-                              <div className="w-8 h-4 bg-green-200 rounded-full flex items-center justify-end pr-0.5 pointer-events-none">
-                                <div className="w-3 h-3 bg-green-600 rounded-full" />
-                              </div>
-                              <span className="text-sm text-gray-500">{mod.label}</span>
-                              <span className="text-xs text-gray-300">(padrão)</span>
-                            </div>
-                          ))}
-
-                          {/* Advanced modules — toggleable */}
-                          {[
-                            { key: 'chat', label: 'Conversas' },
-                            { key: 'calendario', label: 'Calendário' },
-                            { key: 'automations', label: 'Automações' },
-                            { key: 'forms', label: 'Formulários' },
-                          ].map(mod => {
-                            const currentPerms = (org.permissions as Record<string, any>) || {};
-                            const isEnabled = mod.key in currentPerms;
-                            return (
-                              <div key={mod.key} className="flex items-center gap-2">
-                                <button
-                                  disabled={saModuleUpdating === org.id}
-                                  onClick={async () => {
-                                    setSaModuleUpdating(org.id);
-                                    try {
-                                      const newPerms = { ...currentPerms };
-                                      if (isEnabled) {
-                                        delete newPerms[mod.key];
-                                      } else {
-                                        newPerms[mod.key] = 'edit';
-                                      }
-                                      await updateSuperAdminOrg(org.id, {
-                                        permissions: Object.keys(newPerms).length > 0 ? newPerms as any : null,
-                                      });
-                                      refetchSaOrgs();
-                                    } catch (e: any) {
-                                      setSaError(e.response?.data?.error || 'Erro ao atualizar módulo');
-                                    } finally {
-                                      setSaModuleUpdating(null);
-                                    }
-                                  }}
-                                  className={`w-8 h-4 rounded-full flex items-center transition-colors flex-shrink-0 ${
-                                    isEnabled ? 'bg-green-400 justify-end pr-0.5' : 'bg-gray-200 justify-start pl-0.5'
-                                  } ${saModuleUpdating === org.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                                  title={`${isEnabled ? 'Desativar' : 'Ativar'} ${mod.label}`}
-                                >
-                                  <div className="w-3 h-3 bg-white rounded-full shadow" />
-                                </button>
-                                <span className="text-sm text-gray-700">{mod.label}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              ))}
-
-              {(saOrgs as SuperAdminOrg[]).length === 0 && (
-                <div className="text-center py-10 text-gray-400 text-sm">Nenhuma conta de cliente encontrada.</div>
-              )}
-            </div>
-          )}
-
-          {/* ── Utilização ── */}
-          {saSubTab === 'utilizacao' && (
-            <Card>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Conta</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Logins (7d)</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Logins (30d)</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Último Acesso</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Atividade (7d)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(saUsage as SuperAdminUsageStat[]).map(stat => (
-                      <tr key={stat.orgId} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                        <td className="py-3 px-4 text-gray-900 text-sm font-medium">{stat.orgName}</td>
-                        <td className="py-3 px-4 text-gray-700 text-sm">{stat.logins7d}</td>
-                        <td className="py-3 px-4 text-gray-500 text-sm">{stat.logins30d}</td>
-                        <td className="py-3 px-4 text-gray-500 text-sm">
-                          {stat.lastLogin ? new Date(stat.lastLogin).toLocaleString('pt-PT') : <span className="text-gray-300">Nunca</span>}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-end gap-0.5 h-6">
-                            {stat.sparkline.map(day => {
-                              const max = Math.max(...stat.sparkline.map(d => d.count), 1);
-                              const pct = Math.round((day.count / max) * 100);
-                              return (
-                                <div
-                                  key={day.date}
-                                  title={`${day.date}: ${day.count}`}
-                                  style={{ height: `${Math.max(pct, 8)}%` }}
-                                  className={`w-3 rounded-sm flex-shrink-0 ${day.count > 0 ? 'bg-[#0A2540]' : 'bg-gray-100'}`}
-                                />
-                              );
-                            })}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {(saUsage as SuperAdminUsageStat[]).length === 0 && (
-                  <div className="text-center py-8 text-gray-400 text-sm">Sem dados de utilização.</div>
-                )}
-              </div>
-            </Card>
-          )}
-
-          {/* ── Armazenamento ── */}
-          {saSubTab === 'armazenamento' && (
-            <Card>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Conta</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Clientes</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Tarefas</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Transações</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Notas</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Ficheiros</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Armazenamento</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Peso</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(saStorage as SuperAdminStorageStat[]).map(stat => {
-                      const totalRecords = stat.contacts + stat.tasks + stat.transactions + stat.notes;
-                      const storageMb = (stat.fileSizeBytes / (1024 * 1024)).toFixed(1);
-                      const barPct = Math.min((stat.fileSizeBytes / (100 * 1024 * 1024)) * 100, 100);
-                      return (
-                        <tr key={stat.orgId} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                          <td className="py-3 px-4 text-gray-900 text-sm font-medium">{stat.orgName}</td>
-                          <td className="py-3 px-4 text-gray-600 text-sm">{stat.contacts}</td>
-                          <td className="py-3 px-4 text-gray-600 text-sm">{stat.tasks}</td>
-                          <td className="py-3 px-4 text-gray-600 text-sm">{stat.transactions}</td>
-                          <td className="py-3 px-4 text-gray-600 text-sm">{stat.notes}</td>
-                          <td className="py-3 px-4 text-gray-600 text-sm">{stat.fileCount}</td>
-                          <td className="py-3 px-4 text-gray-600 text-sm">{storageMb} MB</td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-20 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-[#0A2540] rounded-full" style={{ width: `${barPct}%` }} />
-                              </div>
-                              <span className="text-xs text-gray-400">{totalRecords} reg.</span>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                {(saStorage as SuperAdminStorageStat[]).length === 0 && (
-                  <div className="text-center py-8 text-gray-400 text-sm">Sem dados de armazenamento.</div>
-                )}
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
-
       {/* ── DIALOGS ─────────────────────────────────────────── */}
 
-      <Dialog open={showEstab} onOpenChange={setShowEstab}>
+      <Dialog open={showEstab} onOpenChange={(open) => { setShowEstab(open); if (!open) setEstabError(''); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Novo Estabelecimento</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
+            {estabError && (
+              <ErrorState
+                compact
+                title="Não foi possível criar o estabelecimento"
+                message={estabError}
+                onRetry={() => estabMutation.mutate()}
+                secondaryAction={{ label: 'Fechar', onClick: () => setEstabError('') }}
+              />
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-sm">Nome *</Label>
@@ -1215,9 +898,9 @@ function ConfiguracoesContent() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEstab(false)}>Cancelar</Button>
-            <Button onClick={() => estabMutation.mutate()} disabled={estabMutation.isPending} className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90">
-              {estabMutation.isPending ? 'A criar...' : 'Criar'}
-            </Button>
+            <LoadingButton onClick={() => estabMutation.mutate()} disabled={estabMutation.isPending} loading={estabMutation.isPending} loadingLabel="A criar..." className="bg-[#0A2540] text-white hover:bg-[#0A2540]/90">
+              Criar
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1227,7 +910,17 @@ function ConfiguracoesContent() {
           <Card className="w-full max-w-md">
             <div className="p-6">
               <h2 className="text-xl font-bold mb-4">Adicionar Membro</h2>
-              {memberError && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">{memberError}</div>}
+              {memberError && (
+                <div className="mb-3">
+                  <ErrorState
+                    compact
+                    title="Não foi possível adicionar o membro"
+                    message={memberError}
+                    onRetry={() => addMemberMutation.mutate()}
+                    secondaryAction={{ label: 'Fechar', onClick: () => setMemberError('') }}
+                  />
+                </div>
+              )}
               <form onSubmit={e => { e.preventDefault(); addMemberMutation.mutate(); }} className="space-y-4">
                 <div>
                   <Label className="text-gray-600">Nome</Label>
@@ -1243,9 +936,9 @@ function ConfiguracoesContent() {
                 </div>
                 <div className="flex gap-3 pt-2">
                   <Button type="button" variant="outline" onClick={() => setShowAddMember(false)} className="flex-1">Cancelar</Button>
-                  <Button type="submit" disabled={addMemberMutation.isPending} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90">
-                    {addMemberMutation.isPending ? 'A criar...' : 'Adicionar'}
-                  </Button>
+                  <LoadingButton type="submit" disabled={addMemberMutation.isPending} loading={addMemberMutation.isPending} loadingLabel="A criar..." className="flex-1 bg-[#0A2540] text-white hover:bg-[#0A2540]/90">
+                    Adicionar
+                  </LoadingButton>
                 </div>
               </form>
             </div>
@@ -1253,92 +946,6 @@ function ConfiguracoesContent() {
         </div>
       )}
 
-      {showCreateAccount && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md">
-            <div className="p-6">
-              <h2 className="text-xl font-bold mb-4">Nova Conta Cliente</h2>
-              {accountError && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">{accountError}</div>}
-              <form onSubmit={e => { e.preventDefault(); createAccountMutation.mutate(); }} className="space-y-4">
-                <div>
-                  <Label className="text-gray-600">Nome</Label>
-                  <Input type="text" placeholder="Nome da empresa ou pessoa" value={accountForm.name} onChange={e => setAccountForm(p => ({ ...p, name: e.target.value }))} required className="mt-1" />
-                </div>
-                <div>
-                  <Label className="text-gray-600">Email</Label>
-                  <Input type="email" placeholder="email@example.com" value={accountForm.email} onChange={e => setAccountForm(p => ({ ...p, email: e.target.value }))} required className="mt-1" />
-                </div>
-                <div>
-                  <Label className="text-gray-600">Password Inicial</Label>
-                  <Input type="password" placeholder="Mínimo 6 caracteres" value={accountForm.password} onChange={e => setAccountForm(p => ({ ...p, password: e.target.value }))} required minLength={6} className="mt-1" />
-                </div>
-                <div>
-                  <Label className="text-gray-600">Plano</Label>
-                  <select value={accountForm.plan} onChange={e => setAccountForm(p => ({ ...p, plan: e.target.value }))} className="w-full mt-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-[#0A2540] focus:ring-1 focus:ring-[#0A2540]">
-                    <option value="essencial">Essencial</option>
-                    <option value="profissional">Profissional</option>
-                  </select>
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <Button type="button" variant="outline" onClick={() => setShowCreateAccount(false)} className="flex-1">Cancelar</Button>
-                  <Button type="submit" disabled={createAccountMutation.isPending} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90">
-                    {createAccountMutation.isPending ? 'A criar...' : 'Criar Conta'}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {showCreateUser && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md">
-            <div className="p-6">
-              <h2 className="text-xl font-bold mb-4">Novo Utilizador</h2>
-              {userError && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">{userError}</div>}
-              <form onSubmit={e => { e.preventDefault(); createUserMutation.mutate(); }} className="space-y-4">
-                <div>
-                  <Label className="text-gray-600">Nome</Label>
-                  <Input type="text" placeholder="Nome completo" value={userForm.name} onChange={e => setUserForm(p => ({ ...p, name: e.target.value }))} required className="mt-1" />
-                </div>
-                <div>
-                  <Label className="text-gray-600">Email</Label>
-                  <Input type="email" placeholder="email@example.com" value={userForm.email} onChange={e => setUserForm(p => ({ ...p, email: e.target.value }))} required className="mt-1" />
-                </div>
-                <div>
-                  <Label className="text-gray-600">Password</Label>
-                  <Input type="password" placeholder="Mínimo 6 caracteres" value={userForm.password} onChange={e => setUserForm(p => ({ ...p, password: e.target.value }))} required minLength={6} className="mt-1" />
-                </div>
-                <div>
-                  <Label className="text-gray-600">Role</Label>
-                  <select value={userForm.role} onChange={e => setUserForm(p => ({ ...p, role: e.target.value }))} className="w-full mt-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-[#0A2540] focus:ring-1 focus:ring-[#0A2540]">
-                    <option value="user">Utilizador</option>
-                    {isSuperAdmin && <option value="admin">Admin</option>}
-                  </select>
-                </div>
-                {isSuperAdmin && (
-                  <div>
-                    <Label className="text-gray-600">Atribuir a Conta (Opcional)</Label>
-                    <select value={userForm.accountOwnerId} onChange={e => setUserForm(p => ({ ...p, accountOwnerId: e.target.value }))} className="w-full mt-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-[#0A2540] focus:ring-1 focus:ring-[#0A2540]">
-                      <option value="">Nenhuma (Independente)</option>
-                      {(allUsers as User[]).filter(u => !u.accountOwnerId && u.role !== 'admin').map(u => (
-                        <option key={u.id} value={u.id}>{u.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <div className="flex gap-3 pt-2">
-                  <Button type="button" variant="outline" onClick={() => setShowCreateUser(false)} className="flex-1">Cancelar</Button>
-                  <Button type="submit" disabled={createUserMutation.isPending} className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90">
-                    {createUserMutation.isPending ? 'A criar...' : 'Criar'}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }

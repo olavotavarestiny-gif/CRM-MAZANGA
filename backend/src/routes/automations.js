@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { requirePermission, requireDeletePermission } = require('../lib/permissions');
+const { canCreateAutomation, buildLimitErrorPayload } = require('../lib/plan-limits');
 
 const VALID_TRIGGERS = ['new_contact', 'form_submission', 'contact_tag', 'contact_revenue', 'contact_sector'];
 const VALID_ACTIONS = ['send_email', 'send_whatsapp_template', 'send_whatsapp_text', 'update_stage'];
@@ -78,6 +79,11 @@ router.post('/', requirePermission('automations', 'edit'), async (req, res) => {
         .json({
           error: 'emailSubject and emailBody are required for send_email action',
         });
+    }
+
+    const limitState = await canCreateAutomation(req.user.effectiveUserId);
+    if (!limitState.allowed) {
+      return res.status(403).json(buildLimitErrorPayload(limitState));
     }
 
     const data = {

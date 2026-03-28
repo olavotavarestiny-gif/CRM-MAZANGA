@@ -6,6 +6,7 @@ const requireAuth = require('../middleware/auth');
 const { verifySupabaseJwt } = require('../middleware/auth');
 const { intersectPermissions, parsePermissions } = require('../lib/permissions');
 const { normalizePlan } = require('../lib/plans');
+const { getSerializedPlanCatalog } = require('../lib/plan-limits');
 
 // Lazy Supabase admin client
 let _supabaseAdmin = null;
@@ -84,9 +85,18 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
     }
   }
 
+  const currentPlanCatalog = getSerializedPlanCatalog(effectivePlan);
+
   return {
     ...user,
     plan: effectivePlan,
+    planDetails: {
+      label: currentPlanCatalog.label,
+      description: currentPlanCatalog.description,
+    },
+    planLimits: currentPlanCatalog.limits,
+    planFeatures: currentPlanCatalog.features,
+    availablePlans: getSerializedPlanCatalog(),
     permissions: effectivePermissions,
     accountOwnerName,
     impersonatedBy,
@@ -117,7 +127,10 @@ router.post('/sync', async (req, res) => {
       return res.status(401).json({ error: 'Token inválido ou expirado' });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, supabaseUid: true, mustChangePassword: true },
+    });
     if (!user) {
       return res.status(404).json({ error: 'Utilizador não encontrado' });
     }

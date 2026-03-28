@@ -220,6 +220,7 @@ export async function getTasks(params?: { done?: boolean; contactId?: number }) 
 
 export async function createTask(data: {
   contactId?: number | null;
+  assignedToUserId?: number | null;
   title: string;
   notes?: string;
   dueDate?: string;
@@ -375,6 +376,50 @@ export interface UserPermissions {
   };
 }
 
+export type PlanName = 'essencial' | 'profissional' | 'enterprise';
+
+export type PlanFeatureName =
+  | 'painel'
+  | 'clientes'
+  | 'processos'
+  | 'tarefas'
+  | 'vendas'
+  | 'conversas'
+  | 'calendario'
+  | 'automacoes'
+  | 'formularios'
+  | 'financas';
+
+export interface PlanDetails {
+  label: string;
+  description: string;
+}
+
+export interface PlanLimits {
+  users: number | null;
+  contacts: number | null;
+  tasks: number | null;
+  automations: number | null;
+}
+
+export interface PlanFeatures {
+  painel: boolean;
+  clientes: boolean;
+  processos: boolean;
+  tarefas: boolean;
+  vendas: boolean;
+  conversas: boolean;
+  calendario: boolean;
+  automacoes: boolean;
+  formularios: boolean;
+  financas: boolean;
+}
+
+export interface PlanCatalogEntry extends PlanDetails {
+  limits: PlanLimits;
+  features: PlanFeatures;
+}
+
 // Admin - User Management
 export interface User {
   id: number;
@@ -383,7 +428,11 @@ export interface User {
   role: string;
   jobTitle?: string | null;
   active: boolean;
-  plan?: string;
+  plan?: PlanName;
+  planDetails?: PlanDetails;
+  planLimits?: PlanLimits;
+  planFeatures?: PlanFeatures;
+  availablePlans?: Partial<Record<PlanName, PlanCatalogEntry>>;
   isSuperAdmin?: boolean;
   permissions?: UserPermissions | null; // null = full access (no restrictions)
   accountOwnerId?: number | null;
@@ -745,6 +794,18 @@ export async function createChatChannel(data: {
   return res.data;
 }
 
+export async function updateChatChannel(
+  channelId: string,
+  data: { name?: string; description?: string; memberIds?: number[] }
+): Promise<ChatChannel> {
+  const res = await api.patch(`/api/chat/channels/${channelId}`, data);
+  return res.data;
+}
+
+export async function deleteChatChannel(channelId: string): Promise<void> {
+  await api.delete(`/api/chat/channels/${channelId}`);
+}
+
 export async function createDM(targetUserId: number): Promise<ChatChannel> {
   const res = await api.post('/api/chat/dm', { targetUserId });
   return res.data;
@@ -810,7 +871,7 @@ export async function getSuperAdminOrgs(): Promise<SuperAdminOrg[]> {
 
 export async function updateSuperAdminOrg(
   id: number,
-  data: { plan?: string; active?: boolean; permissions?: UserPermissions | null }
+  data: { plan?: PlanName; active?: boolean; permissions?: UserPermissions | null }
 ): Promise<void> {
   await api.patch(`/api/superadmin/orgs/${id}`, data);
 }
@@ -863,7 +924,7 @@ export async function getClientAccounts(): Promise<import('./types').ClientAccou
 }
 
 // Admin: update plan for a client account
-export async function updateClientAccount(id: number, data: { plan?: string }): Promise<void> {
+export async function updateClientAccount(id: number, data: { plan?: PlanName }): Promise<void> {
   await api.patch(`/api/admin/accounts/${id}`, data);
 }
 
@@ -872,7 +933,7 @@ export async function createClientAccount(data: {
   name: string;
   email: string;
   password: string;
-  plan?: string;
+  plan?: PlanName;
   permissions?: UserPermissions | null;
 }): Promise<User> {
   const res = await api.post('/api/superadmin/users', data);

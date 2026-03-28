@@ -13,6 +13,7 @@ export type Priority = 'Alta' | 'Media' | 'Baixa';
 export interface Task {
   id: number;
   contactId?: number | null;
+  assignedToUserId?: number | null;
   title: string;
   notes?: string;
   dueDate?: string;
@@ -24,6 +25,11 @@ export interface Task {
     id: number;
     name: string;
     company: string;
+  } | null;
+  assignedTo?: {
+    id: number;
+    name: string;
+    email: string;
   } | null;
 }
 
@@ -420,15 +426,19 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+import type { PlanCatalogEntry, PlanName } from './api';
+
 export interface PlanUsageItem {
   current: number;
   limit: number;
 }
 
 export interface PlanUsage {
-  plan: string;
+  plan: PlanName;
   usage: Record<string, PlanUsageItem>;
 }
+
+export type AvailablePlanCatalog = Record<PlanName, PlanCatalogEntry>;
 
 // ── GESTÃO DE CONTAS CLIENTES ────────────────────────────────
 export interface ClientAccountMember {
@@ -444,7 +454,7 @@ export interface ClientAccount {
   name: string;
   email: string;
   active: boolean;
-  plan: string;
+  plan: PlanName;
   permissions: import('./api').UserPermissions | null;
   createdAt: string;
   accountMembers: ClientAccountMember[];

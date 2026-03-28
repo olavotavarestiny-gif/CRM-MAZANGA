@@ -1,10 +1,7 @@
 'use strict';
 
-const SUPPORTED_PLANS = ['essencial', 'profissional'];
+const SUPPORTED_PLANS = ['essencial', 'profissional', 'enterprise'];
 const DEFAULT_PLAN = 'essencial';
-const LEGACY_PLAN_FALLBACKS = {
-  enterprise: 'profissional',
-};
 
 function isSupportedPlan(plan) {
   return SUPPORTED_PLANS.includes(plan);
@@ -13,7 +10,6 @@ function isSupportedPlan(plan) {
 function normalizePlan(plan) {
   if (!plan) return DEFAULT_PLAN;
   if (isSupportedPlan(plan)) return plan;
-  if (plan in LEGACY_PLAN_FALLBACKS) return LEGACY_PLAN_FALLBACKS[plan];
   return DEFAULT_PLAN;
 }
 

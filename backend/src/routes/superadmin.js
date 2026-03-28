@@ -56,7 +56,7 @@ router.patch('/orgs/:id', async (req, res) => {
     const data = {};
     if (plan !== undefined) {
       if (!isSupportedPlan(plan)) {
-        return res.status(400).json({ error: 'Plano inválido. Use essencial ou profissional.' });
+        return res.status(400).json({ error: 'Plano inválido. Use essencial, profissional ou enterprise.' });
       }
       data.plan = plan;
     }
@@ -174,10 +174,13 @@ router.post('/users', async (req, res) => {
     }
 
     if (plan !== undefined && !isSupportedPlan(plan)) {
-      return res.status(400).json({ error: 'Plano inválido. Use essencial ou profissional.' });
+      return res.status(400).json({ error: 'Plano inválido. Use essencial, profissional ou enterprise.' });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
     if (existing) return res.status(400).json({ error: 'Email já está registado' });
 
     const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({

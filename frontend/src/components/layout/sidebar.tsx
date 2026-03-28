@@ -14,6 +14,7 @@ import { getChatUnreadCount } from '@/lib/api';
 import { canView } from '@/lib/permissions';
 import type { ModuleKey } from '@/lib/permissions';
 import { ONBOARDING_OPEN, ONBOARDING_DISMISSED } from '@/lib/onboarding-tasks';
+import { getPlanBadgeClasses } from '@/lib/plan-utils';
 
 const TOUR_ATTR: Record<string, string> = {
   '/':          'sidebar-painel',
@@ -45,14 +46,13 @@ export default function Sidebar({
     window.location.href = '/auth/signout';
   };
 
-  const isAdmin = currentUser?.role === 'admin';
-  const isOwner = currentUser && !currentUser.accountOwnerId;
+  const hasAdminAccess = !!(currentUser?.isSuperAdmin || currentUser?.role === 'admin');
 
   const { data: chatUnread = 0 } = useQuery({
     queryKey: ['chat-unread'],
     queryFn: getChatUnreadCount,
     refetchInterval: 15_000,
-    enabled: !!currentUser,
+    enabled: !!currentUser && canView(currentUser, 'chat'),
   });
 
   const navItemClass = (active: boolean) => cn(
@@ -76,14 +76,6 @@ export default function Sidebar({
     '/finances':   'finances',
   };
 
-  // Advanced modules only show for SuperAdmin or users with explicit permission set
-  const isAdvancedVisible = (module: ModuleKey) => {
-    if (!currentUser) return false;
-    if (currentUser.isSuperAdmin) return true;
-    if (currentUser.permissions && canView(currentUser, module)) return true;
-    return false;
-  };
-
   const isVisible = (href: string) => {
     if (!currentUser) return false;
     const module = hrefToModule[href];
@@ -98,26 +90,21 @@ export default function Sidebar({
     { href: '/pipeline', label: 'Processos', icon: Kanban, module: 'pipeline' as const },
     { href: '/tasks', label: 'Tarefas', icon: CheckSquare, module: 'tasks' as const },
     { href: '/vendas', label: 'Vendas', icon: ShoppingBag, module: 'vendas' as const },
-    { href: '/chat', label: 'Conversas', icon: MessageSquare, module: 'chat' as const, advanced: true },
-    { href: '/calendario', label: 'Calendário', icon: CalendarDays, module: 'calendario' as const, advanced: true },
-    { href: '/automations', label: 'Automações', icon: Zap, module: 'automations' as const, advanced: true },
-    { href: '/forms', label: 'Formulários', icon: FileText, module: 'forms' as const, advanced: true },
+    { href: '/chat', label: 'Conversas', icon: MessageSquare, module: 'chat' as const },
+    { href: '/calendario', label: 'Calendário', icon: CalendarDays, module: 'calendario' as const },
+    { href: '/automations', label: 'Automações', icon: Zap, module: 'automations' as const },
+    { href: '/forms', label: 'Formulários', icon: FileText, module: 'forms' as const },
   ];
 
-  const allGestaoLinks = (isOwner || isAdmin) ? [
+  const allGestaoLinks = [
     { href: '/finances', label: 'Finanças', icon: DollarSign },
-  ] : [];
+  ];
 
-  const mainLinks = allMainLinks.filter(l => {
-    if ((l as any).advanced) {
-      return isAdvancedVisible((l as any).module as ModuleKey);
-    }
-    return isVisible(l.href);
-  });
+  const mainLinks = allMainLinks.filter((link) => isVisible(link.href));
   const gestaoLinks = allGestaoLinks.filter(l => isVisible(l.href));
 
-  const adminLinks: { href: string; label: string; icon: React.ElementType }[] = currentUser?.isSuperAdmin
-    ? [{ href: '/superadmin', label: 'SuperAdmin', icon: ShieldAlert }]
+  const adminLinks: { href: string; label: string; icon: React.ElementType }[] = hasAdminAccess
+    ? [{ href: '/superadmin?section=users', label: 'Administração', icon: ShieldAlert }]
     : [];
 
   return (
@@ -193,6 +180,16 @@ export default function Sidebar({
 
       {/* Footer */}
       <div className="px-3 py-4 border-t border-slate-100 space-y-0.5">
+        {currentUser?.plan && (
+          <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/70">
+              Plano atual da sua conta
+            </p>
+            <div className={`mt-2 inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getPlanBadgeClasses(currentUser.plan)}`}>
+              {currentUser.plan.toUpperCase()}
+            </div>
+          </div>
+        )}
         <Link href="/configuracoes" className={navItemClass(isActive('/configuracoes'))} onClick={onClose}>
           <Settings className="w-[18px] h-[18px] flex-shrink-0" />
           <span>Configurações</span>

@@ -1,4 +1,4 @@
-import type { User, UserPermissions } from './api';
+import type { PlanFeatureName, PlanFeatures, User, UserPermissions } from './api';
 
 export type ModuleKey =
   | 'contacts'
@@ -11,8 +11,33 @@ export type ModuleKey =
   | 'finances'
   | 'vendas';
 
+const MODULE_TO_FEATURE: Record<ModuleKey, PlanFeatureName> = {
+  contacts: 'clientes',
+  pipeline: 'processos',
+  tasks: 'tarefas',
+  chat: 'conversas',
+  calendario: 'calendario',
+  automations: 'automacoes',
+  forms: 'formularios',
+  finances: 'financas',
+  vendas: 'vendas',
+};
+
+export function hasFeature(
+  userOrFeatures: Pick<User, 'planFeatures'> | PlanFeatures | null | undefined,
+  featureName: PlanFeatureName
+): boolean {
+  if (!userOrFeatures) return true;
+  const features = (
+    'planFeatures' in userOrFeatures ? userOrFeatures.planFeatures : userOrFeatures
+  ) as PlanFeatures | null | undefined;
+  if (!features) return true;
+  return features[featureName] === true;
+}
+
 /** Returns true if user can view the given module */
 export function canView(user: User, module: ModuleKey): boolean {
+  if (!hasFeature(user, MODULE_TO_FEATURE[module])) return false;
   // SuperAdmin and platform admin see everything
   if (user.isSuperAdmin || user.role === 'admin') return true;
   // Account owner (no accountOwnerId) has full access
@@ -40,6 +65,7 @@ export function canView(user: User, module: ModuleKey): boolean {
 
 /** Returns true if user can create/edit records in the given module */
 export function canEdit(user: User, module: ModuleKey): boolean {
+  if (!hasFeature(user, MODULE_TO_FEATURE[module])) return false;
   if (user.isSuperAdmin || user.role === 'admin') return true;
   if (!user.accountOwnerId) return true;
   if (!user.permissions) return true;

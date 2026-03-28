@@ -16,6 +16,7 @@ interface PlanLimitModalProps {
 
 export function PlanLimitModal({ feature, featureLabel, current, limit, plan, onClose }: PlanLimitModalProps) {
   const router = useRouter();
+  const planLabel = plan === 'enterprise' ? 'Enterprise' : plan === 'profissional' ? 'Profissional' : 'Essencial';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -27,7 +28,7 @@ export function PlanLimitModal({ feature, featureLabel, current, limit, plan, on
             </div>
             <div>
               <h2 className="text-[#0A2540] font-semibold text-lg">Limite Atingido</h2>
-              <p className="text-[#6b7e9a] text-sm">Plano {plan === 'essencial' ? 'Essencial' : 'Profissional'}</p>
+              <p className="text-[#6b7e9a] text-sm">Plano {planLabel}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-[#6b7e9a] hover:text-[#0A2540] transition-colors">
@@ -37,7 +38,7 @@ export function PlanLimitModal({ feature, featureLabel, current, limit, plan, on
 
         <p className="text-[#374151] text-sm mb-4">
           Atingiste o limite de <strong>{limit} {featureLabel}</strong> do plano{' '}
-          <strong>{plan === 'essencial' ? 'Essencial' : 'Profissional'}</strong>.
+          <strong>{planLabel}</strong>.
           {plan === 'essencial' && ' Faz upgrade para o Profissional para aumentares os teus limites.'}
         </p>
 

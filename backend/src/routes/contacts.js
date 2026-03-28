@@ -3,6 +3,7 @@ const router = express.Router();
 const prisma = require('../lib/prisma');
 const automationRunner = require('../services/automationRunner');
 const { requirePermission, requireDeletePermission } = require('../lib/permissions');
+const { canCreateContact, getLimitState, buildLimitErrorPayload } = require('../lib/plan-limits');
 
 const VALID_STAGES = ['Novo', 'Contactado', 'Qualificado', 'Proposta Enviada', 'Fechado', 'Perdido'];
 const VALID_FIELD_TYPES = ['text', 'number', 'date', 'select', 'url'];
@@ -288,6 +289,11 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
       return res.status(400).json({ error: 'Phone format is invalid. Use only digits, spaces, +, -, (, )' });
     }
 
+    const limitState = await canCreateContact(req.user.effectiveUserId);
+    if (!limitState.allowed) {
+      return res.status(403).json(buildLimitErrorPayload(limitState));
+    }
+
     const finalStage = stage && VALID_STAGES.includes(stage) ? stage : 'Novo';
 
     const contact = await prisma.contact.create({
@@ -370,6 +376,27 @@ router.post('/import', requirePermission('contacts', 'edit'), async (req, res) =
         sector: c.sector || null,
         stage: 'Novo',
       }));
+
+    const limitState = await getLimitState(req.user.effectiveUserId, 'contacts');
+    if (limitState.rawLimit !== Infinity) {
+      const uniquePhones = [...new Set(preparedContacts.map((contact) => contact.phone))];
+      const existingContacts = uniquePhones.length
+        ? await prisma.contact.findMany({
+            where: {
+              userId: req.user.effectiveUserId,
+              phone: { in: uniquePhones },
+            },
+            select: { phone: true },
+          })
+        : [];
+
+      const existingPhones = new Set(existingContacts.map((contact) => contact.phone));
+      const effectiveInsertCount = uniquePhones.filter((phone) => !existingPhones.has(phone)).length;
+
+      if (limitState.current + effectiveInsertCount > limitState.rawLimit) {
+        return res.status(403).json(buildLimitErrorPayload(limitState));
+      }
+    }
 
     // Insert all contacts
     const inserted = await Promise.all(
@@ -457,6 +484,14 @@ router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
           orderBy: { timestamp: 'asc' },
         },
         tasks: {
+          where: req.user.isSuperAdmin || req.user.isAccountOwner || req.user.role === 'admin'
+            ? undefined
+            : { assignedToUserId: req.user.id },
+          include: {
+            assignedTo: {
+              select: { id: true, name: true, email: true },
+            },
+          },
           orderBy: { dueDate: 'asc' },
         },
       },
