@@ -16,6 +16,7 @@ import { Contact } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { ErrorState } from '@/components/ui/error-state';
 import {
   Table,
   TableBody,
@@ -56,6 +57,7 @@ function formatWA(phone: string): string | null {
 
 export default function ContactsPage() {
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('ALL');
   const [revenueFilter, setRevenueFilter] = useState<string>('ALL');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -91,16 +93,30 @@ export default function ContactsPage() {
     getCurrentUser().then(setCurrentUser).catch(() => {});
   }, []);
 
-  const { data: contacts = [] } = useQuery({
-    queryKey: ['contacts', search, stageFilter, revenueFilter, contactTypeTab],
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  const contactsQuery = useQuery({
+    queryKey: ['contacts', debouncedSearch, stageFilter, revenueFilter, contactTypeTab],
     queryFn: () =>
       getContacts({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         stage: stageFilter === 'ALL' ? undefined : stageFilter,
         revenue: revenueFilter === 'ALL' ? undefined : revenueFilter,
         contactType: contactTypeTab,
       }),
+    placeholderData: (previousData) => previousData,
+    retry: false,
   });
+  const contacts = contactsQuery.data || [];
+  const hasActiveFilters =
+    debouncedSearch.length > 0 || stageFilter !== 'ALL' || revenueFilter !== 'ALL';
+  const isSearching = contactsQuery.isFetching && !contactsQuery.isLoading;
 
   const deleteMutation = useMutation({
     mutationFn: deleteContact,
@@ -110,9 +126,14 @@ export default function ContactsPage() {
   });
 
   return (
-    <div className="p-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h1 className="text-3xl font-bold">Contactos</h1>
+    <div className="mx-auto max-w-6xl space-y-6 p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Contactos</h1>
+          <p className="mt-1 text-sm text-[#6b7e9a]">
+            Interessados, clientes e campos personalizados num fluxo único.
+          </p>
+        </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
@@ -152,15 +173,15 @@ export default function ContactsPage() {
       <ImportCSVModal open={isImportOpen} onOpenChange={setIsImportOpen} />
       <ContactFieldsManager open={isFieldsOpen} onOpenChange={setIsFieldsOpen} />
 
-      <div className="flex gap-1 mb-4 border-b border-[#dde3ec]">
+      <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
         {(['interessado', 'cliente'] as const).map(type => (
           <button
             key={type}
             onClick={() => setContactTypeTab(type)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
               contactTypeTab === type
-                ? 'border-[#0A2540] text-[#0A2540]'
-                : 'border-transparent text-[#6b7e9a] hover:text-[#0A2540]'
+                ? 'bg-[#0A2540] text-white shadow-sm'
+                : 'text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540]'
             }`}
           >
             {type === 'interessado' ? 'Interessados' : 'Clientes'}
@@ -168,7 +189,7 @@ export default function ContactsPage() {
         ))}
       </div>
 
-      <Card data-tour="contacts-filters" className="mb-6">
+      <Card data-tour="contacts-filters" className="border-slate-200 shadow-sm">
         <div className="p-4 flex flex-col sm:flex-row gap-4">
           <Input
             placeholder="Pesquisar por nome, telefone, empresa..."
@@ -203,101 +224,155 @@ export default function ContactsPage() {
             </SelectContent>
           </Select>
         </div>
+        {isSearching && (
+          <div className="border-t border-slate-100 px-4 py-3 text-sm text-[#6b7e9a]">
+            A procurar contactos com os filtros atuais...
+          </div>
+        )}
       </Card>
 
-      <Card data-tour="contacts-table">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead className="hidden sm:table-cell">Telefone</TableHead>
-                {visibleSystemCols.map(cfg => (
-                  <TableHead key={cfg.fieldKey} className="hidden md:table-cell">{cfg.label}</TableHead>
-                ))}
-                {fieldDefs.map((f) => (
-                  <TableHead key={f.id} className="hidden lg:table-cell">{f.label}</TableHead>
-                ))}
-                <TableHead>Stage</TableHead>
-                <TableHead>Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-          <TableBody>
-            {contacts.map((contact) => (
-              <TableRow key={contact.id}>
-                <TableCell className="font-medium">{contact.name}</TableCell>
-                <TableCell className="hidden sm:table-cell">{contact.phone || '-'}</TableCell>
-                {visibleSystemCols.map(cfg => (
-                  <TableCell key={cfg.fieldKey} className="hidden md:table-cell text-sm">
-                    {cfg.fieldKey === 'tags'
-                      ? ((contact.tags ?? []).join(', ') || '-')
-                      : ((contact as any)[cfg.fieldKey] || '-')}
-                  </TableCell>
-                ))}
-                {fieldDefs.map((f) => (
-                  <TableCell key={f.id} className="hidden lg:table-cell text-sm">
-                    {contact.customFields?.[f.key] || '-'}
-                  </TableCell>
-                ))}
-                <TableCell>
-                  <Badge
-                    style={{
-                      background: (pipelineStages.find((s) => s.name === contact.stage)?.color ?? '#6B7280') + '22',
-                      color: pipelineStages.find((s) => s.name === contact.stage)?.color ?? '#6B7280',
-                      border: 'none',
-                    }}
-                  >
-                    {contact.stage}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    <Link href={`/contacts/${contact.id}`}>
-                      <Button variant="outline" size="sm">
-                        <MessageCircle className="w-4 h-4" />
-                      </Button>
-                    </Link>
-                    {(() => {
-                      const waNum = formatWA(contact.phone ?? '');
-                      return waNum ? (
-                        <a href={`https://wa.me/${waNum}`} target="_blank" rel="noopener noreferrer">
-                          <Button variant="outline" size="sm" className="text-green-600 border-green-200 hover:bg-green-50" title="WhatsApp">
-                            <Phone className="w-4 h-4" />
-                          </Button>
-                        </a>
-                      ) : (
-                        <Button variant="outline" size="sm" disabled className="opacity-40" title="Sem telefone">
-                          <Phone className="w-4 h-4" />
-                        </Button>
-                      );
-                    })()}
-                    {contactTypeTab === 'interessado' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
-                        title="Converter para Cliente"
-                        onClick={() => updateContact(String(contact.id), { contactType: 'cliente' } as any).then(() => queryClient.invalidateQueries({ queryKey: ['contacts'] }))}
-                      >
-                        → Cliente
-                      </Button>
-                    )}
-                    {!currentUser?.accountOwnerId && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteMutation.mutate(contact.id.toString())}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
+      <Card data-tour="contacts-table" className="border-slate-200 shadow-sm">
+        {contactsQuery.isLoading ? (
+          <div className="space-y-3 p-6">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="h-12 animate-pulse rounded-2xl bg-slate-100" />
             ))}
-          </TableBody>
-          </Table>
-        </div>
+          </div>
+        ) : contactsQuery.isError ? (
+          <div className="p-6">
+            <ErrorState
+              title="Não foi possível carregar os contactos"
+              message="A lista de contactos não respondeu como esperado com os filtros atuais."
+              onRetry={() => contactsQuery.refetch()}
+              secondaryAction={{ label: 'Voltar ao Painel', href: '/' }}
+            />
+          </div>
+        ) : contacts.length === 0 ? (
+          <div className="p-8 text-center">
+            <h2 className="text-lg font-semibold text-[#2c2f31]">
+              {hasActiveFilters ? 'Nenhum resultado para esta pesquisa' : 'Ainda não tens contactos'}
+            </h2>
+            <p className="mt-2 text-sm text-[#6b7e9a]">
+              {hasActiveFilters
+                ? 'Experimenta outro termo, remove filtros ou cria um novo contacto manualmente.'
+                : 'Começa por criar o primeiro contacto ou importa a tua base via CSV.'}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <Button onClick={() => setIsFormOpen(true)}>Criar primeiro contacto</Button>
+              {hasActiveFilters && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearch('');
+                    setDebouncedSearch('');
+                    setStageFilter('ALL');
+                    setRevenueFilter('ALL');
+                  }}
+                >
+                  Limpar filtros
+                </Button>
+              )}
+            </div>
+            <p className="mt-3 text-xs text-slate-400">
+              {hasActiveFilters
+                ? 'A pesquisa continua ativa enquanto ajustas os filtros.'
+                : 'Também podes importar contactos para acelerar o arranque.'}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead className="hidden sm:table-cell">Telefone</TableHead>
+                  {visibleSystemCols.map(cfg => (
+                    <TableHead key={cfg.fieldKey} className="hidden md:table-cell">{cfg.label}</TableHead>
+                  ))}
+                  {fieldDefs.map((f) => (
+                    <TableHead key={f.id} className="hidden lg:table-cell">{f.label}</TableHead>
+                  ))}
+                  <TableHead>Stage</TableHead>
+                  <TableHead>Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {contacts.map((contact) => (
+                  <TableRow key={contact.id}>
+                    <TableCell className="font-medium">{contact.name}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{contact.phone || '-'}</TableCell>
+                    {visibleSystemCols.map(cfg => (
+                      <TableCell key={cfg.fieldKey} className="hidden md:table-cell text-sm">
+                        {cfg.fieldKey === 'tags'
+                          ? ((contact.tags ?? []).join(', ') || '-')
+                          : ((contact as any)[cfg.fieldKey] || '-')}
+                      </TableCell>
+                    ))}
+                    {fieldDefs.map((f) => (
+                      <TableCell key={f.id} className="hidden lg:table-cell text-sm">
+                        {contact.customFields?.[f.key] || '-'}
+                      </TableCell>
+                    ))}
+                    <TableCell>
+                      <Badge
+                        style={{
+                          background: (pipelineStages.find((s) => s.name === contact.stage)?.color ?? '#6B7280') + '22',
+                          color: pipelineStages.find((s) => s.name === contact.stage)?.color ?? '#6B7280',
+                          border: 'none',
+                        }}
+                      >
+                        {contact.stage}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Link href={`/contacts/${contact.id}`}>
+                          <Button variant="outline" size="sm">
+                            <MessageCircle className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                        {(() => {
+                          const waNum = formatWA(contact.phone ?? '');
+                          return waNum ? (
+                            <a href={`https://wa.me/${waNum}`} target="_blank" rel="noopener noreferrer">
+                              <Button variant="outline" size="sm" className="text-green-600 border-green-200 hover:bg-green-50" title="WhatsApp">
+                                <Phone className="w-4 h-4" />
+                              </Button>
+                            </a>
+                          ) : (
+                            <Button variant="outline" size="sm" disabled className="opacity-40" title="Sem telefone">
+                              <Phone className="w-4 h-4" />
+                            </Button>
+                          );
+                        })()}
+                        {contactTypeTab === 'interessado' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                            title="Converter para Cliente"
+                            onClick={() => updateContact(String(contact.id), { contactType: 'cliente' } as any).then(() => queryClient.invalidateQueries({ queryKey: ['contacts'] }))}
+                          >
+                            → Cliente
+                          </Button>
+                        )}
+                        {!currentUser?.accountOwnerId && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => deleteMutation.mutate(contact.id.toString())}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </Card>
     </div>
   );

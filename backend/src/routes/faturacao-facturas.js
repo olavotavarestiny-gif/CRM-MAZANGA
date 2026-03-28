@@ -7,6 +7,7 @@ const { generateQRCode, getQRCodeUrl } = require('../lib/faturacao/qrcode');
 const { registarFatura, isMock } = require('../lib/faturacao/agt-api');
 const { generateFacturaPDF } = require('../lib/faturacao/pdf');
 const { logEvent } = require('../lib/faturacao/audit');
+const { isValidRate, getTaxCode } = require('../lib/fiscal/iva-rates');
 
 // GET /api/faturacao/dashboard
 router.get('/dashboard', async (req, res) => {
@@ -95,8 +96,16 @@ router.post('/facturas', async (req, res) => {
     const processedLines = (lines || []).map((line, idx) => {
       const isIncluded = !!line.isIncluded;
       const settlementAmount = isIncluded ? 0 : Number(line.quantity) * Number(line.unitPrice);
-      const taxes = line.taxes || [{ taxType: 'IVA', taxCode: 'NOR', taxPercentage: isIncluded ? 0 : 14, taxAmount: 0 }];
-      const taxAmount = isIncluded ? 0 : taxes.reduce((sum, t) => sum + (settlementAmount * (Number(t.taxPercentage) / 100)), 0);
+      const taxes = line.taxes || [{ taxType: 'IVA', taxCode: isIncluded ? 'ISE' : 'NOR', taxPercentage: isIncluded ? 0 : 14, taxAmount: 0 }];
+      // Normalise tax codes and validate percentages
+      const normalisedTaxes = taxes.map((t) => {
+        const pct = Number(t.taxPercentage);
+        if (!isIncluded && !isValidRate(pct)) {
+          throw Object.assign(new Error(`Taxa de IVA inválida: ${pct}%. Valores aceites: 0%, 5%, 14%.`), { status: 400 });
+        }
+        return { ...t, taxCode: getTaxCode(pct), taxPercentage: pct };
+      });
+      const taxAmount = isIncluded ? 0 : normalisedTaxes.reduce((sum, t) => sum + (settlementAmount * (t.taxPercentage / 100)), 0);
       netTotal += settlementAmount;
       taxPayable += taxAmount;
       return {
@@ -108,7 +117,7 @@ router.post('/facturas', async (req, res) => {
         unitOfMeasure: line.unitOfMeasure || 'UN',
         settlementAmount,
         isIncluded,
-        taxes,
+        taxes: normalisedTaxes,
       };
     });
     const grossTotal = netTotal + taxPayable;
@@ -170,6 +179,7 @@ router.post('/facturas', async (req, res) => {
   } catch (err) {
     console.error('Error creating factura:', err);
     const msg = err.message || '';
+    if (err.status === 400) return res.status(400).json({ error: msg });
     if (err.code === 'P2002') return res.status(409).json({ error: 'Já existe uma fatura com este número. Por favor tente novamente.' });
     if (msg.includes('Série não encontrada')) return res.status(400).json({ error: 'A série seleccionada não existe. Selecione outra série nas definições.' });
     if (msg.includes('Série está fechada')) return res.status(400).json({ error: 'A série está fechada. Crie ou seleccione uma série activa.' });

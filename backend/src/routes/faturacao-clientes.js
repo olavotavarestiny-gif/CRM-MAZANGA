@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { isValidNIF, looksLikePhone } = require('../lib/fiscal/nif-validator');
 
 // GET /api/faturacao/clientes
 router.get('/clientes', async (req, res) => {
@@ -63,18 +64,41 @@ router.put('/clientes/:id', async (req, res) => {
 });
 
 // POST /api/faturacao/clientes/from-contact — importar contacto CRM
+// Requer NIF válido no campo customerTaxID do body; rejeita fallback para telefone.
 router.post('/clientes/from-contact', async (req, res) => {
   try {
-    const { contactId } = req.body;
+    const { contactId, customerTaxID } = req.body;
     const contact = await prisma.contact.findFirst({
       where: { id: Number(contactId), userId: req.user.effectiveUserId },
     });
     if (!contact) return res.status(404).json({ error: 'Contacto não encontrado' });
+
+    // Validar NIF fornecido explicitamente
+    const nif = (customerTaxID || '').trim();
+    if (!nif) {
+      return res.status(422).json({
+        error: 'NIF obrigatório para criar cliente de faturação.',
+        hint: 'Introduza o NIF do cliente antes de importar para faturação. O número de telefone não pode ser usado como NIF.',
+      });
+    }
+    if (looksLikePhone(nif)) {
+      return res.status(422).json({
+        error: 'O valor introduzido parece ser um número de telefone, não um NIF.',
+        hint: 'O NIF angolano tem 10 dígitos e começa em 1 (pessoa singular) ou 5 (empresa).',
+      });
+    }
+    if (!isValidNIF(nif)) {
+      return res.status(422).json({
+        error: 'NIF inválido. Verifique o número e o dígito verificador.',
+        hint: 'O NIF angolano tem 10 dígitos e começa em 1 (pessoa singular) ou 5 (empresa).',
+      });
+    }
+
     const cliente = await prisma.clienteFaturacao.upsert({
-      where: { userId_customerTaxID: { userId: req.user.effectiveUserId, customerTaxID: contact.phone || `CONTACT-${contactId}` } },
+      where: { userId_customerTaxID: { userId: req.user.effectiveUserId, customerTaxID: nif } },
       create: {
         userId: req.user.effectiveUserId,
-        customerTaxID: contact.phone || `CONTACT-${contactId}`,
+        customerTaxID: nif,
         customerName: contact.name,
         customerAddress: '',
         customerPhone: contact.phone,
@@ -85,6 +109,7 @@ router.post('/clientes/from-contact', async (req, res) => {
     });
     res.json(cliente);
   } catch (err) {
+    if (err.code === 'P2002') return res.status(409).json({ error: 'Já existe um cliente com este NIF.' });
     res.status(500).json({ error: "Erro de servidor. Tente novamente." });
   }
 });

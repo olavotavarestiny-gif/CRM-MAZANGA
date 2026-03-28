@@ -1,19 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ErrorState } from '@/components/ui/error-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Trash2, Plus, AlertCircle } from 'lucide-react';
-import { getSeries, getEstabelecimentos, createFactura, createClienteFaturacao, createProduto, updateProduto } from '@/lib/api';
-import { ClienteAutocomplete } from './cliente-autocomplete';
+import { useToast } from '@/components/ui/toast-provider';
+import { AsyncSearchPicker, SearchGroup } from '@/components/search/async-search-picker';
+import {
+  createClienteFaturacao,
+  createFactura,
+  createProduto,
+  createSerie,
+  getClientesFaturacao,
+  getContacts,
+  getEstabelecimentos,
+  getSeries,
+  updateProduto,
+} from '@/lib/api';
+import type { ClienteFaturacao, Contact, Produto } from '@/lib/types';
 import { ProdutoAutocomplete } from './produto-autocomplete';
-import type { ClienteFaturacao, Produto } from '@/lib/types';
 
 interface LineState {
   productId?: string;
@@ -23,7 +36,49 @@ interface LineState {
   unitPrice: number;
   unitOfMeasure: string;
   taxPercentage: number;
-  isIncluded?: boolean; // Proforma: item sem custo extra ("Incluído")
+  isIncluded?: boolean;
+}
+
+interface ProdutoDialogState {
+  open: boolean;
+  lineIndex: number;
+  mode: 'create' | 'edit';
+  productId?: string;
+  productCode: string;
+  productDescription: string;
+  unitPrice: number;
+  unitOfMeasure: string;
+  taxPercentage: number;
+}
+
+type CustomerMode = 'search' | 'manual';
+type CustomerSource = 'crm' | 'faturacao' | 'manual';
+
+interface InvoiceCustomerFields {
+  taxId: string;
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+}
+
+interface SelectedCustomerMeta {
+  source: CustomerSource;
+  id?: string;
+  contactId?: number;
+}
+
+interface CustomerLookupItem {
+  id: string;
+  source: 'crm' | 'faturacao';
+  label: string;
+  customerName: string;
+  customerTaxID: string;
+  customerAddress?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  company?: string;
+  contactId?: number;
 }
 
 const DOCUMENT_TYPES = [
@@ -56,43 +111,107 @@ const PAYMENT_METHODS = [
   'Cartão de Débito',
 ];
 
+const SOURCE_BADGE_STYLES: Record<'crm' | 'faturacao', string> = {
+  crm: 'border-slate-200 bg-slate-100 text-slate-600',
+  faturacao: 'border-blue-200 bg-blue-50 text-blue-700',
+};
+
+const blankCustomerFields: InvoiceCustomerFields = {
+  taxId: '',
+  name: '',
+  address: '',
+  phone: '',
+  email: '',
+};
+
 function fmtAmount(n: number, currency: string) {
   if (currency === 'AOA') {
     return n.toLocaleString('pt-AO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kz';
   }
-  const sym = CURRENCIES.find(c => c.value === currency)?.symbol ?? currency;
+  const sym = CURRENCIES.find((c) => c.value === currency)?.symbol ?? currency;
   return sym + ' ' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-interface ProdutoDialogState {
-  open: boolean;
-  lineIndex: number;
-  mode: 'create' | 'edit';
-  productId?: string;
-  productCode: string;
-  productDescription: string;
-  unitPrice: number;
-  unitOfMeasure: string;
-  taxPercentage: number;
+function emptyDialog(lineIndex = 0, description = ''): ProdutoDialogState {
+  return {
+    open: true,
+    lineIndex,
+    mode: 'create',
+    productId: undefined,
+    productCode: '',
+    productDescription: description,
+    unitPrice: 0,
+    unitOfMeasure: 'UN',
+    taxPercentage: 14,
+  };
 }
 
-const emptyDialog = (lineIndex = 0, description = ''): ProdutoDialogState => ({
-  open: true, lineIndex, mode: 'create', productId: undefined,
-  productCode: '', productDescription: description,
-  unitPrice: 0, unitOfMeasure: 'UN', taxPercentage: 14,
-});
+function normalizeLookupValue(value: string | undefined | null) {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function getContactTaxIdFallback(contact: Contact) {
+  const digits = (contact.phone || '').replace(/\D/g, '');
+  return digits || `CONTACT-${contact.id}`;
+}
+
+function rankCustomerOption(option: CustomerLookupItem, query: string) {
+  const normalizedQuery = normalizeLookupValue(query);
+  const fields = [
+    option.customerName,
+    option.customerTaxID,
+    option.customerPhone,
+    option.company,
+    option.customerEmail,
+  ].map(normalizeLookupValue);
+
+  if (fields.some((field) => field === normalizedQuery)) {
+    return 0;
+  }
+
+  if (fields.some((field) => field.startsWith(normalizedQuery))) {
+    return 1;
+  }
+
+  return 2;
+}
+
+function buildFieldsFromBillingClient(cliente: ClienteFaturacao): InvoiceCustomerFields {
+  return {
+    taxId: cliente.customerTaxID || '',
+    name: cliente.customerName || '',
+    address: cliente.customerAddress || '',
+    phone: cliente.customerPhone || '',
+    email: cliente.customerEmail || '',
+  };
+}
+
+function buildFieldsFromContact(contact: Contact): InvoiceCustomerFields {
+  return {
+    taxId: getContactTaxIdFallback(contact),
+    name: contact.company?.trim() || contact.name,
+    address: '',
+    phone: contact.phone || '',
+    email: contact.email || '',
+  };
+}
 
 export function FacturaForm() {
   const router = useRouter();
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
   const [documentType, setDocumentType] = useState('FT');
   const [serieId, setSerieId] = useState('');
   const [estabelecimentoId, setEstabelecimentoId] = useState('');
-  const [cliente, setCliente] = useState<ClienteFaturacao | null>(null);
-  const [newNif, setNewNif] = useState('');
-  const [newNome, setNewNome] = useState('');
-  const [newMorada, setNewMorada] = useState('');
-  const [manualCliente, setManualCliente] = useState(false);
+  const [customerMode, setCustomerMode] = useState<CustomerMode>('search');
+  const [selectedCustomerMeta, setSelectedCustomerMeta] = useState<SelectedCustomerMeta | null>(null);
+  const [customerFields, setCustomerFields] = useState<InvoiceCustomerFields>(blankCustomerFields);
+  const [customerWarning, setCustomerWarning] = useState('');
   const [lines, setLines] = useState<LineState[]>([
     { productCode: '', productDescription: '', quantity: 1, unitPrice: 0, unitOfMeasure: 'UN', taxPercentage: 14 },
   ]);
@@ -101,10 +220,95 @@ export function FacturaForm() {
   const [paymentMethod, setPaymentMethod] = useState('Transferência Bancária');
   const [error, setError] = useState('');
   const [dialog, setDialog] = useState<ProdutoDialogState | null>(null);
+  const [dialogError, setDialogError] = useState('');
   const [dialogSaving, setDialogSaving] = useState(false);
+  const [seriesModalOpen, setSeriesModalOpen] = useState(false);
+  const [seriesError, setSeriesError] = useState('');
+  const [seriesForm, setSeriesForm] = useState({
+    estabelecimentoId: '',
+    seriesCode: '',
+    seriesYear: String(new Date().getFullYear()),
+    documentType: 'FT',
+    firstDocumentNumber: '1',
+  });
 
-  const { data: series = [] } = useQuery({ queryKey: ['series'], queryFn: getSeries });
-  const { data: estabs = [] } = useQuery({ queryKey: ['estabelecimentos'], queryFn: getEstabelecimentos });
+  const seriesQuery = useQuery({
+    queryKey: ['series'],
+    queryFn: getSeries,
+  });
+  const estabsQuery = useQuery({
+    queryKey: ['estabelecimentos'],
+    queryFn: getEstabelecimentos,
+  });
+
+  const series = seriesQuery.data || [];
+  const estabs = estabsQuery.data || [];
+
+  const searchCustomers = useMemo(
+    () => async (query: string): Promise<SearchGroup<CustomerLookupItem>[]> => {
+      const [billingData, contacts] = await Promise.all([
+        getClientesFaturacao({ search: query }),
+        getContacts({ search: query }),
+      ]);
+
+      const billingClients = billingData.clientes
+        .map((cliente) => ({
+          id: cliente.id,
+          source: 'faturacao' as const,
+          label: 'Faturação',
+          customerName: cliente.customerName,
+          customerTaxID: cliente.customerTaxID,
+          customerAddress: cliente.customerAddress,
+          customerPhone: cliente.customerPhone,
+          customerEmail: cliente.customerEmail,
+          contactId: cliente.contactId,
+        }))
+        .sort((a, b) => {
+          const rankDiff = rankCustomerOption(a, query) - rankCustomerOption(b, query);
+          return rankDiff || a.customerName.localeCompare(b.customerName);
+        });
+
+      const crmContacts = contacts
+        .map((contact) => ({
+          id: String(contact.id),
+          source: 'crm' as const,
+          label: 'CRM',
+          customerName: contact.company?.trim() || contact.name,
+          customerTaxID: getContactTaxIdFallback(contact),
+          customerPhone: contact.phone,
+          customerEmail: contact.email,
+          company: contact.company,
+          contactId: contact.id,
+        }))
+        .sort((a, b) => {
+          const rankDiff = rankCustomerOption(a, query) - rankCustomerOption(b, query);
+          return rankDiff || a.customerName.localeCompare(b.customerName);
+        });
+
+      return [
+        {
+          id: 'billing',
+          label: 'Clientes de faturação',
+          items: billingClients,
+        },
+        {
+          id: 'crm',
+          label: 'Contactos CRM',
+          items: crmContacts,
+        },
+      ]
+        .filter((group) => group.items.length > 0)
+        .sort((a, b) => {
+          const aRank = a.items.length > 0 ? rankCustomerOption(a.items[0], query) : Number.MAX_SAFE_INTEGER;
+          const bRank = b.items.length > 0 ? rankCustomerOption(b.items[0], query) : Number.MAX_SAFE_INTEGER;
+          if (aRank !== bRank) {
+            return aRank - bRank;
+          }
+          return a.id === 'billing' ? -1 : 1;
+        });
+    },
+    []
+  );
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -113,75 +317,176 @@ export function FacturaForm() {
       let customerName = '';
       let customerAddress = '';
 
-      if (manualCliente) {
-        if (!newNif.trim() || !newNome.trim()) throw new Error('NIF e nome do cliente obrigatórios');
-        const c = await createClienteFaturacao({ customerTaxID: newNif, customerName: newNome, customerAddress: newMorada });
-        clienteFaturacaoId = c.id;
-        customerTaxID = c.customerTaxID;
-        customerName = c.customerName;
-        customerAddress = newMorada;
-      } else {
-        if (!cliente) throw new Error('Selecione um cliente');
-        clienteFaturacaoId = cliente.id;
-        customerTaxID = cliente.customerTaxID;
-        customerName = cliente.customerName;
-        customerAddress = cliente.customerAddress || '';
+      if (!customerFields.taxId.trim() || !customerFields.name.trim()) {
+        throw new Error('NIF e nome do cliente são obrigatórios');
       }
 
-      if (!serieId) throw new Error('Selecione uma série');
-      if (!estabelecimentoId) throw new Error('Selecione um estabelecimento');
-      if (lines.some(l => !l.productDescription)) throw new Error('Preencha todos os produtos/serviços');
+      if (customerMode === 'manual') {
+        const createdCustomer = await createClienteFaturacao({
+          customerTaxID: customerFields.taxId.trim(),
+          customerName: customerFields.name.trim(),
+          customerAddress: customerFields.address.trim() || undefined,
+          customerPhone: customerFields.phone.trim() || undefined,
+          customerEmail: customerFields.email.trim() || undefined,
+        });
+        clienteFaturacaoId = createdCustomer.id;
+      } else if (selectedCustomerMeta?.source === 'faturacao') {
+        clienteFaturacaoId = selectedCustomerMeta.id;
+      }
+
+      customerTaxID = customerFields.taxId.trim();
+      customerName = customerFields.name.trim();
+      customerAddress = customerFields.address.trim();
+
+      if (!serieId) {
+        throw new Error('Selecione uma série');
+      }
+      if (!estabelecimentoId) {
+        throw new Error('Selecione um estabelecimento');
+      }
+      if (lines.some((line) => !line.productDescription.trim())) {
+        throw new Error('Preencha todos os produtos ou serviços');
+      }
 
       const isAOA = currencyCode === 'AOA';
 
       return createFactura({
-        documentType, serieId, estabelecimentoId,
-        customerTaxID, customerName, customerAddress, clienteFaturacaoId,
+        documentType,
+        serieId,
+        estabelecimentoId,
+        customerTaxID,
+        customerName,
+        customerAddress,
+        clienteFaturacaoId,
         currencyCode,
         currencyAmount: isAOA ? undefined : grossTotal,
         exchangeRate: isAOA ? undefined : exchangeRate,
         paymentMethod,
-        lines: lines.map(l => ({
-          productCode: l.productCode || l.productDescription.substring(0, 10).toUpperCase().replace(/\s/g, '_'),
-          productDescription: l.productDescription,
-          quantity: l.quantity,
-          unitPrice: l.isIncluded ? 0 : l.unitPrice,
-          unitOfMeasure: l.unitOfMeasure,
-          settlementAmount: l.isIncluded ? 0 : l.quantity * l.unitPrice,
-          isIncluded: l.isIncluded || false,
-          taxes: [{ taxType: 'IVA', taxCode: l.isIncluded || l.taxPercentage === 0 ? 'ISE' : 'NOR', taxPercentage: l.isIncluded ? 0 : l.taxPercentage }],
+        lines: lines.map((line) => ({
+          productCode:
+            line.productCode ||
+            line.productDescription.substring(0, 10).toUpperCase().replace(/\s/g, '_'),
+          productDescription: line.productDescription,
+          quantity: line.quantity,
+          unitPrice: line.isIncluded ? 0 : line.unitPrice,
+          unitOfMeasure: line.unitOfMeasure,
+          settlementAmount: line.isIncluded ? 0 : line.quantity * line.unitPrice,
+          isIncluded: line.isIncluded || false,
+          taxes: [
+            {
+              taxType: 'IVA',
+              taxCode: line.isIncluded || line.taxPercentage === 0 ? 'ISE' : line.taxPercentage === 5 ? 'RED' : 'NOR',
+              taxPercentage: line.isIncluded ? 0 : line.taxPercentage,
+            },
+          ],
         })),
       });
     },
     onSuccess: (factura) => {
-      qc.invalidateQueries({ queryKey: ['facturas'] });
-      qc.invalidateQueries({ queryKey: ['faturacao-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['facturas'] });
+      queryClient.invalidateQueries({ queryKey: ['faturacao-dashboard'] });
+      toast({
+        variant: 'success',
+        title: 'Fatura emitida',
+        description: 'O documento foi criado com sucesso.',
+      });
       router.push(`/faturacao/${factura.id}`);
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => {
+      setError(err.message);
+      toast({
+        variant: 'error',
+        title: 'Não foi possível emitir a fatura',
+        description: err.message,
+      });
+    },
   });
 
-  // Linhas "incluído" contribuem 0 ao total
-  const netTotal = lines.reduce((s, l) => s + (l.isIncluded ? 0 : l.quantity * l.unitPrice), 0);
-  const taxPayable = lines.reduce((s, l) => s + (l.isIncluded ? 0 : l.quantity * l.unitPrice * (l.taxPercentage / 100)), 0);
+  const createSerieMutation = useMutation({
+    mutationFn: () =>
+      createSerie({
+        estabelecimentoId: seriesForm.estabelecimentoId,
+        seriesCode: seriesForm.seriesCode.trim(),
+        seriesYear: Number(seriesForm.seriesYear),
+        documentType: seriesForm.documentType,
+        firstDocumentNumber: Number(seriesForm.firstDocumentNumber || '1'),
+      }),
+    onSuccess: async (serie) => {
+      await queryClient.invalidateQueries({ queryKey: ['series'] });
+      setSerieId(serie.id);
+      if (!estabelecimentoId) {
+        setEstabelecimentoId(seriesForm.estabelecimentoId);
+      }
+      setSeriesModalOpen(false);
+      setSeriesError('');
+      toast({
+        variant: 'success',
+        title: 'Série criada',
+        description: 'A nova série ficou disponível e já foi selecionada na fatura.',
+      });
+    },
+    onError: (err: Error) => {
+      setSeriesError(err.message);
+      toast({
+        variant: 'error',
+        title: 'Não foi possível criar a série',
+        description: err.message,
+      });
+    },
+  });
+
+  const netTotal = lines.reduce((sum, line) => sum + (line.isIncluded ? 0 : line.quantity * line.unitPrice), 0);
+  const taxPayable = lines.reduce(
+    (sum, line) => sum + (line.isIncluded ? 0 : line.quantity * line.unitPrice * (line.taxPercentage / 100)),
+    0
+  );
   const grossTotal = netTotal + taxPayable;
 
-  const addLine = () => setLines(p => [...p, { productCode: '', productDescription: '', quantity: 1, unitPrice: 0, unitOfMeasure: 'UN', taxPercentage: 14, isIncluded: false }]);
-  const removeLine = (i: number) => setLines(p => p.filter((_, idx) => idx !== i));
-  const updateLine = (i: number, field: keyof LineState, val: string | number) =>
-    setLines(p => p.map((l, idx) => idx === i ? { ...l, [field]: val } : l));
-  const toggleIncluded = (i: number) =>
-    setLines(p => p.map((l, idx) => idx === i ? { ...l, isIncluded: !l.isIncluded, unitPrice: !l.isIncluded ? 0 : l.unitPrice } : l));
+  const activeSeries = series.filter(
+    (serie) => serie.seriesStatus !== 'F' && serie.documentType === documentType
+  );
 
-  const activeSeries = series.filter(s => s.seriesStatus !== 'F' && s.documentType === documentType);
+  const addLine = () => {
+    setLines((prev) => [
+      ...prev,
+      { productCode: '', productDescription: '', quantity: 1, unitPrice: 0, unitOfMeasure: 'UN', taxPercentage: 14, isIncluded: false },
+    ]);
+  };
 
-  // --- Produto Dialog handlers ---
+  const removeLine = (index: number) => {
+    setLines((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const updateLine = (index: number, field: keyof LineState, value: string | number | boolean) => {
+    setLines((prev) =>
+      prev.map((line, currentIndex) => (currentIndex === index ? { ...line, [field]: value } : line))
+    );
+  };
+
+  const toggleIncluded = (index: number) => {
+    setLines((prev) =>
+      prev.map((line, currentIndex) =>
+        currentIndex === index
+          ? {
+              ...line,
+              isIncluded: !line.isIncluded,
+              unitPrice: !line.isIncluded ? 0 : line.unitPrice,
+            }
+          : line
+      )
+    );
+  };
+
   async function handleDialogSave() {
-    if (!dialog) return;
-    if (!dialog.productDescription.trim()) return;
+    if (!dialog || !dialog.productDescription.trim()) {
+      return;
+    }
+
     setDialogSaving(true);
+    setDialogError('');
     try {
       let produto: Produto;
+
       if (dialog.mode === 'edit' && dialog.productId) {
         produto = await updateProduto(dialog.productId, {
           productDescription: dialog.productDescription,
@@ -191,207 +496,476 @@ export function FacturaForm() {
         });
       } else {
         produto = await createProduto({
-          productCode: dialog.productCode || dialog.productDescription.substring(0, 10).toUpperCase().replace(/\s/g, '_'),
+          productCode:
+            dialog.productCode ||
+            dialog.productDescription.substring(0, 10).toUpperCase().replace(/\s/g, '_'),
           productDescription: dialog.productDescription,
           unitPrice: dialog.unitPrice,
           unitOfMeasure: dialog.unitOfMeasure,
           taxPercentage: dialog.taxPercentage,
         });
       }
-      qc.invalidateQueries({ queryKey: ['produtos'] });
-      const i = dialog.lineIndex;
-      setLines(p => p.map((l, idx) => idx === i ? {
-        ...l,
-        productId: produto.id,
-        productCode: produto.productCode,
-        productDescription: produto.productDescription,
-        unitPrice: produto.unitPrice,
-        unitOfMeasure: produto.unitOfMeasure,
-        taxPercentage: produto.taxPercentage,
-      } : l));
+
+      queryClient.invalidateQueries({ queryKey: ['produtos'] });
+
+      setLines((prev) =>
+        prev.map((line, index) =>
+          index === dialog.lineIndex
+            ? {
+                ...line,
+                productId: produto.id,
+                productCode: produto.productCode,
+                productDescription: produto.productDescription,
+                unitPrice: produto.unitPrice,
+                unitOfMeasure: produto.unitOfMeasure,
+                taxPercentage: produto.taxPercentage,
+              }
+            : line
+        )
+      );
+
       setDialog(null);
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Erro ao guardar produto');
+      toast({
+        variant: 'success',
+        title: dialog.mode === 'edit' ? 'Produto atualizado' : 'Produto criado',
+        description: 'A linha da fatura foi atualizada com os dados guardados.',
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao guardar produto';
+      setDialogError(message);
+      toast({
+        variant: 'error',
+        title: 'Não foi possível guardar o produto',
+        description: message,
+      });
     } finally {
       setDialogSaving(false);
     }
   }
 
   function openCreateDialog(lineIndex: number, description: string) {
+    setDialogError('');
     setDialog(emptyDialog(lineIndex, description));
   }
 
   function openEditDialog(lineIndex: number) {
-    const l = lines[lineIndex];
+    setDialogError('');
+    const line = lines[lineIndex];
     setDialog({
-      open: true, lineIndex, mode: 'edit',
-      productId: l.productId,
-      productCode: l.productCode,
-      productDescription: l.productDescription,
-      unitPrice: l.unitPrice,
-      unitOfMeasure: l.unitOfMeasure,
-      taxPercentage: l.taxPercentage,
+      open: true,
+      lineIndex,
+      mode: 'edit',
+      productId: line.productId,
+      productCode: line.productCode,
+      productDescription: line.productDescription,
+      unitPrice: line.unitPrice,
+      unitOfMeasure: line.unitOfMeasure,
+      taxPercentage: line.taxPercentage,
     });
   }
 
+  function handleCustomerSelect(customer: CustomerLookupItem) {
+    setCustomerMode('search');
+    setSelectedCustomerMeta({
+      source: customer.source,
+      id: customer.source === 'faturacao' ? customer.id : undefined,
+      contactId: customer.contactId,
+    });
+    setCustomerFields({
+      taxId: customer.customerTaxID || '',
+      name: customer.customerName || '',
+      address: customer.customerAddress || '',
+      phone: customer.customerPhone || '',
+      email: customer.customerEmail || '',
+    });
+    setCustomerWarning(
+      customer.source === 'crm'
+        ? 'Verifique os dados antes de emitir a fatura. Os dados vieram do CRM e podem precisar de ajuste fiscal.'
+        : ''
+    );
+  }
+
+  function handleOpenSeriesModal() {
+    setSeriesError('');
+    setSeriesForm({
+      estabelecimentoId: estabelecimentoId || estabs[0]?.id || '',
+      seriesCode: '',
+      seriesYear: String(new Date().getFullYear()),
+      documentType,
+      firstDocumentNumber: '1',
+    });
+    setSeriesModalOpen(true);
+  }
+
+  const customerSourceLabel =
+    selectedCustomerMeta?.source === 'crm'
+      ? 'CRM'
+      : selectedCustomerMeta?.source === 'faturacao'
+      ? 'Faturação'
+      : 'Manual';
+
+  const shouldShowCustomerFields = customerMode === 'manual' || !!selectedCustomerMeta;
+
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="max-w-4xl space-y-6">
       {error && (
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          {error}
-        </div>
+        <ErrorState
+          compact
+          title="Não foi possível preparar a emissão"
+          message={error}
+          onRetry={() => {
+            setError('');
+            mutation.mutate();
+          }}
+          secondaryAction={{ label: 'Voltar', onClick: () => setError('') }}
+        />
       )}
 
       {documentType === 'PF' && (
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
           <div>
             <p className="font-semibold">Fatura Proforma — Documento sem validade fiscal</p>
-            <p className="text-xs mt-0.5 text-amber-700">Este documento é uma proposta comercial. Não é submetido à AGT e não substitui uma fatura. Para faturar oficialmente, emita uma FT ou FR.</p>
+            <p className="mt-0.5 text-xs text-amber-700">
+              Este documento é uma proposta comercial. Não é submetido à AGT e não substitui uma fatura.
+            </p>
           </div>
         </div>
       )}
 
-      {/* Tipo e Série */}
       <Card>
-        <CardHeader><CardTitle className="text-[#0A2540] text-base">Documento</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
-          <div>
-            <Label className="text-xs text-gray-600">Tipo de Documento</Label>
-            <Select value={documentType} onValueChange={v => { setDocumentType(v); setSerieId(''); }}>
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DOCUMENT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs text-gray-600">Série</Label>
-            <Select value={serieId} onValueChange={setSerieId}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Selecionar série..." />
-              </SelectTrigger>
-              <SelectContent>
-                {activeSeries.length === 0 && <SelectItem value="none" disabled>Sem séries ativas para este tipo</SelectItem>}
-                {activeSeries.map(s => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.seriesCode} / {s.seriesYear} · #{(s.lastDocumentNumber ?? 0) + 1}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs text-gray-600">Estabelecimento</Label>
-            <Select value={estabelecimentoId} onValueChange={setEstabelecimentoId}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Selecionar estabelecimento..." />
-              </SelectTrigger>
-              <SelectContent>
-                {estabs.map(e => <SelectItem key={e.id} value={e.id}>{e.nome} — {e.nif}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs text-gray-600">Moeda</Label>
-            <Select value={currencyCode} onValueChange={v => { setCurrencyCode(v); setExchangeRate(1); }}>
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CURRENCIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          {currencyCode !== 'AOA' && (
-            <div className="col-span-2">
-              <Label className="text-xs text-gray-600">Taxa de câmbio (1 {currencyCode} = ? AOA)</Label>
-              <Input
-                type="number" min="0.01" step="0.01" value={exchangeRate}
-                onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)}
-                className="mt-1 w-48"
-              />
-            </div>
-          )}
-          <div className="col-span-2">
-            <Label className="text-xs text-gray-600">Método de Pagamento</Label>
-            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Cliente */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-[#0A2540] text-base">Cliente</CardTitle>
-          <button
-            type="button"
-            onClick={() => { setManualCliente(!manualCliente); setCliente(null); }}
-            className="text-xs text-violet-600 hover:text-violet-700 underline"
-          >
-            {manualCliente ? 'Pesquisar existente' : 'Novo cliente'}
-          </button>
+        <CardHeader>
+          <CardTitle className="text-base text-[#0A2540]">Documento</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {manualCliente ? (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-gray-600">NIF *</Label>
-                <Input value={newNif} onChange={e => setNewNif(e.target.value)} placeholder="5000123456" className="mt-1" />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-600">Nome *</Label>
-                <Input value={newNome} onChange={e => setNewNome(e.target.value)} placeholder="Nome da empresa" className="mt-1" />
-              </div>
-              <div className="col-span-2">
-                <Label className="text-xs text-gray-600">Morada</Label>
-                <Input value={newMorada} onChange={e => setNewMorada(e.target.value)} placeholder="Endereço completo" className="mt-1" />
-              </div>
+        <CardContent className="space-y-4">
+          {seriesQuery.isError || estabsQuery.isError ? (
+            <ErrorState
+              compact
+              title="Não foi possível carregar a configuração da fatura"
+              message="As séries ou os estabelecimentos não responderam como esperado."
+              onRetry={() => {
+                seriesQuery.refetch();
+                estabsQuery.refetch();
+              }}
+              secondaryAction={{ label: 'Voltar', onClick: () => router.back() }}
+            />
+          ) : seriesQuery.isLoading || estabsQuery.isLoading ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="h-3 w-24 animate-pulse rounded-full bg-slate-200" />
+                  <div className="h-10 animate-pulse rounded-xl bg-slate-100" />
+                </div>
+              ))}
             </div>
           ) : (
             <>
-              <ClienteAutocomplete onChange={setCliente} />
-              {cliente && (
-                <div className="p-3 rounded-lg bg-gray-50 border border-gray-200 space-y-1">
-                  <p className="text-sm font-medium text-[#0A2540]">{cliente.customerName}</p>
-                  <p className="text-xs text-gray-500">NIF: {cliente.customerTaxID}</p>
-                  {cliente.customerAddress && <p className="text-xs text-gray-500">{cliente.customerAddress}</p>}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <Label className="text-xs text-gray-600">Tipo de Documento</Label>
+                  <Select
+                    value={documentType}
+                    onValueChange={(value) => {
+                      setDocumentType(value);
+                      setSerieId('');
+                    }}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DOCUMENT_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="text-xs text-gray-600">Série</Label>
+                    <button
+                      type="button"
+                      onClick={handleOpenSeriesModal}
+                      className="text-xs font-medium text-[#0A2540] underline underline-offset-4"
+                    >
+                      Criar série
+                    </button>
+                  </div>
+                  <Select value={serieId} onValueChange={setSerieId}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecionar série..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeSeries.length === 0 && (
+                        <SelectItem value="none" disabled>
+                          Sem séries ativas para este tipo
+                        </SelectItem>
+                      )}
+                      {activeSeries.map((serie) => (
+                        <SelectItem key={serie.id} value={serie.id}>
+                          {serie.seriesCode} / {serie.seriesYear} · #{(serie.lastDocumentNumber ?? 0) + 1}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Se a série ainda não existir, podes criá-la sem sair desta fatura.
+                  </p>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-gray-600">Estabelecimento</Label>
+                  <Select value={estabelecimentoId} onValueChange={setEstabelecimentoId}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecionar estabelecimento..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {estabs.map((estabelecimento) => (
+                        <SelectItem key={estabelecimento.id} value={estabelecimento.id}>
+                          {estabelecimento.nome} — {estabelecimento.nif}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-gray-600">Moeda</Label>
+                  <Select
+                    value={currencyCode}
+                    onValueChange={(value) => {
+                      setCurrencyCode(value);
+                      setExchangeRate(1);
+                    }}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CURRENCIES.map((currency) => (
+                        <SelectItem key={currency.value} value={currency.value}>
+                          {currency.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {currencyCode !== 'AOA' && (
+                <div>
+                  <Label className="text-xs text-gray-600">
+                    Taxa de câmbio (1 {currencyCode} = ? AOA)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={exchangeRate}
+                    onChange={(event) => setExchangeRate(parseFloat(event.target.value) || 1)}
+                    className="mt-1 w-full sm:w-52"
+                  />
                 </div>
               )}
+
+              <div>
+                <Label className="text-xs text-gray-600">Método de Pagamento</Label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map((method) => (
+                      <SelectItem key={method} value={method}>
+                        {method}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </>
           )}
         </CardContent>
       </Card>
 
-      {/* Artigos */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-[#0A2540] text-base">Artigos / Serviços</CardTitle>
+          <CardTitle className="text-base text-[#0A2540]">Cliente</CardTitle>
+          <button
+            type="button"
+            onClick={() => {
+              setCustomerMode((prev) => (prev === 'manual' ? 'search' : 'manual'));
+              if (customerMode !== 'manual') {
+                setSelectedCustomerMeta(null);
+                setCustomerFields(blankCustomerFields);
+                setCustomerWarning('');
+              }
+            }}
+            className="text-xs font-medium text-[#0A2540] underline underline-offset-4"
+          >
+            {customerMode === 'manual' ? 'Pesquisar cliente existente' : 'Introduzir manualmente'}
+          </button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {customerMode === 'manual' ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+              <p className="text-sm font-medium text-[#0A2540]">Novo cliente</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Estes dados serão usados na emissão e o cliente será criado automaticamente na faturação.
+              </p>
+            </div>
+          ) : (
+            <AsyncSearchPicker
+              label="Cliente (CRM + Faturação)"
+              placeholder="Pesquisar por nome, telefone, NIF ou empresa..."
+              helperText="Pesquisa unificada entre contactos CRM e clientes já registados na faturação."
+              searchFn={searchCustomers}
+              getItemKey={(customer) => `${customer.source}-${customer.id}`}
+              getSelectedLabel={(customer) => customer.customerName}
+              onSelect={handleCustomerSelect}
+              footerAction={{
+                label: '+ Criar novo cliente',
+                onClick: () => {
+                  setCustomerMode('manual');
+                  setSelectedCustomerMeta(null);
+                  setCustomerFields(blankCustomerFields);
+                  setCustomerWarning('');
+                },
+              }}
+              emptyState={{
+                title: 'Nenhum cliente encontrado',
+                message: 'Tenta outro nome, empresa, telefone ou NIF.',
+              }}
+              renderItem={(customer) => (
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-[#0A2540]">{customer.customerName}</p>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SOURCE_BADGE_STYLES[customer.source]}`}>
+                      {customer.label}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    NIF: {customer.customerTaxID}
+                    {customer.customerPhone ? ` · ${customer.customerPhone}` : ''}
+                    {customer.company ? ` · ${customer.company}` : ''}
+                  </p>
+                </div>
+              )}
+            />
+          )}
+
+          {selectedCustomerMeta && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium text-[#0A2540]">{customerFields.name || 'Cliente selecionado'}</p>
+                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${selectedCustomerMeta.source === 'crm' ? SOURCE_BADGE_STYLES.crm : SOURCE_BADGE_STYLES.faturacao}`}>
+                  {customerSourceLabel}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                Podes ajustar os dados abaixo antes de emitir o documento.
+              </p>
+            </div>
+          )}
+
+          {customerWarning && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {customerWarning}
+            </div>
+          )}
+
+          {shouldShowCustomerFields && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <Label className="text-xs text-gray-600">NIF *</Label>
+                <Input
+                  value={customerFields.taxId}
+                  onChange={(event) =>
+                    setCustomerFields((prev) => ({ ...prev, taxId: event.target.value }))
+                  }
+                  placeholder="5000123456"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-gray-600">Nome *</Label>
+                <Input
+                  value={customerFields.name}
+                  onChange={(event) =>
+                    setCustomerFields((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                  placeholder="Nome da empresa ou cliente"
+                  className="mt-1"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label className="text-xs text-gray-600">Morada</Label>
+                <Input
+                  value={customerFields.address}
+                  onChange={(event) =>
+                    setCustomerFields((prev) => ({ ...prev, address: event.target.value }))
+                  }
+                  placeholder="Endereço completo"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-gray-600">Telefone</Label>
+                <Input
+                  value={customerFields.phone}
+                  onChange={(event) =>
+                    setCustomerFields((prev) => ({ ...prev, phone: event.target.value }))
+                  }
+                  placeholder="923 000 000"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-gray-600">Email</Label>
+                <Input
+                  value={customerFields.email}
+                  onChange={(event) =>
+                    setCustomerFields((prev) => ({ ...prev, email: event.target.value }))
+                  }
+                  placeholder="cliente@empresa.ao"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base text-[#0A2540]">Artigos / Serviços</CardTitle>
           <Button type="button" variant="outline" size="sm" onClick={addLine} className="border-gray-200 text-gray-700 hover:bg-gray-50">
-            <Plus className="w-3 h-3 mr-1" /> Adicionar linha
+            <Plus className="mr-1 h-3 w-3" /> Adicionar linha
           </Button>
         </CardHeader>
         <CardContent className="space-y-3">
-          {lines.map((line, i) => (
-            <div key={i} className={`grid grid-cols-12 gap-2 items-end p-3 rounded-lg border ${line.isIncluded ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50 border-gray-100'}`}>
-              <div className="col-span-4">
-                <div className="flex items-center justify-between mb-1">
+          {lines.map((line, index) => (
+            <div
+              key={index}
+              className={`grid grid-cols-12 items-end gap-2 rounded-lg border p-3 ${
+                line.isIncluded ? 'border-emerald-100 bg-emerald-50' : 'border-gray-100 bg-gray-50'
+              }`}
+            >
+              <div className="col-span-12 lg:col-span-4">
+                <div className="mb-1 flex items-center justify-between">
                   <Label className="text-xs text-gray-600">Produto / Serviço</Label>
                   {documentType === 'PF' && (
                     <button
                       type="button"
-                      onClick={() => toggleIncluded(i)}
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${line.isIncluded ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-500 border-gray-300 hover:border-emerald-400 hover:text-emerald-600'}`}
+                      onClick={() => toggleIncluded(index)}
+                      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+                        line.isIncluded
+                          ? 'border-emerald-600 bg-emerald-600 text-white'
+                          : 'border-gray-300 bg-white text-gray-500 hover:border-emerald-400 hover:text-emerald-600'
+                      }`}
                     >
                       {line.isIncluded ? '✓ Incluído' : '+ Incluído'}
                     </button>
@@ -402,78 +976,115 @@ export function FacturaForm() {
                     value={line.productDescription}
                     placeholder="Pesquisar ou digitar..."
                     hasSelection={!!line.productDescription}
-                    onCreateNew={(desc) => openCreateDialog(i, desc)}
-                    onEditCurrent={() => openEditDialog(i)}
-                    onChange={p => {
-                      setLines(prev => prev.map((l, idx) => idx === i ? {
-                        ...l,
-                        productId: p.id,
-                        productCode: p.productCode,
-                        productDescription: p.productDescription,
-                        unitPrice: l.isIncluded ? 0 : p.unitPrice,
-                        taxPercentage: p.taxPercentage,
-                        unitOfMeasure: p.unitOfMeasure,
-                      } : l));
+                    onCreateNew={(description) => openCreateDialog(index, description)}
+                    onEditCurrent={() => openEditDialog(index)}
+                    onChange={(product) => {
+                      setLines((prev) =>
+                        prev.map((currentLine, currentIndex) =>
+                          currentIndex === index
+                            ? {
+                                ...currentLine,
+                                productId: product.id,
+                                productCode: product.productCode,
+                                productDescription: product.productDescription,
+                                unitPrice: currentLine.isIncluded ? 0 : product.unitPrice,
+                                taxPercentage: product.taxPercentage,
+                                unitOfMeasure: product.unitOfMeasure,
+                              }
+                            : currentLine
+                        )
+                      );
                     }}
                   />
                   {!line.productId && (
                     <Input
                       value={line.productDescription}
-                      placeholder="Ou digitar descrição directamente..."
+                      placeholder="Ou digitar descrição diretamente..."
                       className="mt-1 text-sm"
-                      onChange={e => updateLine(i, 'productDescription', e.target.value)}
+                      onChange={(event) => updateLine(index, 'productDescription', event.target.value)}
                     />
                   )}
                 </div>
               </div>
-              <div className="col-span-2">
+
+              <div className="col-span-4 lg:col-span-2">
                 <Label className="text-xs text-gray-600">Qtd.</Label>
-                <Input type="number" min="0.01" step="0.01" value={line.quantity}
-                  onChange={e => updateLine(i, 'quantity', parseFloat(e.target.value) || 1)}
-                  className="mt-1 text-sm" />
+                <Input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={line.quantity}
+                  onChange={(event) => updateLine(index, 'quantity', parseFloat(event.target.value) || 1)}
+                  className="mt-1 text-sm"
+                />
               </div>
-              <div className="col-span-2">
+
+              <div className="col-span-4 lg:col-span-2">
                 <Label className="text-xs text-gray-600">Preço Unit.</Label>
                 {line.isIncluded ? (
-                  <div className="mt-1 h-9 flex items-center px-3 bg-emerald-100 rounded-md border border-emerald-200">
+                  <div className="mt-1 flex h-9 items-center rounded-md border border-emerald-200 bg-emerald-100 px-3">
                     <span className="text-xs font-semibold text-emerald-700">Incluído</span>
                   </div>
                 ) : (
-                  <Input type="number" min="0" step="0.01" value={line.unitPrice}
-                    onChange={e => updateLine(i, 'unitPrice', parseFloat(e.target.value) || 0)}
-                    className="mt-1 text-sm" />
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={line.unitPrice}
+                    onChange={(event) => updateLine(index, 'unitPrice', parseFloat(event.target.value) || 0)}
+                    className="mt-1 text-sm"
+                  />
                 )}
               </div>
-              <div className="col-span-1">
+
+              <div className="col-span-4 lg:col-span-1">
                 <Label className="text-xs text-gray-600">IVA%</Label>
                 {line.isIncluded ? (
-                  <div className="mt-1 h-9 flex items-center px-3 bg-emerald-100 rounded-md border border-emerald-200">
+                  <div className="mt-1 flex h-9 items-center rounded-md border border-emerald-200 bg-emerald-100 px-3">
                     <span className="text-xs text-emerald-700">—</span>
                   </div>
                 ) : (
-                  <Select value={String(line.taxPercentage)} onValueChange={v => updateLine(i, 'taxPercentage', Number(v))}>
-                    <SelectTrigger className="mt-1 text-sm h-9">
+                  <Select
+                    value={String(line.taxPercentage)}
+                    onValueChange={(value) => updateLine(index, 'taxPercentage', Number(value))}
+                  >
+                    <SelectTrigger className="mt-1 h-9 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="14">14%</SelectItem>
+                      <SelectItem value="14">14% (NOR)</SelectItem>
+                      <SelectItem value="5">5% (RED)</SelectItem>
                       <SelectItem value="0">0% (ISE)</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
               </div>
-              <div className="col-span-2">
+
+              <div className="col-span-10 lg:col-span-2">
                 <Label className="text-xs text-gray-600">Total (s/IVA)</Label>
-                <div className={`mt-1 h-9 flex items-center px-3 rounded-md border ${line.isIncluded ? 'bg-emerald-100 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}>
-                  {line.isIncluded
-                    ? <span className="text-xs font-semibold text-emerald-700">Incluído</span>
-                    : <span className="text-sm text-[#0A2540] font-mono">{(line.quantity * line.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>}
+                <div className={`mt-1 flex h-9 items-center rounded-md border px-3 ${line.isIncluded ? 'border-emerald-200 bg-emerald-100' : 'border-gray-200 bg-gray-50'}`}>
+                  {line.isIncluded ? (
+                    <span className="text-xs font-semibold text-emerald-700">Incluído</span>
+                  ) : (
+                    <span className="font-mono text-sm text-[#0A2540]">
+                      {(line.quantity * line.unitPrice).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                      })}
+                    </span>
+                  )}
                 </div>
               </div>
-              <div className="col-span-1 flex justify-center">
-                <Button type="button" variant="ghost" size="sm" onClick={() => removeLine(i)} disabled={lines.length === 1}
-                  className="text-gray-400 hover:text-red-600 hover:bg-red-50 mt-1">
-                  <Trash2 className="w-3.5 h-3.5" />
+
+              <div className="col-span-2 flex justify-center lg:col-span-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeLine(index)}
+                  disabled={lines.length === 1}
+                  className="mt-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>
@@ -481,9 +1092,8 @@ export function FacturaForm() {
         </CardContent>
       </Card>
 
-      {/* Totais */}
       <Card>
-        <CardContent className="pt-4 space-y-2">
+        <CardContent className="space-y-2 pt-4">
           <div className="flex justify-between text-sm text-gray-600">
             <span>Total sem IVA</span>
             <span className="font-mono text-[#0A2540]">{fmtAmount(netTotal, currencyCode)}</span>
@@ -492,111 +1102,284 @@ export function FacturaForm() {
             <span>IVA</span>
             <span className="font-mono text-[#0A2540]">{fmtAmount(taxPayable, currencyCode)}</span>
           </div>
-          <div className="flex justify-between text-lg font-bold border-t border-gray-200 pt-2">
+          <div className="flex justify-between border-t border-gray-200 pt-2 text-lg font-bold">
             <span className="text-[#0A2540]">Total com IVA</span>
             <span className="font-mono text-violet-700">{fmtAmount(grossTotal, currencyCode)}</span>
           </div>
           {currencyCode !== 'AOA' && exchangeRate > 0 && (
-            <div className="flex justify-between text-sm text-gray-500 border-t border-gray-100 pt-2">
+            <div className="flex justify-between border-t border-gray-100 pt-2 text-sm text-gray-500">
               <span>Equivalente AOA (taxa {exchangeRate})</span>
-              <span className="font-mono">{(grossTotal * exchangeRate).toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz</span>
+              <span className="font-mono">
+                {(grossTotal * exchangeRate).toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz
+              </span>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Acções */}
       <div className="flex gap-3">
-        <Button
-          onClick={() => { setError(''); mutation.mutate(); }}
-          disabled={mutation.isPending}
-          className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold"
+        <LoadingButton
+          onClick={() => {
+            setError('');
+            mutation.mutate();
+          }}
+          loading={mutation.isPending}
+          loadingLabel="A emitir..."
+          className="flex-1 bg-[#0A2540] font-semibold text-white hover:bg-[#0A2540]/90"
         >
-          {mutation.isPending ? 'A emitir...' : 'Emitir Factura'}
-        </Button>
+          Emitir Factura
+        </LoadingButton>
         <Button variant="outline" onClick={() => router.back()} className="border-gray-200 text-gray-700 hover:bg-gray-50">
           Cancelar
         </Button>
       </div>
 
-      {/* Dialog: Criar / Editar Produto */}
       {dialog && (
         <Dialog open={dialog.open} onOpenChange={(open) => !open && setDialog(null)}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>{dialog.mode === 'edit' ? 'Editar Produto' : 'Criar Produto'}</DialogTitle>
             </DialogHeader>
+
             <div className="space-y-3 py-2">
+              {dialogError && (
+                <ErrorState
+                  compact
+                  title="Não foi possível guardar o produto"
+                  message={dialogError}
+                  onRetry={handleDialogSave}
+                  secondaryAction={{ label: 'Fechar', onClick: () => setDialogError('') }}
+                />
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs text-gray-600">Código (opcional)</Label>
                   <Input
                     value={dialog.productCode}
-                    onChange={e => setDialog(d => d ? { ...d, productCode: e.target.value } : d)}
+                    onChange={(event) =>
+                      setDialog((prev) => (prev ? { ...prev, productCode: event.target.value } : prev))
+                    }
                     placeholder="Auto-gerado"
                     className="mt-1 text-sm"
                   />
                 </div>
                 <div>
                   <Label className="text-xs text-gray-600">Unidade</Label>
-                  <Select value={dialog.unitOfMeasure} onValueChange={v => setDialog(d => d ? { ...d, unitOfMeasure: v } : d)}>
+                  <Select
+                    value={dialog.unitOfMeasure}
+                    onValueChange={(value) =>
+                      setDialog((prev) => (prev ? { ...prev, unitOfMeasure: value } : prev))
+                    }
+                  >
                     <SelectTrigger className="mt-1 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      {UNITS.map((unit) => (
+                        <SelectItem key={unit} value={unit}>
+                          {unit}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
+
               <div>
                 <Label className="text-xs text-gray-600">Descrição *</Label>
                 <Input
                   value={dialog.productDescription}
-                  onChange={e => setDialog(d => d ? { ...d, productDescription: e.target.value } : d)}
+                  onChange={(event) =>
+                    setDialog((prev) =>
+                      prev ? { ...prev, productDescription: event.target.value } : prev
+                    )
+                  }
                   placeholder="Nome do produto ou serviço"
                   className="mt-1 text-sm"
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs text-gray-600">Preço Unitário *</Label>
                   <Input
-                    type="number" min="0" step="0.01"
+                    type="number"
+                    min="0"
+                    step="0.01"
                     value={dialog.unitPrice}
-                    onChange={e => setDialog(d => d ? { ...d, unitPrice: parseFloat(e.target.value) || 0 } : d)}
+                    onChange={(event) =>
+                      setDialog((prev) =>
+                        prev ? { ...prev, unitPrice: parseFloat(event.target.value) || 0 } : prev
+                      )
+                    }
                     className="mt-1 text-sm"
                   />
                 </div>
                 <div>
                   <Label className="text-xs text-gray-600">IVA</Label>
-                  <Select value={String(dialog.taxPercentage)} onValueChange={v => setDialog(d => d ? { ...d, taxPercentage: Number(v) } : d)}>
+                  <Select
+                    value={String(dialog.taxPercentage)}
+                    onValueChange={(value) =>
+                      setDialog((prev) => (prev ? { ...prev, taxPercentage: Number(value) } : prev))
+                    }
+                  >
                     <SelectTrigger className="mt-1 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="14">14% (NOR)</SelectItem>
+                      <SelectItem value="5">5% (RED)</SelectItem>
                       <SelectItem value="0">0% (ISE)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
             </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialog(null)}>
                 Cancelar
               </Button>
-              <Button
+              <LoadingButton
                 onClick={handleDialogSave}
-                disabled={dialogSaving || !dialog.productDescription.trim()}
-                className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90"
+                loading={dialogSaving}
+                loadingLabel="A guardar..."
+                disabled={!dialog.productDescription.trim()}
+                className="bg-[#0A2540] text-white hover:bg-[#0A2540]/90"
               >
-                {dialogSaving ? 'A guardar...' : (dialog.mode === 'edit' ? 'Actualizar' : 'Criar e Adicionar')}
-              </Button>
+                {dialog.mode === 'edit' ? 'Actualizar' : 'Criar e Adicionar'}
+              </LoadingButton>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
+
+      <Dialog open={seriesModalOpen} onOpenChange={(open) => !open && setSeriesModalOpen(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Criar Série</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {seriesError && (
+              <ErrorState
+                compact
+                title="Não foi possível criar a série"
+                message={seriesError}
+                onRetry={() => createSerieMutation.mutate()}
+                secondaryAction={{ label: 'Fechar', onClick: () => setSeriesError('') }}
+              />
+            )}
+
+            <div>
+              <Label className="text-xs text-gray-600">Estabelecimento *</Label>
+              <Select
+                value={seriesForm.estabelecimentoId}
+                onValueChange={(value) =>
+                  setSeriesForm((prev) => ({ ...prev, estabelecimentoId: value }))
+                }
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Selecionar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {estabs.map((estabelecimento) => (
+                    <SelectItem key={estabelecimento.id} value={estabelecimento.id}>
+                      {estabelecimento.nome} — {estabelecimento.nif}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-gray-600">Código da Série *</Label>
+                <Input
+                  value={seriesForm.seriesCode}
+                  onChange={(event) =>
+                    setSeriesForm((prev) => ({ ...prev, seriesCode: event.target.value.toUpperCase() }))
+                  }
+                  placeholder="2026A"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-gray-600">Ano *</Label>
+                <Input
+                  type="number"
+                  value={seriesForm.seriesYear}
+                  onChange={(event) =>
+                    setSeriesForm((prev) => ({ ...prev, seriesYear: event.target.value }))
+                  }
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-gray-600">Tipo de Documento *</Label>
+                <Select
+                  value={seriesForm.documentType}
+                  onValueChange={(value) =>
+                    setSeriesForm((prev) => ({ ...prev, documentType: value }))
+                  }
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOCUMENT_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-gray-600">Primeiro Número *</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={seriesForm.firstDocumentNumber}
+                  onChange={(event) =>
+                    setSeriesForm((prev) => ({
+                      ...prev,
+                      firstDocumentNumber: event.target.value,
+                    }))
+                  }
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSeriesModalOpen(false)}>
+              Cancelar
+            </Button>
+            <LoadingButton
+              onClick={() => {
+                setSeriesError('');
+                createSerieMutation.mutate();
+              }}
+              loading={createSerieMutation.isPending}
+              loadingLabel="A criar..."
+              disabled={
+                !seriesForm.estabelecimentoId ||
+                !seriesForm.seriesCode.trim() ||
+                !seriesForm.seriesYear.trim()
+              }
+              className="bg-[#0A2540] text-white hover:bg-[#0A2540]/90"
+            >
+              Criar Série
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
