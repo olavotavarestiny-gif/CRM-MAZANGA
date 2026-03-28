@@ -123,7 +123,10 @@ async function requireAuth(req, res, next) {
 
     // Auto-link: first login after migration — supabaseUid not yet linked in DB
     if (!user && jwtEmail) {
-      const byEmail = await prisma.user.findUnique({ where: { email: jwtEmail } });
+      const byEmail = await prisma.user.findUnique({
+        where: { email: jwtEmail },
+        select: USER_SELECT,
+      });
       if (byEmail && !byEmail.supabaseUid) {
         user = await prisma.user.update({
           where: { id: byEmail.id },
