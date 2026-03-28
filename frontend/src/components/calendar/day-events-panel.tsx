@@ -37,34 +37,37 @@ export default function DayEventsPanel({ dateStr, events, onClose, onNewTask }: 
   const googleEvents = events.filter((e) => e.source === 'google');
 
   return (
-    <div className="w-72 border-l border-[#E2E8F0] bg-white flex flex-col">
+    <div className="flex w-80 flex-col border-l border-[#E2E8F0] bg-[#FBFDFF]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#E2E8F0]">
+      <div className="border-b border-[#E2E8F0] px-5 py-4">
         <div>
-          <p className="text-xs text-[#64748B] capitalize">{formatDisplayDate(dateStr)}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#94a3b8]">Dia Selecionado</p>
+          <p className="mt-2 text-sm font-semibold capitalize text-[#0A2540]">{formatDisplayDate(dateStr)}</p>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-[#F8FAFC] rounded transition-colors"
-        >
-          <X className="w-4 h-4 text-[#64748B]" />
-        </button>
+        <div className="mt-3 flex justify-end">
+          <button
+            onClick={onClose}
+            className="rounded-xl p-2 transition-colors hover:bg-white"
+          >
+            <X className="w-4 h-4 text-[#64748B]" />
+          </button>
+        </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+      <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
         {/* CRM Tasks */}
         {crmEvents.length > 0 && (
           <div>
-            <div className="flex items-center gap-1.5 mb-2">
+            <div className="mb-3 flex items-center gap-1.5">
               <CheckSquare className="w-3.5 h-3.5 text-[#635BFF]" />
               <span className="text-xs font-semibold text-[#0A2540]">Tarefas CRM</span>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {crmEvents.map((ev) => (
                 <div
                   key={ev.id}
-                  className="flex items-start gap-2 p-2 rounded-lg border border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors"
+                  className="flex items-start gap-2 rounded-2xl border border-[#E2E8F0] bg-white p-3 shadow-sm transition-colors hover:bg-[#F8FAFC]"
                 >
                   <span
                     className="w-2 h-2 rounded-full mt-1 flex-shrink-0"
@@ -90,15 +93,15 @@ export default function DayEventsPanel({ dateStr, events, onClose, onNewTask }: 
         {/* Google Events */}
         {googleEvents.length > 0 && (
           <div>
-            <div className="flex items-center gap-1.5 mb-2">
+            <div className="mb-3 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-[#10B981]" />
               <span className="text-xs font-semibold text-[#0A2540]">Google Agenda</span>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {googleEvents.map((ev) => (
                 <div
                   key={ev.id}
-                  className="flex items-start gap-2 p-2 rounded-lg border border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors"
+                  className="flex items-start gap-2 rounded-2xl border border-[#E2E8F0] bg-white p-3 shadow-sm transition-colors hover:bg-[#F8FAFC]"
                 >
                   <span className="w-2 h-2 rounded-full mt-1 flex-shrink-0 bg-[#10B981]" />
                   <div className="flex-1 min-w-0">
@@ -117,18 +120,19 @@ export default function DayEventsPanel({ dateStr, events, onClose, onNewTask }: 
         )}
 
         {events.length === 0 && (
-          <div className="text-center py-8">
-            <Calendar className="w-8 h-8 text-[#E2E8F0] mx-auto mb-2" />
-            <p className="text-sm text-[#64748B]">Sem eventos neste dia</p>
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center shadow-sm">
+            <Calendar className="mx-auto mb-2 h-8 w-8 text-[#E2E8F0]" />
+            <p className="text-sm font-medium text-[#64748B]">Sem eventos neste dia</p>
+            <p className="mt-1 text-xs text-[#94a3b8]">Podes criar uma tarefa para começar o planeamento.</p>
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-[#E2E8F0]">
+      <div className="border-t border-[#E2E8F0] px-5 py-4">
         <button
           onClick={() => onNewTask(dateStr)}
-          className="w-full py-2 rounded-lg bg-[#635BFF] text-white text-sm font-semibold hover:bg-[#4F46E5] transition-colors"
+          className="w-full rounded-2xl bg-[#0A2540] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0A2540]/92"
         >
           + Nova Tarefa
         </button>

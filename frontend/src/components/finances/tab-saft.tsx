@@ -67,7 +67,7 @@ export function TabSaft() {
           <Button
             onClick={() => generateMutation.mutate()}
             disabled={generateMutation.isPending}
-            className="bg-gradient-to-r from-orange-500 to-red-500 hover:opacity-90 text-white"
+            className="text-white"
           >
             {generateMutation.isPending ? (
               <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> A gerar...</>

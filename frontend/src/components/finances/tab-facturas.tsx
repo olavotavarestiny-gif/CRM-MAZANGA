@@ -13,6 +13,13 @@ function fmtKz(n: number) {
   return n.toLocaleString('pt-AO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kz';
 }
 
+const CARD_COLORS: Record<string, { iconBg: string; border: string; text: string }> = {
+  violet: { iconBg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700' },
+  emerald: { iconBg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' },
+  amber: { iconBg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
+  indigo: { iconBg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700' },
+};
+
 function AgtBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; className: string }> = {
     P:  { label: 'Pendente',   className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
@@ -57,7 +64,7 @@ export function TabFacturas() {
           )}
         </div>
         <Link href="/faturacao/nova">
-          <Button className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90 gap-2">
+          <Button className="gap-2">
             <Plus className="w-4 h-4" /> Nova Factura
           </Button>
         </Link>
@@ -65,18 +72,29 @@ export function TabFacturas() {
 
       {/* Stats */}
       {dash && (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: 'Facturas (Mês)', value: dash.totalMes, icon: FileText, color: 'border-l-purple-500' },
-            { label: 'Receita (Mês)', value: fmtKz(dash.receitaMes), icon: TrendingUp, color: 'border-l-emerald-500' },
-            { label: 'Pendentes AGT', value: dash.pendentesAGT, icon: Clock, color: 'border-l-amber-500' },
-            { label: 'Total Facturas', value: dash.totalGeral, icon: FileText, color: 'border-l-indigo-500' },
-          ].map(s => (
-            <div key={s.label} className={`p-4 rounded-xl bg-gray-50 border border-gray-200 border-l-4 ${s.color}`}>
-              <p className="text-xs text-gray-500 mb-1">{s.label}</p>
-              <p className="text-xl font-bold text-[#0A2540]">{s.value}</p>
-            </div>
-          ))}
+            { label: 'Facturas (Mês)', value: dash.totalMes, icon: FileText, color: 'violet' },
+            { label: 'Receita (Mês)', value: fmtKz(dash.receitaMes), icon: TrendingUp, color: 'emerald' },
+            { label: 'Pendentes AGT', value: dash.pendentesAGT, icon: Clock, color: 'amber' },
+            { label: 'Total Facturas', value: dash.totalGeral, icon: FileText, color: 'indigo' },
+          ].map(({ label, value, icon: Icon, color }) => {
+            const styles = CARD_COLORS[color] ?? CARD_COLORS.violet;
+
+            return (
+              <div key={label} className={`rounded-2xl border bg-white p-4 shadow-sm ${styles.border}`}>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs text-gray-500">{label}</span>
+                  <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${styles.iconBg}`}>
+                    <Icon className="h-4 w-4 text-gray-500" />
+                  </span>
+                </div>
+                <div className={`text-lg font-bold ${styles.text}`}>
+                  {value}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -134,7 +152,7 @@ export function TabFacturas() {
           <div className="py-12 text-center text-gray-400">
             <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p>Nenhuma factura encontrada</p>
-            <Link href="/faturacao/nova" className="text-orange-500 hover:text-orange-600 text-sm mt-1 inline-block">
+            <Link href="/faturacao/nova" className="mt-1 inline-block text-sm text-[#0A2540] underline-offset-4 hover:underline">
               Criar primeira factura →
             </Link>
           </div>

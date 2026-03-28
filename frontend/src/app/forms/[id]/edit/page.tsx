@@ -320,22 +320,32 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
   ] as const;
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      {/* Tabs */}
-      <div className="flex gap-4 border-b border-[#E2E8F0]">
+    <div className="mx-auto max-w-7xl space-y-6 p-6">
+      <div>
+        <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">
+          {form?.title || 'Editor de Formulários'}
+        </h1>
+        <p className="mt-1 text-sm text-[#6b7e9a]">
+          Estrutura, identidade visual e submissões do formulário no mesmo fluxo.
+        </p>
+      </div>
+
+      <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
         {TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`pb-3 px-2 font-medium transition-colors flex items-center gap-2 ${
+            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
               activeTab === tab.key
-                ? 'text-[#0A2540] border-b-2 border-[#0A2540]'
-                : 'text-[#6b7e9a] hover:text-[#0A2540]'
+                ? 'bg-[#0A2540] text-white shadow-sm'
+                : 'text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540]'
             }`}
           >
             {tab.label}
             {'badge' in tab && tab.badge ? (
-              <Badge className="bg-green-500/20 text-green-600">{tab.badge}</Badge>
+              <Badge className={activeTab === tab.key ? 'bg-white/15 text-white' : 'bg-green-500/20 text-green-600'}>
+                {tab.badge}
+              </Badge>
             ) : null}
           </button>
         ))}
@@ -344,7 +354,7 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
       {/* ── BUILDER TAB ── */}
       {activeTab === 'builder' && (
         <>
-          <Card>
+          <Card className="border-slate-200 shadow-sm">
             <CardHeader>
               <CardTitle>Configurações do Formulário</CardTitle>
             </CardHeader>
@@ -388,7 +398,7 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Fields list */}
-            <Card className="col-span-1">
+            <Card className="col-span-1 border-slate-200 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">Campos ({form?.fields?.length || 0})</CardTitle>
               </CardHeader>
@@ -439,7 +449,7 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
             </Card>
 
             {/* Field editor */}
-            <Card className="col-span-2">
+            <Card className="col-span-2 border-slate-200 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">
                   {selectedField ? `Editar: ${selectedField.label}` : 'Selecione um campo'}
@@ -523,7 +533,7 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
           {/* Controls */}
           <div className="space-y-6">
             {/* Logo */}
-            <Card>
+            <Card className="border-slate-200 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <ImageIcon className="w-4 h-4" /> Logotipo
@@ -566,7 +576,7 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
             </Card>
 
             {/* Colors */}
-            <Card>
+            <Card className="border-slate-200 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Palette className="w-4 h-4" /> Cores
@@ -615,7 +625,7 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
 
       {/* ── SUBMISSIONS TAB ── */}
       {activeTab === 'submissions' && (
-        <Card>
+        <Card className="border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle>Submissões ({submissions.length})</CardTitle>
           </CardHeader>

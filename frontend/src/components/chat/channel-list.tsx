@@ -8,6 +8,8 @@ import { markChannelRead } from '@/lib/api';
 import type { ChatChannel } from '@/lib/types';
 import { CreateChannelModal } from './create-channel-modal';
 import { cn } from '@/lib/utils';
+import { ErrorState } from '@/components/ui/error-state';
+import { useToast } from '@/components/ui/toast-provider';
 
 interface ChannelListProps {
   selectedId: string | null;
@@ -36,22 +38,35 @@ function ChannelItem({
     <button
       onClick={onClick}
       className={cn(
-        'w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left transition-colors text-sm',
+        'w-full rounded-2xl border px-3.5 py-3 text-left text-sm transition-all',
         selected
-          ? 'bg-[#0A2540]/10 text-[#0A2540] font-semibold'
-          : 'text-[#6b7e9a] hover:bg-[#0A2540]/5 hover:text-[#0A2540]'
+          ? 'border-[#D6E4FF] bg-[#EEF4FF] text-[#0A2540] shadow-sm'
+          : 'border-transparent text-[#6b7e9a] hover:border-slate-200 hover:bg-white hover:text-[#0A2540]'
       )}
     >
       {isDM ? (
-        <div className="w-5 h-5 rounded-full bg-[#E2E8F0] flex items-center justify-center text-[10px] font-bold text-[#0A2540] flex-shrink-0">
+        <div className={cn(
+          'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
+          selected ? 'bg-[#0A2540] text-white' : 'bg-[#E2E8F0] text-[#0A2540]'
+        )}>
           {displayName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
         </div>
       ) : (
-        <Hash className="w-3.5 h-3.5 flex-shrink-0" />
+        <div className={cn(
+          'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full',
+          selected ? 'bg-[#0A2540] text-white' : 'bg-white text-[#526277]'
+        )}>
+          <Hash className="h-4 w-4" />
+        </div>
       )}
-      <span className="flex-1 truncate">{displayName}</span>
+      <div className="min-w-0 flex-1">
+        <span className="block truncate font-medium">{displayName}</span>
+        <span className="mt-0.5 block truncate text-[11px] text-[#94a3b8]">
+          {isDM ? 'Mensagem directa' : 'Canal interno'}
+        </span>
+      </div>
       {channel.unreadCount > 0 && (
-        <span className="bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">
+        <span className="min-w-[24px] rounded-full bg-[#0A2540] px-2 py-1 text-center text-[10px] font-bold leading-none text-white">
           {channel.unreadCount > 99 ? '99+' : channel.unreadCount}
         </span>
       )}
@@ -61,10 +76,11 @@ function ChannelItem({
 
 export function ChannelList({ selectedId, onSelect, currentUserId }: ChannelListProps) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [showCreate, setShowCreate] = useState(false);
   const [showDMPicker, setShowDMPicker] = useState(false);
 
-  const { data: channels = [], isLoading } = useQuery({
+  const { data: channels = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['chat-channels'],
     queryFn: getChatChannels,
     refetchInterval: 10_000,
@@ -83,6 +99,13 @@ export function ChannelList({ selectedId, onSelect, currentUserId }: ChannelList
       onSelect(channel.id);
       setShowDMPicker(false);
     },
+    onError: (error: any) => {
+      toast({
+        variant: 'error',
+        title: 'Não foi possível abrir a conversa',
+        description: error?.response?.data?.error || error?.message || 'Tenta novamente.',
+      });
+    },
   });
 
   const handleSelect = (channel: ChatChannel) => {
@@ -98,48 +121,96 @@ export function ChannelList({ selectedId, onSelect, currentUserId }: ChannelList
 
   return (
     <>
-      <div className="w-56 flex-shrink-0 border-r border-[#E2E8F0] bg-[#F8FAFC] flex flex-col h-full">
+      <div className="flex h-full w-80 flex-shrink-0 flex-col border-r border-[#E2E8F0] bg-[#F8FAFC]">
         {/* Header */}
-        <div className="flex items-center justify-between px-3 py-3 border-b border-[#E2E8F0]">
-          <div className="flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-[#0A2540]" />
-            <span className="font-semibold text-[#0A2540] text-sm">Chat Equipa</span>
+        <div className="border-b border-[#E2E8F0] px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm">
+                <MessageSquare className="h-4 w-4 text-[#0A2540]" />
+              </div>
+              <div>
+                <span className="block text-sm font-semibold text-[#0A2540]">Chat Equipa</span>
+                <span className="block text-xs text-[#94a3b8]">Coordenação interna da operação</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-[#6b7e9a] transition-colors hover:text-[#0A2540]"
+              title="Criar canal"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="w-6 h-6 flex items-center justify-center rounded-md text-[#6b7e9a] hover:text-[#0A2540] hover:bg-[#E2E8F0] transition-colors"
-            title="Criar canal"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
+          <div className="mt-4 rounded-2xl bg-white px-4 py-3 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#94a3b8]">Estado</p>
+            <p className="mt-1 text-sm font-medium text-[#0A2540]">
+              {isLoading ? 'A carregar canais…' : `${channels.length} conversa${channels.length !== 1 ? 's' : ''} ativa${channels.length !== 1 ? 's' : ''}`}
+            </p>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
+        <div className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
           {/* Channels section */}
           <div>
-            <p className="text-[10px] font-semibold text-[#94a3b8] uppercase tracking-wider px-1 mb-1">Canais</p>
-            {isLoading && <p className="text-xs text-[#94a3b8] px-1">A carregar…</p>}
-            {regularChannels.length === 0 && !isLoading && (
-              <p className="text-xs text-[#94a3b8] px-1">Sem canais. Cria um!</p>
-            )}
-            {regularChannels.map((ch) => (
-              <ChannelItem
-                key={ch.id}
-                channel={ch}
-                selected={selectedId === ch.id}
-                onClick={() => handleSelect(ch)}
-                currentUserId={currentUserId}
-              />
-            ))}
+            <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#94a3b8]">Canais</p>
+            <div className="space-y-2">
+              {isLoading && Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="rounded-2xl border border-transparent bg-white px-3.5 py-3 shadow-sm">
+                  <div className="flex animate-pulse items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-slate-200" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 w-24 rounded-full bg-slate-200" />
+                      <div className="h-2.5 w-16 rounded-full bg-slate-100" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {isError && (
+                <div className="rounded-2xl bg-white p-2 shadow-sm">
+                  <ErrorState
+                    compact
+                    title="Erro ao carregar canais"
+                    message="As conversas internas não responderam como esperado."
+                    onRetry={() => refetch()}
+                    secondaryAction={{ label: 'Ir para o Painel', href: '/' }}
+                  />
+                </div>
+              )}
+              {regularChannels.length === 0 && !isLoading && !isError && (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-[#94a3b8] shadow-sm">
+                  <p className="font-medium text-[#0A2540]">Sem canais ainda</p>
+                  <p className="mt-1">
+                    Cria o primeiro canal para organizar a coordenação interna da equipa.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreate(true)}
+                    className="mt-3 text-sm font-medium text-[#0A2540] underline underline-offset-4"
+                  >
+                    Criar canal
+                  </button>
+                </div>
+              )}
+              {regularChannels.map((ch) => (
+                <ChannelItem
+                  key={ch.id}
+                  channel={ch}
+                  selected={selectedId === ch.id}
+                  onClick={() => handleSelect(ch)}
+                  currentUserId={currentUserId}
+                />
+              ))}
+            </div>
           </div>
 
           {/* DMs section */}
           <div>
-            <div className="flex items-center justify-between px-1 mb-1">
-              <p className="text-[10px] font-semibold text-[#94a3b8] uppercase tracking-wider">Mensagens Directas</p>
+            <div className="mb-2 flex items-center justify-between px-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#94a3b8]">Mensagens Directas</p>
               <button
                 onClick={() => setShowDMPicker((v) => !v)}
-                className="text-[#94a3b8] hover:text-[#0A2540] transition-colors"
+                className="rounded-full p-1 text-[#94a3b8] transition-colors hover:bg-white hover:text-[#0A2540]"
                 title="Nova mensagem directa"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -148,7 +219,7 @@ export function ChannelList({ selectedId, onSelect, currentUserId }: ChannelList
 
             {/* DM user picker */}
             {showDMPicker && (
-              <div className="mb-2 bg-white border border-[#E2E8F0] rounded-lg shadow-sm overflow-hidden">
+              <div className="mb-2 overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-sm">
                 {orgUsers
                   .filter((u) => u.id !== currentUserId)
                   .map((u) => (
@@ -156,26 +227,39 @@ export function ChannelList({ selectedId, onSelect, currentUserId }: ChannelList
                       key={u.id}
                       onClick={() => dmMutation.mutate(u.id)}
                       disabled={dmMutation.isPending}
-                      className="w-full text-left px-3 py-2 hover:bg-[#F8FAFC] transition-colors text-xs"
+                      className="w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F8FAFC]"
                     >
                       <p className="font-medium text-[#0A2540]">{u.name}</p>
+                      <p className="mt-0.5 text-[11px] text-[#94a3b8]">{u.email}</p>
                     </button>
                   ))}
               </div>
             )}
 
-            {dmChannels.length === 0 && (
-              <p className="text-xs text-[#94a3b8] px-1">Sem mensagens directas.</p>
-            )}
-            {dmChannels.map((ch) => (
-              <ChannelItem
-                key={ch.id}
-                channel={ch}
-                selected={selectedId === ch.id}
-                onClick={() => handleSelect(ch)}
-                currentUserId={currentUserId}
-              />
-            ))}
+            <div className="space-y-2">
+              {dmChannels.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-xs text-[#94a3b8] shadow-sm">
+                  <p className="font-medium text-[#0A2540]">Sem mensagens directas</p>
+                  <p className="mt-1">Escolhe um colega para abrir uma conversa privada.</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowDMPicker(true)}
+                    className="mt-3 text-sm font-medium text-[#0A2540] underline underline-offset-4"
+                  >
+                    Nova mensagem directa
+                  </button>
+                </div>
+              )}
+              {dmChannels.map((ch) => (
+                <ChannelItem
+                  key={ch.id}
+                  channel={ch}
+                  selected={selectedId === ch.id}
+                  onClick={() => handleSelect(ch)}
+                  currentUserId={currentUserId}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -184,6 +268,7 @@ export function ChannelList({ selectedId, onSelect, currentUserId }: ChannelList
         <CreateChannelModal
           onClose={() => setShowCreate(false)}
           onCreated={(id) => { onSelect(id); }}
+          channel={null}
         />
       )}
     </>

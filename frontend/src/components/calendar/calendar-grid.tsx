@@ -47,27 +47,24 @@ export default function CalendarGrid({ year, month, events, selectedDay, onDayCl
   return (
     <div className="w-full">
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 mb-1">
+      <div className="mb-3 grid grid-cols-7 gap-2">
         {WEEKDAYS.map((d) => (
-          <div key={d} className="text-center text-xs font-semibold text-[#64748B] py-2">
+          <div key={d} className="rounded-full bg-[#F8FAFC] py-2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-[#64748B]">
             {d}
           </div>
         ))}
       </div>
 
       {/* Weeks */}
-      <div className="border border-[#E2E8F0] rounded-xl overflow-hidden">
+      <div className="grid gap-3">
         {weeks.map((week, wi) => (
-          <div
-            key={wi}
-            className={cn('grid grid-cols-7', wi < weeks.length - 1 && 'border-b border-[#E2E8F0]')}
-          >
+          <div key={wi} className="grid grid-cols-7 gap-3">
             {week.map((day, di) => {
               if (!day) {
                 return (
                   <div
                     key={di}
-                    className={cn('min-h-[80px] p-1.5 bg-[#F8FAFC]', di < 6 && 'border-r border-[#E2E8F0]')}
+                    className="min-h-[118px] rounded-[22px] bg-[#F8FAFC]"
                   />
                 );
               }
@@ -84,17 +81,17 @@ export default function CalendarGrid({ year, month, events, selectedDay, onDayCl
                   key={di}
                   onClick={() => onDayClick(dateStr)}
                   className={cn(
-                    'min-h-[80px] p-1.5 cursor-pointer transition-colors',
-                    di < 6 && 'border-r border-[#E2E8F0]',
-                    isSelected && !isToday && 'bg-[#635BFF]/5',
-                    !isSelected && !isToday && 'hover:bg-[#F8FAFC]'
+                    'min-h-[118px] cursor-pointer rounded-[22px] border p-3 transition-all',
+                    isToday && 'border-[#635BFF]/20 bg-[#EEF2FF]',
+                    isSelected && !isToday && 'border-[#D6E4FF] bg-[#EEF4FF]',
+                    !isSelected && !isToday && 'border-slate-200 bg-white hover:bg-[#F8FAFC]'
                   )}
                 >
                   {/* Day number */}
-                  <div className="flex justify-end mb-1">
+                  <div className="mb-3 flex justify-between">
                     <span
                       className={cn(
-                        'w-6 h-6 flex items-center justify-center rounded-full text-xs font-medium',
+                        'flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium',
                         isToday && 'bg-[#635BFF] text-white font-bold',
                         !isToday && isSelected && 'text-[#635BFF] font-semibold',
                         !isToday && !isSelected && 'text-[#0A2540]'
@@ -102,14 +99,19 @@ export default function CalendarGrid({ year, month, events, selectedDay, onDayCl
                     >
                       {day.getDate()}
                     </span>
+                    {dayEvents.length > 0 && (
+                      <span className="rounded-full bg-[#F8FAFC] px-2 py-1 text-[10px] font-semibold text-[#64748B]">
+                        {dayEvents.length}
+                      </span>
+                    )}
                   </div>
 
                   {/* Event dots / pills */}
-                  <div className="space-y-0.5">
+                  <div className="space-y-1.5">
                     {visibleEvents.map((ev) => (
                       <div
                         key={ev.id}
-                        className="flex items-center gap-1 px-1 py-0.5 rounded text-[10px] font-medium truncate"
+                        className="flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[10px] font-semibold truncate"
                         style={{
                           background: ev.source === 'google' ? '#10B98120' : '#635BFF20',
                           color: ev.source === 'google' ? '#059669' : '#4F46E5',
@@ -123,7 +125,7 @@ export default function CalendarGrid({ year, month, events, selectedDay, onDayCl
                       </div>
                     ))}
                     {extraCount > 0 && (
-                      <div className="text-[10px] text-[#64748B] px-1">+{extraCount} mais</div>
+                      <div className="px-1 text-[10px] font-medium text-[#64748B]">+{extraCount} mais</div>
                     )}
                   </div>
                 </div>

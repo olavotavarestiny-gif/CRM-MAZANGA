@@ -22,6 +22,7 @@ import {
 } from '@/lib/api';
 import type {
   LoginLog,
+  PlanName,
   SuperAdminOrg,
   SuperAdminStorageStat,
   SuperAdminUsageStat,
@@ -56,11 +57,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-
-const PLAN_LABELS: Record<string, string> = {
-  essencial: 'Essencial',
-  profissional: 'Profissional',
-};
+import { ErrorState } from '@/components/ui/error-state';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { useToast } from '@/components/ui/toast-provider';
 
 const ADMIN_SECTIONS = [
   { id: 'users', label: 'Utilizadores', icon: Users },
@@ -83,6 +82,7 @@ export default function SuperAdminPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   const { data: currentUser, isLoading: userLoading } = useQuery({
     queryKey: ['currentUser'],
@@ -130,7 +130,7 @@ export default function SuperAdminPage() {
     name: '',
     email: '',
     password: '',
-    plan: 'essencial',
+    plan: 'essencial' as PlanName,
   });
   const [createUserForm, setCreateUserForm] = useState({
     name: '',
@@ -140,37 +140,37 @@ export default function SuperAdminPage() {
     accountOwnerId: '',
   });
 
-  const { data: users = [] } = useQuery({
+  const { data: users = [], isLoading: usersLoading, isError: usersError, refetch: refetchUsers } = useQuery({
     queryKey: ['admin-users'],
     queryFn: getUsers,
     enabled: hasAdminAccess && currentSection === 'users',
   });
 
-  const { data: accounts = [] } = useQuery({
+  const { data: accounts = [], isLoading: accountsLoading, isError: accountsError, refetch: refetchAccounts } = useQuery({
     queryKey: ['admin-accounts'],
     queryFn: getClientAccounts,
     enabled: hasAdminAccess && currentSection === 'accounts',
   });
 
-  const { data: loginLogs = [] } = useQuery({
+  const { data: loginLogs = [], isLoading: loginLogsLoading, isError: loginLogsError, refetch: refetchLoginLogs } = useQuery({
     queryKey: ['admin-logins'],
     queryFn: getLoginLogs,
     enabled: hasAdminAccess && currentSection === 'logins',
   });
 
-  const { data: orgs = [], isLoading: orgsLoading } = useQuery({
+  const { data: orgs = [], isLoading: orgsLoading, isError: orgsError, refetch: refetchOrgs } = useQuery({
     queryKey: ['superadmin-orgs'],
     queryFn: getSuperAdminOrgs,
     enabled: isSuperAdmin && currentSection === 'organizations',
   });
 
-  const { data: usage = [] } = useQuery({
+  const { data: usage = [], isLoading: usageLoading, isError: usageError, refetch: refetchUsage } = useQuery({
     queryKey: ['superadmin-usage'],
     queryFn: getSuperAdminUsage,
     enabled: isSuperAdmin && currentSection === 'usage',
   });
 
-  const { data: storage = [] } = useQuery({
+  const { data: storage = [], isLoading: storageLoading, isError: storageError, refetch: refetchStorage } = useQuery({
     queryKey: ['superadmin-storage'],
     queryFn: getSuperAdminStorage,
     enabled: isSuperAdmin && currentSection === 'storage',
@@ -194,8 +194,21 @@ export default function SuperAdminPage() {
       setShowCreateUser(false);
       setCreateUserForm({ name: '', email: '', password: '', role: 'user', accountOwnerId: '' });
       setUserError('');
+      toast({
+        variant: 'success',
+        title: 'Utilizador criado',
+        description: 'O novo utilizador já está disponível na administração.',
+      });
     },
-    onError: (err: Error) => setUserError(err.message || 'Erro ao criar utilizador'),
+    onError: (err: Error) => {
+      const message = err.message || 'Erro ao criar utilizador';
+      setUserError(message);
+      toast({
+        variant: 'error',
+        title: 'Falha ao criar utilizador',
+        description: message,
+      });
+    },
   });
 
   const createAccountMutation = useMutation({
@@ -206,8 +219,21 @@ export default function SuperAdminPage() {
       setShowCreateAccount(false);
       setCreateAccountForm({ name: '', email: '', password: '', plan: 'essencial' });
       setAccountError('');
+      toast({
+        variant: 'success',
+        title: 'Conta criada',
+        description: 'A nova conta cliente foi criada com sucesso.',
+      });
     },
-    onError: (err: Error) => setAccountError(err.message || 'Erro ao criar conta'),
+    onError: (err: Error) => {
+      const message = err.message || 'Erro ao criar conta';
+      setAccountError(message);
+      toast({
+        variant: 'error',
+        title: 'Falha ao criar conta',
+        description: message,
+      });
+    },
   });
 
   const orgUpdateMutation = useMutation({
@@ -216,8 +242,22 @@ export default function SuperAdminPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['superadmin-orgs'] });
       qc.invalidateQueries({ queryKey: ['admin-accounts'] });
+      setOrgError('');
+      toast({
+        variant: 'success',
+        title: 'Organização atualizada',
+        description: 'As alterações foram aplicadas.',
+      });
     },
-    onError: (err: Error) => setOrgError(err.message || 'Erro ao atualizar organização'),
+    onError: (err: Error) => {
+      const message = err.message || 'Erro ao atualizar organização';
+      setOrgError(message);
+      toast({
+        variant: 'error',
+        title: 'Falha ao atualizar organização',
+        description: message,
+      });
+    },
   });
 
   const orgDeleteMutation = useMutation({
@@ -227,8 +267,22 @@ export default function SuperAdminPage() {
       qc.invalidateQueries({ queryKey: ['admin-accounts'] });
       qc.invalidateQueries({ queryKey: ['superadmin-usage'] });
       qc.invalidateQueries({ queryKey: ['superadmin-storage'] });
+      setOrgError('');
+      toast({
+        variant: 'success',
+        title: 'Organização eliminada',
+        description: 'A organização foi removida com sucesso.',
+      });
     },
-    onError: (err: Error) => setOrgError(err.message || 'Erro ao eliminar organização'),
+    onError: (err: Error) => {
+      const message = err.message || 'Erro ao eliminar organização';
+      setOrgError(message);
+      toast({
+        variant: 'error',
+        title: 'Falha ao eliminar organização',
+        description: message,
+      });
+    },
   });
 
   const impersonateMutation = useMutation({
@@ -237,7 +291,15 @@ export default function SuperAdminPage() {
       localStorage.setItem('impersonation_token', token);
       window.location.href = '/';
     },
-    onError: (err: Error) => setOrgError(err.message || 'Erro ao entrar como utilizador'),
+    onError: (err: Error) => {
+      const message = err.message || 'Erro ao entrar como utilizador';
+      setOrgError(message);
+      toast({
+        variant: 'error',
+        title: 'Falha na impersonação',
+        description: message,
+      });
+    },
   });
 
   const goToSection = (section: SectionId) => {
@@ -270,8 +332,58 @@ export default function SuperAdminPage() {
 
   const totalUsers = orgs.reduce((sum, org) => sum + 1 + (org._count?.accountMembers ?? 0), 0);
 
+  const currentSectionError =
+    currentSection === 'users' ? usersError :
+    currentSection === 'accounts' ? accountsError :
+    currentSection === 'logins' ? loginLogsError :
+    currentSection === 'organizations' ? orgsError :
+    currentSection === 'usage' ? usageError :
+    currentSection === 'storage' ? storageError :
+    false;
+
+  const retryCurrentSection = () => {
+    if (currentSection === 'users') {
+      refetchUsers();
+      return;
+    }
+    if (currentSection === 'accounts') {
+      refetchAccounts();
+      return;
+    }
+    if (currentSection === 'logins') {
+      refetchLoginLogs();
+      return;
+    }
+    if (currentSection === 'organizations') {
+      refetchOrgs();
+      return;
+    }
+    if (currentSection === 'usage') {
+      refetchUsage();
+      return;
+    }
+    if (currentSection === 'storage') {
+      refetchStorage();
+    }
+  };
+
   if (userLoading || !currentUser) {
-    return <div className="min-h-screen bg-[#f5f7f9]" />;
+    return (
+      <div className="mx-auto max-w-7xl space-y-6 p-6">
+        <div className="space-y-2">
+          <div className="h-10 w-72 animate-pulse rounded-2xl bg-slate-200" />
+          <div className="h-4 w-[32rem] animate-pulse rounded-full bg-slate-100" />
+        </div>
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex gap-2">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="h-10 w-32 animate-pulse rounded-xl bg-slate-100" />
+            ))}
+          </div>
+        </div>
+        <div className="h-[28rem] animate-pulse rounded-3xl border border-slate-200 bg-white shadow-sm" />
+      </div>
+    );
   }
 
   if (!hasAdminAccess) {
@@ -284,14 +396,14 @@ export default function SuperAdminPage() {
     : 'Superfície canónica para utilizadores, contas e histórico de logins.';
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100">
             <Shield className="h-5 w-5 text-[#0A2540]" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#0A2540]">{sectionTitle}</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">{sectionTitle}</h1>
             <p className="mt-1 text-sm text-[#6b7e9a]">{sectionDescription}</p>
           </div>
         </div>
@@ -312,7 +424,7 @@ export default function SuperAdminPage() {
       </div>
 
       <div className="space-y-4">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-wrap gap-2">
             {ADMIN_SECTIONS.map(({ id, label, icon: Icon }) => (
               <button
@@ -340,8 +452,8 @@ export default function SuperAdminPage() {
                     onClick={() => goToSection(id)}
                     className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition ${
                       currentSection === id
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                        ? 'bg-[#0A2540] text-white'
+                        : 'bg-slate-50 text-[#516173] hover:bg-slate-100'
                     }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -353,87 +465,134 @@ export default function SuperAdminPage() {
           )}
         </div>
 
-        {currentSection === 'users' && (
-          <Card>
+        {currentSectionError && (
+          <ErrorState
+            title="Não foi possível carregar esta área"
+            message="Os dados desta secção não responderam como esperado."
+            onRetry={retryCurrentSection}
+            secondaryAction={{ label: 'Ir para Painel', href: '/' }}
+          />
+        )}
+
+        {currentSection === 'users' && !currentSectionError && (
+          <Card className="overflow-hidden border-slate-200 shadow-sm">
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Nome</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Email</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Função</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Conta</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Estado</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Último Login</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => (
-                    <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                      <td className="px-4 py-3 text-sm text-gray-900">{user.name}</td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{user.email}</td>
-                      <td className="px-4 py-3">
-                        <span className={`rounded px-2 py-1 text-xs font-medium ${user.role === 'admin' ? 'bg-red-50 text-[#0A2540]' : 'bg-zinc-500/20 text-gray-600'}`}>
-                          {user.role === 'admin' ? 'Admin' : 'Utilizador'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {user.accountOwnerId ? user.accountOwnerName || 'Membro' : <span className="text-gray-400">Independente</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={async () => {
-                            try {
-                              await updateUser(user.id, { active: !user.active });
-                              qc.invalidateQueries({ queryKey: ['admin-users'] });
-                            } catch (err: any) {
-                              setUserError(err.message || 'Erro ao atualizar utilizador');
-                            }
-                          }}
-                          className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition ${
-                            user.active
-                              ? 'bg-green-50 text-green-700 hover:bg-green-500/30'
-                              : 'bg-red-50 text-red-600 hover:bg-red-500/30'
-                          }`}
-                        >
-                          {user.active ? <><Eye className="h-3 w-3" /> Ativo</> : <><EyeOff className="h-3 w-3" /> Inativo</>}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {user.lastLogin ? new Date(user.lastLogin).toLocaleString('pt-PT') : 'Nunca'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={async () => {
-                            if (!confirm('Tem a certeza que quer eliminar este utilizador?')) return;
-                            try {
-                              await deleteUser(user.id);
-                              qc.invalidateQueries({ queryKey: ['admin-users'] });
-                            } catch (err: any) {
-                              setUserError(err.message || 'Erro ao eliminar utilizador');
-                            }
-                          }}
-                          className="text-red-400 hover:text-red-600 transition"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {users.length === 0 && (
-                <div className="py-8 text-center text-sm text-gray-400">Nenhum utilizador encontrado.</div>
+              {usersLoading ? (
+                <div className="flex items-center justify-center py-16 text-[#6b7e9a]">
+                  <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                  A carregar utilizadores...
+                </div>
+              ) : (
+                <>
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Nome</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Email</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Função</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Conta</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Estado</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Último Login</th>
+                        <th className="px-4 py-3" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((user) => (
+                        <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                          <td className="px-4 py-3 text-sm text-gray-900">{user.name}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{user.email}</td>
+                          <td className="px-4 py-3">
+                            <span className={`rounded px-2 py-1 text-xs font-medium ${user.role === 'admin' ? 'bg-red-50 text-[#0A2540]' : 'bg-zinc-500/20 text-gray-600'}`}>
+                              {user.role === 'admin' ? 'Admin' : 'Utilizador'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {user.accountOwnerId ? user.accountOwnerName || 'Membro' : <span className="text-gray-400">Independente</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await updateUser(user.id, { active: !user.active });
+                                  qc.invalidateQueries({ queryKey: ['admin-users'] });
+                                  toast({
+                                    variant: 'success',
+                                    title: 'Utilizador atualizado',
+                                    description: 'O estado do utilizador foi alterado.',
+                                  });
+                                } catch (err: any) {
+                                  const message = err.message || 'Erro ao atualizar utilizador';
+                                  setUserError(message);
+                                  toast({
+                                    variant: 'error',
+                                    title: 'Falha ao atualizar utilizador',
+                                    description: message,
+                                  });
+                                }
+                              }}
+                              className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition ${
+                                user.active
+                                  ? 'bg-green-50 text-green-700 hover:bg-green-500/30'
+                                  : 'bg-red-50 text-red-600 hover:bg-red-500/30'
+                              }`}
+                            >
+                              {user.active ? <><Eye className="h-3 w-3" /> Ativo</> : <><EyeOff className="h-3 w-3" /> Inativo</>}
+                            </button>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {user.lastLogin ? new Date(user.lastLogin).toLocaleString('pt-PT') : 'Nunca'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={async () => {
+                                if (!confirm('Tem a certeza que quer eliminar este utilizador?')) return;
+                                try {
+                                  await deleteUser(user.id);
+                                  qc.invalidateQueries({ queryKey: ['admin-users'] });
+                                  toast({
+                                    variant: 'success',
+                                    title: 'Utilizador eliminado',
+                                    description: 'O utilizador foi removido com sucesso.',
+                                  });
+                                } catch (err: any) {
+                                  const message = err.message || 'Erro ao eliminar utilizador';
+                                  setUserError(message);
+                                  toast({
+                                    variant: 'error',
+                                    title: 'Falha ao eliminar utilizador',
+                                    description: message,
+                                  });
+                                }
+                              }}
+                              className="text-red-400 hover:text-red-600 transition"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {users.length === 0 && (
+                    <div className="py-8 text-center text-sm text-gray-400">Nenhum utilizador encontrado.</div>
+                  )}
+                </>
               )}
             </div>
           </Card>
         )}
 
-        {currentSection === 'accounts' && (
-          <Card>
+        {currentSection === 'accounts' && !currentSectionError && (
+          <Card className="overflow-hidden border-slate-200 shadow-sm">
             <div className="overflow-x-auto">
+              {accountsLoading ? (
+                <div className="flex items-center justify-center py-16 text-[#6b7e9a]">
+                  <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                  A carregar contas...
+                </div>
+              ) : (
+                <>
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
@@ -453,14 +612,30 @@ export default function SuperAdminPage() {
                         <select
                           value={account.plan}
                           onChange={async (event) => {
-                            await updateClientAccount(account.id, { plan: event.target.value });
-                            qc.invalidateQueries({ queryKey: ['admin-accounts'] });
-                            qc.invalidateQueries({ queryKey: ['superadmin-orgs'] });
+                            try {
+                              await updateClientAccount(account.id, { plan: event.target.value as PlanName });
+                              qc.invalidateQueries({ queryKey: ['admin-accounts'] });
+                              qc.invalidateQueries({ queryKey: ['superadmin-orgs'] });
+                              toast({
+                                variant: 'success',
+                                title: 'Plano atualizado',
+                                description: 'O plano da conta foi alterado.',
+                              });
+                            } catch (err: any) {
+                              const message = err.message || 'Erro ao atualizar conta';
+                              setAccountError(message);
+                              toast({
+                                variant: 'error',
+                                title: 'Falha ao atualizar conta',
+                                description: message,
+                              });
+                            }
                           }}
                           className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:border-[#0A2540]"
                         >
                           <option value="essencial">Essencial</option>
                           <option value="profissional">Profissional</option>
+                          <option value="enterprise">Enterprise</option>
                         </select>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
@@ -476,13 +651,22 @@ export default function SuperAdminPage() {
               {accounts.length === 0 && (
                 <div className="py-8 text-center text-sm text-gray-400">Nenhuma conta de cliente criada ainda.</div>
               )}
+                </>
+              )}
             </div>
           </Card>
         )}
 
-        {currentSection === 'logins' && (
-          <Card>
+        {currentSection === 'logins' && !currentSectionError && (
+          <Card className="overflow-hidden border-slate-200 shadow-sm">
             <div className="overflow-x-auto">
+              {loginLogsLoading ? (
+                <div className="flex items-center justify-center py-16 text-[#6b7e9a]">
+                  <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                  A carregar histórico...
+                </div>
+              ) : (
+                <>
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
@@ -506,13 +690,15 @@ export default function SuperAdminPage() {
               {loginLogs.length === 0 && (
                 <div className="py-8 text-center text-sm text-gray-400">Sem registos de login.</div>
               )}
+                </>
+              )}
             </div>
           </Card>
         )}
 
-        {currentSection === 'organizations' && isSuperAdmin && (
+        {currentSection === 'organizations' && isSuperAdmin && !currentSectionError && (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h2 className="text-base font-semibold text-[#0A2540]">Organizações</h2>
@@ -532,9 +718,14 @@ export default function SuperAdminPage() {
               </div>
 
               {orgError && (
-                <div className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-                  <span>{orgError}</span>
-                  <button onClick={() => setOrgError('')} className="ml-4 text-red-400 hover:text-red-600">✕</button>
+                <div className="mb-4">
+                  <ErrorState
+                    compact
+                    title="Não foi possível concluir a ação"
+                    message={orgError}
+                    onRetry={retryCurrentSection}
+                    secondaryAction={{ label: 'Fechar', onClick: () => setOrgError('') }}
+                  />
                 </div>
               )}
 
@@ -583,12 +774,13 @@ export default function SuperAdminPage() {
                                   <select
                                     value={org.plan || 'essencial'}
                                     onChange={(event) =>
-                                      orgUpdateMutation.mutate({ id: org.id, data: { plan: event.target.value } })
+                                      orgUpdateMutation.mutate({ id: org.id, data: { plan: event.target.value as PlanName } })
                                     }
                                     className="appearance-none rounded-lg border border-[#dde3ec] bg-white py-1 pl-2 pr-6 text-xs font-medium text-[#0A2540] focus:outline-none focus:ring-2 focus:ring-blue-500"
                                   >
                                     <option value="essencial">Essencial</option>
                                     <option value="profissional">Profissional</option>
+                                    <option value="enterprise">Enterprise</option>
                                   </select>
                                   <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[#6b7e9a]" />
                                 </div>
@@ -685,9 +877,16 @@ export default function SuperAdminPage() {
           </div>
         )}
 
-        {currentSection === 'usage' && isSuperAdmin && (
-          <Card>
+        {currentSection === 'usage' && isSuperAdmin && !currentSectionError && (
+          <Card className="overflow-hidden border-slate-200 shadow-sm">
             <div className="overflow-x-auto">
+              {usageLoading ? (
+                <div className="flex items-center justify-center py-16 text-[#6b7e9a]">
+                  <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                  A carregar utilização...
+                </div>
+              ) : (
+                <>
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
@@ -730,13 +929,22 @@ export default function SuperAdminPage() {
               {usage.length === 0 && (
                 <div className="py-8 text-center text-sm text-gray-400">Sem dados de utilização.</div>
               )}
+                </>
+              )}
             </div>
           </Card>
         )}
 
-        {currentSection === 'storage' && isSuperAdmin && (
-          <Card>
+        {currentSection === 'storage' && isSuperAdmin && !currentSectionError && (
+          <Card className="overflow-hidden border-slate-200 shadow-sm">
             <div className="overflow-x-auto">
+              {storageLoading ? (
+                <div className="flex items-center justify-center py-16 text-[#6b7e9a]">
+                  <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                  A carregar armazenamento...
+                </div>
+              ) : (
+                <>
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
@@ -780,19 +988,27 @@ export default function SuperAdminPage() {
               {storage.length === 0 && (
                 <div className="py-8 text-center text-sm text-gray-400">Sem dados de armazenamento.</div>
               )}
+                </>
+              )}
             </div>
           </Card>
         )}
       </div>
 
-      <Dialog open={showCreateAccount} onOpenChange={setShowCreateAccount}>
+      <Dialog open={showCreateAccount} onOpenChange={(open) => { setShowCreateAccount(open); if (!open) setAccountError(''); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Nova Conta Cliente</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             {accountError && (
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{accountError}</p>
+              <ErrorState
+                compact
+                title="Não foi possível criar a conta"
+                message={accountError}
+                onRetry={() => createAccountMutation.mutate(createAccountForm)}
+                secondaryAction={{ label: 'Fechar', onClick: () => setAccountError('') }}
+              />
             )}
             <div>
               <label className="mb-1 block text-sm font-medium text-[#0A2540]">Nome</label>
@@ -824,17 +1040,18 @@ export default function SuperAdminPage() {
               <label className="mb-1 block text-sm font-medium text-[#0A2540]">Plano</label>
               <select
                 value={createAccountForm.plan}
-                onChange={(event) => setCreateAccountForm({ ...createAccountForm, plan: event.target.value })}
+                onChange={(event) => setCreateAccountForm({ ...createAccountForm, plan: event.target.value as PlanName })}
                 className="w-full rounded-lg border border-[#dde3ec] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="essencial">Essencial</option>
                 <option value="profissional">Profissional</option>
+                <option value="enterprise">Enterprise</option>
               </select>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateAccount(false)}>Cancelar</Button>
-            <Button
+            <LoadingButton
               onClick={() => createAccountMutation.mutate(createAccountForm)}
               disabled={
                 createAccountMutation.isPending ||
@@ -842,21 +1059,29 @@ export default function SuperAdminPage() {
                 !createAccountForm.email ||
                 !createAccountForm.password
               }
+              loading={createAccountMutation.isPending}
+              loadingLabel="A criar..."
             >
-              {createAccountMutation.isPending ? 'A criar...' : 'Criar Conta'}
-            </Button>
+              Criar Conta
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showCreateUser} onOpenChange={setShowCreateUser}>
+      <Dialog open={showCreateUser} onOpenChange={(open) => { setShowCreateUser(open); if (!open) setUserError(''); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Novo Utilizador</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             {userError && (
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{userError}</p>
+              <ErrorState
+                compact
+                title="Não foi possível criar o utilizador"
+                message={userError}
+                onRetry={() => createUserMutation.mutate()}
+                secondaryAction={{ label: 'Fechar', onClick: () => setUserError('') }}
+              />
             )}
             <div>
               <label className="mb-1 block text-sm font-medium text-[#0A2540]">Nome</label>
@@ -917,7 +1142,7 @@ export default function SuperAdminPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateUser(false)}>Cancelar</Button>
-            <Button
+            <LoadingButton
               onClick={() => createUserMutation.mutate()}
               disabled={
                 createUserMutation.isPending ||
@@ -925,9 +1150,11 @@ export default function SuperAdminPage() {
                 !createUserForm.email ||
                 !createUserForm.password
               }
+              loading={createUserMutation.isPending}
+              loadingLabel="A criar..."
             >
-              {createUserMutation.isPending ? 'A criar...' : 'Criar'}
-            </Button>
+              Criar
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

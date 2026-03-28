@@ -102,7 +102,7 @@ export default function ProdutosPage() {
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">Catálogo</h2>
           <Button onClick={() => { setShowNewProduto(true); setProdForm(EMPTY_PRODUTO); setEditing(null); setProdErr(''); }}
-            className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90 gap-2">
+            className="gap-2">
             <Plus className="w-4 h-4" /> Novo Produto
           </Button>
         </div>
@@ -242,6 +242,7 @@ export default function ProdutosPage() {
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="14">14% (Normal)</SelectItem>
+                    <SelectItem value="5">5% (Taxa Reduzida)</SelectItem>
                     <SelectItem value="0">0% (Isento)</SelectItem>
                   </SelectContent>
                 </Select>
@@ -253,7 +254,7 @@ export default function ProdutosPage() {
             <Button
               onClick={() => editing ? editProdMutation.mutate() : createProdMutation.mutate()}
               disabled={createProdMutation.isPending || editProdMutation.isPending}
-              className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90"
+              className="bg-[#0A2540] text-white hover:bg-[#0A2540]/90"
             >
               {(createProdMutation.isPending || editProdMutation.isPending) ? 'A guardar...' : 'Guardar'}
             </Button>
@@ -299,7 +300,7 @@ export default function ProdutosPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNewSerie(false)}>Cancelar</Button>
             <Button onClick={() => createSerieMutation.mutate()} disabled={createSerieMutation.isPending}
-              className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90">
+              className="bg-[#0A2540] text-white hover:bg-[#0A2540]/90">
               {createSerieMutation.isPending ? 'A criar...' : 'Criar Série'}
             </Button>
           </DialogFooter>

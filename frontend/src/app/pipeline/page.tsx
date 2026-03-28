@@ -47,11 +47,16 @@ export default function PipelinePage() {
   );
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-[#0A2540]">Negociações</h1>
+    <div className="mx-auto max-w-7xl space-y-6 p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Negociações</h1>
+          <p className="mt-1 text-sm text-[#6b7e9a]">
+            Pipeline visual por etapas com gestão rápida de oportunidades.
+          </p>
+        </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsStageManagerOpen(true)}>
+          <Button variant="outline" onClick={() => setIsStageManagerOpen(true)} className="border-slate-200 bg-white">
             <Settings2 className="w-4 h-4 mr-2" />
             Gerir Etapas
           </Button>
@@ -61,7 +66,7 @@ export default function PipelinePage() {
         </div>
       </div>
 
-      <div data-tour="pipeline-board">
+      <div data-tour="pipeline-board" className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
         <KanbanBoard contacts={pipelineContacts} stages={stages} />
       </div>
 
@@ -96,7 +101,7 @@ export default function PipelinePage() {
                   {filteredContacts.map((contact) => (
                     <div
                       key={contact.id}
-                      className="flex justify-between items-center p-3 border border-[#E2E8F0] rounded-lg hover:bg-[#F8FAFC]"
+                      className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3 transition-colors hover:bg-[#F8FAFC]"
                     >
                       <div className="flex-1">
                         <p className="font-medium text-[#0A2540]">{contact.name}</p>

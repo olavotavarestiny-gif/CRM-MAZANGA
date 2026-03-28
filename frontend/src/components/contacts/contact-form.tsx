@@ -15,6 +15,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { X } from 'lucide-react';
+import { ErrorState } from '@/components/ui/error-state';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { useToast } from '@/components/ui/toast-provider';
 
 // Renders a single field based on its type
 function FieldInput({
@@ -119,6 +122,7 @@ export default function ContactForm({
   onSuccess?: () => void;
 }) {
   const isEditMode = !!contactId;
+  const { toast } = useToast();
 
   // Core values (always present)
   const [name, setName] = useState(contact?.name ?? '');
@@ -223,7 +227,19 @@ export default function ContactForm({
         setStage('Novo');
         setValues({ email: '', phone: '', company: '', revenue: '', sector: '', tags: [] });
       }
+      toast({
+        variant: 'success',
+        title: isEditMode ? 'Contacto actualizado' : 'Contacto criado',
+        description: isEditMode ? 'As alterações foram guardadas.' : 'O novo contacto já está disponível na lista.',
+      });
       onSuccess?.();
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'error',
+        title: 'Falha ao guardar contacto',
+        description: error?.response?.data?.error || error?.message || 'Tenta novamente.',
+      });
     },
   });
 
@@ -360,11 +376,23 @@ export default function ContactForm({
         </div>
       )}
 
-      <Button type="submit" disabled={mutation.isPending} className="w-full">
-        {mutation.isPending
-          ? isEditMode ? 'Guardando...' : 'Criando...'
-          : isEditMode ? 'Guardar Alterações' : 'Criar Contacto'}
-      </Button>
+      {mutation.isError && (
+        <ErrorState
+          compact
+          title="Não foi possível guardar o contacto"
+          message={(mutation.error as any)?.response?.data?.error || (mutation.error as Error)?.message || 'Verifica os dados e tenta novamente.'}
+          onRetry={() => mutation.mutate()}
+        />
+      )}
+
+      <LoadingButton
+        type="submit"
+        loading={mutation.isPending}
+        loadingLabel={isEditMode ? 'A guardar...' : 'A criar...'}
+        className="w-full"
+      >
+        {isEditMode ? 'Guardar Alterações' : 'Criar Contacto'}
+      </LoadingButton>
     </form>
   );
 }

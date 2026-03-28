@@ -22,9 +22,14 @@ export default function FormsPage() {
     getCurrentUser().then(setCurrentUser).catch(() => {});
   }, []);
 
-  const { data: forms = [] } = useQuery({
+  const {
+    data: forms = [],
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ['forms'],
     queryFn: getForms,
+    retry: false,
   });
 
   const createMutation = useMutation({
@@ -63,7 +68,19 @@ export default function FormsPage() {
         </Button>
       </div>
 
-      {forms.length === 0 ? (
+      {isLoading ? (
+        <Card>
+          <CardContent className="pt-8 text-center text-gray-500">
+            <p>A carregar formulários...</p>
+          </CardContent>
+        </Card>
+      ) : isError ? (
+        <Card>
+          <CardContent className="pt-8 text-center text-red-600">
+            <p>Não foi possível carregar os formulários. Recarrega a página para tentar novamente.</p>
+          </CardContent>
+        </Card>
+      ) : forms.length === 0 ? (
         <Card>
           <CardContent className="pt-8 text-center text-gray-500">
             <p>Nenhum formulário criado ainda</p>

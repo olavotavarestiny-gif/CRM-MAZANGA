@@ -13,6 +13,8 @@ import WeeklyInsightCard from '@/components/dashboard/weekly-insight-card';
 import DashboardCustomizer from '@/components/dashboard/dashboard-customizer';
 import { WidgetSource, SOURCE_UNITS } from '@/components/dashboard/types';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { ErrorState } from '@/components/ui/error-state';
 import { Settings2 } from 'lucide-react';
 import { isSameDay, parseISO } from 'date-fns';
 
@@ -26,9 +28,24 @@ export default function Dashboard() {
   const dashboardScope = currentUser?.id ?? 'demo-user';
   const { widgets, loaded } = useDashboardConfig(dashboardScope);
 
-  const { data: contacts = [] } = useQuery({ queryKey: ['contacts'], queryFn: () => getContacts() });
-  const { data: tasks = [] } = useQuery({ queryKey: ['tasks', 'pending'], queryFn: () => getTasks({ done: false }) });
-  const { data: financeStats } = useQuery({
+  const {
+    data: contacts = [],
+    isLoading: contactsLoading,
+    isError: contactsError,
+    refetch: refetchContacts,
+  } = useQuery({ queryKey: ['contacts'], queryFn: () => getContacts() });
+  const {
+    data: tasks = [],
+    isLoading: tasksLoading,
+    isError: tasksError,
+    refetch: refetchTasks,
+  } = useQuery({ queryKey: ['tasks', 'pending'], queryFn: () => getTasks({ done: false }) });
+  const {
+    data: financeStats,
+    isLoading: financeLoading,
+    isError: financeError,
+    refetch: refetchFinance,
+  } = useQuery({
     queryKey: ['finance-dashboard'],
     queryFn: () => getFinanceDashboard(),
     retry: false,
@@ -78,11 +95,34 @@ export default function Dashboard() {
     );
   }
 
+  if (contactsLoading || tasksLoading || financeLoading) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="animate-pulse space-y-6">
+          <div className="flex items-start justify-between">
+            <div className="space-y-3">
+              <div className="h-8 w-32 rounded-full bg-slate-200" />
+              <div className="h-4 w-56 rounded-full bg-slate-200" />
+            </div>
+            <div className="h-10 w-32 rounded-xl bg-slate-200" />
+          </div>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="h-36 rounded-2xl bg-slate-200" />
+            ))}
+          </div>
+          <div className="h-44 max-w-2xl rounded-3xl bg-slate-200" />
+        </div>
+      </div>
+    );
+  }
+
   const visible = widgets.filter((w) => w.visible);
   const statGoalWidgets = visible.filter((w) => w.type === 'stat' || w.type === 'goal');
   const otherWidgets = visible.filter((w) => w.type === 'tasks' || w.type === 'pipeline');
   const pipelineCount = sourceValues.pipeline_count;
   const pendingTasks = sourceValues.tasks_pending;
+  const hasDashboardError = contactsError || tasksError || financeError;
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -98,6 +138,22 @@ export default function Dashboard() {
           Personalizar
         </Button>
       </div>
+
+      {hasDashboardError && (
+        <div className="mb-6">
+          <ErrorState
+            compact
+            title="Não foi possível carregar o painel"
+            message="Alguns dados do painel não responderam como esperado."
+            onRetry={() => {
+              refetchContacts();
+              refetchTasks();
+              refetchFinance();
+            }}
+            secondaryAction={{ label: 'Ir para Contactos', href: '/contacts' }}
+          />
+        </div>
+      )}
 
       {/* Stat / Goal widgets grid */}
       {statGoalWidgets.length > 0 && (
@@ -143,6 +199,17 @@ export default function Dashboard() {
             return null;
           })}
         </div>
+      )}
+
+      {statGoalWidgets.length === 0 && otherWidgets.length === 0 && (
+        <Card>
+          <div className="p-8 text-center">
+            <h2 className="text-lg font-semibold text-[#2c2f31]">Nenhum widget ativo</h2>
+            <p className="mt-2 text-sm text-[#6b7e9a]">
+              Usa “Personalizar” para adicionar widgets ao teu painel.
+            </p>
+          </div>
+        </Card>
       )}
 
       <DashboardCustomizer

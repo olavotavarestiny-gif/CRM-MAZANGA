@@ -77,9 +77,9 @@ interface DaySeparatorProps {
 
 export function DaySeparator({ dateStr }: DaySeparatorProps) {
   return (
-    <div className="flex items-center gap-3 my-4">
+    <div className="my-5 flex items-center gap-3">
       <div className="flex-1 h-px bg-[#E2E8F0]" />
-      <span className="text-xs text-[#94a3b8] font-medium px-2">{formatDate(dateStr)}</span>
+      <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-[#94a3b8] shadow-sm">{formatDate(dateStr)}</span>
       <div className="flex-1 h-px bg-[#E2E8F0]" />
     </div>
   );
@@ -94,16 +94,16 @@ export function MessageBubble({ message, isOwn, showAvatar, orgUsers }: MessageB
     .slice(0, 2);
 
   return (
-    <div className={`flex gap-2.5 ${isOwn ? 'flex-row-reverse' : 'flex-row'} ${!showAvatar ? (isOwn ? 'pr-9' : 'pl-9') : ''}`}>
+    <div className={`flex gap-3 ${isOwn ? 'flex-row-reverse' : 'flex-row'} ${!showAvatar ? (isOwn ? 'pr-11' : 'pl-11') : ''}`}>
       {showAvatar ? (
-        <div className="w-8 h-8 rounded-full bg-[#0A2540] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">
+        <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#0A2540] text-xs font-bold text-white shadow-sm">
           {initials}
         </div>
       ) : null}
 
       <div className={`max-w-[70%] ${isOwn ? 'items-end' : 'items-start'} flex flex-col`}>
         {showAvatar && (
-          <div className={`flex items-baseline gap-2 mb-0.5 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+          <div className={`mb-1 flex items-baseline gap-2 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
             <span className="text-xs font-semibold text-[#0A2540]">{message.senderName}</span>
             <span className="text-[10px] text-[#94a3b8]">{formatTime(message.createdAt)}</span>
           </div>
@@ -111,10 +111,10 @@ export function MessageBubble({ message, isOwn, showAvatar, orgUsers }: MessageB
 
         {message.text && (
           <div
-            className={`px-3 py-2 rounded-2xl text-sm leading-relaxed ${
+            className={`rounded-[22px] px-4 py-3 text-sm leading-relaxed shadow-sm ${
               isOwn
-                ? 'bg-[#0A2540] text-white rounded-tr-sm'
-                : 'bg-[#F1F5F9] text-[#0A2540] rounded-tl-sm'
+                ? 'rounded-tr-md bg-[#0A2540] text-white'
+                : 'rounded-tl-md border border-slate-200 bg-white text-[#0A2540]'
             }`}
           >
             {renderTextWithMentions(message.text, orgUsers)}
@@ -126,7 +126,7 @@ export function MessageBubble({ message, isOwn, showAvatar, orgUsers }: MessageB
         ))}
 
         {!showAvatar && (
-          <span className="text-[10px] text-[#94a3b8] mt-0.5">{formatTime(message.createdAt)}</span>
+          <span className="mt-1 text-[10px] text-[#94a3b8]">{formatTime(message.createdAt)}</span>
         )}
       </div>
     </div>

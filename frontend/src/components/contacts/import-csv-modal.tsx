@@ -14,7 +14,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
-import { AlertCircle, CheckCircle2, Upload } from 'lucide-react';
+import { CheckCircle2, Upload } from 'lucide-react';
+import { ErrorState } from '@/components/ui/error-state';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { useToast } from '@/components/ui/toast-provider';
 
 interface ImportCSVModalProps {
   open: boolean;
@@ -27,12 +30,18 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
   const [step, setStep] = useState<'upload' | 'preview' | 'success'>('upload');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const mutation = useMutation({
     mutationFn: (contacts: ImportContactData[]) => importContacts(contacts),
     onSuccess: () => {
       setErrorMsg(null);
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      toast({
+        variant: 'success',
+        title: 'Importação concluída',
+        description: 'Os contactos foram processados com sucesso.',
+      });
       setStep('success');
       setTimeout(() => {
         onOpenChange(false);
@@ -42,6 +51,11 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
     onError: (error: any) => {
       const message = error?.response?.data?.error || error?.message || 'Erro desconhecido ao importar';
       setErrorMsg(message);
+      toast({
+        variant: 'error',
+        title: 'Falha na importação',
+        description: message,
+      });
     },
   });
 
@@ -75,7 +89,7 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
         .filter((line) => line.trim());
 
       if (lines.length < 2) {
-        alert('CSV deve ter pelo menos uma linha de dados');
+        setErrorMsg('CSV deve ter pelo menos uma linha de dados.');
         return;
       }
 
@@ -158,15 +172,16 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
       }
 
       if (data.length === 0) {
-        alert('Nenhum contacto válido encontrado no CSV');
+        setErrorMsg('Nenhum contacto válido encontrado no CSV.');
         return;
       }
 
+      setErrorMsg(null);
       setPreview(data);
       setStep('preview');
     } catch (error) {
       console.error('Error parsing CSV:', error);
-      alert('Erro ao processar ficheiro CSV');
+      setErrorMsg('Erro ao processar ficheiro CSV.');
     }
   };
 
@@ -175,7 +190,7 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
     if (!selectedFile) return;
 
     if (!selectedFile.name.endsWith('.csv')) {
-      alert('Por favor, selecione um ficheiro CSV');
+      setErrorMsg('Por favor, selecione um ficheiro CSV.');
       return;
     }
 
@@ -200,6 +215,15 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
 
         {step === 'upload' && (
           <div className="space-y-4">
+            {errorMsg && (
+              <ErrorState
+                compact
+                title="Não foi possível preparar o CSV"
+                message={errorMsg}
+                onRetry={() => file && parseCSV(file)}
+                secondaryAction={{ label: 'Escolher outro ficheiro', onClick: resetForm }}
+              />
+            )}
             <div className="border-2 border-dashed border-white/20 rounded-lg p-6 text-center">
               <Upload className="w-8 h-8 mx-auto mb-2 text-slate-500" />
               <Label className="cursor-pointer block">
@@ -239,6 +263,15 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
 
         {step === 'preview' && (
           <div className="space-y-4">
+            {errorMsg && (
+              <ErrorState
+                compact
+                title="Não foi possível importar os contactos"
+                message={errorMsg}
+                onRetry={handleImport}
+                secondaryAction={{ label: 'Voltar', onClick: () => setStep('upload') }}
+              />
+            )}
             <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-emerald-400" />
               <p className="text-sm font-medium text-emerald-300">
@@ -288,13 +321,14 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
               >
                 Voltar
               </Button>
-              <Button
+              <LoadingButton
                 onClick={handleImport}
-                disabled={mutation.isPending}
+                loading={mutation.isPending}
+                loadingLabel="A importar..."
                 className="flex-1"
               >
-                {mutation.isPending ? 'Importando...' : 'Confirmar Importação'}
-              </Button>
+                Confirmar Importação
+              </LoadingButton>
             </div>
           </div>
         )}
@@ -313,13 +347,6 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
                 </p>
               )}
             </Card>
-          </div>
-        )}
-
-        {(mutation.isError || errorMsg) && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-start gap-2">
-            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-300">{errorMsg || 'Erro ao importar contactos'}</p>
           </div>
         )}
       </DialogContent>

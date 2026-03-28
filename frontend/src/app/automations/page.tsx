@@ -40,9 +40,14 @@ export default function AutomationsPage() {
     getCurrentUser().then(setCurrentUser).catch(() => {});
   }, []);
 
-  const { data: automations = [] } = useQuery({
+  const {
+    data: automations = [],
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ['automations'],
     queryFn: () => getAutomations(),
+    retry: false,
   });
 
   const toggleMutation = useMutation({
@@ -83,6 +88,20 @@ export default function AutomationsPage() {
       </div>
 
       <Card>
+        {isLoading ? (
+          <div className="p-8 text-center text-sm text-gray-500">A carregar automações...</div>
+        ) : isError ? (
+          <div className="p-8 text-center text-sm text-red-600">
+            Não foi possível carregar as automações. Recarrega a página para tentar novamente.
+          </div>
+        ) : automations.length === 0 ? (
+          <div className="p-8 text-center">
+            <h2 className="text-lg font-semibold text-[#2c2f31]">Nenhuma automação criada</h2>
+            <p className="mt-2 text-sm text-gray-500">
+              Cria a primeira automação para automatizar ações do CRM.
+            </p>
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -141,6 +160,7 @@ export default function AutomationsPage() {
           </TableBody>
           </Table>
         </div>
+        )}
       </Card>
     </div>
   );

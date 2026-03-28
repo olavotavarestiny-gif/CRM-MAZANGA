@@ -29,12 +29,12 @@ function fmt(n: number | null | undefined) {
   return new Intl.NumberFormat('pt-PT').format(Math.round(n)) + ' Kz';
 }
 
-const CARD_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  emerald: { bg: 'bg-emerald-50',  border: 'border-emerald-200', text: 'text-emerald-700' },
-  red:     { bg: 'bg-red-50',      border: 'border-red-200',     text: 'text-red-700' },
-  blue:    { bg: 'bg-amber-50',    border: 'border-amber-200',   text: 'text-amber-700' },
-  purple:  { bg: 'bg-violet-50',   border: 'border-violet-200',  text: 'text-violet-700' },
-  cyan:    { bg: 'bg-sky-50',      border: 'border-sky-200',     text: 'text-sky-700' },
+const CARD_COLORS: Record<string, { iconBg: string; border: string; text: string }> = {
+  emerald: { iconBg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' },
+  red:     { iconBg: 'bg-red-50',     border: 'border-red-200',     text: 'text-red-700' },
+  blue:    { iconBg: 'bg-amber-50',   border: 'border-amber-200',   text: 'text-amber-700' },
+  purple:  { iconBg: 'bg-violet-50',  border: 'border-violet-200',  text: 'text-violet-700' },
+  cyan:    { iconBg: 'bg-sky-50',     border: 'border-sky-200',     text: 'text-sky-700' },
 };
 
 const now = new Date();
@@ -143,17 +143,16 @@ export default function FinancesPage() {
   ] as const;
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-7xl space-y-6 p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#0A2540]">Finanças</h1>
-          <p className="text-gray-500 text-sm mt-1">Receitas, despesas e rentabilidade por cliente</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Finanças</h1>
+          <p className="mt-1 text-sm text-[#6b7e9a]">Receitas, despesas e rentabilidade por cliente.</p>
         </div>
         {activeTab === 'transacoes' && (
           <Button
             onClick={() => { setEditTransaction(undefined); setFormOpen(true); }}
-            className="bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90 gap-2"
+            className="gap-2"
           >
             <Plus className="w-4 h-4" />
             Nova Transação
@@ -161,16 +160,15 @@ export default function FinancesPage() {
         )}
       </div>
 
-      {/* Tab navigation */}
-      <div className="flex gap-0 border-b border-gray-200">
+      <div className="flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
         {TABS.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            className={`rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
               activeTab === tab.id
-                ? 'border-[#0A2540] text-[#0A2540]'
-                : 'border-transparent text-gray-500 hover:text-[#0A2540]'
+                ? 'bg-[#0A2540] text-white shadow-sm'
+                : 'text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540]'
             }`}
           >
             {tab.label}
@@ -178,13 +176,13 @@ export default function FinancesPage() {
         ))}
       </div>
 
-      {/* Link to vendas */}
-      <p className="text-xs text-gray-400 mt-2">
-        Faturas e documentos fiscais →{' '}
-        <a href="/vendas" className="text-[#0A2540] underline hover:text-orange-500 transition-colors">
+      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-[#6b7e9a] shadow-sm">
+        Faturas e documentos fiscais estão centralizados em{' '}
+        <a href="/vendas" className="font-medium text-[#0A2540] underline-offset-4 hover:underline">
           /vendas
         </a>
-      </p>
+        .
+      </div>
 
       {/* Tab content */}
       {activeTab === 'rentabilidade' && (
@@ -193,11 +191,11 @@ export default function FinancesPage() {
             Rentabilidade por Cliente
           </h2>
           {profitability.length === 0 ? (
-            <div className="bg-gray-50 border border-gray-200 rounded-xl py-12 text-center text-gray-400">
+            <div className="rounded-2xl border border-slate-200 bg-white py-12 text-center text-gray-400 shadow-sm">
               Sem dados de rentabilidade disponíveis.
             </div>
           ) : (
-            <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -272,13 +270,12 @@ export default function FinancesPage() {
           ].map(({ label, value, color, icon: Icon, isPercent }) => {
             const c = CARD_COLORS[color] ?? CARD_COLORS.emerald;
             return (
-              <div
-                key={label}
-                className={`${c.bg} border ${c.border} rounded-xl p-4 backdrop-blur-sm`}
-              >
+              <div key={label} className={`rounded-2xl border bg-white p-4 shadow-sm ${c.border}`}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-gray-500">{label}</span>
-                  <Icon className="w-4 h-4 text-gray-400" />
+                  <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${c.iconBg}`}>
+                    <Icon className="w-4 h-4 text-gray-500" />
+                  </span>
                 </div>
                 <div className={`text-lg font-bold ${c.text}`}>
                   {isPercent ? `${(value as number).toFixed(1)}%` : fmt(value)}
@@ -346,7 +343,7 @@ export default function FinancesPage() {
         </div>
 
         {/* Tabela */}
-        <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
