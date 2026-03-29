@@ -8,11 +8,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, Package, Pencil, Trash2, Search, Hash, PlusCircle, ArrowUpCircle, ClipboardList } from 'lucide-react';
-import { getProdutos, createProduto, updateProduto, deleteProduto, addStock, getStockMovements, getSeries, getEstabelecimentos, createSerie, updateSerie } from '@/lib/api';
+import { getProdutos, createProduto, updateProduto, deleteProduto, addStock, getStockMovements, getSeries, getEstabelecimentos, createSerie, updateSerie, getCategoriasProduto } from '@/lib/api';
 import type { Produto, StockMovement } from '@/lib/types';
 
 const UNITS = ['UN', 'H', 'KG', 'L', 'M', 'M2', 'M3'];
 const DOC_TYPES = ['FT', 'FR', 'ND', 'NC', 'FA', 'PF'];
+const CATEGORY_FILTER_ALL = 'all';
+const CATEGORY_NONE_VALUE = '__sem_categoria__';
 const PRODUCT_TYPES = [
   { value: 'S', label: 'Serviço' },
   { value: 'P', label: 'Produto' },
@@ -34,6 +36,8 @@ interface ProdutoForm {
   sku: string;
   unitOfMeasure: string;
   taxPercentage: number;
+  stockMinimo: number | null;
+  categoriaId: string | null;
 }
 
 const EMPTY_FORM: ProdutoForm = {
@@ -41,6 +45,7 @@ const EMPTY_FORM: ProdutoForm = {
   unitPrice: 0, cost: '',
   productType: 'S', sku: '',
   unitOfMeasure: 'UN', taxPercentage: 14,
+  stockMinimo: null, categoriaId: null,
 };
 
 /** Calcula margem % a partir de custo e preço de venda. */
@@ -55,11 +60,46 @@ function calcSalePrice(cost: number, margin: number): number {
   return Math.round((cost / (1 - margin / 100)) * 100) / 100;
 }
 
+function StockBadge({ product }: { product: Produto }) {
+  if (product.productType !== 'P' || product.stock == null) {
+    return <span className="text-xs text-slate-400">sem controlo</span>;
+  }
+
+  const stock = product.stock;
+  const stockMinimo = product.stockMinimo ?? 0;
+
+  if (stock === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 text-red-600 font-semibold">
+        <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+        {stock}
+      </span>
+    );
+  }
+
+  if (stockMinimo > 0 && stock <= stockMinimo) {
+    return (
+      <span className="inline-flex items-center gap-1 text-amber-600 font-semibold">
+        <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+        {stock}
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 text-green-700 font-semibold">
+      <span className="inline-block h-2 w-2 rounded-full bg-green-400" />
+      {stock}
+    </span>
+  );
+}
+
 export default function ProdutosPage() {
   const qc = useQueryClient();
 
   // Produtos state
   const [search, setSearch] = useState('');
+  const [categoriaFiltro, setCategoriaFiltro] = useState(CATEGORY_FILTER_ALL);
   const [editing, setEditing] = useState<Produto | null>(null);
   const [showNewProduto, setShowNewProduto] = useState(false);
   const [prodForm, setProdForm] = useState<ProdutoForm>(EMPTY_FORM);
@@ -87,6 +127,10 @@ export default function ProdutosPage() {
   const { data: produtos = [], isLoading: prodLoading } = useQuery({
     queryKey: ['produtos', search],
     queryFn: () => getProdutos({ search: search || undefined, active: true }),
+  });
+  const { data: categorias = [] } = useQuery({
+    queryKey: ['categorias-produto'],
+    queryFn: getCategoriasProduto,
   });
 
   const { data: series = [], isLoading: seriesLoading } = useQuery({ queryKey: ['series'], queryFn: getSeries });
@@ -136,6 +180,8 @@ export default function ProdutosPage() {
       cost: prodForm.cost === '' ? null : Number(prodForm.cost),
       unitPrice: Number(prodForm.unitPrice),
       taxPercentage: Number(prodForm.taxPercentage),
+      stockMinimo: prodForm.stockMinimo,
+      categoriaId: prodForm.categoriaId,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['produtos'] });
@@ -153,6 +199,8 @@ export default function ProdutosPage() {
       cost: prodForm.cost === '' ? null : Number(prodForm.cost),
       unitPrice: Number(prodForm.unitPrice),
       taxPercentage: Number(prodForm.taxPercentage),
+      stockMinimo: prodForm.stockMinimo,
+      categoriaId: prodForm.categoriaId,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['produtos'] });
@@ -218,12 +266,15 @@ export default function ProdutosPage() {
       sku: p.sku ?? '',
       unitOfMeasure: p.unitOfMeasure,
       taxPercentage: p.taxPercentage,
+      stockMinimo: p.stockMinimo ?? null,
+      categoriaId: p.categoriaId ?? null,
     });
     setMarginInput(m ?? '');
     setProdErr('');
   };
 
   const openAddStock = (p: Produto) => {
+    if (p.productType !== 'P') return;
     setStockTarget(p);
     setStockQty('');
     setStockReason('');
@@ -232,6 +283,9 @@ export default function ProdutosPage() {
   };
 
   const computedMargin = calcMargin(prodForm.cost, prodForm.unitPrice);
+  const produtosFiltrados = produtos.filter((p) =>
+    categoriaFiltro === CATEGORY_FILTER_ALL || p.categoriaId === categoriaFiltro
+  );
 
   return (
     <div className="p-6 space-y-8">
@@ -250,9 +304,25 @@ export default function ProdutosPage() {
           </Button>
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input placeholder="Pesquisar produto, serviço ou SKU..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+        <div className="grid gap-3 md:grid-cols-[1fr_260px]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input placeholder="Pesquisar produto, serviço ou SKU..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+          </div>
+
+          <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todas as categorias" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={CATEGORY_FILTER_ALL}>Todas as categorias</SelectItem>
+              {categorias.map((categoria) => (
+                <SelectItem key={categoria.id} value={categoria.id}>
+                  {categoria.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
@@ -267,20 +337,36 @@ export default function ProdutosPage() {
             <span className="col-span-2"></span>
           </div>
           {prodLoading && <div className="py-8 text-center text-gray-400">A carregar...</div>}
-          {!prodLoading && produtos.length === 0 && (
+          {!prodLoading && produtosFiltrados.length === 0 && (
             <div className="py-12 text-center text-gray-400">
               <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p>Nenhum produto criado</p>
+              <p>Nenhum produto encontrado</p>
             </div>
           )}
-          {produtos.map(p => {
+          {produtosFiltrados.map(p => {
             const margin = p.margin ?? calcMargin(p.cost ?? '', p.unitPrice);
-            const stock = p.stock ?? 0;
-            const stockLow = stock <= 5;
             return (
               <div key={p.id} className="grid grid-cols-12 px-4 py-3 border-b border-gray-100 items-center hover:bg-white transition-colors">
                 <span className="col-span-2 text-gray-500 font-mono text-sm">{p.productCode}</span>
-                <span className="col-span-3 text-[#0A2540] text-sm truncate" title={p.productDescription}>{p.productDescription}</span>
+                <div className="col-span-3 min-w-0">
+                  <span className="block truncate text-[#0A2540] text-sm" title={p.productDescription}>{p.productDescription}</span>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {p.categoria?.nome && (
+                      <span
+                        className="inline-flex items-center rounded-full border bg-slate-50 px-2 py-0.5 text-[10px] font-semibold"
+                        style={{
+                          borderColor: p.categoria.cor || '#cbd5e1',
+                          color: p.categoria.cor || '#475569',
+                        }}
+                      >
+                        {p.categoria.nome}
+                      </span>
+                    )}
+                    {p.productType === 'P' && p.stockMinimo != null && p.stockMinimo > 0 && (
+                      <span className="text-[10px] text-slate-400">min. {p.stockMinimo}</span>
+                    )}
+                  </div>
+                </div>
                 <span className="col-span-1 text-center">
                   <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">
                     {p.productType === 'P' ? 'Prod.' : p.productType === 'S' ? 'Serv.' : 'Outro'}
@@ -301,21 +387,25 @@ export default function ProdutosPage() {
                 </span>
                 {/* Stock */}
                 <span className="col-span-1 text-center">
-                  <button
-                    onClick={() => openAddStock(p)}
-                    className="group inline-flex items-center gap-1"
-                    title="Adicionar stock"
-                  >
-                    <span className={`text-xs font-semibold tabular-nums ${stockLow ? 'text-red-500' : 'text-gray-700'}`}>
-                      {stock}
-                    </span>
-                    <PlusCircle className="w-3 h-3 text-gray-300 group-hover:text-blue-500 transition-colors" />
-                  </button>
+                  {p.productType === 'P' ? (
+                    <button
+                      onClick={() => openAddStock(p)}
+                      className="group inline-flex items-center gap-1"
+                      title="Adicionar stock"
+                    >
+                      <StockBadge product={p} />
+                      <PlusCircle className="w-3 h-3 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                    </button>
+                  ) : (
+                    <StockBadge product={p} />
+                  )}
                 </span>
                 <div className="col-span-2 flex justify-end gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => setMovementsTarget(p)} className="text-gray-400 hover:text-[#0A2540] h-7 w-7 p-0" title="Histórico de stock">
-                    <ClipboardList className="w-3.5 h-3.5" />
-                  </Button>
+                  {p.productType === 'P' && (
+                    <Button variant="ghost" size="sm" onClick={() => setMovementsTarget(p)} className="text-gray-400 hover:text-[#0A2540] h-7 w-7 p-0" title="Histórico de stock">
+                      <ClipboardList className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
                   <Button variant="ghost" size="sm" onClick={() => openEdit(p)} className="text-gray-400 hover:text-[#0A2540] h-7 w-7 p-0">
                     <Pencil className="w-3.5 h-3.5" />
                   </Button>
@@ -410,7 +500,7 @@ export default function ProdutosPage() {
               </div>
               <div>
                 <Label className="text-sm">Tipo (AGT)</Label>
-                <Select value={prodForm.productType} onValueChange={v => setProdForm(p => ({ ...p, productType: v }))}>
+                <Select value={prodForm.productType} onValueChange={v => setProdForm(p => ({ ...p, productType: v, stockMinimo: v === 'P' ? p.stockMinimo : null }))}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {PRODUCT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
@@ -439,6 +529,42 @@ export default function ProdutosPage() {
                 placeholder="opcional"
                 className="mt-1"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm">Categoria</Label>
+                <Select
+                  value={prodForm.categoriaId ?? CATEGORY_NONE_VALUE}
+                  onValueChange={value => setProdForm((p) => ({ ...p, categoriaId: value === CATEGORY_NONE_VALUE ? null : value }))}
+                >
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={CATEGORY_NONE_VALUE}>Sem categoria</SelectItem>
+                    {categorias.map((categoria) => (
+                      <SelectItem key={categoria.id} value={categoria.id}>
+                        {categoria.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Stock mínimo</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={prodForm.stockMinimo ?? ''}
+                  onChange={e => setProdForm((p) => ({
+                    ...p,
+                    stockMinimo: e.target.value === '' ? null : Math.max(0, Math.floor(Number(e.target.value))),
+                  }))}
+                  placeholder={prodForm.productType === 'P' ? '0 (sem alerta)' : 'Apenas para produtos'}
+                  className="mt-1"
+                  disabled={prodForm.productType !== 'P'}
+                />
+                <p className="mt-1 text-xs text-gray-400">Usado para alerta visual quando o stock de produto físico fica baixo.</p>
+              </div>
             </div>
 
             {/* Trio: Custo / Preço venda / Margem */}
