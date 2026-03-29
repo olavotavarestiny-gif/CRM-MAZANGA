@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, Task, CRMForm, FormField, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, ProdutoCategoria, StockMovement, CaixaSessao, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount } from './types';
+import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, Task, CRMForm, FormField, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, ProdutoCategoria, ComercialResumo, ComercialAnalise, StockMovement, CaixaSessao, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount } from './types';
 import { createClient } from './supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -759,6 +759,25 @@ export async function updateCategoriaProduto(id: string, data: { nome?: string; 
 
 export async function deleteCategoriaProduto(id: string): Promise<void> {
   await api.delete(`/api/produto-categorias/${id}`);
+}
+
+// Painel Comercial
+export async function getComercialResumo(): Promise<ComercialResumo> {
+  const res = await api.get('/api/comercial/resumo');
+  return res.data;
+}
+
+export async function getComercialInsights(): Promise<string[]> {
+  const res = await api.get('/api/comercial/insights');
+  return res.data;
+}
+
+export async function getComercialAnalise(params?: {
+  dias?: number;
+  estabelecimentoId?: string;
+}): Promise<ComercialAnalise> {
+  const res = await api.get('/api/comercial/analise', { params });
+  return res.data;
 }
 
 // Caixa — Sessões

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getContacts, getTasks, getFinanceDashboard, getCurrentUser } from '@/lib/api';
 import { useDashboardConfig } from '@/components/dashboard/use-dashboard-config';
+import PainelComercialPage from '@/components/comercial/painel-comercial';
 import StatWidget from '@/components/dashboard/stat-widget';
 import GoalWidget from '@/components/dashboard/goal-widget';
 import TasksWidget from '@/components/dashboard/tasks-widget';
@@ -17,14 +18,10 @@ import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
 import { Settings2 } from 'lucide-react';
 import { isSameDay, parseISO } from 'date-fns';
+import { isComercio } from '@/lib/business-modes';
 
-export default function Dashboard() {
+function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof getCurrentUser>> | undefined }) {
   const [customizerOpen, setCustomizerOpen] = useState(false);
-  const { data: currentUser } = useQuery({
-    queryKey: ['currentUser'],
-    queryFn: getCurrentUser,
-    retry: false,
-  });
   const dashboardScope = currentUser?.id ?? 'demo-user';
   const { widgets, loaded } = useDashboardConfig(dashboardScope);
 
@@ -219,4 +216,18 @@ export default function Dashboard() {
       />
     </div>
   );
+}
+
+export default function Dashboard() {
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+    retry: false,
+  });
+
+  if (isComercio(currentUser?.workspaceMode)) {
+    return <PainelComercialPage />;
+  }
+
+  return <DashboardCrm currentUser={currentUser} />;
 }

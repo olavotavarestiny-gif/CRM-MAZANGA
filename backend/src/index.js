@@ -28,6 +28,7 @@ const faturacaoSaftRouter = require('./routes/faturacao-saft');
 const faturacaoRelatoriosRouter = require('./routes/faturacao-relatorios');
 const faturacaoRecorrentesRouter = require('./routes/faturacao-recorrentes');
 const produtoCategoriasRouter = require('./routes/produto-categorias');
+const comercialDashboardRouter = require('./routes/comercial-dashboard');
 const chatRouter = require('./routes/chat');
 const notesRouter = require('./routes/notes');
 const quickSalesRouter = require('./routes/quick-sales');
@@ -126,6 +127,7 @@ app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoSa
 app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoRelatoriosRouter);
 app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoRecorrentesRouter);
 app.use('/api/produto-categorias', requireAuth, requirePlanFeature('vendas'), produtoCategoriasRouter);
+app.use('/api/comercial', requireAuth, requirePlanFeature('vendas'), comercialDashboardRouter);
 app.use('/api/chat', requireAuth, requirePlanFeature('conversas'), chatRouter);
 app.use('/api/quick-sales', requireAuth, requirePlanFeature('vendas'), quickSalesRouter);
 app.use('/api/caixa', requireAuth, requirePlanFeature('vendas'), caixaSessoesRouter);

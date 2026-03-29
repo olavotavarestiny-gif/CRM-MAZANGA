@@ -327,6 +327,52 @@ export interface ProdutoCategoria {
   _count?: { produtos: number };
 }
 
+export interface ComercialResumo {
+  totalHoje: number;
+  vendasHoje: number;
+  totalOntem: number;
+  variacao: number;
+  topProduto: {
+    productCode: string;
+    productDescription: string;
+    quantidadeVendida: number;
+    facturacaoTotal: number;
+  } | null;
+  estabelecimentoDestaque: {
+    id: string;
+    nome: string;
+    totalHoje: number;
+  } | null;
+  stockAlertaCount: number;
+}
+
+export interface ComercialTopProduto {
+  productCode: string;
+  productDescription: string;
+  quantidadeTotal: number;
+  facturacaoTotal: number;
+}
+
+export interface ComercialAnalise {
+  totalVendas: number;
+  numVendas: number;
+  ticketMedio: number;
+  topPorQuantidade: ComercialTopProduto[];
+  topPorFacturacao: ComercialTopProduto[];
+  produtosParados: Produto[];
+  rankingEstabelecimentos: {
+    id: string;
+    nome: string;
+    total: number;
+    count: number;
+  }[];
+  vendasPorDia: {
+    date: string;
+    total: number;
+    count: number;
+  }[];
+}
+
 export interface Produto {
   id: string;
   productCode: string;
