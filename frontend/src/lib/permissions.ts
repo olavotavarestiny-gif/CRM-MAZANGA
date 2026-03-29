@@ -23,6 +23,16 @@ const MODULE_TO_FEATURE: Record<ModuleKey, PlanFeatureName> = {
   vendas: 'vendas',
 };
 
+function parsePermissions(permissions?: UserPermissions | null): UserPermissions | null {
+  if (!permissions) return null;
+  return permissions;
+}
+
+function hasFullAccess(user?: User | null): boolean {
+  if (!user) return false;
+  return !!(user.isSuperAdmin || user.role === 'admin' || !user.accountOwnerId);
+}
+
 export function hasFeature(
   userOrFeatures: Pick<User, 'planFeatures'> | PlanFeatures | null | undefined,
   featureName: PlanFeatureName
@@ -39,13 +49,11 @@ export function hasFeature(
 export function canView(user: User, module: ModuleKey): boolean {
   if (!hasFeature(user, MODULE_TO_FEATURE[module])) return false;
   // SuperAdmin and platform admin see everything
-  if (user.isSuperAdmin || user.role === 'admin') return true;
-  // Account owner (no accountOwnerId) has full access
-  if (!user.accountOwnerId) return true;
+  if (hasFullAccess(user)) return true;
   // null permissions = no restrictions
   if (!user.permissions) return true;
 
-  const perms = user.permissions as UserPermissions;
+  const perms = parsePermissions(user.permissions) as UserPermissions;
 
   if (module === 'finances') {
     const f = perms.finances;
@@ -66,11 +74,10 @@ export function canView(user: User, module: ModuleKey): boolean {
 /** Returns true if user can create/edit records in the given module */
 export function canEdit(user: User, module: ModuleKey): boolean {
   if (!hasFeature(user, MODULE_TO_FEATURE[module])) return false;
-  if (user.isSuperAdmin || user.role === 'admin') return true;
-  if (!user.accountOwnerId) return true;
+  if (hasFullAccess(user)) return true;
   if (!user.permissions) return true;
 
-  const perms = user.permissions as UserPermissions;
+  const perms = parsePermissions(user.permissions) as UserPermissions;
 
   if (module === 'finances') {
     const f = perms.finances;
@@ -85,27 +92,74 @@ export function canEdit(user: User, module: ModuleKey): boolean {
 
 /** Returns true if user can delete records (only owners/admins) */
 export function canDelete(user: User): boolean {
-  return user.isSuperAdmin || !user.accountOwnerId || user.role === 'admin';
+  return hasFullAccess(user);
 }
 
 /** Returns true if user can view invoices */
 export function canViewInvoices(user: User): boolean {
-  if (user.isSuperAdmin || user.role === 'admin') return true;
-  if (!user.accountOwnerId) return true;
+  if (hasFullAccess(user)) return true;
   if (!user.permissions) return true;
-  const f = (user.permissions as UserPermissions).finances;
+  const f = (parsePermissions(user.permissions) as UserPermissions).finances;
   if (!f) return true;
   return !!f.view_invoices || !!f.emit_invoices;
 }
 
 /** Returns true if user can emit invoices */
 export function canEmitInvoices(user: User): boolean {
-  if (user.isSuperAdmin || user.role === 'admin') return true;
-  if (!user.accountOwnerId) return true;
+  if (hasFullAccess(user)) return true;
   if (!user.permissions) return true;
-  const f = (user.permissions as UserPermissions).finances;
+  const f = (parsePermissions(user.permissions) as UserPermissions).finances;
   if (!f) return true;
   return !!f.emit_invoices;
+}
+
+export function canComercialDashboardBasic(user: User): boolean {
+  if (hasFullAccess(user)) return true;
+  const perms = parsePermissions(user.permissions);
+  if (perms === null) return true;
+  return perms?.comercial?.dashboard_basic !== false;
+}
+
+export function canComercialDashboardAnalysis(user: User): boolean {
+  if (hasFullAccess(user)) return true;
+  const perms = parsePermissions(user.permissions);
+  if (perms === null) return true;
+  return perms?.comercial?.dashboard_analysis === true;
+}
+
+export function canCaixaView(user: User): boolean {
+  if (hasFullAccess(user)) return true;
+  const perms = parsePermissions(user.permissions);
+  if (perms === null) return true;
+  return perms?.caixa?.view !== false;
+}
+
+export function canCaixaOpen(user: User): boolean {
+  if (hasFullAccess(user)) return true;
+  const perms = parsePermissions(user.permissions);
+  if (perms === null) return true;
+  return perms?.caixa?.open === true;
+}
+
+export function canCaixaClose(user: User): boolean {
+  if (hasFullAccess(user)) return true;
+  const perms = parsePermissions(user.permissions);
+  if (perms === null) return true;
+  return perms?.caixa?.close === true;
+}
+
+export function canCaixaAudit(user: User): boolean {
+  if (hasFullAccess(user)) return true;
+  const perms = parsePermissions(user.permissions);
+  if (perms === null) return true;
+  return perms?.caixa?.audit === true;
+}
+
+export function canStockEdit(user: User): boolean {
+  if (hasFullAccess(user)) return true;
+  const perms = parsePermissions(user.permissions);
+  if (perms === null) return true;
+  return perms?.stock?.edit === true;
 }
 
 /** Returns the list of modules visible to the user */
@@ -114,6 +168,6 @@ export function getVisibleModules(user: User): ModuleKey[] {
     'contacts', 'pipeline', 'tasks', 'chat', 'calendario',
     'automations', 'forms', 'finances', 'vendas',
   ];
-  if (user.isSuperAdmin || user.role === 'admin' || !user.accountOwnerId) return all;
+  if (hasFullAccess(user)) return all;
   return all.filter((m) => canView(user, m));
 }

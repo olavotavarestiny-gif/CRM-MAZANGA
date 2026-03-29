@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { requireComercialPermission } = require('../lib/permissions');
 
 function startOfDay(date) {
   const d = new Date(date);
@@ -22,7 +23,7 @@ function toNumber(value) {
 }
 
 // GET /api/comercial/resumo
-router.get('/resumo', async (req, res) => {
+router.get('/resumo', requireComercialPermission('dashboard_basic'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const hoje = startOfDay(new Date());
@@ -113,7 +114,7 @@ router.get('/resumo', async (req, res) => {
 });
 
 // GET /api/comercial/insights
-router.get('/insights', async (req, res) => {
+router.get('/insights', requireComercialPermission('dashboard_basic'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const hoje = startOfDay(new Date());
@@ -181,7 +182,7 @@ router.get('/insights', async (req, res) => {
 });
 
 // GET /api/comercial/analise
-router.get('/analise', async (req, res) => {
+router.get('/analise', requireComercialPermission('dashboard_analysis'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const { dias = '30', estabelecimentoId } = req.query;

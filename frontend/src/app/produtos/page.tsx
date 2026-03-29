@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, Package, Pencil, Trash2, Search, Hash, PlusCircle, ArrowUpCircle, ClipboardList } from 'lucide-react';
-import { getProdutos, createProduto, updateProduto, deleteProduto, addStock, getStockMovements, getSeries, getEstabelecimentos, createSerie, updateSerie, getCategoriasProduto } from '@/lib/api';
+import { getProdutos, createProduto, updateProduto, deleteProduto, addStock, getStockMovements, getSeries, getEstabelecimentos, createSerie, updateSerie, getCategoriasProduto, getCurrentUser } from '@/lib/api';
 import type { Produto, StockMovement } from '@/lib/types';
+import { canStockEdit } from '@/lib/permissions';
 
 const UNITS = ['UN', 'H', 'KG', 'L', 'M', 'M2', 'M3'];
 const DOC_TYPES = ['FT', 'FR', 'ND', 'NC', 'FA', 'PF'];
@@ -96,6 +97,12 @@ function StockBadge({ product }: { product: Produto }) {
 
 export default function ProdutosPage() {
   const qc = useQueryClient();
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+    retry: false,
+  });
+  const podeEditarStock = currentUser ? canStockEdit(currentUser) : false;
 
   // Produtos state
   const [search, setSearch] = useState('');
@@ -391,7 +398,8 @@ export default function ProdutosPage() {
                     <button
                       onClick={() => openAddStock(p)}
                       className="group inline-flex items-center gap-1"
-                      title="Adicionar stock"
+                      title={podeEditarStock ? 'Adicionar stock' : 'Sem permissão para editar stock'}
+                      disabled={!podeEditarStock}
                     >
                       <StockBadge product={p} />
                       <PlusCircle className="w-3 h-3 text-gray-300 group-hover:text-blue-500 transition-colors" />

@@ -7,7 +7,7 @@ import {
   Banknote, CreditCard, History, Lock, RefreshCw,
   Store, TrendingUp, Unlock, Wallet,
 } from 'lucide-react';
-import { abrirCaixaSessao, fecharCaixaSessao, getCaixaSessaoAtual, getCaixaSessoes, getEstabelecimentos } from '@/lib/api';
+import { abrirCaixaSessao, fecharCaixaSessao, getCaixaSessaoAtual, getCaixaSessoes, getCurrentUser, getEstabelecimentos } from '@/lib/api';
 import type { CaixaSessao, Estabelecimento } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { canCaixaAudit, canCaixaClose, canCaixaOpen, canCaixaView } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 
 const HISTORY_PAGE_SIZE = 10;
@@ -102,6 +103,15 @@ export default function CaixaPage() {
   const [historyEstabelecimentoId, setHistoryEstabelecimentoId] = useState('all');
   const [historyPage, setHistoryPage] = useState(1);
   const abrirSelectionTouchedRef = useRef(false);
+  const { data: currentUser, isLoading: loadingUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+    retry: false,
+  });
+  const podeVerCaixa = currentUser ? canCaixaView(currentUser) : false;
+  const podeAbrirCaixa = currentUser ? canCaixaOpen(currentUser) : false;
+  const podeFecharCaixa = currentUser ? canCaixaClose(currentUser) : false;
+  const podeAuditarCaixa = currentUser ? canCaixaAudit(currentUser) : false;
 
   const {
     data: estabelecimentos = [],
@@ -111,6 +121,7 @@ export default function CaixaPage() {
     queryKey: ['estabelecimentos'],
     queryFn: getEstabelecimentos,
     retry: false,
+    enabled: !!currentUser && podeVerCaixa,
   });
 
   const {
@@ -123,6 +134,7 @@ export default function CaixaPage() {
     queryFn: () => getCaixaSessaoAtual(),
     retry: false,
     refetchInterval: activeTab === 'sessao' ? 30_000 : false,
+    enabled: !!currentUser && podeVerCaixa,
   });
 
   const {
@@ -138,7 +150,7 @@ export default function CaixaPage() {
       page: 1,
       limit: HISTORY_FETCH_LIMIT,
     }),
-    enabled: activeTab === 'historico',
+    enabled: !!currentUser && podeVerCaixa && podeAuditarCaixa && activeTab === 'historico',
   });
 
   const sessaoAberta = sessao?.status === 'open';
@@ -177,6 +189,12 @@ export default function CaixaPage() {
     }
   }, [historyPage, totalPages]);
 
+  useEffect(() => {
+    if (activeTab === 'historico' && !podeAuditarCaixa) {
+      setActiveTab('sessao');
+    }
+  }, [activeTab, podeAuditarCaixa]);
+
   const abrirMutation = useMutation({
     mutationFn: () => abrirCaixaSessao({
       estabelecimentoId: abrirEstabelecimentoId,
@@ -212,7 +230,7 @@ export default function CaixaPage() {
     onError: (error: Error) => setFecharErr(error.message),
   });
 
-  if (loadingSessao && activeTab === 'sessao') {
+  if (loadingUser || (loadingSessao && activeTab === 'sessao')) {
     return (
       <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-6">
         <div className="h-8 w-48 animate-pulse rounded-full bg-slate-200" />
@@ -222,6 +240,17 @@ export default function CaixaPage() {
             <div key={index} className="h-32 animate-pulse rounded-2xl bg-slate-200" />
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (currentUser && !podeVerCaixa) {
+    return (
+      <div className="mx-auto max-w-6xl p-4 md:p-6">
+        <ErrorState
+          title="Acesso restrito"
+          message="Não tem permissão para ver o estado do caixa desta conta."
+        />
       </div>
     );
   }
@@ -252,17 +281,17 @@ export default function CaixaPage() {
             Atualizar
           </Button>
 
-          {sessaoAberta ? (
+          {sessaoAberta && podeFecharCaixa ? (
             <Button variant="destructive" className="gap-2" onClick={() => { setFecharErr(''); setShowFecharCaixa(true); }}>
               <Lock className="h-4 w-4" />
               Fechar Caixa
             </Button>
-          ) : (
+          ) : !sessaoAberta && podeAbrirCaixa ? (
             <Button className="gap-2 bg-green-600 text-white hover:bg-green-700" onClick={() => { setAbrirErr(''); setShowAbrirCaixa(true); }}>
               <Unlock className="h-4 w-4" />
               Abrir Caixa
             </Button>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -277,28 +306,34 @@ export default function CaixaPage() {
         >
           Sessão Atual
         </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('historico')}
-          className={cn(
-            'rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
-            activeTab === 'historico' ? 'bg-[#0A2540] text-white' : 'text-slate-600 hover:bg-slate-100'
-          )}
-        >
-          Histórico
-        </button>
-        <button
-          type="button"
-          disabled
-          className="cursor-not-allowed rounded-lg px-4 py-2 text-sm font-semibold text-slate-400"
-        >
-          Auditoria
-        </button>
+        {podeAuditarCaixa ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setActiveTab('historico')}
+              className={cn(
+                'rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+                activeTab === 'historico' ? 'bg-[#0A2540] text-white' : 'text-slate-600 hover:bg-slate-100'
+              )}
+            >
+              Histórico
+            </button>
+            <button
+              type="button"
+              disabled
+              className="cursor-not-allowed rounded-lg px-4 py-2 text-sm font-semibold text-slate-400"
+            >
+              Auditoria
+            </button>
+          </>
+        ) : null}
       </div>
 
-      <p className="text-xs text-slate-500">
-        A aba de auditoria entra com as permissões granulares previstas para a Fase E.
-      </p>
+      {podeAuditarCaixa ? (
+        <p className="text-xs text-slate-500">
+          A aba de auditoria entra com as permissões granulares previstas para a Fase E.
+        </p>
+      ) : null}
 
       {activeTab === 'sessao' ? (
         <>
@@ -336,7 +371,7 @@ export default function CaixaPage() {
                     </p>
                   </div>
 
-                  {!sessaoAberta ? (
+                  {!sessaoAberta && podeAbrirCaixa ? (
                     <Button className="gap-2 bg-green-600 text-white hover:bg-green-700" onClick={() => { setAbrirErr(''); setShowAbrirCaixa(true); }}>
                       <Unlock className="h-4 w-4" />
                       Abrir Caixa
@@ -566,7 +601,7 @@ export default function CaixaPage() {
         </>
       )}
 
-      <Dialog open={showAbrirCaixa} onOpenChange={(open) => { if (!open) setShowAbrirCaixa(false); }}>
+      <Dialog open={podeAbrirCaixa && showAbrirCaixa} onOpenChange={(open) => { if (!open) setShowAbrirCaixa(false); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -666,7 +701,7 @@ export default function CaixaPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showFecharCaixa} onOpenChange={(open) => { if (!open) setShowFecharCaixa(false); }}>
+      <Dialog open={podeFecharCaixa && showFecharCaixa} onOpenChange={(open) => { if (!open) setShowFecharCaixa(false); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

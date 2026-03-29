@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { getTaxCode, isValidRate } = require('../lib/fiscal/iva-rates');
+const { requireStockPermission } = require('../lib/permissions');
 
 /**
  * Calcula margem a partir de custo e preço de venda.
@@ -161,7 +162,7 @@ router.delete('/produtos/:id', async (req, res) => {
 });
 
 // POST /api/faturacao/produtos/:id/stock — entrada manual de stock
-router.post('/produtos/:id/stock', async (req, res) => {
+router.post('/produtos/:id/stock', requireStockPermission('edit'), async (req, res) => {
   try {
     const produto = await prisma.produto.findUnique({
       where: { id: req.params.id },
@@ -235,7 +236,7 @@ router.post('/produtos/:id/stock', async (req, res) => {
 });
 
 // GET /api/faturacao/produtos/:id/stock-movements — histórico de movimentos
-router.get('/produtos/:id/stock-movements', async (req, res) => {
+router.get('/produtos/:id/stock-movements', requireStockPermission('view'), async (req, res) => {
   try {
     const produto = await prisma.produto.findUnique({
       where: { id: req.params.id },

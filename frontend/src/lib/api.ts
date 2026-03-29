@@ -374,6 +374,22 @@ export interface UserPermissions {
     view_reports?:  boolean;
     saft?:          boolean;
   };
+  comercial?: {
+    dashboard_basic?: boolean;
+    dashboard_analysis?: boolean;
+    view_store_ranking?: boolean;
+    view_product_performance?: boolean;
+  };
+  caixa?: {
+    view?: boolean;
+    open?: boolean;
+    close?: boolean;
+    audit?: boolean;
+  };
+  stock?: {
+    view?: boolean;
+    edit?: boolean;
+  };
 }
 
 export type PlanName = 'essencial' | 'profissional' | 'enterprise';

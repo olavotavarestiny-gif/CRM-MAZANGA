@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { requireCaixaPermission } = require('../lib/permissions');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -15,7 +16,7 @@ const SESSION_INCLUDE = {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/caixa/sessoes — Abrir sessão de caixa
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/sessoes', async (req, res) => {
+router.post('/sessoes', requireCaixaPermission('open'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const { estabelecimentoId, openingBalance, notes } = req.body;
@@ -65,7 +66,7 @@ router.post('/sessoes', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/caixa/sessoes/atual — Sessão aberta do utilizador actual
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/sessoes/atual', async (req, res) => {
+router.get('/sessoes/atual', requireCaixaPermission('view'), async (req, res) => {
   try {
     const { estabelecimentoId } = req.query;
     const where = {
@@ -89,7 +90,7 @@ router.get('/sessoes/atual', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /api/caixa/sessoes/:id/fechar — Fechar sessão
 // ─────────────────────────────────────────────────────────────────────────────
-router.patch('/sessoes/:id/fechar', async (req, res) => {
+router.patch('/sessoes/:id/fechar', requireCaixaPermission('close'), async (req, res) => {
   try {
     const sessao = await prisma.caixaSessao.findUnique({
       where: { id: req.params.id },
@@ -160,7 +161,7 @@ router.patch('/sessoes/:id/fechar', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/caixa/sessoes — Listar sessões (admin/owner vê todas, user vê as suas)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/sessoes', async (req, res) => {
+router.get('/sessoes', requireCaixaPermission('audit'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const { status, estabelecimentoId, page = '1', limit = '20' } = req.query;

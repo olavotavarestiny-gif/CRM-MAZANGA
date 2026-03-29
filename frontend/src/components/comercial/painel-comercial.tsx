@@ -8,6 +8,7 @@ import { getComercialAnalise, getComercialInsights, getComercialResumo, getCurre
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
+import { canComercialDashboardAnalysis, canComercialDashboardBasic } from '@/lib/permissions';
 
 function formatKz(value: number) {
   return `${value.toLocaleString('pt-AO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Kz`;
@@ -134,13 +135,14 @@ function PainelAnalise() {
 
 export default function PainelComercialPage() {
   const [modo, setModo] = useState<'resumo' | 'analise'>('resumo');
-  const { data: currentUser } = useQuery({
+  const { data: currentUser, isLoading: loadingUser } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
     retry: false,
   });
 
-  const podeAnalise = !!(currentUser?.isSuperAdmin || currentUser?.role === 'admin' || !currentUser?.accountOwnerId);
+  const podeResumo = currentUser ? canComercialDashboardBasic(currentUser) : false;
+  const podeAnalise = currentUser ? canComercialDashboardAnalysis(currentUser) : false;
 
   const {
     data: resumo,
@@ -151,6 +153,7 @@ export default function PainelComercialPage() {
     queryKey: ['comercial-resumo'],
     queryFn: getComercialResumo,
     refetchInterval: 60_000,
+    enabled: !!currentUser && podeResumo,
   });
 
   const {
@@ -162,7 +165,34 @@ export default function PainelComercialPage() {
     queryKey: ['comercial-insights'],
     queryFn: getComercialInsights,
     refetchInterval: 60_000,
+    enabled: !!currentUser && podeResumo,
   });
+
+  if (loadingUser) {
+    return (
+      <div className="mx-auto max-w-6xl p-4 md:p-6">
+        <div className="space-y-4">
+          <div className="h-8 w-64 animate-pulse rounded-full bg-slate-200" />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="h-36 animate-pulse rounded-2xl bg-slate-200" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentUser && !podeResumo) {
+    return (
+      <div className="mx-auto max-w-6xl p-4 md:p-6">
+        <ErrorState
+          title="Acesso restrito"
+          message="Não tem permissão para ver o painel comercial desta conta."
+        />
+      </div>
+    );
+  }
 
   if (resumoLoading || insightsLoading) {
     return (
