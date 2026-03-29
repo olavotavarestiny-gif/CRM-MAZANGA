@@ -4,6 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const { getNextDocumentNumber } = require('./numeracao');
 const { generateQRCode } = require('./qrcode');
 const { registarFatura } = require('./agt-api');
+const { registerFacturaFinanceEntry } = require('./register-finance-entry');
 
 const prisma = new PrismaClient();
 
@@ -72,29 +73,48 @@ async function processOne(rec) {
   ).catch(() => ({ status: 'P', requestId: null }));
 
   // Create the real Factura
-  const factura = await prisma.factura.create({
-    data: {
-      userId:            rec.userId,
+  const factura = await prisma.$transaction(async (tx) => {
+    const createdFactura = await tx.factura.create({
+      data: {
+        userId:            rec.userId,
+        documentNo,
+        documentType:      rec.documentType,
+        serieId:           rec.serieId,
+        estabelecimentoId: rec.estabelecimentoId,
+        customerTaxID:     rec.customerTaxID,
+        customerName:      rec.customerName,
+        customerAddress:   rec.customerAddress ?? null,
+        clienteFaturacaoId: rec.clienteFaturacaoId ?? null,
+        lines:             JSON.stringify(processedLines),
+        netTotal,
+        taxPayable,
+        grossTotal,
+        qrCodeImage:       qrCodeImage ?? null,
+        jwsSignature:      'PLACEHOLDER',
+        currencyCode:      rec.currencyCode,
+        exchangeRate:      rec.exchangeRate ?? null,
+        paymentMethod:     rec.paymentMethod,
+        agtValidationStatus: agtResult.status ?? 'P',
+        agtRequestId:      agtResult.requestId ?? null,
+      },
+    });
+
+    await registerFacturaFinanceEntry(tx, {
+      userId: rec.userId,
+      facturaId: createdFactura.id,
       documentNo,
-      documentType:      rec.documentType,
-      serieId:           rec.serieId,
-      estabelecimentoId: rec.estabelecimentoId,
-      customerTaxID:     rec.customerTaxID,
-      customerName:      rec.customerName,
-      customerAddress:   rec.customerAddress ?? null,
+      documentType: rec.documentType,
+      documentDate: createdFactura.documentDate,
+      customerName: rec.customerName,
       clienteFaturacaoId: rec.clienteFaturacaoId ?? null,
-      lines:             JSON.stringify(processedLines),
-      netTotal,
-      taxPayable,
       grossTotal,
-      qrCodeImage:       qrCodeImage ?? null,
-      jwsSignature:      'PLACEHOLDER',
-      currencyCode:      rec.currencyCode,
-      exchangeRate:      rec.exchangeRate ?? null,
-      paymentMethod:     rec.paymentMethod,
-      agtValidationStatus: agtResult.status ?? 'P',
-      agtRequestId:      agtResult.requestId ?? null,
-    },
+      currencyCode: rec.currencyCode,
+      currencyAmount: rec.currencyCode && rec.currencyCode !== 'AOA' ? grossTotal : null,
+      exchangeRate: rec.exchangeRate ?? null,
+      paymentMethod: rec.paymentMethod,
+    });
+
+    return createdFactura;
   });
 
   return factura;

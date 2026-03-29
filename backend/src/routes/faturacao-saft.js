@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
-const { generateSAFT } = require('../lib/faturacao/saft-generator');
+const { buildSAFT, validateSaftReadiness } = require('../lib/fiscal/saft-builder');
 
-// GET /api/faturacao/saft
+// GET /api/faturacao/saft — listar períodos gerados
 router.get('/saft', async (req, res) => {
   try {
     const periodos = await prisma.saftPeriodo.findMany({
@@ -17,10 +17,25 @@ router.get('/saft', async (req, res) => {
   }
 });
 
-// POST /api/faturacao/saft/generate
+// POST /api/faturacao/saft/validate — pré-validar período antes de gerar
+router.post('/saft/validate', async (req, res) => {
+  try {
+    const { periodo } = req.body;
+    if (!periodo || !/^\d{4}-\d{2}$/.test(periodo)) {
+      return res.status(400).json({ error: 'Período inválido. Formato: YYYY-MM' });
+    }
+    const errors = await validateSaftReadiness(req.user.effectiveUserId, periodo);
+    res.json({ valid: errors.length === 0, errors });
+  } catch (err) {
+    console.error('SAF-T validate error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/faturacao/saft/generate — gerar SAF-T para um período
 router.post('/saft/generate', async (req, res) => {
   try {
-    const { periodo } = req.body; // "2026-01"
+    const { periodo } = req.body;
     if (!periodo || !/^\d{4}-\d{2}$/.test(periodo)) {
       return res.status(400).json({ error: 'Período inválido. Formato: YYYY-MM' });
     }
@@ -30,11 +45,7 @@ router.post('/saft/generate', async (req, res) => {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
-    const xmlContent = await generateSAFT(userId, periodo);
-
-    const totalFacturas = await prisma.factura.count({
-      where: { userId, documentDate: { gte: startDate, lte: endDate }, documentStatus: 'N' },
-    });
+    const { xml: xmlContent, totalFacturas, warnings } = await buildSAFT(userId, periodo);
 
     const saftPeriodo = await prisma.saftPeriodo.upsert({
       where: { id: `${userId}-${periodo}` },
@@ -56,14 +67,14 @@ router.post('/saft/generate', async (req, res) => {
       },
     });
 
-    res.json({ ...saftPeriodo, xmlContent: undefined }); // não retornar XML no JSON
+    res.json({ ...saftPeriodo, xmlContent: undefined, warnings });
   } catch (err) {
     console.error('SAF-T generation error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/faturacao/saft/:id/download
+// GET /api/faturacao/saft/:id/download — descarregar XML
 router.get('/saft/:id/download', async (req, res) => {
   try {
     const periodo = await prisma.saftPeriodo.findUnique({ where: { id: req.params.id } });
@@ -71,7 +82,7 @@ router.get('/saft/:id/download', async (req, res) => {
       return res.status(404).json({ error: 'Período não encontrado' });
     }
     if (!periodo.xmlContent) {
-      return res.status(404).json({ error: 'Ficheiro XML não disponível' });
+      return res.status(404).json({ error: 'Ficheiro XML não disponível. Regenere o SAF-T.' });
     }
     const filename = `saft-${periodo.periodo}.xml`;
     res.setHeader('Content-Type', 'application/xml; charset=utf-8');

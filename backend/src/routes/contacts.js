@@ -227,11 +227,21 @@ function parseDocuments(raw) {
   }
 }
 
+async function getWorkspaceModeForUser(userId) {
+  const ownerAccount = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { workspaceMode: true },
+  });
+
+  return ownerAccount?.workspaceMode === 'comercio' ? 'comercio' : 'servicos';
+}
+
 // GET all contacts with optional filters
 router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
   try {
     const { stage, search, inPipeline, revenue, contactType } = req.query;
     const where = { userId: req.user.effectiveUserId };
+    const workspaceMode = await getWorkspaceModeForUser(req.user.effectiveUserId);
 
     if (stage && VALID_STAGES.includes(stage)) {
       where.stage = stage;
@@ -247,7 +257,9 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
       where.revenue = revenue;
     }
 
-    if (contactType && ['interessado', 'cliente'].includes(contactType)) {
+    if (workspaceMode === 'comercio') {
+      where.contactType = 'cliente';
+    } else if (contactType && ['interessado', 'cliente'].includes(contactType)) {
       where.contactType = contactType;
     }
 
@@ -294,7 +306,15 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
       return res.status(403).json(buildLimitErrorPayload(limitState));
     }
 
+    const workspaceMode = await getWorkspaceModeForUser(req.user.effectiveUserId);
     const finalStage = stage && VALID_STAGES.includes(stage) ? stage : 'Novo';
+    const finalInPipeline = workspaceMode === 'comercio' ? false : true;
+    const finalContactType =
+      workspaceMode === 'comercio'
+        ? 'cliente'
+        : ['interessado', 'cliente'].includes(contactType)
+        ? contactType
+        : 'interessado';
 
     const contact = await prisma.contact.create({
       data: {
@@ -307,8 +327,9 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
         sector: sector || null,
         tags: Array.isArray(tags) ? JSON.stringify(tags) : '[]',
         stage: finalStage,
+        inPipeline: finalInPipeline,
         customFields: customFields && typeof customFields === 'object' ? JSON.stringify(customFields) : '{}',
-        contactType: ['interessado', 'cliente'].includes(contactType) ? contactType : 'interessado',
+        contactType: finalContactType,
         status: ['ativo', 'inativo'].includes(status) ? status : 'ativo',
         clienteType: ['empresa', 'particular'].includes(clienteType) ? clienteType : 'particular',
       },
@@ -530,6 +551,8 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
       return res.status(400).json({ error: 'Phone format is invalid. Use only digits, spaces, +, -, (, )' });
     }
 
+    const workspaceMode = await getWorkspaceModeForUser(req.user.effectiveUserId);
+
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
@@ -547,7 +570,11 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
       const merged = { ...parseCustomFields(existing2?.customFields), ...customFields };
       updateData.customFields = JSON.stringify(merged);
     }
-    if (contactType !== undefined && ['interessado', 'cliente'].includes(contactType)) updateData.contactType = contactType;
+    if (workspaceMode === 'comercio') {
+      updateData.contactType = 'cliente';
+    } else if (contactType !== undefined && ['interessado', 'cliente'].includes(contactType)) {
+      updateData.contactType = contactType;
+    }
     if (status !== undefined && ['ativo', 'inativo'].includes(status)) updateData.status = status;
     if (clienteType !== undefined && ['empresa', 'particular'].includes(clienteType)) updateData.clienteType = clienteType;
     if (documents !== undefined) {

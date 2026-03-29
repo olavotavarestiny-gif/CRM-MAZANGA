@@ -25,6 +25,7 @@ model User {
   permissions          String?    // JSON: null = full access; see permissions structure in lib/permissions.js
   mustChangePassword   Boolean    @default(false)
   accountOwnerId       Int?       // null = owner of their own account; Int = member of another account
+  workspaceMode        String     @default("servicos") // "servicos" | "comercio"
   createdAt            DateTime   @default(now())
   loginLogs            LoginLog[]
   contacts             Contact[]  @relation("ContactUser")
@@ -41,6 +42,11 @@ model User {
   series               Serie[]               @relation("SerieUser")
   clientesFaturacao    ClienteFaturacao[]    @relation("ClienteFaturacaoUser")
   produtos             Produto[]             @relation("ProdutoUser")
+  stockMovements       StockMovement[]       @relation("StockMovementUser")
+  stockMovementsCreated StockMovement[]      @relation("StockMovementCreatedBy")
+  caixaSessoes         CaixaSessao[]         @relation("CaixaSessaoUser")
+  caixaSessoesAbertas  CaixaSessao[]         @relation("CaixaSessaoOpenedBy")
+  caixaSessoesFechadas CaixaSessao[]         @relation("CaixaSessaoClosedBy")
   facturas             Factura[]             @relation("FacturaUser")
   facturaRecorrentes   FacturaRecorrente[]   @relation("FacturaRecorrenteUser")
   saftPeriodos         SaftPeriodo[]         @relation("SaftPeriodoUser")
@@ -295,15 +301,18 @@ model Estabelecimento {
   userId      Int
   nome        String
   nif         String
+  defaultSerieId String?
   morada      String?
   telefone    String?
   email       String?
   isPrincipal Boolean   @default(false)
   createdAt   DateTime  @default(now())
   user        User      @relation("EstabelecimentoUser", fields: [userId], references: [id], onDelete: Cascade)
-  series               Serie[]
+  series               Serie[] @relation("EstabelecimentoSeries")
+  defaultSerie         Serie? @relation("EstabelecimentoDefaultSerie", fields: [defaultSerieId], references: [id], onDelete: SetNull)
   facturas             Factura[]
   facturaRecorrentes   FacturaRecorrente[]
+  caixaSessoes         CaixaSessao[]
 }
 
 model Serie {
@@ -318,7 +327,8 @@ model Serie {
   seriesStatus        String          @default("A") // A=Ativa, U=Em uso, F=Fechada
   createdAt           DateTime        @default(now())
   user                User            @relation("SerieUser", fields: [userId], references: [id], onDelete: Cascade)
-  estabelecimento     Estabelecimento @relation(fields: [estabelecimentoId], references: [id], onDelete: Cascade)
+  estabelecimento     Estabelecimento @relation("EstabelecimentoSeries", fields: [estabelecimentoId], references: [id], onDelete: Cascade)
+  defaultForEstabelecimentos Estabelecimento[] @relation("EstabelecimentoDefaultSerie")
   facturas             Factura[]
   facturaRecorrentes   FacturaRecorrente[]
 
@@ -348,15 +358,40 @@ model Produto {
   userId             Int
   productCode        String
   productDescription String
-  unitPrice          Float    @default(0)
+  unitPrice          Float    @default(0)   // preço de venda (salePrice)
+  cost               Float?                 // preço de custo
+  productType        String   @default("S") // S=serviço, P=produto, O=outro (AGT)
+  sku                String?                // referência interna
+  barcode            String?                // código de barras EAN/QR (para leitura por scanner)
   unitOfMeasure      String   @default("UN")
   taxPercentage      Float    @default(14)
   taxCode            String   @default("NOR")
   active             Boolean  @default(true)
+  stock              Int?     @default(0)    // stock atual (null = produto sem controlo de stock)
   createdAt          DateTime @default(now())
   user               User     @relation("ProdutoUser", fields: [userId], references: [id], onDelete: Cascade)
+  stockMovements     StockMovement[]
 
   @@unique([userId, productCode])
+}
+
+model StockMovement {
+  id              String   @id @default(cuid())
+  productId       String
+  userId          Int                          // effectiveUserId (scoping por conta)
+  type            String                       // "entry" | "exit" | "adjustment"
+  quantity        Int
+  previousStock   Int
+  newStock        Int
+  reason          String?
+  notes           String?
+  createdByUserId Int
+  referenceType   String?                      // "manual" | "quick_sale"
+  referenceId     String?
+  createdAt       DateTime @default(now())
+  product         Produto  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user            User     @relation("StockMovementUser", fields: [userId], references: [id])
+  createdBy       User     @relation("StockMovementCreatedBy", fields: [createdByUserId], references: [id])
 }
 
 model Factura {
@@ -379,6 +414,8 @@ model Factura {
   grossTotal           Float
   qrCodeUrl            String?
   qrCodeImage          String?
+  hashCode             String?          // Cadeia de hash AGT (SHA256 → RSA-2048 quando certificado disponível)
+  hashControl          String?          // "1" = primeiro doc da série; "0" = encadeado
   jwsSignature         String           @default("PLACEHOLDER")
   agtRequestId         String?
   agtValidationStatus  String           @default("P") // P=Pendente, V=Válida, I=Inválida, A=Anulada
@@ -396,8 +433,35 @@ model Factura {
   serie                Serie            @relation(fields: [serieId], references: [id])
   estabelecimento      Estabelecimento  @relation(fields: [estabelecimentoId], references: [id])
   clienteFaturacao     ClienteFaturacao? @relation(fields: [clienteFaturacaoId], references: [id])
+  caixaSessaoId        String?
+  caixaSessao          CaixaSessao?      @relation(fields: [caixaSessaoId], references: [id], onDelete: SetNull)
 
   @@unique([userId, documentNo])
+}
+
+model CaixaSessao {
+  id                    String          @id @default(cuid())
+  userId                Int                               // effectiveUserId (scoping)
+  estabelecimentoId     String
+  openedByUserId        Int
+  closedByUserId        Int?
+  openedAt              DateTime        @default(now())
+  closedAt              DateTime?
+  openingBalance        Float           @default(0)
+  closingCountedAmount  Float?
+  expectedClosingAmount Float?
+  differenceAmount      Float?
+  totalSalesAmount      Float           @default(0)
+  salesCount            Int             @default(0)
+  status                String          @default("open")  // "open" | "closed"
+  notes                 String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  user                  User            @relation("CaixaSessaoUser", fields: [userId], references: [id])
+  openedBy              User            @relation("CaixaSessaoOpenedBy", fields: [openedByUserId], references: [id])
+  closedBy              User?           @relation("CaixaSessaoClosedBy", fields: [closedByUserId], references: [id])
+  estabelecimento       Estabelecimento @relation(fields: [estabelecimentoId], references: [id])
+  facturas              Factura[]
 }
 
 model SaftPeriodo {

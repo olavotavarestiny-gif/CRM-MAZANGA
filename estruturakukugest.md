@@ -778,3 +778,360 @@ Em termos de organização, o sistema já não é só um CRM simples:
 - tem automação
 
 Ou seja, a estrutura atual já é de um produto SaaS operacional com múltiplos domínios, onde o backend protege as regras e o frontend organiza a experiência.
+
+## 11. Lógica Atual do CRM
+
+### 11.1 Modelo de papéis e escopo
+
+Estado atual do modelo de acesso:
+
+| Papel | Escopo | Observação |
+|------|--------|------------|
+| `isSuperAdmin=true` | plataforma inteira | vê organizações, contas, utilização, planos, impersonation |
+| `account owner` | própria organização | controlo total da conta, equipa, permissões e workspace mode |
+| `role='admin'` | própria organização | gestão operacional da org, sem privilégios de plataforma |
+| `role='user'` | própria organização | acesso por permissões de módulo |
+
+Regra importante:
+- `role='admin'` já não é tratado como superadmin de plataforma
+- `/api/admin` é agora superadmin-only
+- `/superadmin` no frontend é superadmin-only
+
+### 11.2 Escopo real de conta
+
+O sistema usa `effectiveUserId` no backend para isolar dados por organização.
+
+Lógica:
+- se o utilizador é owner, `effectiveUserId = user.id`
+- se o utilizador pertence a uma conta, `effectiveUserId = accountOwnerId`
+
+Isso é usado para:
+- contactos
+- tarefas
+- automações
+- finanças
+- faturação
+- configurações
+- equipa
+
+### 11.3 Permissões por módulo
+
+Os módulos principais usam permissões equivalentes a:
+- `none`
+- `view`
+- `edit`
+
+Módulos com controlo explícito:
+- contactos
+- pipeline
+- tarefas
+- chat
+- calendario
+- automations
+- forms
+- finanças
+
+Notas:
+- account owner e superadmin continuam com bypass controlado
+- membros normais dependem da matriz de permissões
+- admin de org já não deve ganhar acesso de plataforma só por `role='admin'`
+
+### 11.4 Lógica de planos
+
+Planos ativos:
+- `essencial`
+- `profissional`
+- `enterprise`
+
+O plano controla duas coisas:
+
+1. limites
+- utilizadores
+- contactos
+- tarefas
+- automações
+
+2. features
+- painel
+- clientes
+- processos
+- tarefas
+- vendas
+- conversas
+- calendario
+- automacoes
+- formularios
+- financas
+
+Fonte de verdade:
+- backend resolve o plano
+- `/api/auth/me` devolve plano, limites e features
+- frontend usa isso para esconder, redirecionar e informar
+
+### 11.5 Lógica de tarefas
+
+Hoje as tarefas funcionam assim:
+- podem ter um único responsável
+- admins/owners/superadmin veem todas as tarefas da org
+- membros normais veem apenas tarefas atribuídas a eles
+- tarefas concluídas não desaparecem
+- filtros:
+  - `todas`
+  - `hoje`
+  - `atrasadas`
+  - `concluidas`
+- em listas mistas:
+  - pendentes aparecem primeiro
+  - concluídas aparecem abaixo
+
+Quando uma tarefa é atribuída:
+- backend envia notificação interna através do sistema de chat
+
+### 11.6 Lógica de chat interno
+
+Hoje o chat suporta:
+- canais internos
+- mensagens diretas
+- membros por canal
+- unread count
+- realtime
+- anexos
+- mentions
+
+Gestão de canal:
+- superadmin
+- account owner/admin da org
+- criador do canal
+
+Fluxos já implementados:
+- renomear canal
+- gerir membros
+- apagar canal
+
+### 11.7 Lógica de calendário
+
+O calendário agrega:
+- tarefas do CRM
+- eventos do Google Calendar
+
+Inclui:
+- navegação por mês
+- seleção de dia
+- painel lateral por dia
+- criação de tarefa a partir do dia
+
+### 11.8 Lógica de faturação
+
+Hoje a faturação já inclui:
+- configuração fiscal
+- estabelecimentos
+- séries
+- clientes de faturação
+- produtos e serviços
+- faturas
+- recorrentes
+- SAF-T
+- QR code
+- PDF
+- integração AGT
+
+Emissão atual:
+- o cliente pode ser localizado via pesquisa unificada
+  - CRM
+  - faturação
+- é possível criar série inline no fluxo de emissão
+- continuam a existir áreas de gestão avançada para séries e produtos
+
+### 11.9 Contactos e pipeline
+
+Contactos:
+- pesquisa
+- filtros
+- importação CSV
+- campos dinâmicos
+- notas
+- detalhe individual
+
+Pipeline:
+- estágios configuráveis
+- kanban
+- drag and drop
+- relação forte com contactos
+
+### 11.10 Workspace modes / modos de negócio
+
+O produto já suporta variação de experiência por modo de operação.
+
+Na prática:
+- existem ajustes de navegação e foco conforme o `workspaceMode`
+- o modo `comércio` ativa uma navegação mais orientada a venda rápida e faturação
+
+Isto afeta principalmente:
+- sidebar
+- prioridades de navegação
+- módulo de vendas rápidas
+
+## 12. Módulos e Áreas que Também Fazem Parte do Produto
+
+Além dos módulos principais já descritos, o CRM hoje também inclui:
+
+### 12.1 Inbox, mensagens e envio
+
+Rotas backend:
+- `messages.js`
+- `inbox.js`
+- `send.js`
+- `whatsapp.js`
+- `webhook.js`
+
+Estas áreas suportam:
+- histórico de mensagens
+- receção por webhook
+- envio
+- integração operacional com canais externos
+
+### 12.2 Notas
+
+Rota:
+- `backend/src/routes/notes.js`
+
+Função:
+- notas ligadas a contactos
+- edição e remoção conforme regras do utilizador
+
+### 12.3 Setup e bootstrap
+
+Rota:
+- `backend/src/routes/setup.js`
+
+Função:
+- configuração inicial
+- bootstrap do sistema
+
+### 12.4 Quick Sales / vendas rápidas
+
+Hoje já existe:
+- rota API `quick-sales`
+- página `/vendas-rapidas`
+
+Isto é importante porque aproxima o produto de cenários de balcão/comércio, não só CRM consultivo.
+
+### 12.5 Fiscal helpers
+
+Pasta:
+- `backend/src/lib/fiscal/`
+
+Função:
+- validações fiscais auxiliares
+- preparação de regras ligadas à faturação
+
+## 13. O Que o Produto Já É Hoje
+
+Hoje o KukuGest já é:
+- um CRM operacional multi-módulo
+- um sistema com colaboração interna
+- um sistema com faturação e camada fiscal
+- um SaaS com planos e limites
+- uma plataforma com administração global
+- uma base já suficientemente estruturada para venda assistida/manual
+
+Hoje o produto já pode ser demonstrado comercialmente para:
+- pequenas equipas comerciais
+- equipas de serviços
+- negócios com necessidade de CRM + tarefas + faturação
+- operações que precisam de colaboração interna simples
+- organizações com necessidade de controlo por plano
+
+## 14. Próximos Passos para Ficar Live e Vendível
+
+### 14.1 Pronto para vender de forma manual
+
+O produto já pode ser vendido com processo assistido/manual se houver:
+- ativação de conta por equipa interna
+- atribuição manual de plano
+- onboarding inicial acompanhado
+- canal comercial/WhatsApp para upgrade
+
+Isto já encaixa no modelo atual:
+- sem gateway de pagamento
+- sem billing automático
+- com CTA via WhatsApp
+
+### 14.2 O que falta para ficar live com segurança
+
+Blocos prioritários antes de produção comercial ampla:
+
+1. Segurança e acesso
+- concluir auditoria de papéis e permissões em todos os pontos residuais
+- rever rotas ainda com checks especiais por `role='admin'`
+- validar impersonation e auditoria
+
+2. Qualidade e estabilidade
+- smoke tests por papel
+- smoke tests por plano
+- validação ponta-a-ponta de faturação
+- validação de Google Calendar
+- validação de chat realtime
+
+3. Operação
+- estratégia de backups
+- monitorização de backend
+- monitorização de erros frontend
+- logs de produção e alertas
+
+4. Compliance comercial e legal
+- rever termos e privacidade
+- rever política de retenção de dados
+- garantir consistência de faturação fiscal antes de escalar
+
+### 14.3 O que falta para ficar claramente vendível no mercado
+
+Para transformar em produto mais fácil de vender:
+
+1. Comercial
+- pricing final validado
+- mensagem clara por segmento
+- demo comercial padronizada
+- landing page mais orientada à venda
+
+2. Produto
+- onboarding mais guiado
+- seeds/dados demo melhores
+- defaults mais fortes na primeira experiência
+- relatórios de valor mais visíveis
+
+3. Billing
+- hoje existe ativação manual
+- mais à frente será útil adicionar:
+  - cobrança recorrente
+  - upgrades self-serve
+  - gestão de subscrição
+
+### 14.4 Ordem recomendada para ir live
+
+Recomendação prática:
+
+1. fechar auditoria de permissões
+2. validar faturação em ambiente real
+3. executar checklist de QA por plano e papel
+4. preparar onboarding comercial/manual
+5. lançar primeiro com ativação assistida
+6. só depois automatizar billing e self-serve
+
+### 14.5 Definição honesta do estado atual
+
+Hoje o produto está:
+- tecnicamente avançado
+- funcionalmente largo
+- comercialmente promissor
+
+Mas para ficar realmente live e vendível sem fricção, ainda precisa de:
+- polimento final de segurança e permissões
+- QA mais sistemático
+- operação de produção mais robusta
+- processo comercial/onboarding mais definido
+
+Em resumo:
+- já está perto de ser vendável
+- já pode ser vendido manualmente
+- ainda não está na forma final de SaaS totalmente auto-serviço

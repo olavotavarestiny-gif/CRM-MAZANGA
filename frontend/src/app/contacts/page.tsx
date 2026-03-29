@@ -65,6 +65,7 @@ export default function ContactsPage() {
   const [isFieldsOpen, setIsFieldsOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [contactTypeTab, setContactTypeTab] = useState<'interessado' | 'cliente'>('interessado');
+  const isComercioWorkspace = currentUser?.workspaceMode === 'comercio';
 
   const { data: fieldDefs = [] } = useQuery({
     queryKey: ['contactFieldDefs'],
@@ -94,6 +95,12 @@ export default function ContactsPage() {
   }, []);
 
   useEffect(() => {
+    if (isComercioWorkspace) {
+      setContactTypeTab('cliente');
+    }
+  }, [isComercioWorkspace]);
+
+  useEffect(() => {
     const timeout = window.setTimeout(() => {
       setDebouncedSearch(search.trim());
     }, 300);
@@ -108,7 +115,7 @@ export default function ContactsPage() {
         search: debouncedSearch || undefined,
         stage: stageFilter === 'ALL' ? undefined : stageFilter,
         revenue: revenueFilter === 'ALL' ? undefined : revenueFilter,
-        contactType: contactTypeTab,
+        contactType: isComercioWorkspace ? 'cliente' : contactTypeTab,
       }),
     placeholderData: (previousData) => previousData,
     retry: false,
@@ -131,7 +138,9 @@ export default function ContactsPage() {
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Contactos</h1>
           <p className="mt-1 text-sm text-[#6b7e9a]">
-            Interessados, clientes e campos personalizados num fluxo único.
+            {isComercioWorkspace
+              ? 'Clientes e campos personalizados num fluxo alinhado com o comércio.'
+              : 'Interessados, clientes e campos personalizados num fluxo único.'}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -173,21 +182,23 @@ export default function ContactsPage() {
       <ImportCSVModal open={isImportOpen} onOpenChange={setIsImportOpen} />
       <ContactFieldsManager open={isFieldsOpen} onOpenChange={setIsFieldsOpen} />
 
-      <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
-        {(['interessado', 'cliente'] as const).map(type => (
-          <button
-            key={type}
-            onClick={() => setContactTypeTab(type)}
-            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
-              contactTypeTab === type
-                ? 'bg-[#0A2540] text-white shadow-sm'
-                : 'text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540]'
-            }`}
-          >
-            {type === 'interessado' ? 'Interessados' : 'Clientes'}
-          </button>
-        ))}
-      </div>
+      {!isComercioWorkspace && (
+        <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+          {(['interessado', 'cliente'] as const).map(type => (
+            <button
+              key={type}
+              onClick={() => setContactTypeTab(type)}
+              className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                contactTypeTab === type
+                  ? 'bg-[#0A2540] text-white shadow-sm'
+                  : 'text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540]'
+              }`}
+            >
+              {type === 'interessado' ? 'Interessados' : 'Clientes'}
+            </button>
+          ))}
+        </div>
+      )}
 
       <Card data-tour="contacts-filters" className="border-slate-200 shadow-sm">
         <div className="p-4 flex flex-col sm:flex-row gap-4">
@@ -345,7 +356,7 @@ export default function ContactsPage() {
                             </Button>
                           );
                         })()}
-                        {contactTypeTab === 'interessado' && (
+                        {!isComercioWorkspace && contactTypeTab === 'interessado' && (
                           <Button
                             variant="outline"
                             size="sm"

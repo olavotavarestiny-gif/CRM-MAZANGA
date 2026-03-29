@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { createContact, updateContact, getContactFieldDefs, getContactFieldConfigs, getPipelineStages } from '@/lib/api';
+import { createContact, updateContact, getContactFieldDefs, getContactFieldConfigs, getPipelineStages, getCurrentUser } from '@/lib/api';
 import { Contact, ContactFieldDef, ContactFieldConfig, ContactFieldType } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -167,15 +167,25 @@ export default function ContactForm({
     queryFn: getContactFieldDefs,
   });
 
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+    staleTime: 30_000,
+  });
+
   const { data: systemConfigs = [] } = useQuery({
     queryKey: ['contactFieldConfigs'],
     queryFn: getContactFieldConfigs,
     staleTime: 0,
   });
 
+  const isComercioWorkspace = currentUser?.workspaceMode === 'comercio';
+  const showStageField = isEditMode || !isComercioWorkspace;
+
   const { data: pipelineStages = [] } = useQuery({
     queryKey: ['pipeline-stages'],
     queryFn: getPipelineStages,
+    enabled: showStageField,
   });
 
   const nameConfig = systemConfigs.find(c => c.fieldKey === 'name');
@@ -206,7 +216,6 @@ export default function ContactForm({
 
       const payload = {
         name,
-        stage,
         clienteType: tipoCliente,
         email: (values.email as string) || '',
         phone: (values.phone as string) || '',
@@ -216,6 +225,10 @@ export default function ContactForm({
         tags: Array.isArray(values.tags) ? values.tags : [],
         customFields,
       };
+
+      if (showStageField) {
+        (payload as any).stage = stage;
+      }
 
       return isEditMode
         ? updateContact(String(contactId), payload as any)
@@ -336,20 +349,25 @@ export default function ContactForm({
           </div>
         ))}
 
-      {/* Stage — always shown */}
-      <div>
-        <Label>Etapa *</Label>
-        <Select value={stage} onValueChange={(v) => setStage(v)}>
-          <SelectTrigger className="mt-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {pipelineStages.map((s) => (
-              <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {showStageField ? (
+        <div>
+          <Label>Etapa *</Label>
+          <Select value={stage} onValueChange={(v) => setStage(v)}>
+            <SelectTrigger className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {pipelineStages.map((s) => (
+                <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          No modo Comércio, cada contacto é criado automaticamente como cliente e fica fora de Processos. Usa Processos apenas quando a compra precisar de acompanhamento e negociação.
+        </div>
+      )}
 
       {/* Custom fields */}
       {customFieldDefs.length > 0 && (

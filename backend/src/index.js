@@ -25,11 +25,14 @@ const faturacaoClientesRouter = require('./routes/faturacao-clientes');
 const faturacaoProdutosRouter = require('./routes/faturacao-produtos');
 const faturacaoFacturasRouter = require('./routes/faturacao-facturas');
 const faturacaoSaftRouter = require('./routes/faturacao-saft');
+const faturacaoRelatoriosRouter = require('./routes/faturacao-relatorios');
 const faturacaoRecorrentesRouter = require('./routes/faturacao-recorrentes');
 const chatRouter = require('./routes/chat');
 const notesRouter = require('./routes/notes');
+const quickSalesRouter = require('./routes/quick-sales');
+const caixaSessoesRouter = require('./routes/caixa-sessoes');
 const requireAuth = require('./middleware/auth');
-const { requireAdmin, requireAccountOwnerOrAdmin, requireSuperAdmin } = require('./middleware/auth');
+const { requireSuperAdmin } = require('./middleware/auth');
 const { requirePlanFeature } = require('./lib/plan-limits');
 
 const app = express();
@@ -101,8 +104,8 @@ app.use('/api/whatsapp', requireAuth, whatsappRouter);
 app.use('/api/tasks', requireAuth, tasksRouter);
 app.use('/api/inbox', requireAuth, inboxRouter);
 
-// Admin-only routes (require authentication + admin role)
-app.use('/api/admin', requireAuth, requireAdmin, adminRouter);
+// Platform admin routes
+app.use('/api/admin', requireAuth, requireSuperAdmin, adminRouter);
 
 // SuperAdmin-only routes
 app.use('/api/superadmin', requireAuth, requireSuperAdmin, superadminRouter);
@@ -119,8 +122,11 @@ app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoCl
 app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoProdutosRouter);
 app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoFacturasRouter);
 app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoSaftRouter);
+app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoRelatoriosRouter);
 app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoRecorrentesRouter);
 app.use('/api/chat', requireAuth, requirePlanFeature('conversas'), chatRouter);
+app.use('/api/quick-sales', requireAuth, requirePlanFeature('vendas'), quickSalesRouter);
+app.use('/api/caixa', requireAuth, requirePlanFeature('vendas'), caixaSessoesRouter);
 app.use('/api', requireAuth, notesRouter);
 
 // Scheduler: process recurring invoices daily at 00:05

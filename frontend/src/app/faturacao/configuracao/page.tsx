@@ -1,2 +1,2 @@
 import { redirect } from 'next/navigation';
-export default function Page() { redirect('/configuracoes'); }
+export default function Page() { redirect('/configuracoes?tab=empresa&section=faturacao'); }

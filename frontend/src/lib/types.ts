@@ -274,7 +274,7 @@ export interface Factura {
   exchangeRate?: number;
   paymentMethod?: string;
   serie?: { seriesCode: string; seriesYear: number; documentType: string };
-  estabelecimento?: { id: string; nome: string; nif: string };
+  estabelecimento?: { id: string; nome: string; nif?: string };
 }
 
 export interface Serie {
@@ -292,11 +292,18 @@ export interface Serie {
 export interface Estabelecimento {
   id: string;
   nome: string;
-  nif: string;
+  nif?: string;
+  defaultSerieId?: string | null;
   morada?: string;
   telefone?: string;
   email?: string;
   isPrincipal: boolean;
+  defaultSerie?: {
+    id: string;
+    seriesCode: string;
+    seriesYear: number;
+    documentType: string;
+  } | null;
 }
 
 export interface ClienteFaturacao {
@@ -314,11 +321,99 @@ export interface Produto {
   id: string;
   productCode: string;
   productDescription: string;
-  unitPrice: number;
+  unitPrice: number;       // preço de venda
+  cost?: number | null;    // preço de custo (opcional)
+  margin?: number | null;  // margem % — calculada pelo servidor
+  productType: string;     // S=serviço, P=produto, O=outro
+  sku?: string | null;
+  barcode?: string | null; // código de barras EAN/QR
   unitOfMeasure: string;
   taxPercentage: number;
   taxCode: string;
   active: boolean;
+  stock?: number | null;   // stock atual (null = sem controlo de stock)
+}
+
+export interface CaixaSessao {
+  id: string;
+  userId: number;
+  estabelecimentoId: string;
+  openedByUserId: number;
+  closedByUserId?: number | null;
+  openedAt: string;
+  closedAt?: string | null;
+  openingBalance: number;
+  closingCountedAmount?: number | null;
+  expectedClosingAmount?: number | null;
+  differenceAmount?: number | null;
+  totalSalesAmount: number;
+  salesCount: number;
+  status: 'open' | 'closed';
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  estabelecimento?: { id: string; nome: string; nif: string };
+  openedBy?: { id: number; name: string };
+  closedBy?: { id: number; name: string } | null;
+}
+
+export interface StockMovement {
+  id: string;
+  productId: string;
+  userId: number;
+  type: 'entry' | 'exit' | 'adjustment';
+  quantity: number;
+  previousStock: number;
+  newStock: number;
+  reason?: string | null;
+  notes?: string | null;
+  createdByUserId: number;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  createdAt: string;
+}
+
+export interface IvaRateBreakdown {
+  base: number;
+  iva: number;
+  count: number;
+}
+
+export interface IvaReport {
+  periodo: string;
+  totalBase: number;
+  totalIva: number;
+  totalGross: number;
+  byRate: {
+    rate0:  IvaRateBreakdown;
+    rate5:  IvaRateBreakdown;
+    rate14: IvaRateBreakdown;
+  };
+  facturas: {
+    documentNo: string;
+    documentDate: string;
+    documentType: string;
+    customerName: string;
+    customerTaxID: string;
+    netTotal: number;
+    taxPayable: number;
+    grossTotal: number;
+  }[];
+}
+
+export interface VendasMonthly {
+  month: number;
+  label: string;
+  count: number;
+  netTotal: number;
+  taxPayable: number;
+  grossTotal: number;
+}
+
+export interface VendasReport {
+  year: number;
+  months: VendasMonthly[];
+  totals: { count: number; netTotal: number; taxPayable: number; grossTotal: number };
 }
 
 export interface FaturacaoDashboard {

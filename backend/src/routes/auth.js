@@ -30,6 +30,7 @@ const CURRENT_USER_BASE_SELECT = {
   permissions: true,
   mustChangePassword: true,
   accountOwnerId: true,
+  workspaceMode: true,
   createdAt: true,
   isSuperAdmin: true,
 };
@@ -70,15 +71,17 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
 
   let effectivePermissions = parsePermissions(user.permissions);
   let effectivePlan = normalizePlan(user.plan);
+  let effectiveWorkspaceMode = user.workspaceMode ?? 'servicos';
   let accountOwnerName = null;
 
   if (user.accountOwnerId) {
     const owner = await prisma.user.findUnique({
       where: { id: user.accountOwnerId },
-      select: { plan: true, permissions: true, name: true },
+      select: { plan: true, permissions: true, name: true, workspaceMode: true },
     });
     if (owner) {
       effectivePlan = normalizePlan(owner.plan);
+      effectiveWorkspaceMode = owner.workspaceMode ?? 'servicos';
       accountOwnerName = owner.name;
       const orgPerms = parsePermissions(owner.permissions);
       effectivePermissions = intersectPermissions(orgPerms, effectivePermissions);
@@ -90,6 +93,7 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
   return {
     ...user,
     plan: effectivePlan,
+    workspaceMode: effectiveWorkspaceMode,
     planDetails: {
       label: currentPlanCatalog.label,
       description: currentPlanCatalog.description,

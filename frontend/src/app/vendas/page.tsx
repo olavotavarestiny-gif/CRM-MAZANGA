@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ShoppingBag } from 'lucide-react';
 import { TabFacturas } from '@/components/finances/tab-facturas';
 import { TabSaft } from '@/components/finances/tab-saft';
+import { TabRelatorios } from '@/components/finances/tab-relatorios';
 import { RecorrentesTab } from '@/components/faturacao/recorrentes-tab';
 import ProdutosPage from '@/app/produtos/page';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ const TABS = [
   { id: 'faturas',      label: 'Faturas' },
   { id: 'produtos',     label: 'Produtos' },
   { id: 'recorrentes',  label: 'Recorrentes' },
+  { id: 'relatorios',   label: 'Relatórios' },
   { id: 'saft',         label: 'SAF-T (AGT)' },
 ] as const;
 
@@ -62,6 +64,7 @@ export default function VendasPage() {
       {/* Tab content */}
       {activeTab === 'faturas'     && <TabFacturas />}
       {activeTab === 'recorrentes' && <RecorrentesTab />}
+      {activeTab === 'relatorios'  && <TabRelatorios />}
       {activeTab === 'saft'        && <TabSaft />}
       {activeTab === 'produtos'    && (
         <div className="-mt-2">

@@ -41,7 +41,7 @@ router.post('/recorrentes', async (req, res) => {
       frequency, startDate, maxOccurrences, notes,
     } = req.body;
 
-    if (!serieId || !estabelecimentoId || !customerTaxID || !customerName || !lines || !frequency || !startDate) {
+    if (!estabelecimentoId || !customerTaxID || !customerName || !lines || !frequency || !startDate) {
       return res.status(400).json({ error: 'Campos obrigatórios em falta' });
     }
 
@@ -50,19 +50,29 @@ router.post('/recorrentes', async (req, res) => {
       return res.status(400).json({ error: 'Frequência inválida' });
     }
 
-    // Verify ownership of serie and estabelecimento
-    const [serie, estab] = await Promise.all([
-      prisma.serie.findFirst({ where: { id: serieId, userId } }),
-      prisma.estabelecimento.findFirst({ where: { id: estabelecimentoId, userId } }),
-    ]);
+    const estab = await prisma.estabelecimento.findFirst({
+      where: { id: estabelecimentoId, userId },
+      select: { id: true, nome: true, defaultSerieId: true },
+    });
+    if (!estab) return res.status(400).json({ error: 'Ponto de venda não encontrado' });
+
+    const resolvedSerieId = serieId || estab.defaultSerieId || null;
+    if (!resolvedSerieId) {
+      return res.status(400).json({
+        error: `O ponto de venda ${estab.nome} ainda não tem série padrão.`,
+      });
+    }
+
+    const serie = await prisma.serie.findFirst({
+      where: { id: resolvedSerieId, userId },
+    });
     if (!serie) return res.status(400).json({ error: 'Série não encontrada' });
-    if (!estab) return res.status(400).json({ error: 'Estabelecimento não encontrado' });
 
     const startDateObj = new Date(startDate);
 
     const rec = await prisma.facturaRecorrente.create({
       data: {
-        userId, serieId, estabelecimentoId,
+        userId, serieId: resolvedSerieId, estabelecimentoId,
         clienteFaturacaoId: clienteFaturacaoId || null,
         customerTaxID, customerName, customerAddress: customerAddress || null,
         documentType,

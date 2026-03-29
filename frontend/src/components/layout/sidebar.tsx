@@ -1,13 +1,16 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3, Users, MessageSquare, Zap, Kanban,
   CheckSquare, FileText, LogOut, X, DollarSign, CalendarDays,
-  Package, Settings, HelpCircle, ShieldAlert, ShoppingBag,
+  Package, Settings, HelpCircle, ShieldAlert, ShoppingBag, ShoppingCart,
+  ChevronDown,
 } from 'lucide-react';
+import { isComercio } from '@/lib/business-modes';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
 import { getChatUnreadCount } from '@/lib/api';
@@ -35,6 +38,7 @@ export default function Sidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [gestaoInternaOpen, setGestaoInternaOpen] = useState(true);
 
   const isActive = (path: string) => {
     if (path === '/') return pathname === '/' || pathname.startsWith('/dashboard');
@@ -46,7 +50,7 @@ export default function Sidebar({
     window.location.href = '/auth/signout';
   };
 
-  const hasAdminAccess = !!(currentUser?.isSuperAdmin || currentUser?.role === 'admin');
+  const hasPlatformAdminAccess = !!currentUser?.isSuperAdmin;
 
   const { data: chatUnread = 0 } = useQuery({
     queryKey: ['chat-unread'],
@@ -62,18 +66,22 @@ export default function Sidebar({
       : 'text-[#6b7e9a] hover:text-[#0049e6] hover:bg-blue-50/60'
   );
 
+  const comercio = isComercio(currentUser?.workspaceMode);
+
   // Map href to module key for permission checks
   const hrefToModule: Record<string, ModuleKey | null> = {
-    '/':           null, // always visible
-    '/contacts':   'contacts',
-    '/pipeline':   'pipeline',
-    '/tasks':      'tasks',
-    '/vendas':     'vendas',
-    '/calendario': 'calendario',
-    '/chat':       'chat',
-    '/automations':'automations',
-    '/forms':      'forms',
-    '/finances':   'finances',
+    '/':                null, // always visible
+    '/vendas-rapidas':  'vendas',
+    '/contacts':        'contacts',
+    '/pipeline':        'pipeline',
+    '/tasks':           'tasks',
+    '/vendas':          'vendas',
+    '/produtos':        'vendas',
+    '/calendario':      'calendario',
+    '/chat':            'chat',
+    '/automations':     'automations',
+    '/forms':           'forms',
+    '/finances':        'finances',
   };
 
   const isVisible = (href: string) => {
@@ -84,6 +92,7 @@ export default function Sidebar({
     return canView(currentUser, module);
   };
 
+  // SERVICOS: standard CRM nav
   const allMainLinks = [
     { href: '/', label: 'Painel', icon: BarChart3 },
     { href: '/contacts', label: 'Clientes', icon: Users, module: 'contacts' as const },
@@ -96,6 +105,26 @@ export default function Sidebar({
     { href: '/forms', label: 'Formulários', icon: FileText, module: 'forms' as const },
   ];
 
+  // COMERCIO: grupo "Uso diário" — itens prioritários de operação diária
+  const comercioUsoDiarioLinks = comercio ? [
+    { href: '/', label: 'Painel', icon: BarChart3 },
+    { href: '/vendas-rapidas', label: 'Venda Rápida', icon: ShoppingCart, module: 'vendas' as const },
+    { href: '/contacts', label: 'Clientes', icon: Users, module: 'contacts' as const },
+    { href: '/tasks', label: 'Tarefas', icon: CheckSquare, module: 'tasks' as const },
+    { href: '/produtos', label: 'Produtos', icon: Package, module: 'vendas' as const },
+  ].filter(l => isVisible(l.href)) : [];
+
+  // COMERCIO: grupo "Gestão interna" — ferramentas de gestão e back-office
+  const comercioGestaoInternaLinks = comercio ? [
+    { href: '/pipeline', label: 'Processos', icon: Kanban, module: 'pipeline' as const },
+    { href: '/chat', label: 'Conversas', icon: MessageSquare, module: 'chat' as const },
+    { href: '/calendario', label: 'Calendário', icon: CalendarDays, module: 'calendario' as const },
+    { href: '/finances', label: 'Finanças', icon: DollarSign },
+    { href: '/forms', label: 'Formulários', icon: FileText, module: 'forms' as const },
+    { href: '/automations', label: 'Automações', icon: Zap, module: 'automations' as const },
+    { href: '/vendas', label: 'Faturação', icon: ShoppingBag, module: 'vendas' as const },
+  ].filter(l => isVisible(l.href)) : [];
+
   const allGestaoLinks = [
     { href: '/finances', label: 'Finanças', icon: DollarSign },
   ];
@@ -103,7 +132,7 @@ export default function Sidebar({
   const mainLinks = allMainLinks.filter((link) => isVisible(link.href));
   const gestaoLinks = allGestaoLinks.filter(l => isVisible(l.href));
 
-  const adminLinks: { href: string; label: string; icon: React.ElementType }[] = hasAdminAccess
+  const adminLinks: { href: string; label: string; icon: React.ElementType }[] = hasPlatformAdminAccess
     ? [{ href: '/superadmin?section=users', label: 'Administração', icon: ShieldAlert }]
     : [];
 
@@ -131,50 +160,130 @@ export default function Sidebar({
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
-        {mainLinks.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            data-tour={TOUR_ATTR[href]}
-            className={navItemClass(isActive(href))}
-            onClick={onClose}
-          >
-            <Icon className="w-[18px] h-[18px] flex-shrink-0" />
-            <span className="flex-1">{label}</span>
-            {href === '/chat' && chatUnread > 0 && (
-              <span className="ml-auto bg-[#b31b25] text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">
-                {chatUnread > 99 ? '99+' : chatUnread}
-              </span>
+        {comercio ? (
+          <>
+            {/* COMERCIO: Grupo "Uso diário" */}
+            <div>
+              <p className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/60">
+                Uso diário
+              </p>
+              {comercioUsoDiarioLinks.map(({ href, label, icon: Icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  data-tour={TOUR_ATTR[href]}
+                  className={navItemClass(isActive(href))}
+                  onClick={onClose}
+                >
+                  <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+                  <span className="flex-1">{label}</span>
+                  {href === '/chat' && chatUnread > 0 && (
+                    <span className="ml-auto bg-[#b31b25] text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">
+                      {chatUnread > 99 ? '99+' : chatUnread}
+                    </span>
+                  )}
+                </Link>
+              ))}
+            </div>
+
+            {/* COMERCIO: Grupo "Gestão interna" (colapsável) */}
+            {comercioGestaoInternaLinks.length > 0 && (
+              <div className="pt-3 mt-2 border-t border-slate-100">
+                <button
+                  onClick={() => setGestaoInternaOpen(o => !o)}
+                  className="w-full flex items-center justify-between px-3 pt-1 pb-2"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/60">
+                    Gestão interna
+                  </p>
+                  <ChevronDown className={cn(
+                    'w-3.5 h-3.5 text-[#6b7e9a]/60 transition-transform duration-200',
+                    gestaoInternaOpen ? 'rotate-0' : '-rotate-90'
+                  )} />
+                </button>
+                {gestaoInternaOpen && comercioGestaoInternaLinks.map(({ href, label, icon: Icon }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={navItemClass(isActive(href))}
+                    onClick={onClose}
+                  >
+                    <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+                    <span className="flex-1">{label}</span>
+                    {href === '/chat' && chatUnread > 0 && (
+                      <span className="ml-auto bg-[#b31b25] text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">
+                        {chatUnread > 99 ? '99+' : chatUnread}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </div>
             )}
-          </Link>
-        ))}
 
-        {gestaoLinks.length > 0 && (
-          <div className="pt-3 mt-2 border-t border-slate-100">
-            <p className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/60">
-              Gestão
-            </p>
-            {gestaoLinks.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose}>
+            {/* Admin section */}
+            {adminLinks.length > 0 && (
+              <div className="pt-3 mt-2 border-t border-slate-100">
+                <p className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/60">
+                  Admin
+                </p>
+                {adminLinks.map(({ href, label, icon: Icon }) => (
+                  <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose}>
+                    <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+                    <span>{label}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {/* SERVICOS: nav padrão inalterado */}
+            {mainLinks.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                data-tour={TOUR_ATTR[href]}
+                className={navItemClass(isActive(href))}
+                onClick={onClose}
+              >
                 <Icon className="w-[18px] h-[18px] flex-shrink-0" />
-                <span>{label}</span>
+                <span className="flex-1">{label}</span>
+                {href === '/chat' && chatUnread > 0 && (
+                  <span className="ml-auto bg-[#b31b25] text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">
+                    {chatUnread > 99 ? '99+' : chatUnread}
+                  </span>
+                )}
               </Link>
             ))}
-          </div>
-        )}
 
-        {adminLinks.length > 0 && (
-          <div className="pt-3 mt-2 border-t border-slate-100">
-            <p className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/60">
-              Admin
-            </p>
-            {adminLinks.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose}>
-                <Icon className="w-[18px] h-[18px] flex-shrink-0" />
-                <span>{label}</span>
-              </Link>
-            ))}
-          </div>
+            {gestaoLinks.length > 0 && (
+              <div className="pt-3 mt-2 border-t border-slate-100">
+                <p className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/60">
+                  Gestão
+                </p>
+                {gestaoLinks.map(({ href, label, icon: Icon }) => (
+                  <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose}>
+                    <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+                    <span>{label}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {adminLinks.length > 0 && (
+              <div className="pt-3 mt-2 border-t border-slate-100">
+                <p className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/60">
+                  Admin
+                </p>
+                {adminLinks.map(({ href, label, icon: Icon }) => (
+                  <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose}>
+                    <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+                    <span>{label}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </nav>
 

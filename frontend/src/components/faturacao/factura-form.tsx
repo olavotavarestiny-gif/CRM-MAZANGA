@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Plus, Trash2 } from 'lucide-react';
@@ -224,6 +224,7 @@ export function FacturaForm() {
   const [dialogSaving, setDialogSaving] = useState(false);
   const [seriesModalOpen, setSeriesModalOpen] = useState(false);
   const [seriesError, setSeriesError] = useState('');
+  const [showSeriesOverride, setShowSeriesOverride] = useState(false);
   const [seriesForm, setSeriesForm] = useState({
     estabelecimentoId: '',
     seriesCode: '',
@@ -243,6 +244,7 @@ export function FacturaForm() {
 
   const series = seriesQuery.data || [];
   const estabs = estabsQuery.data || [];
+  const selectedEstabelecimento = estabs.find((estabelecimento) => estabelecimento.id === estabelecimentoId);
 
   const searchCustomers = useMemo(
     () => async (query: string): Promise<SearchGroup<CustomerLookupItem>[]> => {
@@ -338,11 +340,8 @@ export function FacturaForm() {
       customerName = customerFields.name.trim();
       customerAddress = customerFields.address.trim();
 
-      if (!serieId) {
-        throw new Error('Selecione uma série');
-      }
       if (!estabelecimentoId) {
-        throw new Error('Selecione um estabelecimento');
+        throw new Error('Selecione um ponto de venda');
       }
       if (lines.some((line) => !line.productDescription.trim())) {
         throw new Error('Preencha todos os produtos ou serviços');
@@ -352,7 +351,7 @@ export function FacturaForm() {
 
       return createFactura({
         documentType,
-        serieId,
+        serieId: serieId || undefined,
         estabelecimentoId,
         customerTaxID,
         customerName,
@@ -443,8 +442,58 @@ export function FacturaForm() {
   const grossTotal = netTotal + taxPayable;
 
   const activeSeries = series.filter(
-    (serie) => serie.seriesStatus !== 'F' && serie.documentType === documentType
+    (serie) =>
+      serie.seriesStatus !== 'F' &&
+      serie.documentType === documentType &&
+      (!estabelecimentoId || serie.estabelecimento?.id === estabelecimentoId)
   );
+  const selectedSerie = activeSeries.find((serie) => serie.id === serieId) || series.find((serie) => serie.id === serieId) || null;
+
+  useEffect(() => {
+    if (!estabelecimentoId) {
+      if (serieId) {
+        setSerieId('');
+      }
+      return;
+    }
+
+    const defaultSerieForEstabelecimento = selectedEstabelecimento?.defaultSerieId
+      ? series.find(
+          (serie) =>
+            serie.id === selectedEstabelecimento.defaultSerieId &&
+            serie.documentType === documentType &&
+            serie.seriesStatus !== 'F'
+        )
+      : null;
+
+    if (defaultSerieForEstabelecimento && serieId !== defaultSerieForEstabelecimento.id) {
+      setSerieId(defaultSerieForEstabelecimento.id);
+      return;
+    }
+
+    if (serieId) {
+      const serieStillValid = activeSeries.some((serie) => serie.id === serieId);
+      if (!serieStillValid) {
+        setSerieId(activeSeries[0]?.id || '');
+      }
+      return;
+    }
+
+    if (activeSeries.length > 0) {
+      setSerieId(activeSeries[0].id);
+    }
+  }, [activeSeries, documentType, estabelecimentoId, selectedEstabelecimento?.defaultSerieId, serieId, series]);
+
+  useEffect(() => {
+    if (!showSeriesOverride) {
+      return;
+    }
+
+    const currentSeriesStillValid = activeSeries.some((serie) => serie.id === serieId);
+    if (!currentSeriesStillValid && selectedEstabelecimento?.defaultSerieId) {
+      setShowSeriesOverride(false);
+    }
+  }, [activeSeries, selectedEstabelecimento?.defaultSerieId, serieId, showSeriesOverride]);
 
   const addLine = () => {
     setLines((prev) => [
@@ -684,52 +733,89 @@ export function FacturaForm() {
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between gap-3">
-                    <Label className="text-xs text-gray-600">Série</Label>
-                    <button
-                      type="button"
-                      onClick={handleOpenSeriesModal}
-                      className="text-xs font-medium text-[#0A2540] underline underline-offset-4"
-                    >
-                      Criar série
-                    </button>
-                  </div>
-                  <Select value={serieId} onValueChange={setSerieId}>
+                  <Label className="text-xs text-gray-600">Ponto de Venda</Label>
+                  <Select value={estabelecimentoId} onValueChange={setEstabelecimentoId}>
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Selecionar série..." />
+                      <SelectValue placeholder="Selecionar ponto de venda..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {activeSeries.length === 0 && (
-                        <SelectItem value="none" disabled>
-                          Sem séries ativas para este tipo
-                        </SelectItem>
-                      )}
-                      {activeSeries.map((serie) => (
-                        <SelectItem key={serie.id} value={serie.id}>
-                          {serie.seriesCode} / {serie.seriesYear} · #{(serie.lastDocumentNumber ?? 0) + 1}
+                      {estabs.map((estabelecimento) => (
+                        <SelectItem key={estabelecimento.id} value={estabelecimento.id}>
+                          {estabelecimento.nome}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <p className="mt-1 text-xs text-slate-400">
-                    Se a série ainda não existir, podes criá-la sem sair desta fatura.
+                    Cada ponto de venda pode ter a sua própria série padrão.
                   </p>
                 </div>
 
                 <div>
-                  <Label className="text-xs text-gray-600">Estabelecimento</Label>
-                  <Select value={estabelecimentoId} onValueChange={setEstabelecimentoId}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Selecionar estabelecimento..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {estabs.map((estabelecimento) => (
-                        <SelectItem key={estabelecimento.id} value={estabelecimento.id}>
-                          {estabelecimento.nome} — {estabelecimento.nif}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="text-xs text-gray-600">Série</Label>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setShowSeriesOverride((current) => !current)}
+                        disabled={!estabelecimentoId || activeSeries.length === 0}
+                      >
+                        {showSeriesOverride ? 'Usar automática' : 'Alterar manualmente'}
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={handleOpenSeriesModal}
+                        className="text-xs font-medium text-[#0A2540] underline underline-offset-4"
+                      >
+                        Criar série
+                      </button>
+                    </div>
+                  </div>
+
+                  {showSeriesOverride ? (
+                    <>
+                      <Select value={serieId} onValueChange={setSerieId}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Selecionar série..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {activeSeries.length === 0 && (
+                            <SelectItem value="none" disabled>
+                              Sem séries ativas para este tipo
+                            </SelectItem>
+                          )}
+                          {activeSeries.map((serie) => (
+                            <SelectItem key={serie.id} value={serie.id}>
+                              {serie.seriesCode} / {serie.seriesYear} · #{(serie.lastDocumentNumber ?? 0) + 1}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Só precisas escolher manualmente a série quando quiseres sair da configuração padrão do ponto de venda.
+                      </p>
+                    </>
+                  ) : (
+                    <div className="mt-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                      <p className="text-sm font-semibold text-[#0A2540]">
+                        {selectedSerie
+                          ? `${selectedSerie.seriesCode} / ${selectedSerie.seriesYear}`
+                          : estabelecimentoId
+                          ? 'Sem série padrão disponível'
+                          : 'Seleciona primeiro o ponto de venda'}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {selectedSerie
+                          ? 'Esta série foi escolhida automaticamente a partir do ponto de venda selecionado.'
+                          : estabelecimentoId
+                          ? 'Este ponto de venda ainda não tem uma série padrão ativa para este tipo de documento.'
+                          : 'A série aparece automaticamente depois de escolheres o ponto de venda.'}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1273,7 +1359,7 @@ export function FacturaForm() {
             )}
 
             <div>
-              <Label className="text-xs text-gray-600">Estabelecimento *</Label>
+              <Label className="text-xs text-gray-600">Ponto de Venda *</Label>
               <Select
                 value={seriesForm.estabelecimentoId}
                 onValueChange={(value) =>
@@ -1286,7 +1372,7 @@ export function FacturaForm() {
                 <SelectContent>
                   {estabs.map((estabelecimento) => (
                     <SelectItem key={estabelecimento.id} value={estabelecimento.id}>
-                      {estabelecimento.nome} — {estabelecimento.nif}
+                      {estabelecimento.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -91,7 +91,6 @@ export default function SuperAdminPage() {
   });
 
   const isSuperAdmin = !!currentUser?.isSuperAdmin;
-  const hasAdminAccess = !!(isSuperAdmin || currentUser?.role === 'admin');
 
   const requestedSection = searchParams?.get('section');
   const allowedSections = useMemo(
@@ -110,14 +109,14 @@ export default function SuperAdminPage() {
 
   useEffect(() => {
     if (userLoading) return;
-    if (!hasAdminAccess) {
+    if (!isSuperAdmin) {
       router.replace('/');
       return;
     }
     if (requestedSection !== currentSection) {
       router.replace(`${pathname}?section=${currentSection}`);
     }
-  }, [currentSection, hasAdminAccess, pathname, requestedSection, router, userLoading]);
+  }, [currentSection, isSuperAdmin, pathname, requestedSection, router, userLoading]);
 
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -143,19 +142,19 @@ export default function SuperAdminPage() {
   const { data: users = [], isLoading: usersLoading, isError: usersError, refetch: refetchUsers } = useQuery({
     queryKey: ['admin-users'],
     queryFn: getUsers,
-    enabled: hasAdminAccess && currentSection === 'users',
+    enabled: isSuperAdmin && currentSection === 'users',
   });
 
   const { data: accounts = [], isLoading: accountsLoading, isError: accountsError, refetch: refetchAccounts } = useQuery({
     queryKey: ['admin-accounts'],
     queryFn: getClientAccounts,
-    enabled: hasAdminAccess && currentSection === 'accounts',
+    enabled: isSuperAdmin && currentSection === 'accounts',
   });
 
   const { data: loginLogs = [], isLoading: loginLogsLoading, isError: loginLogsError, refetch: refetchLoginLogs } = useQuery({
     queryKey: ['admin-logins'],
     queryFn: getLoginLogs,
-    enabled: hasAdminAccess && currentSection === 'logins',
+    enabled: isSuperAdmin && currentSection === 'logins',
   });
 
   const { data: orgs = [], isLoading: orgsLoading, isError: orgsError, refetch: refetchOrgs } = useQuery({
@@ -386,14 +385,13 @@ export default function SuperAdminPage() {
     );
   }
 
-  if (!hasAdminAccess) {
+  if (!isSuperAdmin) {
     return null;
   }
 
-  const sectionTitle = isSuperAdmin ? 'Administração da Plataforma' : 'Administração';
-  const sectionDescription = isSuperAdmin
-    ? 'Superfície canónica para utilizadores, contas, organizações, utilização e impersonation.'
-    : 'Superfície canónica para utilizadores, contas e histórico de logins.';
+  const sectionTitle = 'Administração da Plataforma';
+  const sectionDescription =
+    'Superfície canónica para utilizadores, contas, organizações, utilização e impersonation.';
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">

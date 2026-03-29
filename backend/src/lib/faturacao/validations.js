@@ -6,7 +6,7 @@ function validateFactura(data) {
 
   if (!data.documentType) errors.push('Tipo de documento obrigatório');
   if (!data.serieId) errors.push('Série obrigatória');
-  if (!data.estabelecimentoId) errors.push('Estabelecimento obrigatório');
+  if (!data.estabelecimentoId) errors.push('Ponto de venda obrigatório');
   if (!data.customerTaxID?.trim()) errors.push('NIF do cliente obrigatório');
   if (!data.customerName?.trim()) errors.push('Nome do cliente obrigatório');
   if (!data.lines || !Array.isArray(data.lines) || data.lines.length === 0) {

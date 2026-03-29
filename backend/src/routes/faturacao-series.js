@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { generateUniqueSeriesCode } = require('../lib/faturacao/series-code');
 
 // GET /api/faturacao/series
 router.get('/series', async (req, res) => {
@@ -78,6 +79,25 @@ router.get('/estabelecimentos', async (req, res) => {
   try {
     const estabs = await prisma.estabelecimento.findMany({
       where: { userId: req.user.effectiveUserId },
+      select: {
+        id: true,
+        nome: true,
+        nif: true,
+        defaultSerieId: true,
+        morada: true,
+        telefone: true,
+        email: true,
+        isPrincipal: true,
+        createdAt: true,
+        defaultSerie: {
+          select: {
+            id: true,
+            seriesCode: true,
+            seriesYear: true,
+            documentType: true,
+          },
+        },
+      },
       orderBy: { isPrincipal: 'desc' },
     });
     res.json(estabs);
@@ -90,11 +110,109 @@ router.get('/estabelecimentos', async (req, res) => {
 router.post('/estabelecimentos', async (req, res) => {
   try {
     const { nome, nif, morada, telefone, email, isPrincipal } = req.body;
-    if (!nome || !nif) return res.status(400).json({ error: 'Nome e NIF obrigatórios' });
-    const estab = await prisma.estabelecimento.create({
-      data: { userId: req.user.effectiveUserId, nome, nif, morada, telefone, email, isPrincipal: isPrincipal ?? false },
+    if (!nome) return res.status(400).json({ error: 'Nome obrigatório' });
+
+    const ownerAccount = await prisma.user.findUnique({
+      where: { id: req.user.effectiveUserId },
+      select: { workspaceMode: true },
     });
-    res.status(201).json(estab);
+    const workspaceMode = ownerAccount?.workspaceMode === 'comercio' ? 'comercio' : 'servicos';
+
+    let resolvedNif = (nif || '').trim();
+    if (workspaceMode === 'comercio') {
+      const config = await prisma.configuracaoFaturacao.findUnique({
+        where: { userId: req.user.effectiveUserId },
+        select: { nifEmpresa: true },
+      });
+      resolvedNif = config?.nifEmpresa?.trim() || '';
+      if (!resolvedNif) {
+        return res.status(400).json({ error: 'Configure primeiro o NIF da empresa na Configuração Fiscal.' });
+      }
+    } else if (!resolvedNif) {
+      return res.status(400).json({ error: 'Nome e NIF obrigatórios' });
+    }
+
+    const userId = req.user.effectiveUserId;
+    const now = new Date();
+    const seriesYear = now.getFullYear();
+
+    const { estab, defaultSerie } = await prisma.$transaction(async (tx) => {
+      const createdEstab = await tx.estabelecimento.create({
+        data: {
+          userId,
+          nome,
+          nif: resolvedNif,
+          morada,
+          telefone,
+          email,
+          isPrincipal: isPrincipal ?? false,
+        },
+      });
+
+      const seriesCode = await generateUniqueSeriesCode(tx, userId, {
+        nome,
+        morada,
+        documentType: 'FT',
+        year: seriesYear,
+      });
+
+      const createdSerie = await tx.serie.create({
+        data: {
+          userId,
+          estabelecimentoId: createdEstab.id,
+          seriesCode,
+          seriesYear,
+          documentType: 'FT',
+          firstDocumentNumber: 1,
+          seriesStatus: 'A',
+        },
+      });
+
+      const updatedEstab = await tx.estabelecimento.update({
+        where: { id: createdEstab.id },
+        data: { defaultSerieId: createdSerie.id },
+        select: {
+          id: true,
+          nome: true,
+          nif: true,
+          defaultSerieId: true,
+          morada: true,
+          telefone: true,
+          email: true,
+          isPrincipal: true,
+          createdAt: true,
+        },
+      });
+
+      const existingConfig = await tx.configuracaoFaturacao.findUnique({
+        where: { userId },
+        select: { id: true, defaultSerieId: true, defaultEstabelecimentoId: true },
+      });
+
+      const shouldPromoteToGlobalDefault =
+        (isPrincipal ?? false) ||
+        !existingConfig?.defaultSerieId ||
+        !existingConfig?.defaultEstabelecimentoId;
+
+      if (shouldPromoteToGlobalDefault) {
+        await tx.configuracaoFaturacao.upsert({
+          where: { userId },
+          create: {
+            userId,
+            defaultSerieId: createdSerie.id,
+            defaultEstabelecimentoId: createdEstab.id,
+          },
+          update: {
+            defaultSerieId: createdSerie.id,
+            defaultEstabelecimentoId: createdEstab.id,
+          },
+        });
+      }
+
+      return { estab: updatedEstab, defaultSerie: createdSerie };
+    });
+
+    res.status(201).json({ ...estab, defaultSerie });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

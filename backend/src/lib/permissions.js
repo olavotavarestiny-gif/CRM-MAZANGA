@@ -95,11 +95,11 @@ function canPerform(permissionsJson, module, action) {
 
 /**
  * Express middleware factory: requires a specific permission.
- * SuperAdmin, platform admins (role='admin'), and account owners always pass.
+ * SuperAdmin and account owners always pass.
  */
 function requirePermission(module, action) {
   return (req, res, next) => {
-    if (req.user.isSuperAdmin || req.user.isAccountOwner || req.user.role === 'admin') return next();
+    if (req.user.isSuperAdmin || req.user.isAccountOwner) return next();
     if (!canPerform(req.user.permissionsJson, module, action)) {
       return res.status(403).json({ error: 'Sem permissão para esta acção' });
     }
@@ -108,11 +108,11 @@ function requirePermission(module, action) {
 }
 
 /**
- * Express middleware: only account owners, platform admins, and superadmin can delete.
+ * Express middleware: only account owners and superadmin can delete.
  * Regular team members cannot delete anything.
  */
 function requireDeletePermission(req, res, next) {
-  if (req.user.isSuperAdmin || req.user.isAccountOwner || req.user.role === 'admin') return next();
+  if (req.user.isSuperAdmin || req.user.isAccountOwner) return next();
   return res.status(403).json({ error: 'Sem permissão para eliminar' });
 }
 

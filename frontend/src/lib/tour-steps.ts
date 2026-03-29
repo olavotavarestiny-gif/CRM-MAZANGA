@@ -119,7 +119,7 @@ export const TOUR_GROUPS: TourGroup[] = [
         element: '[data-tour="contacts-filters"]',
         popover: {
           title: 'Filtros',
-          description: 'Pesquisa por nome, telefone ou empresa. Filtra por fase do pipeline ou faturamento para segmentar os teus leads.',
+          description: 'Pesquisa por nome, telefone ou empresa. Usa Processos só quando a negociação precisar de acompanhamento mais próximo.',
           side: 'bottom',
           align: 'start',
         },

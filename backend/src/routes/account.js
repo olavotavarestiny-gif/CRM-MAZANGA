@@ -188,4 +188,20 @@ router.delete('/team/:memberId', requireAccountOwner, async (req, res) => {
   }
 });
 
+// PATCH /api/account/workspace-mode — Switch workspace mode (account owner only)
+router.patch('/workspace-mode', requireAccountOwner, async (req, res) => {
+  try {
+    const { workspaceMode } = req.body;
+    if (!['servicos', 'comercio'].includes(workspaceMode)) {
+      return res.status(400).json({ error: 'Modo inválido. Use "servicos" ou "comercio".' });
+    }
+    const userId = req.user.effectiveUserId;
+    await prisma.user.update({ where: { id: userId }, data: { workspaceMode } });
+    res.json({ ok: true, workspaceMode });
+  } catch (error) {
+    console.error('Error updating workspace mode:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

@@ -15,36 +15,39 @@ import { ReactNode } from 'react';
 import { Menu, Eye, Info, LogOut, X } from 'lucide-react';
 import type { User } from '@/lib/api';
 import { canView, getVisibleModules, hasFeature } from '@/lib/permissions';
+import { isComercio } from '@/lib/business-modes';
 
 const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
 
 // Map route prefix → module key (for permission redirect checks)
 const PATH_MODULE_MAP: Record<string, Parameters<typeof canView>[1]> = {
-  '/contacts':   'contacts',
-  '/pipeline':   'pipeline',
-  '/tasks':      'tasks',
-  '/vendas':     'vendas',
-  '/faturacao':  'vendas',
-  '/calendario': 'calendario',
-  '/chat':       'chat',
-  '/automations':'automations',
-  '/forms':      'forms',
-  '/finances':   'finances',
-  '/produtos':   'vendas',
+  '/contacts':        'contacts',
+  '/pipeline':        'pipeline',
+  '/tasks':           'tasks',
+  '/vendas':          'vendas',
+  '/vendas-rapidas':  'vendas',
+  '/faturacao':       'vendas',
+  '/calendario':      'calendario',
+  '/chat':            'chat',
+  '/automations':     'automations',
+  '/forms':           'forms',
+  '/finances':        'finances',
+  '/produtos':        'vendas',
 };
 
 const MODULE_LABELS: Record<string, string> = {
-  '/contacts': 'Clientes',
-  '/pipeline': 'Processos',
-  '/tasks': 'Tarefas',
-  '/vendas': 'Vendas',
-  '/faturacao': 'Vendas',
-  '/calendario': 'Calendário',
-  '/chat': 'Conversas',
-  '/automations': 'Automações',
-  '/forms': 'Formulários',
-  '/finances': 'Finanças',
-  '/produtos': 'Vendas',
+  '/contacts':       'Clientes',
+  '/pipeline':       'Processos',
+  '/tasks':          'Tarefas',
+  '/vendas':         'Vendas',
+  '/vendas-rapidas': 'Vendas',
+  '/faturacao':      'Vendas',
+  '/calendario':     'Calendário',
+  '/chat':           'Conversas',
+  '/automations':    'Automações',
+  '/forms':          'Formulários',
+  '/finances':       'Finanças',
+  '/produtos':       'Vendas',
 };
 
 const MODULE_TO_PLAN_FEATURE = {
@@ -176,13 +179,13 @@ function LayoutInner({ children }: { children: ReactNode }) {
     }
 
     const enforceAccess = (user: User) => {
-      // SuperAdmin can access /superadmin
-      if (pathname.startsWith('/superadmin') && !user.isSuperAdmin && user.role !== 'admin') {
+      // Only platform superadmins can access /superadmin
+      if (pathname.startsWith('/superadmin') && !user.isSuperAdmin) {
         router.push('/');
         return;
       }
-      // Platform admin routes
-      if (pathname.startsWith('/admin') && !user.isSuperAdmin && user.role !== 'admin') {
+      // Defensive guard for any platform admin route aliases
+      if (pathname.startsWith('/admin') && !user.isSuperAdmin) {
         router.push('/');
         return;
       }
@@ -233,6 +236,12 @@ function LayoutInner({ children }: { children: ReactNode }) {
         }
 
         enforceAccess(user);
+
+        // Redirect comercio users from dashboard root to vendas-rapidas
+        if (isComercio(user.workspaceMode) && pathname === '/') {
+          router.replace('/vendas-rapidas');
+          return;
+        }
 
         // Show welcome modal on first visit
         if (!localStorage.getItem('kukugest_guide_seen')) setShowWelcome(true);

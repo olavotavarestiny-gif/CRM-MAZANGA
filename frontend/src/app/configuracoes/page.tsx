@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -11,13 +11,14 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   CheckCircle2, Plus, Building2, Settings, User as UserIcon,
-  Users, Shield, Trash2, Pencil,
+  Users, Shield, Trash2, Pencil, ArrowRight,
 } from 'lucide-react';
 import {
   getFaturacaoConfig, updateFaturacaoConfig, getEstabelecimentos, createEstabelecimento,
   getCurrentUser, updateCurrentUserProfile, changePassword,
-  getTeamMembers, addTeamMember, removeTeamMember,
+  getTeamMembers, addTeamMember, removeTeamMember, updateWorkspaceMode,
 } from '@/lib/api';
+import { isComercio, getLandingRoute } from '@/lib/business-modes';
 import type { PlanName, User } from '@/lib/api';
 import type { IBANEntry } from '@/lib/types';
 import MemberPermissionsModal from '@/components/configuracoes/member-permissions-modal';
@@ -43,11 +44,13 @@ function ConfiguracoesContent() {
   type TabId = 'perfil' | 'plano' | 'empresa' | 'equipa';
   type RedirectTabId = TabId | 'admin' | 'superadmin';
   const requestedTab = searchParams?.get('tab') as RedirectTabId | null;
+  const requestedSection = searchParams?.get('section');
   const isConfigTab = (tab: string | null): tab is TabId =>
     tab === 'perfil' || tab === 'plano' || tab === 'empresa' || tab === 'equipa';
   const [activeTab, setActiveTab] = useState<TabId>(
-    isConfigTab(requestedTab) ? requestedTab : 'perfil'
+    requestedSection === 'faturacao' ? 'empresa' : isConfigTab(requestedTab) ? requestedTab : 'perfil'
   );
+  const faturacaoSectionRef = useRef<HTMLDivElement | null>(null);
 
   // ── Current User ─────────────────────────────────────────
   const { data: currentUser } = useQuery({
@@ -56,10 +59,9 @@ function ConfiguracoesContent() {
   });
 
   const isOwner = currentUser && !currentUser.accountOwnerId;
-  const isAdmin = currentUser?.role === 'admin';
-  const isSuperAdmin = !!(currentUser?.isSuperAdmin || currentUser?.email === 'olavo@mazanga.digital');
-  const hasAdminAccess = !!(isAdmin || isSuperAdmin);
-  const platformAdminHref = isSuperAdmin ? '/superadmin?section=organizations' : hasAdminAccess ? '/superadmin?section=users' : null;
+  const isSuperAdmin = !!currentUser?.isSuperAdmin;
+  const isComercioWorkspace = currentUser?.workspaceMode === 'comercio';
+  const platformAdminHref = isSuperAdmin ? '/superadmin?section=organizations' : null;
   const currentPlan = (currentUser?.plan || 'essencial') as PlanName;
   const currentPlanCatalog = currentUser?.availablePlans?.[currentPlan];
   const planEntries = getSortedPlanEntries(currentUser?.availablePlans);
@@ -70,22 +72,26 @@ function ConfiguracoesContent() {
   });
 
   useEffect(() => {
+    if (requestedSection === 'faturacao') {
+      setActiveTab('empresa');
+      return;
+    }
     if (isConfigTab(requestedTab)) {
       setActiveTab(requestedTab);
       return;
     }
     setActiveTab('perfil');
-  }, [requestedTab]);
+  }, [requestedSection, requestedTab]);
 
   useEffect(() => {
-    if (requestedTab === 'admin' && hasAdminAccess) {
+    if (requestedTab === 'admin' && isSuperAdmin) {
       router.replace('/superadmin?section=users');
       return;
     }
     if (requestedTab === 'superadmin' && isSuperAdmin) {
       router.replace('/superadmin?section=organizations');
     }
-  }, [hasAdminAccess, isSuperAdmin, requestedTab, router]);
+  }, [isSuperAdmin, requestedTab, router]);
 
   // ── Perfil ───────────────────────────────────────────────
   const [profileForm, setProfileForm] = useState({ jobTitle: '' });
@@ -173,7 +179,7 @@ function ConfiguracoesContent() {
   const [configError, setConfigError] = useState('');
   const [showEstab, setShowEstab] = useState(false);
   const [estabError, setEstabError] = useState('');
-  const [estabForm, setEstabForm] = useState({ nome: '', nif: '', morada: '', telefone: '', email: '', isPrincipal: false });
+  const [estabForm, setEstabForm] = useState({ nome: '', morada: '', telefone: '', email: '', isPrincipal: false });
   const companyNameForPlan =
     (isOwner ? configForm.nomeEmpresa : currentUser?.accountOwnerName) || currentUser?.accountOwnerName || null;
 
@@ -183,7 +189,13 @@ function ConfiguracoesContent() {
     enabled: (activeTab === 'empresa' || activeTab === 'plano') && !!isOwner,
   });
 
-  const { data: estabs = [] } = useQuery({
+  const {
+    data: estabs = [],
+    isLoading: estabsLoading,
+    isError: estabsIsError,
+    refetch: refetchEstabs,
+    error: estabsQueryError,
+  } = useQuery({
     queryKey: ['estabelecimentos'],
     queryFn: getEstabelecimentos,
     enabled: activeTab === 'empresa' && !!isOwner,
@@ -238,11 +250,13 @@ function ConfiguracoesContent() {
       qc.invalidateQueries({ queryKey: ['estabelecimentos'] });
       setShowEstab(false);
       setEstabError('');
-      setEstabForm({ nome: '', nif: '', morada: '', telefone: '', email: '', isPrincipal: false });
+      setEstabForm({ nome: '', morada: '', telefone: '', email: '', isPrincipal: false });
       toast({
         variant: 'success',
-        title: 'Estabelecimento criado',
-        description: 'O novo estabelecimento já está disponível.',
+        title: isComercioWorkspace ? 'Ponto de venda criado' : 'Estabelecimento criado',
+        description: isComercioWorkspace
+          ? 'O novo ponto de venda já está disponível com a série padrão criada automaticamente.'
+          : 'O novo estabelecimento já está disponível com a série padrão criada automaticamente.',
       });
     },
     onError: (err: any) => {
@@ -250,11 +264,19 @@ function ConfiguracoesContent() {
       setEstabError(message);
       toast({
         variant: 'error',
-        title: 'Falha ao criar estabelecimento',
+        title: isComercioWorkspace ? 'Falha ao criar ponto de venda' : 'Falha ao criar estabelecimento',
         description: message,
       });
     },
   });
+
+  useEffect(() => {
+    if (activeTab !== 'empresa' || requestedSection !== 'faturacao') return;
+    const timer = setTimeout(() => {
+      faturacaoSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [activeTab, requestedSection]);
 
   // ── Equipa ───────────────────────────────────────────────
   const [showAddMember, setShowAddMember] = useState(false);
@@ -309,6 +331,25 @@ function ConfiguracoesContent() {
         title: 'Falha ao remover membro',
         description: message,
       });
+    }
+  };
+
+  // ── Workspace Mode ───────────────────────────────────────
+  const [workspaceSaving, setWorkspaceSaving] = useState(false);
+
+  const handleWorkspaceModeChange = async (mode: 'servicos' | 'comercio') => {
+    if (workspaceSaving || currentUser?.workspaceMode === mode) return;
+    setWorkspaceSaving(true);
+    try {
+      await updateWorkspaceMode(mode);
+      qc.invalidateQueries({ queryKey: ['currentUser'] });
+      toast({ variant: 'success', title: 'Modo alterado', description: `Workspace definido para ${mode === 'comercio' ? 'Comércio' : 'Serviços'}.` });
+      // Redirect to the new landing after a brief delay
+      setTimeout(() => { window.location.href = getLandingRoute(mode); }, 800);
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Erro', description: err.message || 'Não foi possível alterar o modo.' });
+    } finally {
+      setWorkspaceSaving(false);
     }
   };
 
@@ -421,6 +462,43 @@ function ConfiguracoesContent() {
               )}
             </div>
           </Card>
+
+          {isOwner && (
+            <Card className="border-slate-200 shadow-sm">
+              <div className="p-6 space-y-4">
+                <h2 className="text-base font-semibold text-[#0A2540]">Modo de Trabalho</h2>
+                <p className="text-sm text-gray-500">
+                  Define como a plataforma é apresentada para toda a conta.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {(['servicos', 'comercio'] as const).map((mode) => {
+                    const active = (currentUser?.workspaceMode ?? 'servicos') === mode;
+                    return (
+                      <button
+                        key={mode}
+                        onClick={() => handleWorkspaceModeChange(mode)}
+                        disabled={workspaceSaving}
+                        className={`flex flex-col items-start gap-1.5 rounded-xl border p-4 text-left transition-all ${
+                          active
+                            ? 'border-[#0049e6] bg-blue-50 ring-2 ring-[#0049e6]/20'
+                            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className={`text-sm font-semibold ${active ? 'text-[#0049e6]' : 'text-[#2c2f31]'}`}>
+                          {mode === 'servicos' ? 'Serviços' : 'Comércio'}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {mode === 'servicos'
+                            ? 'CRM, pipeline, automações e gestão de clientes.'
+                            : 'Venda rápida, ponto de venda, faturação direta.'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </Card>
+          )}
 
           <Card className="border-slate-200 shadow-sm">
             <div className="p-6 space-y-4">
@@ -596,13 +674,36 @@ function ConfiguracoesContent() {
 
       {/* ── EMPRESA & AGT ───────────────────────────────────── */}
       {activeTab === 'empresa' && (
-        <div className="space-y-4 max-w-2xl">
-          <Card className="border-slate-200 shadow-sm">
+        <div className="space-y-4 max-w-3xl">
+          <Card
+            ref={faturacaoSectionRef}
+            className={`border-slate-200 shadow-sm ${requestedSection === 'faturacao' ? 'ring-2 ring-[#0049e6]/20 border-[#0049e6]/30' : ''}`}
+          >
             <div className="p-6 space-y-4">
               <h2 className="text-base font-semibold text-[#0A2540] flex items-center gap-2">
                 <Settings className="w-4 h-4 text-gray-500" />
-                Dados da Empresa & AGT
+                Configuração Fiscal e AGT
               </h2>
+              <p className="text-sm text-gray-500">
+                Define os dados fiscais da conta, a emissão documental e a base usada pela faturação e pela Venda Rápida.
+              </p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-sm font-medium text-[#0A2540]">Estrutura desta área</p>
+                <div className="mt-2 grid gap-2 text-xs text-slate-600 sm:grid-cols-3">
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <span className="font-semibold text-slate-900">Empresa</span>
+                    <p className="mt-1">Guarda o NIF fiscal central, morada, IBANs e dados AGT.</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <span className="font-semibold text-slate-900">{isComercioWorkspace ? 'Pontos de venda' : 'Estabelecimentos'}</span>
+                    <p className="mt-1">Definem a origem operacional da emissão, como loja, balcão ou unidade.</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <span className="font-semibold text-slate-900">Séries</span>
+                    <p className="mt-1">São criadas automaticamente e só precisam de gestão manual em casos avançados.</p>
+                  </div>
+                </div>
+              </div>
               {/* Logo upload */}
               <div>
                 <Label className="text-gray-700">Logotipo da Empresa</Label>
@@ -746,17 +847,55 @@ function ConfiguracoesContent() {
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-[#0A2540] flex items-center gap-2">
                   <Building2 className="w-4 h-4 text-gray-500" />
-                  Estabelecimentos
+                  {isComercioWorkspace ? 'Pontos de Venda' : 'Estabelecimentos'}
                 </h2>
                 <Button size="sm" variant="outline" onClick={() => { setEstabError(''); setShowEstab(true); }} className="border-gray-200 text-gray-600 hover:bg-gray-50 gap-1">
                   <Plus className="w-3.5 h-3.5" /> Novo
                 </Button>
               </div>
-              {estabs.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                {isComercioWorkspace
+                  ? 'Lojas, balcões e locais de operação. Todos assumem automaticamente o NIF da empresa.'
+                  : 'Locais de emissão associados à faturação da conta.'}
+              </p>
+              <p className="text-xs text-slate-500">
+                Ao criar o estabelecimento, o sistema gera automaticamente a série padrão inicial.
+              </p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-sm font-medium text-[#0A2540]">Fluxo recomendado</p>
+                <p className="mt-1 text-xs text-slate-600">
+                  Cria o {isComercioWorkspace ? 'ponto de venda' : 'estabelecimento'}, deixa a série inicial ser criada automaticamente e começa logo a emitir. A gestão manual de séries fica reservada para casos mais avançados.
+                </p>
+              </div>
+              {estabsLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 2 }).map((_, index) => (
+                    <div key={index} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+                      <div className="mt-2 h-3 w-56 animate-pulse rounded bg-slate-100" />
+                    </div>
+                  ))}
+                </div>
+              ) : estabsIsError ? (
+                <ErrorState
+                  compact
+                  title={isComercioWorkspace ? 'Não foi possível carregar os pontos de venda' : 'Não foi possível carregar os estabelecimentos'}
+                  message={(estabsQueryError as Error | undefined)?.message || 'Tente novamente para carregar a lista.'}
+                  onRetry={() => refetchEstabs()}
+                  secondaryAction={{ label: 'Criar novo', onClick: () => { setEstabError(''); setShowEstab(true); } }}
+                />
+              ) : estabs.length === 0 ? (
                 <div className="py-6 text-center text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">
                   <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p>Nenhum estabelecimento criado</p>
-                  <p className="text-xs mt-1">Crie pelo menos um para poder emitir facturas</p>
+                  <p>{isComercioWorkspace ? 'Ainda não existem pontos de venda' : 'Ainda não existem estabelecimentos'}</p>
+                  <p className="text-xs mt-1">
+                    {isComercioWorkspace
+                      ? 'Crie o primeiro ponto de venda para começar a emitir.'
+                      : 'Crie o primeiro estabelecimento para começar a emitir facturas.'}
+                  </p>
+                  <Button size="sm" variant="outline" onClick={() => { setEstabError(''); setShowEstab(true); }} className="mt-3 border-gray-200 text-gray-600 hover:bg-gray-50 gap-1">
+                    <Plus className="w-3.5 h-3.5" /> Criar primeiro
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -764,13 +903,58 @@ function ConfiguracoesContent() {
                     <div key={e.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200">
                       <div>
                         <p className="text-[#0A2540] text-sm font-medium">{e.nome}</p>
-                        <p className="text-gray-500 text-xs">NIF: {e.nif}{e.morada ? ` · ${e.morada}` : ''}</p>
+                        <p className="text-gray-500 text-xs">
+                          {isComercioWorkspace
+                            ? e.morada || 'Usa o NIF da empresa'
+                            : `NIF: ${e.nif}${e.morada ? ` · ${e.morada}` : ''}`}
+                        </p>
+                        {e.defaultSerie && (
+                          <p className="mt-1 text-xs text-slate-500">
+                            Série padrão: <span className="font-medium text-slate-700">{e.defaultSerie.seriesCode}/{e.defaultSerie.seriesYear}</span>
+                          </p>
+                        )}
                       </div>
-                      {e.isPrincipal && <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 border border-blue-200">Principal</span>}
+                      {e.isPrincipal && <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 border border-blue-200">{isComercioWorkspace ? 'Padrão' : 'Principal'}</span>}
                     </div>
                   ))}
                 </div>
               )}
+            </div>
+          </Card>
+
+          <Card className="border-slate-200 shadow-sm">
+            <div className="p-6 space-y-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-base font-semibold text-[#0A2540] flex items-center gap-2">
+                    <Settings className="w-4 h-4 text-gray-500" />
+                    Gestão Avançada de Séries
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Usa esta área só quando precisares de séries adicionais, outros tipos de documento ou separação operacional mais fina.
+                  </p>
+                </div>
+                <Button asChild size="sm" variant="outline" className="border-gray-200 text-gray-600 hover:bg-gray-50 gap-1.5">
+                  <Link href="/produtos">
+                    Abrir gestão
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Uso diário</p>
+                  <p className="mt-2 text-sm text-slate-700">A emissão normal, recorrente e a venda rápida usam a série padrão do ponto de venda.</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Quando abrir</p>
+                  <p className="mt-2 text-sm text-slate-700">Quando precisares de uma série extra, outro tipo documental ou um fluxo separado.</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Setup inicial</p>
+                  <p className="mt-2 text-sm text-slate-700">Não é obrigatório passar por esta gestão avançada para começar a faturar.</p>
+                </div>
+              </div>
             </div>
           </Card>
         </div>
@@ -866,34 +1050,36 @@ function ConfiguracoesContent() {
 
       <Dialog open={showEstab} onOpenChange={(open) => { setShowEstab(open); if (!open) setEstabError(''); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Novo Estabelecimento</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{isComercioWorkspace ? 'Novo Ponto de Venda' : 'Novo Estabelecimento'}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             {estabError && (
               <ErrorState
                 compact
-                title="Não foi possível criar o estabelecimento"
+                title={isComercioWorkspace ? 'Não foi possível criar o ponto de venda' : 'Não foi possível criar o estabelecimento'}
                 message={estabError}
                 onRetry={() => estabMutation.mutate()}
                 secondaryAction={{ label: 'Fechar', onClick: () => setEstabError('') }}
               />
             )}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm">Nome *</Label>
-                <Input value={estabForm.nome} onChange={e => setEstabForm(p => ({ ...p, nome: e.target.value }))} placeholder="Sede" className="mt-1" />
-              </div>
-              <div>
-                <Label className="text-sm">NIF *</Label>
-                <Input value={estabForm.nif} onChange={e => setEstabForm(p => ({ ...p, nif: e.target.value }))} placeholder="NIF do estabelecimento" className="mt-1" />
-              </div>
+            <div>
+              <Label className="text-sm">Nome *</Label>
+              <Input value={estabForm.nome} onChange={e => setEstabForm(p => ({ ...p, nome: e.target.value }))} placeholder={isComercioWorkspace ? 'Loja Central' : 'Sede'} className="mt-1" />
             </div>
+            {isComercioWorkspace && (
+              <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                Este ponto de venda vai usar automaticamente o NIF da empresa definido na Configuração Fiscal.
+              </p>
+            )}
+            <p className="text-xs text-slate-500">
+              A série padrão será criada automaticamente com base no nome e/ou localização deste estabelecimento.
+            </p>
             <div>
               <Label className="text-sm">Morada</Label>
               <Input value={estabForm.morada} onChange={e => setEstabForm(p => ({ ...p, morada: e.target.value }))} className="mt-1" />
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="isPrincipal" checked={estabForm.isPrincipal} onChange={e => setEstabForm(p => ({ ...p, isPrincipal: e.target.checked }))} className="w-4 h-4 accent-[#0A2540]" />
-              <label htmlFor="isPrincipal" className="text-sm cursor-pointer">Estabelecimento principal</label>
+              <label htmlFor="isPrincipal" className="text-sm cursor-pointer">{isComercioWorkspace ? 'Ponto de venda padrão' : 'Estabelecimento principal'}</label>
             </div>
           </div>
           <DialogFooter>

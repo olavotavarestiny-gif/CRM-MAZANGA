@@ -503,10 +503,11 @@ router.post('/seed-categories', async (req, res) => {
   try {
     const categories = [
       // ENTRADAS
-      { type: 'entrada', category: 'Serviços Recorrentes', subcategories: ['Cliente Angola', 'Cliente Suíça', 'Cliente Portugal', 'Cliente Brasil', 'Cliente França'], color: '#10B981', icon: '💰', sortOrder: 1 },
-      { type: 'entrada', category: 'Projetos One-off', subcategories: ['Website', 'Landing Page', 'Diagnóstico', 'Consultoria', 'Setup CRM'], color: '#3B82F6', icon: '🚀', sortOrder: 2 },
-      { type: 'entrada', category: 'Serviços Extras', subcategories: ['Vídeo adicional', 'Posts extras', 'Fotografia', 'Design pontual'], color: '#8B5CF6', icon: '✨', sortOrder: 3 },
-      { type: 'entrada', category: 'Outras Receitas', subcategories: ['Formação', 'Comissões', 'Parceria', 'Diversos'], color: '#06B6D4', icon: '💡', sortOrder: 4 },
+      { type: 'entrada', category: 'Receitas de Faturação', subcategories: ['Documento FT', 'Documento FR', 'Documento FA', 'Documento ND'], color: '#0EA5E9', icon: '🧾', sortOrder: 1 },
+      { type: 'entrada', category: 'Serviços Recorrentes', subcategories: ['Cliente Angola', 'Cliente Suíça', 'Cliente Portugal', 'Cliente Brasil', 'Cliente França'], color: '#10B981', icon: '💰', sortOrder: 2 },
+      { type: 'entrada', category: 'Projetos One-off', subcategories: ['Website', 'Landing Page', 'Diagnóstico', 'Consultoria', 'Setup CRM'], color: '#3B82F6', icon: '🚀', sortOrder: 3 },
+      { type: 'entrada', category: 'Serviços Extras', subcategories: ['Vídeo adicional', 'Posts extras', 'Fotografia', 'Design pontual'], color: '#8B5CF6', icon: '✨', sortOrder: 4 },
+      { type: 'entrada', category: 'Outras Receitas', subcategories: ['Formação', 'Comissões', 'Parceria', 'Diversos'], color: '#06B6D4', icon: '💡', sortOrder: 5 },
       // SAÍDAS
       { type: 'saida', category: 'Design', subcategories: ['Designer freelance', 'Designer mensal', 'Assets (stock)', 'Impressão'], color: '#EC4899', icon: '🎨', sortOrder: 1 },
       { type: 'saida', category: 'Ferramentas', subcategories: ['Claude Pro', 'CapCut Pro', 'Canva Pro', 'Buffer/Later', 'GHL/CRM', 'Google Workspace', 'Adobe CC', 'Outras'], color: '#F59E0B', icon: '🛠️', sortOrder: 2 },

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { CheckCircle2, Clock, XCircle, AlertCircle, FileDown, Ban } from 'lucide-react';
-import { anularFactura, downloadFacturaPdf } from '@/lib/api';
+import { anularFactura, downloadFacturaPdf, getCurrentUser, getFaturacaoConfig } from '@/lib/api';
 import type { Factura, IBANEntry } from '@/lib/types';
 
 const CURRENCY_SYMBOLS: Record<string, string> = { AOA: 'Kz', USD: '$', EUR: '€', GBP: '£', CHF: 'Fr', CNY: '¥' };
@@ -54,6 +54,21 @@ export function FacturaDetail({ factura, isMock, ibans }: Props) {
   const [showAnular, setShowAnular] = useState(false);
   const [motivo, setMotivo] = useState('');
   const [pdfLoading, setPdfLoading] = useState(false);
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+    staleTime: 30_000,
+  });
+  const { data: faturacaoConfig } = useQuery({
+    queryKey: ['faturacao-config'],
+    queryFn: getFaturacaoConfig,
+    staleTime: 30_000,
+  });
+
+  const emitenteNif =
+    currentUser?.workspaceMode === 'comercio'
+      ? faturacaoConfig?.nifEmpresa || factura.estabelecimento?.nif || '—'
+      : factura.estabelecimento?.nif || faturacaoConfig?.nifEmpresa || '—';
 
   const handleDownloadPdf = async () => {
     setPdfLoading(true);
@@ -108,7 +123,7 @@ export function FacturaDetail({ factura, isMock, ibans }: Props) {
           <CardHeader><CardTitle className="text-sm text-gray-500">Emitente</CardTitle></CardHeader>
           <CardContent>
             <p className="text-[#0A2540] font-medium">{factura.estabelecimento?.nome}</p>
-            <p className="text-gray-500 text-sm">NIF: {factura.estabelecimento?.nif}</p>
+            <p className="text-gray-500 text-sm">NIF: {emitenteNif}</p>
           </CardContent>
         </Card>
         {/* Cliente */}

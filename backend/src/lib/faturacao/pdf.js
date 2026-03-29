@@ -194,8 +194,12 @@ async function generateFacturaPDF(factura, config) {
        .text('EMITENTE', MARGIN + pad, y + pad);
     doc.font('SB').fontSize(9.5).fillColor(NAVY)
        .text(factura.estabelecimento?.nome || config.nomeEmpresa || '—', MARGIN + pad, y + pad + 13, { width: boxW - pad * 2 });
+    const emitenteNif =
+      config.workspaceMode === 'comercio'
+        ? (config.nifEmpresa || factura.estabelecimento?.nif || '—')
+        : (factura.estabelecimento?.nif || config.nifEmpresa || '—');
     doc.font('R').fontSize(8).fillColor(GRAY)
-       .text(`NIF: ${factura.estabelecimento?.nif || config.nifEmpresa || '—'}`, MARGIN + pad, y + pad + 29, { width: boxW - pad * 2 });
+       .text(`NIF: ${emitenteNif}`, MARGIN + pad, y + pad + 29, { width: boxW - pad * 2 });
     if (config.moradaEmpresa) {
       doc.font('R').fontSize(7.5).fillColor(GRAY)
          .text(config.moradaEmpresa, MARGIN + pad, y + pad + 42, { width: boxW - pad * 2 });

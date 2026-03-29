@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, Task, CRMForm, FormField, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount } from './types';
+import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, Task, CRMForm, FormField, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, StockMovement, CaixaSessao, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount } from './types';
 import { createClient } from './supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -439,6 +439,7 @@ export interface User {
   accountOwnerName?: string | null;
   impersonatedBy?: number | null;
   mustChangePassword?: boolean;
+  workspaceMode?: 'servicos' | 'comercio';
   createdAt: string;
   lastLogin?: string;
 }
@@ -618,7 +619,7 @@ export async function getFactura(id: string): Promise<Factura> {
 }
 
 export async function createFactura(data: {
-  documentType: string; serieId: string; estabelecimentoId: string;
+  documentType: string; serieId?: string; estabelecimentoId: string;
   customerTaxID: string; customerName: string; customerAddress?: string;
   clienteFaturacaoId?: string; lines: Omit<FacturaLine, 'lineNumber'>[];
   currencyCode?: string; currencyAmount?: number; exchangeRate?: number; paymentMethod?: string;
@@ -674,7 +675,7 @@ export async function getEstabelecimentos(): Promise<Estabelecimento[]> {
 }
 
 export async function createEstabelecimento(data: {
-  nome: string; nif: string; morada?: string; telefone?: string; email?: string; isPrincipal?: boolean;
+  nome: string; nif?: string; morada?: string; telefone?: string; email?: string; isPrincipal?: boolean;
 }): Promise<Estabelecimento> {
   const res = await api.post('/api/faturacao/estabelecimentos', data);
   return res.data;
@@ -706,8 +707,14 @@ export async function getProdutos(params?: { search?: string; active?: boolean }
 }
 
 export async function createProduto(data: {
-  productCode: string; productDescription: string; unitPrice: number;
-  unitOfMeasure?: string; taxPercentage?: number; taxCode?: string;
+  productCode: string;
+  productDescription: string;
+  unitPrice: number;
+  cost?: number | null;
+  productType?: string;
+  sku?: string | null;
+  unitOfMeasure?: string;
+  taxPercentage?: number;
 }): Promise<Produto> {
   const res = await api.post('/api/faturacao/produtos', data);
   return res.data;
@@ -720,6 +727,39 @@ export async function updateProduto(id: string, data: Partial<Produto>): Promise
 
 export async function deleteProduto(id: string): Promise<void> {
   await api.delete(`/api/faturacao/produtos/${id}`);
+}
+
+export async function addStock(id: string, data: { quantity: number; reason?: string; notes?: string }): Promise<{ produto: Produto; movement: StockMovement }> {
+  const res = await api.post(`/api/faturacao/produtos/${id}/stock`, data);
+  return res.data;
+}
+
+export async function getStockMovements(id: string): Promise<StockMovement[]> {
+  const res = await api.get(`/api/faturacao/produtos/${id}/stock-movements`);
+  return res.data;
+}
+
+// Caixa — Sessões
+export async function getCaixaSessaoAtual(): Promise<CaixaSessao | null> {
+  const res = await api.get('/api/caixa/sessoes/atual');
+  return res.data;
+}
+
+export async function abrirCaixaSessao(data: {
+  estabelecimentoId: string;
+  openingBalance?: number;
+  notes?: string;
+}): Promise<CaixaSessao> {
+  const res = await api.post('/api/caixa/sessoes', data);
+  return res.data;
+}
+
+export async function fecharCaixaSessao(id: string, data: {
+  closingCountedAmount?: number;
+  notes?: string;
+}): Promise<CaixaSessao> {
+  const res = await api.patch(`/api/caixa/sessoes/${id}/fechar`, data);
+  return res.data;
 }
 
 // Configuração
@@ -741,6 +781,32 @@ export async function getSaftPeriodos(): Promise<SaftPeriodo[]> {
 
 export async function generateSaft(periodo: string): Promise<SaftPeriodo> {
   const res = await api.post('/api/faturacao/saft/generate', { periodo });
+  return res.data;
+}
+
+// Relatórios fiscais
+export async function getIvaReport(periodo: string) {
+  const res = await api.get('/api/faturacao/relatorios/iva', { params: { periodo } });
+  return res.data as import('./types').IvaReport;
+}
+
+export async function getVendasReport(year: number) {
+  const res = await api.get('/api/faturacao/relatorios/vendas', { params: { year } });
+  return res.data as import('./types').VendasReport;
+}
+
+export function getIvaExportUrl(periodo: string): string {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3011';
+  return `${API_URL}/api/faturacao/relatorios/iva/export?periodo=${periodo}`;
+}
+
+export function getVendasExportUrl(year: number): string {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3011';
+  return `${API_URL}/api/faturacao/relatorios/vendas/export?year=${year}`;
+}
+
+export async function validateSaft(periodo: string): Promise<{ valid: boolean; errors: string[] }> {
+  const res = await api.post('/api/faturacao/saft/validate', { periodo });
   return res.data;
 }
 
@@ -938,6 +1004,50 @@ export async function createClientAccount(data: {
 }): Promise<User> {
   const res = await api.post('/api/superadmin/users', data);
   return res.data;
+}
+
+// ============================================
+// QUICK SALES (Workspace COMERCIO)
+// ============================================
+
+export interface QuickSaleDefaults {
+  ready: boolean;
+  defaultSerieId: string | null;
+  defaultEstabelecimentoId: string | null;
+}
+
+export interface QuickSaleItem {
+  productCode: string;
+  productDescription: string;
+  quantity: number;
+  unitPrice: number;
+  unitOfMeasure?: string;
+  taxCode?: string;
+  taxPercentage?: number;
+}
+
+export async function getQuickSaleDefaults(): Promise<QuickSaleDefaults> {
+  const res = await api.get('/api/quick-sales/defaults');
+  return res.data;
+}
+
+export async function emitQuickSale(payload: {
+  items: QuickSaleItem[];
+  customerTaxID?: string;
+  customerName?: string;
+  paymentMethod?: string;
+  estabelecimentoId?: string;
+}): Promise<Factura> {
+  const res = await api.post<Factura>('/api/quick-sales/emit', payload);
+  return res.data;
+}
+
+// ============================================
+// WORKSPACE MODE
+// ============================================
+
+export async function updateWorkspaceMode(workspaceMode: 'servicos' | 'comercio'): Promise<void> {
+  await api.patch('/api/account/workspace-mode', { workspaceMode });
 }
 
 export default api;

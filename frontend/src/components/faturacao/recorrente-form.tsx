@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,6 +78,7 @@ export function RecorrenteForm({ open, onClose }: Props) {
   const [documentType, setDocumentType] = useState('FT');
   const [serieId, setSerieId] = useState('');
   const [estabelecimentoId, setEstabelecimentoId] = useState('');
+  const [showSeriesOverride, setShowSeriesOverride] = useState(false);
   const [cliente, setCliente] = useState<ClienteFaturacao | undefined>(undefined);
   const [manualNif, setManualNif] = useState('');
   const [manualNome, setManualNome] = useState('');
@@ -94,6 +95,54 @@ export function RecorrenteForm({ open, onClose }: Props) {
 
   const { data: series = [] } = useQuery({ queryKey: ['series'], queryFn: getSeries });
   const { data: estabelecimentos = [] } = useQuery({ queryKey: ['estabelecimentos'], queryFn: getEstabelecimentos });
+  const selectedEstabelecimento = useMemo(
+    () => estabelecimentos.find((estabelecimento) => estabelecimento.id === estabelecimentoId),
+    [estabelecimentos, estabelecimentoId]
+  );
+  const activeSeries = useMemo(
+    () =>
+      series.filter((serie) =>
+        serie.documentType === documentType &&
+        serie.seriesStatus !== 'F' &&
+        (!estabelecimentoId || serie.estabelecimento?.id === estabelecimentoId)
+      ),
+    [documentType, estabelecimentoId, series]
+  );
+  const selectedSerie = activeSeries.find((serie) => serie.id === serieId) || series.find((serie) => serie.id === serieId) || null;
+
+  useEffect(() => {
+    const defaultSerieForEstabelecimento = selectedEstabelecimento?.defaultSerieId
+      ? activeSeries.find((serie) => serie.id === selectedEstabelecimento.defaultSerieId)
+      : null;
+
+    if (defaultSerieForEstabelecimento && serieId !== defaultSerieForEstabelecimento.id) {
+      setSerieId(defaultSerieForEstabelecimento.id);
+      return;
+    }
+
+    if (serieId) {
+      const serieStillValid = activeSeries.some((serie) => serie.id === serieId);
+      if (!serieStillValid) {
+        setSerieId(activeSeries[0]?.id || '');
+      }
+      return;
+    }
+
+    if (activeSeries.length > 0) {
+      setSerieId(activeSeries[0].id);
+    }
+  }, [activeSeries, selectedEstabelecimento?.defaultSerieId, serieId]);
+
+  useEffect(() => {
+    if (!showSeriesOverride) {
+      return;
+    }
+
+    const currentSeriesStillValid = activeSeries.some((serie) => serie.id === serieId);
+    if (!currentSeriesStillValid && selectedEstabelecimento?.defaultSerieId) {
+      setShowSeriesOverride(false);
+    }
+  }, [activeSeries, selectedEstabelecimento?.defaultSerieId, serieId, showSeriesOverride]);
 
   // Calculate totals preview
   const netTotal = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
@@ -106,7 +155,6 @@ export function RecorrenteForm({ open, onClose }: Props) {
       const nif  = manualCliente ? manualNif  : (cliente?.customerTaxID ?? '');
       const nome = manualCliente ? manualNome : (cliente?.customerName ?? '');
       if (!nif || !nome)        throw new Error('Selecione ou introduza os dados do cliente');
-      if (!serieId)             throw new Error('Selecione uma série');
       if (!estabelecimentoId)   throw new Error('Selecione um estabelecimento');
       if (lines.some(l => !l.productDescription || l.quantity <= 0 || l.unitPrice < 0))
         throw new Error('Verifique as linhas: descrição, quantidade e preço são obrigatórios');
@@ -123,7 +171,7 @@ export function RecorrenteForm({ open, onClose }: Props) {
       }));
 
       return createRecorrente({
-        serieId, estabelecimentoId,
+        serieId: serieId || undefined, estabelecimentoId,
         clienteFaturacaoId: !manualCliente ? cliente?.id : undefined,
         customerTaxID: nif,
         customerName: nome,
@@ -148,6 +196,7 @@ export function RecorrenteForm({ open, onClose }: Props) {
 
   function handleClose() {
     setDocumentType('FT'); setSerieId(''); setEstabelecimentoId('');
+    setShowSeriesOverride(false);
     setCliente(undefined); setManualNif(''); setManualNome(''); setManualCliente(false);
     setLines([defaultLine()]); setFrequency('MONTHLY'); setStartDate(tomorrow());
     setMaxOccurrences(''); setPaymentMethod('Transferência Bancária'); setCurrency('AOA'); setExchangeRate(''); setNotes(''); setError('');
@@ -184,29 +233,68 @@ export function RecorrenteForm({ open, onClose }: Props) {
               </Select>
             </div>
             <div>
-              <Label className="text-xs text-gray-500 mb-1 block">Série</Label>
-              <Select value={serieId} onValueChange={setSerieId}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-                <SelectContent>
-                  {series.filter((s: { documentType: string }) => s.documentType === documentType).map((s: { id: string; seriesCode: string; seriesYear: number }) => (
-                    <SelectItem key={s.id} value={s.id}>{s.seriesCode}/{s.seriesYear}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <Label className="text-xs text-gray-500">Série</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setShowSeriesOverride((current) => !current)}
+                  disabled={!estabelecimentoId || activeSeries.length === 0}
+                >
+                  {showSeriesOverride ? 'Usar automática' : 'Alterar manualmente'}
+                </Button>
+              </div>
+              {showSeriesOverride ? (
+                <>
+                  <Select value={serieId} onValueChange={setSerieId}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Selecionar..." /></SelectTrigger>
+                    <SelectContent>
+                      {activeSeries.map((s: { id: string; seriesCode: string; seriesYear: number }) => (
+                        <SelectItem key={s.id} value={s.id}>{s.seriesCode}/{s.seriesYear}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    Só altera manualmente a série quando esta recorrente não deve seguir a configuração padrão do ponto de venda.
+                  </p>
+                </>
+              ) : (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                  <p className="text-sm font-semibold text-[#0A2540]">
+                    {selectedSerie
+                      ? `${selectedSerie.seriesCode} / ${selectedSerie.seriesYear}`
+                      : estabelecimentoId
+                      ? 'Sem série padrão disponível'
+                      : 'Seleciona primeiro o ponto de venda'}
+                  </p>
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    {selectedSerie
+                      ? 'A recorrente vai usar automaticamente a série padrão do ponto de venda.'
+                      : estabelecimentoId
+                      ? 'Este ponto de venda ainda não tem uma série padrão ativa para este tipo de documento.'
+                      : 'A série aparece automaticamente depois de escolheres o ponto de venda.'}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Estabelecimento */}
+          {/* Ponto de venda */}
           <div>
-            <Label className="text-xs text-gray-500 mb-1 block">Estabelecimento</Label>
+            <Label className="text-xs text-gray-500 mb-1 block">Ponto de Venda</Label>
             <Select value={estabelecimentoId} onValueChange={setEstabelecimentoId}>
               <SelectTrigger className="h-9"><SelectValue placeholder="Selecionar..." /></SelectTrigger>
               <SelectContent>
-                {estabelecimentos.map((e: { id: string; nome: string; nif: string }) => (
-                  <SelectItem key={e.id} value={e.id}>{e.nome} · {e.nif}</SelectItem>
+                {estabelecimentos.map((e: { id: string; nome: string; nif?: string }) => (
+                  <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <p className="mt-1 text-[11px] text-gray-500">
+              As recorrentes usam a série padrão do ponto de venda selecionado.
+            </p>
           </div>
 
           {/* Cliente */}
