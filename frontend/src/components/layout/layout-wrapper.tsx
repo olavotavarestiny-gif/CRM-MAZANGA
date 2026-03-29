@@ -15,7 +15,6 @@ import { ReactNode } from 'react';
 import { Menu, Eye, Info, LogOut, X } from 'lucide-react';
 import type { User } from '@/lib/api';
 import { canView, getVisibleModules, hasFeature } from '@/lib/permissions';
-import { isComercio } from '@/lib/business-modes';
 
 const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
 
@@ -24,6 +23,7 @@ const PATH_MODULE_MAP: Record<string, Parameters<typeof canView>[1]> = {
   '/contacts':        'contacts',
   '/pipeline':        'pipeline',
   '/tasks':           'tasks',
+  '/caixa':           'vendas',
   '/vendas':          'vendas',
   '/vendas-rapidas':  'vendas',
   '/faturacao':       'vendas',
@@ -39,6 +39,7 @@ const MODULE_LABELS: Record<string, string> = {
   '/contacts':       'Clientes',
   '/pipeline':       'Processos',
   '/tasks':          'Tarefas',
+  '/caixa':          'Caixa',
   '/vendas':         'Vendas',
   '/vendas-rapidas': 'Vendas',
   '/faturacao':      'Vendas',
@@ -236,12 +237,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
         }
 
         enforceAccess(user);
-
-        // Redirect comercio users from dashboard root to vendas-rapidas
-        if (isComercio(user.workspaceMode) && pathname === '/') {
-          router.replace('/vendas-rapidas');
-          return;
-        }
 
         // Show welcome modal on first visit
         if (!localStorage.getItem('kukugest_guide_seen')) setShowWelcome(true);

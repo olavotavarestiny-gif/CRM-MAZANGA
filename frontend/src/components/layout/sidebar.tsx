@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3, Users, MessageSquare, Zap, Kanban,
   CheckSquare, FileText, LogOut, X, DollarSign, CalendarDays,
   Package, Settings, HelpCircle, ShieldAlert, ShoppingBag, ShoppingCart,
-  ChevronDown,
+  ChevronDown, CreditCard,
 } from 'lucide-react';
 import { isComercio } from '@/lib/business-modes';
 import { cn } from '@/lib/utils';
@@ -37,7 +37,6 @@ export default function Sidebar({
   onStartTour?: () => void;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [gestaoInternaOpen, setGestaoInternaOpen] = useState(true);
 
   const isActive = (path: string) => {
@@ -71,6 +70,7 @@ export default function Sidebar({
   // Map href to module key for permission checks
   const hrefToModule: Record<string, ModuleKey | null> = {
     '/':                null, // always visible
+    '/caixa':           'vendas',
     '/vendas-rapidas':  'vendas',
     '/contacts':        'contacts',
     '/pipeline':        'pipeline',
@@ -108,21 +108,16 @@ export default function Sidebar({
   // COMERCIO: grupo "Uso diário" — itens prioritários de operação diária
   const comercioUsoDiarioLinks = comercio ? [
     { href: '/', label: 'Painel', icon: BarChart3 },
+    { href: '/caixa', label: 'Caixa', icon: CreditCard, module: 'vendas' as const },
     { href: '/vendas-rapidas', label: 'Venda Rápida', icon: ShoppingCart, module: 'vendas' as const },
     { href: '/contacts', label: 'Clientes', icon: Users, module: 'contacts' as const },
-    { href: '/tasks', label: 'Tarefas', icon: CheckSquare, module: 'tasks' as const },
     { href: '/produtos', label: 'Produtos', icon: Package, module: 'vendas' as const },
   ].filter(l => isVisible(l.href)) : [];
 
   // COMERCIO: grupo "Gestão interna" — ferramentas de gestão e back-office
   const comercioGestaoInternaLinks = comercio ? [
-    { href: '/pipeline', label: 'Processos', icon: Kanban, module: 'pipeline' as const },
-    { href: '/chat', label: 'Conversas', icon: MessageSquare, module: 'chat' as const },
-    { href: '/calendario', label: 'Calendário', icon: CalendarDays, module: 'calendario' as const },
-    { href: '/finances', label: 'Finanças', icon: DollarSign },
-    { href: '/forms', label: 'Formulários', icon: FileText, module: 'forms' as const },
-    { href: '/automations', label: 'Automações', icon: Zap, module: 'automations' as const },
     { href: '/vendas', label: 'Faturação', icon: ShoppingBag, module: 'vendas' as const },
+    { href: '/configuracoes', label: 'Configurações', icon: Settings },
   ].filter(l => isVisible(l.href)) : [];
 
   const allGestaoLinks = [
@@ -194,7 +189,7 @@ export default function Sidebar({
                   className="w-full flex items-center justify-between px-3 pt-1 pb-2"
                 >
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/60">
-                    Gestão interna
+                    Gestão
                   </p>
                   <ChevronDown className={cn(
                     'w-3.5 h-3.5 text-[#6b7e9a]/60 transition-transform duration-200',
@@ -299,10 +294,12 @@ export default function Sidebar({
             </div>
           </div>
         )}
-        <Link href="/configuracoes" className={navItemClass(isActive('/configuracoes'))} onClick={onClose}>
-          <Settings className="w-[18px] h-[18px] flex-shrink-0" />
-          <span>Configurações</span>
-        </Link>
+        {!comercio && (
+          <Link href="/configuracoes" className={navItemClass(isActive('/configuracoes'))} onClick={onClose}>
+            <Settings className="w-[18px] h-[18px] flex-shrink-0" />
+            <span>Configurações</span>
+          </Link>
+        )}
         <button
           onClick={() => {
             localStorage.removeItem(ONBOARDING_DISMISSED);

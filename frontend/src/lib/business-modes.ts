@@ -5,5 +5,5 @@ export function isComercio(mode?: WorkspaceMode | string | null): boolean {
 }
 
 export function getLandingRoute(mode?: WorkspaceMode | string | null): string {
-  return isComercio(mode) ? '/vendas-rapidas' : '/';
+  return '/';
 }
