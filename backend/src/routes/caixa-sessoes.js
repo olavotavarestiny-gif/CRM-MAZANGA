@@ -33,14 +33,14 @@ router.post('/sessoes', async (req, res) => {
       return res.status(404).json({ error: 'Ponto de venda não encontrado' });
     }
 
-    // Regra: não pode existir sessão aberta para este utilizador
+    // Regra: só pode existir 1 sessão aberta por estabelecimento
     const sessaoAberta = await prisma.caixaSessao.findFirst({
-      where: { openedByUserId: req.user.id, status: 'open' },
-      select: { id: true, estabelecimento: { select: { nome: true } } },
+      where: { userId, estabelecimentoId, status: 'open' },
+      select: { id: true, openedBy: { select: { name: true } } },
     });
     if (sessaoAberta) {
       return res.status(409).json({
-        error: `Já existe uma sessão aberta em ${sessaoAberta.estabelecimento.nome}. Feche-a antes de abrir uma nova.`,
+        error: `Já existe um caixa aberto neste ponto de venda por ${sessaoAberta.openedBy?.name || 'outro utilizador'}.`,
       });
     }
 
@@ -67,8 +67,15 @@ router.post('/sessoes', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/sessoes/atual', async (req, res) => {
   try {
+    const { estabelecimentoId } = req.query;
+    const where = {
+      userId: req.user.effectiveUserId,
+      status: 'open',
+      ...(estabelecimentoId ? { estabelecimentoId } : { openedByUserId: req.user.id }),
+    };
+
     const sessao = await prisma.caixaSessao.findFirst({
-      where: { openedByUserId: req.user.id, status: 'open' },
+      where,
       include: SESSION_INCLUDE,
       orderBy: { openedAt: 'desc' },
     });
@@ -113,6 +120,19 @@ router.patch('/sessoes/:id/fechar', async (req, res) => {
     const counted = closingCountedAmount != null ? Number(closingCountedAmount) : null;
     const expected = sessao.openingBalance + sessao.totalSalesAmount;
     const difference = counted != null ? counted - expected : null;
+    const facturasDaSessao = await prisma.factura.findMany({
+      where: { caixaSessaoId: sessao.id, documentStatus: 'N' },
+      select: { grossTotal: true, paymentMethod: true },
+    });
+    const totalCash = facturasDaSessao
+      .filter((f) => f.paymentMethod === 'CASH')
+      .reduce((sum, f) => sum + f.grossTotal, 0);
+    const totalMulticaixa = facturasDaSessao
+      .filter((f) => f.paymentMethod === 'MULTICAIXA')
+      .reduce((sum, f) => sum + f.grossTotal, 0);
+    const totalTransferencia = facturasDaSessao
+      .filter((f) => !['CASH', 'MULTICAIXA'].includes(f.paymentMethod))
+      .reduce((sum, f) => sum + f.grossTotal, 0);
 
     const updated = await prisma.caixaSessao.update({
       where: { id: req.params.id },
@@ -123,6 +143,9 @@ router.patch('/sessoes/:id/fechar', async (req, res) => {
         expectedClosingAmount: expected,
         closingCountedAmount: counted,
         differenceAmount: difference,
+        totalCash,
+        totalMulticaixa,
+        totalTransferencia,
         notes: notes || null,
       },
       include: SESSION_INCLUDE,

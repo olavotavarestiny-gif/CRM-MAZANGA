@@ -57,8 +57,17 @@ router.post('/emit', async (req, res) => {
     const productCodes = items.map((i) => i.productCode);
     const produtos = await prisma.produto.findMany({
       where: { userId, productCode: { in: productCodes }, active: true },
-      select: { productCode: true },
+      select: {
+        id: true,
+        productCode: true,
+        stock: true,
+        stockMinimo: true,
+        productDescription: true,
+        unitPrice: true,
+        productType: true,
+      },
     });
+    const produtosMap = new Map(produtos.map((p) => [p.productCode, p]));
     if (produtos.length !== productCodes.length) {
       const found = new Set(produtos.map((p) => p.productCode));
       const missing = productCodes.filter((c) => !found.has(c));
@@ -67,24 +76,13 @@ router.post('/emit', async (req, res) => {
       });
     }
 
-    // ── Step 2: Stock check (deferred — Produto.stock field not yet in schema) ─
-    // NOTE: stock decrement is not implemented for MVP. All products are treated
-    // as unlimited stock (service-type behaviour). When Produto.stock Int? is
-    // added via migration, uncomment and enable the check below:
-    //
-    // const insufficient = items.filter((item) => {
-    //   const p = produtos.find((p) => p.productCode === item.productCode);
-    //   return p.stock != null && p.stock < item.quantity;
-    // });
-    // if (insufficient.length > 0) {
-    //   return res.status(400).json({
-    //     error: `Stock insuficiente para: ${insufficient.map((i) => i.productCode).join(', ')}`,
-    //   });
-    // }
-
     // ── Step 3: Resolve open session — must happen before estabelecimento ───────
     const sessaoAberta = await prisma.caixaSessao.findFirst({
-      where: { openedByUserId: req.user.id, status: 'open' },
+      where: {
+        openedByUserId: req.user.id,
+        status: 'open',
+        ...(estabelecimentoId ? { estabelecimentoId } : {}),
+      },
       select: { id: true, totalSalesAmount: true, salesCount: true, estabelecimentoId: true },
     });
 
@@ -162,6 +160,48 @@ router.post('/emit', async (req, res) => {
 
     // ── Emitir factura ──────────────────────────────────────────────────────
     const factura = await createFactura(userId, facturaBody, req);
+
+    const quantidadesPorProduto = items.reduce((acc, item) => {
+      const current = acc.get(item.productCode) || 0;
+      acc.set(item.productCode, current + Number(item.quantity || 0));
+      return acc;
+    }, new Map());
+
+    for (const [productCode, quantity] of quantidadesPorProduto.entries()) {
+      const produto = produtosMap.get(productCode);
+      if (!produto || produto.stock == null || produto.productType !== 'P') continue;
+
+      await prisma.$transaction(async (tx) => {
+        const produtoAtual = await tx.produto.findUnique({
+          where: { id: produto.id },
+          select: { stock: true, productType: true },
+        });
+
+        if (!produtoAtual || produtoAtual.stock == null || produtoAtual.productType !== 'P') {
+          return;
+        }
+
+        const newStock = Math.max(0, produtoAtual.stock - quantity);
+        await tx.produto.update({
+          where: { id: produto.id },
+          data: { stock: newStock },
+        });
+        await tx.stockMovement.create({
+          data: {
+            productId: produto.id,
+            userId,
+            type: 'exit',
+            quantity,
+            previousStock: produtoAtual.stock,
+            newStock,
+            reason: 'Venda rápida',
+            referenceType: 'quick_sale',
+            referenceId: factura.id,
+            createdByUserId: req.user.id,
+          },
+        });
+      });
+    }
 
     // Actualizar totais da sessão após emissão bem-sucedida
     if (sessaoAberta) {

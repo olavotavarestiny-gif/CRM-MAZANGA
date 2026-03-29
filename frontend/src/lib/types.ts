@@ -317,6 +317,16 @@ export interface ClienteFaturacao {
   source?: 'faturacao' | 'crm';
 }
 
+export interface ProdutoCategoria {
+  id: string;
+  userId: number;
+  nome: string;
+  cor?: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  _count?: { produtos: number };
+}
+
 export interface Produto {
   id: string;
   productCode: string;
@@ -332,6 +342,9 @@ export interface Produto {
   taxCode: string;
   active: boolean;
   stock?: number | null;   // stock atual (null = sem controlo de stock)
+  stockMinimo?: number | null;
+  categoriaId?: string | null;
+  categoria?: ProdutoCategoria | null;
 }
 
 export interface CaixaSessao {
@@ -348,6 +361,9 @@ export interface CaixaSessao {
   differenceAmount?: number | null;
   totalSalesAmount: number;
   salesCount: number;
+  totalCash: number;
+  totalMulticaixa: number;
+  totalTransferencia: number;
   status: 'open' | 'closed';
   notes?: string | null;
   createdAt: string;

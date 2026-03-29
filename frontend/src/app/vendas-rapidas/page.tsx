@@ -116,7 +116,7 @@ export default function VendasRapidasPage() {
   // ── Sessão actual ──────────────────────────────────────────────────────────
   const { data: sessao = null, isLoading: loadingSessao } = useQuery<CaixaSessao | null>({
     queryKey: ['caixa-sessao-atual'],
-    queryFn: getCaixaSessaoAtual,
+    queryFn: () => getCaixaSessaoAtual(),
   });
 
   const sessaoAberta = sessao?.status === 'open';

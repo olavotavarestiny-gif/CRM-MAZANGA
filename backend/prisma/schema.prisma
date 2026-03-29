@@ -41,6 +41,7 @@ model User {
   estabelecimentos     Estabelecimento[]     @relation("EstabelecimentoUser")
   series               Serie[]               @relation("SerieUser")
   clientesFaturacao    ClienteFaturacao[]    @relation("ClienteFaturacaoUser")
+  produtoCategorias    ProdutoCategoria[]    @relation("ProdutoCategoriaUser")
   produtos             Produto[]             @relation("ProdutoUser")
   stockMovements       StockMovement[]       @relation("StockMovementUser")
   stockMovementsCreated StockMovement[]      @relation("StockMovementCreatedBy")
@@ -353,6 +354,19 @@ model ClienteFaturacao {
   @@unique([userId, customerTaxID])
 }
 
+model ProdutoCategoria {
+  id        String    @id @default(cuid())
+  userId    Int
+  nome      String
+  cor       String?   @default("#6b7e9a")
+  isDefault Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  user      User      @relation("ProdutoCategoriaUser", fields: [userId], references: [id], onDelete: Cascade)
+  produtos  Produto[]
+
+  @@unique([userId, nome])
+}
+
 model Produto {
   id                 String   @id @default(cuid())
   userId             Int
@@ -367,9 +381,12 @@ model Produto {
   taxPercentage      Float    @default(14)
   taxCode            String   @default("NOR")
   active             Boolean  @default(true)
-  stock              Int?     @default(0)    // stock atual (null = produto sem controlo de stock)
+  stock              Int?     @default(0) // stock atual (null = produto sem controlo de stock)
+  stockMinimo        Int?     @default(0)
+  categoriaId        String?
   createdAt          DateTime @default(now())
   user               User     @relation("ProdutoUser", fields: [userId], references: [id], onDelete: Cascade)
+  categoria          ProdutoCategoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   stockMovements     StockMovement[]
 
   @@unique([userId, productCode])
@@ -453,6 +470,9 @@ model CaixaSessao {
   differenceAmount      Float?
   totalSalesAmount      Float           @default(0)
   salesCount            Int             @default(0)
+  totalCash             Float           @default(0)
+  totalMulticaixa       Float           @default(0)
+  totalTransferencia    Float           @default(0)
   status                String          @default("open")  // "open" | "closed"
   notes                 String?
   createdAt             DateTime        @default(now())

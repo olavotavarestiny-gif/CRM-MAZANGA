@@ -28,7 +28,15 @@ router.get('/produtos', async (req, res) => {
         ],
       }),
     };
-    const produtos = await prisma.produto.findMany({ where, orderBy: { productDescription: 'asc' } });
+    const produtos = await prisma.produto.findMany({
+      where,
+      orderBy: { productDescription: 'asc' },
+      include: {
+        categoria: {
+          select: { id: true, nome: true, cor: true, isDefault: true },
+        },
+      },
+    });
     // Append computed margin
     const result = produtos.map((p) => ({ ...p, margin: calcMargin(p.cost, p.unitPrice) }));
     res.json(result);
@@ -40,15 +48,36 @@ router.get('/produtos', async (req, res) => {
 // POST /api/faturacao/produtos
 router.post('/produtos', async (req, res) => {
   try {
-    const { productCode, productDescription, unitPrice, cost, productType, sku, unitOfMeasure, taxPercentage } = req.body;
+    const {
+      productCode,
+      productDescription,
+      unitPrice,
+      cost,
+      productType,
+      sku,
+      unitOfMeasure,
+      taxPercentage,
+      stockMinimo,
+      categoriaId,
+    } = req.body;
     if (!productCode || !productDescription) return res.status(400).json({ error: 'Código e descrição obrigatórios' });
     const pct = Number(taxPercentage) ?? 14;
     if (!isValidRate(pct)) return res.status(400).json({ error: `Taxa IVA inválida: ${pct}%. Use 0%, 5% ou 14%.` });
     const salePrice = Number(unitPrice) || 0;
     const costVal = cost != null ? Number(cost) : null;
+    const userId = req.user.effectiveUserId;
+
+    if (categoriaId) {
+      const categoria = await prisma.produtoCategoria.findFirst({
+        where: { id: categoriaId, userId },
+        select: { id: true },
+      });
+      if (!categoria) return res.status(400).json({ error: 'Categoria inválida' });
+    }
+
     const produto = await prisma.produto.create({
       data: {
-        userId: req.user.effectiveUserId,
+        userId,
         productCode,
         productDescription,
         unitPrice: salePrice,
@@ -58,6 +87,13 @@ router.post('/produtos', async (req, res) => {
         unitOfMeasure: unitOfMeasure || 'UN',
         taxPercentage: pct,
         taxCode: getTaxCode(pct),
+        stockMinimo: stockMinimo != null ? Number(stockMinimo) : null,
+        categoriaId: categoriaId || null,
+      },
+      include: {
+        categoria: {
+          select: { id: true, nome: true, cor: true, isDefault: true },
+        },
       },
     });
     res.status(201).json({ ...produto, margin: calcMargin(costVal, salePrice) });
@@ -72,9 +108,18 @@ router.put('/produtos/:id', async (req, res) => {
   try {
     const existing = await prisma.produto.findUnique({ where: { id: req.params.id }, select: { userId: true, unitPrice: true, cost: true } });
     if (!existing || existing.userId !== req.user.effectiveUserId) return res.status(404).json({ error: 'Produto não encontrado' });
-    const { productDescription, unitPrice, cost, productType, sku, unitOfMeasure, taxPercentage, active } = req.body;
+    const { productDescription, unitPrice, cost, productType, sku, unitOfMeasure, taxPercentage, active, stockMinimo, categoriaId } = req.body;
     const pct = taxPercentage !== undefined ? Number(taxPercentage) : undefined;
     if (pct !== undefined && !isValidRate(pct)) return res.status(400).json({ error: `Taxa IVA inválida: ${pct}%. Use 0%, 5% ou 14%.` });
+
+    if (categoriaId) {
+      const categoria = await prisma.produtoCategoria.findFirst({
+        where: { id: categoriaId, userId: req.user.effectiveUserId },
+        select: { id: true },
+      });
+      if (!categoria) return res.status(400).json({ error: 'Categoria inválida' });
+    }
+
     const updated = await prisma.produto.update({
       where: { id: req.params.id },
       data: {
@@ -85,7 +130,14 @@ router.put('/produtos/:id', async (req, res) => {
         ...(sku !== undefined && { sku: sku || null }),
         ...(unitOfMeasure !== undefined && { unitOfMeasure }),
         ...(pct !== undefined && { taxPercentage: pct, taxCode: getTaxCode(pct) }),
+        ...(stockMinimo !== undefined && { stockMinimo: stockMinimo === null ? null : Number(stockMinimo) }),
+        ...(categoriaId !== undefined && { categoriaId: categoriaId || null }),
         ...(active !== undefined && { active }),
+      },
+      include: {
+        categoria: {
+          select: { id: true, nome: true, cor: true, isDefault: true },
+        },
       },
     });
     const salePrice = unitPrice !== undefined ? Number(unitPrice) : existing.unitPrice;

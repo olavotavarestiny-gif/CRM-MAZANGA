@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, Task, CRMForm, FormField, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, StockMovement, CaixaSessao, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount } from './types';
+import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, Task, CRMForm, FormField, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, ProdutoCategoria, StockMovement, CaixaSessao, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount } from './types';
 import { createClient } from './supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -715,6 +715,8 @@ export async function createProduto(data: {
   sku?: string | null;
   unitOfMeasure?: string;
   taxPercentage?: number;
+  stockMinimo?: number | null;
+  categoriaId?: string | null;
 }): Promise<Produto> {
   const res = await api.post('/api/faturacao/produtos', data);
   return res.data;
@@ -739,9 +741,29 @@ export async function getStockMovements(id: string): Promise<StockMovement[]> {
   return res.data;
 }
 
+// Categorias de Produtos
+export async function getCategoriasProduto(): Promise<ProdutoCategoria[]> {
+  const res = await api.get('/api/produto-categorias');
+  return res.data;
+}
+
+export async function createCategoriaProduto(data: { nome: string; cor?: string }): Promise<ProdutoCategoria> {
+  const res = await api.post('/api/produto-categorias', data);
+  return res.data;
+}
+
+export async function updateCategoriaProduto(id: string, data: { nome?: string; cor?: string }): Promise<ProdutoCategoria> {
+  const res = await api.patch(`/api/produto-categorias/${id}`, data);
+  return res.data;
+}
+
+export async function deleteCategoriaProduto(id: string): Promise<void> {
+  await api.delete(`/api/produto-categorias/${id}`);
+}
+
 // Caixa — Sessões
-export async function getCaixaSessaoAtual(): Promise<CaixaSessao | null> {
-  const res = await api.get('/api/caixa/sessoes/atual');
+export async function getCaixaSessaoAtual(params?: { estabelecimentoId?: string }): Promise<CaixaSessao | null> {
+  const res = await api.get('/api/caixa/sessoes/atual', { params });
   return res.data;
 }
 
@@ -759,6 +781,16 @@ export async function fecharCaixaSessao(id: string, data: {
   notes?: string;
 }): Promise<CaixaSessao> {
   const res = await api.patch(`/api/caixa/sessoes/${id}/fechar`, data);
+  return res.data;
+}
+
+export async function getCaixaSessoes(params?: {
+  status?: 'open' | 'closed';
+  estabelecimentoId?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ sessoes: CaixaSessao[]; total: number; page: number; limit: number }> {
+  const res = await api.get('/api/caixa/sessoes', { params });
   return res.data;
 }
 
