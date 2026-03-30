@@ -11,6 +11,7 @@ import {
   ChevronDown, CreditCard,
 } from 'lucide-react';
 import { isComercio } from '@/lib/business-modes';
+import { KukuGestNavLogo, KukuGestNavLogoComercio } from '@/components/KukuGestLogo';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
 import { getChatUnreadCount } from '@/lib/api';
@@ -61,8 +62,8 @@ export default function Sidebar({
   const navItemClass = (active: boolean) => cn(
     'flex items-center gap-3 px-3 py-2 transition-all text-sm font-medium rounded-xl',
     active
-      ? 'bg-blue-50 text-[#0049e6] font-semibold'
-      : 'text-[#6b7e9a] hover:text-[#0049e6] hover:bg-blue-50/60'
+      ? comercio ? 'bg-orange-50 text-[#F06A1A] font-semibold' : 'bg-blue-50 text-[#0049e6] font-semibold'
+      : comercio ? 'text-[#6b7e9a] hover:text-[#F06A1A] hover:bg-orange-50/60' : 'text-[#6b7e9a] hover:text-[#0049e6] hover:bg-blue-50/60'
   );
 
   const comercio = isComercio(currentUser?.workspaceMode);
@@ -137,14 +138,10 @@ export default function Sidebar({
     >
       {/* Logo */}
       <div className="px-5 py-5 flex items-center justify-between flex-shrink-0 border-b border-slate-100">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1A0A02] via-[#2A1205] to-[#080F1A] flex items-center justify-center flex-shrink-0">
-            <BarChart3 className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-[#2c2f31] font-bold text-base leading-none" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-            Kuku<span className="font-medium text-[#595c5e]">Gest</span>
-          </span>
-        </div>
+        {comercio
+          ? <KukuGestNavLogoComercio iconSize={36} />
+          : <KukuGestNavLogo iconSize={36} />
+        }
         <button onClick={onClose} className="md:hidden p-1 hover:bg-slate-100 rounded transition-colors">
           <X className="w-4 h-4 text-[#6b7e9a]" />
         </button>
