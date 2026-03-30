@@ -9,23 +9,29 @@ import type { User, UserPermissions } from '@/lib/api';
 
 interface Props {
   member: User;
+  workspaceMode?: User['workspaceMode'];
   onClose: () => void;
   onSaved: () => void;
 }
 
 type SimpleLevel = 'none' | 'view' | 'edit';
 type CommercialPermissionKey = 'dashboard_basic' | 'dashboard_analysis';
-type CaixaPermissionKey = 'open' | 'close' | 'audit';
-type StockPermissionKey = 'edit';
+type CaixaPermissionKey = 'view' | 'open' | 'close' | 'audit';
+type StockPermissionKey = 'view' | 'edit';
 
-const SIMPLE_MODULES: { key: keyof Omit<UserPermissions, 'finances'>; label: string }[] = [
-  { key: 'contacts',    label: 'Clientes' },
-  { key: 'pipeline',    label: 'Processos' },
-  { key: 'tasks',       label: 'Tarefas' },
-  { key: 'vendas',      label: 'Vendas' },
-  { key: 'calendario',  label: 'Calendário' },
+const SERVICOS_SIMPLE_MODULES: { key: keyof Omit<UserPermissions, 'finances'>; label: string }[] = [
+  { key: 'contacts', label: 'Clientes' },
+  { key: 'pipeline', label: 'Processos' },
+  { key: 'tasks', label: 'Tarefas' },
+  { key: 'vendas', label: 'Vendas' },
+  { key: 'calendario', label: 'Calendário' },
   { key: 'automations', label: 'Automações' },
-  { key: 'forms',       label: 'Formulários' },
+  { key: 'forms', label: 'Formulários' },
+];
+
+const COMERCIO_SIMPLE_MODULES: { key: keyof Omit<UserPermissions, 'finances'>; label: string }[] = [
+  { key: 'contacts', label: 'Clientes' },
+  { key: 'vendas', label: 'Venda Rápida' },
 ];
 
 const LEVEL_LABELS: Record<SimpleLevel, string> = {
@@ -36,9 +42,8 @@ const LEVEL_LABELS: Record<SimpleLevel, string> = {
 
 function initPerms(user: User): UserPermissions {
   if (!user.permissions) {
-    // full access → convert to explicit edit for all
     const perms: UserPermissions = {};
-    SIMPLE_MODULES.forEach(m => { perms[m.key] = 'edit'; });
+    SERVICOS_SIMPLE_MODULES.forEach((module) => { perms[module.key] = 'edit'; });
     perms.vendas = 'edit';
     perms.finances = {
       transactions: 'edit',
@@ -65,6 +70,7 @@ function initPerms(user: User): UserPermissions {
     };
     return perms;
   }
+
   return {
     ...user.permissions,
     comercial: {
@@ -86,39 +92,108 @@ function initPerms(user: User): UserPermissions {
   };
 }
 
-export default function MemberPermissionsModal({ member, onClose, onSaved }: Props) {
+function FinanceBooleanGrid({
+  finances,
+  setFinance,
+}: {
+  finances: NonNullable<UserPermissions['finances']>;
+  setFinance: (key: keyof NonNullable<UserPermissions['finances']>, value: boolean | SimpleLevel) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {(
+        [
+          { key: 'view_invoices', label: 'Ver Faturas' },
+          { key: 'emit_invoices', label: 'Emitir Faturas' },
+          { key: 'view_reports', label: 'Ver Relatórios' },
+          { key: 'saft', label: 'SAF-T' },
+        ] as { key: keyof NonNullable<UserPermissions['finances']>; label: string }[]
+      ).map(({ key, label }) => (
+        <label key={key} className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={!!finances[key]}
+            onChange={(event) => setFinance(key, event.target.checked)}
+            className="w-4 h-4 accent-[#0A2540]"
+          />
+          <span className="text-sm text-[#0A2540]">{label}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+export default function MemberPermissionsModal({
+  member,
+  workspaceMode = 'servicos',
+  onClose,
+  onSaved,
+}: Props) {
   const [perms, setPerms] = useState<UserPermissions>(initPerms(member));
+  const isComercioWorkspace = workspaceMode === 'comercio';
+  const visibleSimpleModules = isComercioWorkspace ? COMERCIO_SIMPLE_MODULES : SERVICOS_SIMPLE_MODULES;
 
   const setModule = (key: keyof Omit<UserPermissions, 'finances'>, level: SimpleLevel) => {
-    setPerms(prev => ({ ...prev, [key]: level }));
+    setPerms((prev) => ({ ...prev, [key]: level }));
   };
 
-  const setFinance = (key: keyof NonNullable<UserPermissions['finances']>, value: boolean | 'none' | 'view' | 'edit') => {
-    setPerms(prev => ({
+  const setFinance = (key: keyof NonNullable<UserPermissions['finances']>, value: boolean | SimpleLevel) => {
+    setPerms((prev) => ({
       ...prev,
       finances: { ...prev.finances, [key]: value },
     }));
   };
 
   const setCommercial = (key: CommercialPermissionKey, value: boolean) => {
-    setPerms(prev => ({
+    setPerms((prev) => ({
       ...prev,
-      comercial: { ...prev.comercial, [key]: value },
+      comercial: {
+        ...prev.comercial,
+        dashboard_basic: key === 'dashboard_analysis' && value ? true : prev.comercial?.dashboard_basic,
+        dashboard_analysis: key === 'dashboard_basic' && !value ? false : prev.comercial?.dashboard_analysis,
+        [key]: value,
+      },
     }));
   };
 
   const setCaixa = (key: CaixaPermissionKey, value: boolean) => {
-    setPerms(prev => ({
-      ...prev,
-      caixa: { ...prev.caixa, view: true, [key]: value },
-    }));
+    setPerms((prev) => {
+      const nextCaixa = { ...prev.caixa, [key]: value };
+
+      if (key === 'view' && !value) {
+        nextCaixa.open = false;
+        nextCaixa.close = false;
+        nextCaixa.audit = false;
+      }
+
+      if (key !== 'view' && value) {
+        nextCaixa.view = true;
+      }
+
+      return {
+        ...prev,
+        caixa: nextCaixa,
+      };
+    });
   };
 
   const setStock = (key: StockPermissionKey, value: boolean) => {
-    setPerms(prev => ({
-      ...prev,
-      stock: { ...prev.stock, view: true, [key]: value },
-    }));
+    setPerms((prev) => {
+      const nextStock = { ...prev.stock, [key]: value };
+
+      if (key === 'view' && !value) {
+        nextStock.edit = false;
+      }
+
+      if (key === 'edit' && value) {
+        nextStock.view = true;
+      }
+
+      return {
+        ...prev,
+        stock: nextStock,
+      };
+    });
   };
 
   const mutation = useMutation({
@@ -126,10 +201,10 @@ export default function MemberPermissionsModal({ member, onClose, onSaved }: Pro
     onSuccess: () => { onSaved(); onClose(); },
   });
 
-  const finances = perms.finances ?? {};
-  const comercial = perms.comercial ?? {};
-  const caixa = perms.caixa ?? {};
-  const stock = perms.stock ?? {};
+  const finances: NonNullable<UserPermissions['finances']> = perms.finances ?? {};
+  const comercial: NonNullable<UserPermissions['comercial']> = perms.comercial ?? {};
+  const caixa: NonNullable<UserPermissions['caixa']> = perms.caixa ?? {};
+  const stock: NonNullable<UserPermissions['stock']> = perms.stock ?? {};
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -139,15 +214,22 @@ export default function MemberPermissionsModal({ member, onClose, onSaved }: Pro
         </DialogHeader>
 
         <div className="py-2 space-y-5">
-          {/* Simple modules */}
+          {isComercioWorkspace ? (
+            <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              Estás a editar as permissões do workspace de comércio. Esta vista segue as abas reais desse modo.
+            </div>
+          ) : null}
+
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">Módulos</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">
+              {isComercioWorkspace ? 'Operação diária' : 'Módulos'}
+            </p>
             <div className="space-y-2">
-              {SIMPLE_MODULES.map(({ key, label }) => (
+              {visibleSimpleModules.map(({ key, label }) => (
                 <div key={key} className="flex items-center justify-between py-2 border-b border-[#f0f0f0] last:border-0">
                   <span className="text-sm font-medium text-[#0A2540]">{label}</span>
                   <div className="flex gap-1">
-                    {(['none', 'view', 'edit'] as SimpleLevel[]).map(level => (
+                    {(['none', 'view', 'edit'] as SimpleLevel[]).map((level) => (
                       <button
                         key={level}
                         onClick={() => setModule(key, level)}
@@ -168,70 +250,56 @@ export default function MemberPermissionsModal({ member, onClose, onSaved }: Pro
                 </div>
               ))}
 
-              {/* Chat: always edit */}
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm font-medium text-[#0A2540]">Conversas</span>
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-[#f8fafc] text-[#6b7e9a] border border-[#dde3ec]">
-                  Sempre activo
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Finance sub-permissions */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">Finanças</p>
-            <div className="space-y-3 p-3 bg-[#f8fafc] rounded-xl border border-[#dde3ec]">
-              {/* Transactions */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-[#0A2540]">Transacções</span>
-                <div className="flex gap-1">
-                  {(['none', 'view', 'edit'] as SimpleLevel[]).map(level => (
-                    <button
-                      key={level}
-                      onClick={() => setFinance('transactions', level)}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all border ${
-                        finances.transactions === level
-                          ? level === 'none'
-                            ? 'bg-red-100 text-red-700 border-red-200'
-                            : level === 'view'
-                            ? 'bg-blue-100 text-blue-700 border-blue-200'
-                            : 'bg-green-100 text-green-700 border-green-200'
-                          : 'bg-white text-[#6b7e9a] border-[#dde3ec] hover:border-[#0A2540]'
-                      }`}
-                    >
-                      {LEVEL_LABELS[level]}
-                    </button>
-                  ))}
+              {!isComercioWorkspace ? (
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm font-medium text-[#0A2540]">Conversas</span>
+                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-[#f8fafc] text-[#6b7e9a] border border-[#dde3ec]">
+                    Sempre ativo
+                  </span>
                 </div>
-              </div>
-
-              {/* Boolean finance permissions */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                {(
-                  [
-                    { key: 'view_invoices', label: 'Ver Faturas' },
-                    { key: 'emit_invoices', label: 'Emitir Faturas' },
-                    { key: 'view_reports',  label: 'Ver Relatórios' },
-                    { key: 'saft',          label: 'SAF-T' },
-                  ] as { key: keyof NonNullable<UserPermissions['finances']>; label: string }[]
-                ).map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={!!(finances as Record<string, unknown>)[key as string]}
-                      onChange={(e) => setFinance(key, e.target.checked)}
-                      className="w-4 h-4 accent-[#0A2540]"
-                    />
-                    <span className="text-sm text-[#0A2540]">{label}</span>
-                  </label>
-                ))}
-              </div>
+              ) : null}
             </div>
           </div>
 
+          {!isComercioWorkspace ? (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">Finanças</p>
+              <div className="space-y-3 p-3 bg-[#f8fafc] rounded-xl border border-[#dde3ec]">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-[#0A2540]">Transações</span>
+                  <div className="flex gap-1">
+                    {(['none', 'view', 'edit'] as SimpleLevel[]).map((level) => (
+                      <button
+                        key={level}
+                        onClick={() => setFinance('transactions', level)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all border ${
+                          finances.transactions === level
+                            ? level === 'none'
+                              ? 'bg-red-100 text-red-700 border-red-200'
+                              : level === 'view'
+                              ? 'bg-blue-100 text-blue-700 border-blue-200'
+                              : 'bg-green-100 text-green-700 border-green-200'
+                            : 'bg-white text-[#6b7e9a] border-[#dde3ec] hover:border-[#0A2540]'
+                        }`}
+                      >
+                        {LEVEL_LABELS[level]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <FinanceBooleanGrid
+                  finances={finances}
+                  setFinance={setFinance}
+                />
+              </div>
+            </div>
+          ) : null}
+
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">Permissões Comerciais</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">
+              {isComercioWorkspace ? 'Painel Comercial' : 'Permissões Comerciais'}
+            </p>
             <div className="space-y-3 p-3 bg-[#f8fafc] rounded-xl border border-[#dde3ec]">
               {([
                 { key: 'dashboard_basic', label: 'Ver painel resumo' },
@@ -242,7 +310,7 @@ export default function MemberPermissionsModal({ member, onClose, onSaved }: Pro
                   <input
                     type="checkbox"
                     checked={!!comercial[key]}
-                    onChange={(e) => setCommercial(key, e.target.checked)}
+                    onChange={(event) => setCommercial(key, event.target.checked)}
                     className="h-4 w-4 accent-[#0A2540]"
                   />
                 </label>
@@ -251,9 +319,12 @@ export default function MemberPermissionsModal({ member, onClose, onSaved }: Pro
           </div>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">Caixa e Stock</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">
+              Caixa
+            </p>
             <div className="space-y-3 p-3 bg-[#f8fafc] rounded-xl border border-[#dde3ec]">
               {([
+                { key: 'view', label: 'Ver caixa' },
                 { key: 'open', label: 'Abrir caixa' },
                 { key: 'close', label: 'Fechar caixa' },
                 { key: 'audit', label: 'Ver auditoria de caixa' },
@@ -263,23 +334,51 @@ export default function MemberPermissionsModal({ member, onClose, onSaved }: Pro
                   <input
                     type="checkbox"
                     checked={!!caixa[key]}
-                    onChange={(e) => setCaixa(key, e.target.checked)}
+                    onChange={(event) => setCaixa(key, event.target.checked)}
                     className="h-4 w-4 accent-[#0A2540]"
                   />
                 </label>
               ))}
+            </div>
+          </div>
 
-              <label className="flex items-center justify-between gap-3 cursor-pointer select-none border-t border-[#dde3ec] pt-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">
+              {isComercioWorkspace ? 'Produtos e Stock' : 'Stock'}
+            </p>
+            <div className="space-y-3 p-3 bg-[#f8fafc] rounded-xl border border-[#dde3ec]">
+              <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
+                <span className="text-sm text-[#0A2540]">Ver produtos e stock</span>
+                <input
+                  type="checkbox"
+                  checked={!!stock.view}
+                  onChange={(event) => setStock('view', event.target.checked)}
+                  className="h-4 w-4 accent-[#0A2540]"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
                 <span className="text-sm text-[#0A2540]">Editar stock manualmente</span>
                 <input
                   type="checkbox"
                   checked={!!stock.edit}
-                  onChange={(e) => setStock('edit', e.target.checked)}
+                  onChange={(event) => setStock('edit', event.target.checked)}
                   className="h-4 w-4 accent-[#0A2540]"
                 />
               </label>
             </div>
           </div>
+
+          {isComercioWorkspace ? (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">Faturação</p>
+              <div className="space-y-3 p-3 bg-[#f8fafc] rounded-xl border border-[#dde3ec]">
+                <FinanceBooleanGrid
+                  finances={finances}
+                  setFinance={setFinance}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter>

@@ -14,54 +14,51 @@ import ProductTourProvider, { useTour } from '@/components/help/product-tour';
 import { ReactNode } from 'react';
 import { Menu, Eye, Info, LogOut, X } from 'lucide-react';
 import type { User } from '@/lib/api';
-import { canView, getVisibleModules, hasFeature } from '@/lib/permissions';
+import { canAccessWorkspaceRoute, getWorkspaceFallbackRoute, hasFeature } from '@/lib/permissions';
 
 const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
 
-// Map route prefix → module key (for permission redirect checks)
-const PATH_MODULE_MAP: Record<string, Parameters<typeof canView>[1]> = {
-  '/contacts':        'contacts',
-  '/pipeline':        'pipeline',
-  '/tasks':           'tasks',
-  '/caixa':           'vendas',
-  '/vendas':          'vendas',
-  '/vendas-rapidas':  'vendas',
-  '/faturacao':       'vendas',
-  '/calendario':      'calendario',
-  '/chat':            'chat',
-  '/automations':     'automations',
-  '/forms':           'forms',
-  '/finances':        'finances',
-  '/produtos':        'vendas',
-};
-
-const MODULE_LABELS: Record<string, string> = {
+const ROUTE_LABELS: Record<string, string> = {
   '/contacts':       'Clientes',
   '/pipeline':       'Processos',
   '/tasks':          'Tarefas',
   '/caixa':          'Caixa',
-  '/vendas':         'Vendas',
-  '/vendas-rapidas': 'Vendas',
-  '/faturacao':      'Vendas',
+  '/vendas':         'Faturação',
+  '/vendas-rapidas': 'Venda Rápida',
+  '/faturacao':      'Faturação',
   '/calendario':     'Calendário',
   '/chat':           'Conversas',
   '/automations':    'Automações',
   '/forms':          'Formulários',
   '/finances':       'Finanças',
-  '/produtos':       'Vendas',
+  '/produtos':       'Produtos',
 };
 
-const MODULE_TO_PLAN_FEATURE = {
-  contacts: 'clientes',
-  pipeline: 'processos',
-  tasks: 'tarefas',
-  chat: 'conversas',
-  calendario: 'calendario',
-  automations: 'automacoes',
-  forms: 'formularios',
-  finances: 'financas',
-  vendas: 'vendas',
-} as const;
+const ROUTE_TO_PLAN_FEATURE = [
+  { prefix: '/contacts', feature: 'clientes' },
+  { prefix: '/pipeline', feature: 'processos' },
+  { prefix: '/tasks', feature: 'tarefas' },
+  { prefix: '/caixa', feature: 'vendas' },
+  { prefix: '/vendas', feature: 'vendas' },
+  { prefix: '/vendas-rapidas', feature: 'vendas' },
+  { prefix: '/faturacao', feature: 'vendas' },
+  { prefix: '/produtos', feature: 'vendas' },
+  { prefix: '/calendario', feature: 'calendario' },
+  { prefix: '/chat', feature: 'conversas' },
+  { prefix: '/automations', feature: 'automacoes' },
+  { prefix: '/forms', feature: 'formularios' },
+  { prefix: '/finances', feature: 'financas' },
+] as const;
+
+function resolveRouteLabel(pathname: string) {
+  const firstSegment = '/' + pathname.split('/')[1];
+  return ROUTE_LABELS[firstSegment] || 'Esta funcionalidade';
+}
+
+function resolveRoutePlanFeature(pathname: string) {
+  const firstSegment = '/' + pathname.split('/')[1];
+  return ROUTE_TO_PLAN_FEATURE.find(({ prefix }) => prefix === firstSegment)?.feature;
+}
 
 type AccessNotice = {
   title: string;
@@ -191,17 +188,10 @@ function LayoutInner({ children }: { children: ReactNode }) {
         return;
       }
 
-      const firstSegment = '/' + pathname.split('/')[1];
-      const module = PATH_MODULE_MAP[firstSegment];
-      if (module && !canView(user, module)) {
-        const visible = getVisibleModules(user);
-        const moduleToPath: Record<string, string> = {
-          contacts: '/contacts', pipeline: '/pipeline', tasks: '/tasks',
-          chat: '/chat', calendario: '/calendario', automations: '/automations',
-          forms: '/forms', finances: '/finances', vendas: '/vendas',
-        };
-        const fallback = visible.map(m => moduleToPath[m]).find(Boolean) ?? '/';
-        const blockedByPlan = !hasFeature(user, MODULE_TO_PLAN_FEATURE[module]);
+      if (!canAccessWorkspaceRoute(user, pathname, user.workspaceMode)) {
+        const fallback = getWorkspaceFallbackRoute(user, user.workspaceMode);
+        const planFeature = resolveRoutePlanFeature(pathname);
+        const blockedByPlan = planFeature ? !hasFeature(user, planFeature) : false;
 
         try {
           sessionStorage.setItem(
@@ -209,7 +199,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
             JSON.stringify({
               title: blockedByPlan ? 'Funcionalidade indisponível no seu plano' : 'Acesso restrito',
               message: blockedByPlan
-                ? `${MODULE_LABELS[firstSegment] || 'Esta funcionalidade'} não está disponível no plano atual da sua conta.`
+                ? `${resolveRouteLabel(pathname)} não está disponível no plano atual da sua conta.`
                 : 'Não tem permissão para aceder a esta área com a configuração atual da sua conta.',
             } satisfies AccessNotice)
           );

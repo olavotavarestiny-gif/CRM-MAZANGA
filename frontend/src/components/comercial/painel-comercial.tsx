@@ -14,12 +14,13 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
 import {
+  canAccessBilling,
   canCaixaOpen,
   canCaixaView,
   canComercialDashboardAnalysis,
   canComercialDashboardBasic,
+  canStockView,
   canView,
-  canViewInvoices,
 } from '@/lib/permissions';
 
 function formatKz(value: number) {
@@ -149,6 +150,7 @@ function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
   const podeVerCaixa = canCaixaView(currentUser);
   const podeAbrirCaixa = podeVerCaixa && canCaixaOpen(currentUser);
   const podeVerVendas = canView(currentUser, 'vendas');
+  const podeVerProdutos = canStockView(currentUser);
   const podeVerContactos = canView(currentUser, 'contacts');
 
   const {
@@ -164,7 +166,7 @@ function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
   const links = [
     podeVerCaixa ? { href: '/caixa', label: 'Ir para Caixa', icon: CreditCard } : null,
     podeVerVendas ? { href: '/vendas-rapidas', label: 'Ir para Venda Rápida', icon: ShoppingCart } : null,
-    podeVerVendas ? { href: '/produtos', label: 'Rever inventário', icon: PackageX } : null,
+    podeVerProdutos ? { href: '/produtos', label: 'Rever inventário', icon: PackageX } : null,
     podeVerContactos ? { href: '/contacts', label: 'Ver clientes', icon: Store } : null,
   ].filter(Boolean) as { href: string; label: string; icon: typeof CreditCard }[];
 
@@ -271,7 +273,8 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
   const podeResumo = currentUser ? canComercialDashboardBasic(currentUser) : false;
   const podeAnalise = currentUser ? canComercialDashboardAnalysis(currentUser) : false;
   const podeVerVendas = currentUser ? canView(currentUser, 'vendas') : false;
-  const podeVerFaturacao = currentUser ? canViewInvoices(currentUser) : false;
+  const podeVerProdutos = currentUser ? canStockView(currentUser) : false;
+  const podeVerFaturacao = currentUser ? canAccessBilling(currentUser) : false;
 
   const {
     data: resumo,
@@ -447,7 +450,7 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
                     </Link>
                   </Button>
                 ) : null}
-                {podeVerVendas ? (
+                {podeVerProdutos ? (
                   <Button asChild variant="outline" className="justify-start gap-2">
                     <Link href="/produtos">
                       <PackageX className="h-4 w-4" />

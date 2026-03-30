@@ -14,7 +14,7 @@ import { isComercio } from '@/lib/business-modes';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
 import { getChatUnreadCount } from '@/lib/api';
-import { canView } from '@/lib/permissions';
+import { canAccessCommerceRoute, canView } from '@/lib/permissions';
 import type { ModuleKey } from '@/lib/permissions';
 import { ONBOARDING_OPEN, ONBOARDING_DISMISSED } from '@/lib/onboarding-tasks';
 import { getPlanBadgeClasses } from '@/lib/plan-utils';
@@ -70,13 +70,9 @@ export default function Sidebar({
   // Map href to module key for permission checks
   const hrefToModule: Record<string, ModuleKey | null> = {
     '/':                null, // always visible
-    '/caixa':           'vendas',
-    '/vendas-rapidas':  'vendas',
     '/contacts':        'contacts',
     '/pipeline':        'pipeline',
     '/tasks':           'tasks',
-    '/vendas':          'vendas',
-    '/produtos':        'vendas',
     '/calendario':      'calendario',
     '/chat':            'chat',
     '/automations':     'automations',
@@ -86,6 +82,7 @@ export default function Sidebar({
 
   const isVisible = (href: string) => {
     if (!currentUser) return false;
+    if (comercio) return canAccessCommerceRoute(currentUser, href);
     const module = hrefToModule[href];
     if (module === null) return true; // always visible (painel)
     if (!module) return true;

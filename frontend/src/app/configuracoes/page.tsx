@@ -1041,6 +1041,7 @@ function ConfiguracoesContent() {
       {permMember && (
         <MemberPermissionsModal
           member={permMember}
+          workspaceMode={currentUser?.workspaceMode}
           onClose={() => setPermMember(null)}
           onSaved={() => { refetchTeam(); setPermMember(null); }}
         />

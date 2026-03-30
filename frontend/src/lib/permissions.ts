@@ -33,6 +33,47 @@ function hasFullAccess(user?: User | null): boolean {
   return !!(user.isSuperAdmin || user.role === 'admin' || !user.accountOwnerId);
 }
 
+type WorkspaceMode = User['workspaceMode'];
+type CommerceRoute =
+  | '/'
+  | '/caixa'
+  | '/vendas-rapidas'
+  | '/contacts'
+  | '/produtos'
+  | '/vendas'
+  | '/configuracoes';
+
+const SERVICOS_ROUTE_TO_MODULE: Array<{ prefix: string; module: ModuleKey }> = [
+  { prefix: '/contacts', module: 'contacts' },
+  { prefix: '/pipeline', module: 'pipeline' },
+  { prefix: '/tasks', module: 'tasks' },
+  { prefix: '/caixa', module: 'vendas' },
+  { prefix: '/vendas', module: 'vendas' },
+  { prefix: '/vendas-rapidas', module: 'vendas' },
+  { prefix: '/faturacao', module: 'vendas' },
+  { prefix: '/calendario', module: 'calendario' },
+  { prefix: '/chat', module: 'chat' },
+  { prefix: '/automations', module: 'automations' },
+  { prefix: '/forms', module: 'forms' },
+  { prefix: '/finances', module: 'finances' },
+  { prefix: '/produtos', module: 'vendas' },
+];
+
+const COMERCIO_FALLBACK_ROUTES: CommerceRoute[] = [
+  '/',
+  '/caixa',
+  '/vendas-rapidas',
+  '/contacts',
+  '/produtos',
+  '/vendas',
+  '/configuracoes',
+];
+
+function normalizePath(pathname: string): string {
+  if (!pathname || pathname === '/') return '/';
+  return pathname.replace(/\/+$/, '') || '/';
+}
+
 export function hasFeature(
   userOrFeatures: Pick<User, 'planFeatures'> | PlanFeatures | null | undefined,
   featureName: PlanFeatureName
@@ -113,7 +154,13 @@ export function canEmitInvoices(user: User): boolean {
   return !!f.emit_invoices;
 }
 
+export function canAccessBilling(user: User): boolean {
+  if (!hasFeature(user, 'vendas')) return false;
+  return canViewInvoices(user);
+}
+
 export function canComercialDashboardBasic(user: User): boolean {
+  if (!hasFeature(user, 'vendas')) return false;
   if (hasFullAccess(user)) return true;
   const perms = parsePermissions(user.permissions);
   if (perms === null) return true;
@@ -121,6 +168,7 @@ export function canComercialDashboardBasic(user: User): boolean {
 }
 
 export function canComercialDashboardAnalysis(user: User): boolean {
+  if (!hasFeature(user, 'vendas')) return false;
   if (hasFullAccess(user)) return true;
   const perms = parsePermissions(user.permissions);
   if (perms === null) return true;
@@ -128,6 +176,7 @@ export function canComercialDashboardAnalysis(user: User): boolean {
 }
 
 export function canCaixaView(user: User): boolean {
+  if (!hasFeature(user, 'vendas')) return false;
   if (hasFullAccess(user)) return true;
   const perms = parsePermissions(user.permissions);
   if (perms === null) return true;
@@ -135,6 +184,7 @@ export function canCaixaView(user: User): boolean {
 }
 
 export function canCaixaOpen(user: User): boolean {
+  if (!hasFeature(user, 'vendas')) return false;
   if (hasFullAccess(user)) return true;
   const perms = parsePermissions(user.permissions);
   if (perms === null) return true;
@@ -142,6 +192,7 @@ export function canCaixaOpen(user: User): boolean {
 }
 
 export function canCaixaClose(user: User): boolean {
+  if (!hasFeature(user, 'vendas')) return false;
   if (hasFullAccess(user)) return true;
   const perms = parsePermissions(user.permissions);
   if (perms === null) return true;
@@ -149,17 +200,82 @@ export function canCaixaClose(user: User): boolean {
 }
 
 export function canCaixaAudit(user: User): boolean {
+  if (!hasFeature(user, 'vendas')) return false;
   if (hasFullAccess(user)) return true;
   const perms = parsePermissions(user.permissions);
   if (perms === null) return true;
   return perms?.caixa?.audit === true;
 }
 
+export function canStockView(user: User): boolean {
+  if (!hasFeature(user, 'vendas')) return false;
+  if (hasFullAccess(user)) return true;
+  const perms = parsePermissions(user.permissions);
+  if (perms === null) return true;
+  return perms?.stock?.view !== false;
+}
+
 export function canStockEdit(user: User): boolean {
+  if (!hasFeature(user, 'vendas')) return false;
   if (hasFullAccess(user)) return true;
   const perms = parsePermissions(user.permissions);
   if (perms === null) return true;
   return perms?.stock?.edit === true;
+}
+
+export function canAccessCommerceRoute(user: User, pathname: string): boolean {
+  const path = normalizePath(pathname);
+
+  if (path === '/' || path.startsWith('/dashboard')) return true;
+  if (path.startsWith('/caixa')) return canCaixaView(user);
+  if (path.startsWith('/vendas-rapidas')) return canView(user, 'vendas');
+  if (path.startsWith('/contacts')) return canView(user, 'contacts');
+  if (path.startsWith('/produtos')) return canStockView(user);
+  if (path.startsWith('/vendas') || path.startsWith('/faturacao')) return canAccessBilling(user);
+  if (path.startsWith('/configuracoes')) return true;
+
+  return true;
+}
+
+export function canAccessWorkspaceRoute(
+  user: User,
+  pathname: string,
+  workspaceMode?: WorkspaceMode | null
+): boolean {
+  const path = normalizePath(pathname);
+
+  if (workspaceMode === 'comercio') {
+    return canAccessCommerceRoute(user, path);
+  }
+
+  if (path === '/' || path.startsWith('/dashboard') || path.startsWith('/configuracoes')) {
+    return true;
+  }
+
+  const route = SERVICOS_ROUTE_TO_MODULE.find(({ prefix }) => path === prefix || path.startsWith(prefix + '/'));
+  if (!route) return true;
+
+  return canView(user, route.module);
+}
+
+export function getWorkspaceFallbackRoute(user: User, workspaceMode?: WorkspaceMode | null): string {
+  if (workspaceMode === 'comercio') {
+    return COMERCIO_FALLBACK_ROUTES.find((route) => canAccessCommerceRoute(user, route)) ?? '/';
+  }
+
+  const moduleToPath: Record<ModuleKey, string> = {
+    contacts: '/contacts',
+    pipeline: '/pipeline',
+    tasks: '/tasks',
+    chat: '/chat',
+    calendario: '/calendario',
+    automations: '/automations',
+    forms: '/forms',
+    finances: '/finances',
+    vendas: '/vendas',
+  };
+
+  return getVisibleModules(user).map((module) => moduleToPath[module]).find(Boolean) ?? '/';
 }
 
 /** Returns the list of modules visible to the user */
