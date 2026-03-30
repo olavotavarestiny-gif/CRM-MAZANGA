@@ -23,7 +23,7 @@ router.get('/orgs', async (req, res) => {
       where: { accountOwnerId: null, isSuperAdmin: false },
       select: {
         id: true, name: true, email: true, active: true, plan: true,
-        permissions: true, createdAt: true,
+        permissions: true, workspaceMode: true, createdAt: true,
         accountMembers: {
           select: { id: true, name: true, email: true, active: true },
           orderBy: { name: 'asc' },
@@ -51,7 +51,7 @@ router.get('/orgs', async (req, res) => {
 router.patch('/orgs/:id', async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
-    const { plan, active, permissions } = req.body;
+    const { plan, active, permissions, workspaceMode } = req.body;
 
     const data = {};
     if (plan !== undefined) {
@@ -64,11 +64,17 @@ router.patch('/orgs/:id', async (req, res) => {
     if (permissions !== undefined) {
       data.permissions = permissions ? JSON.stringify(permissions) : null;
     }
+    if (workspaceMode !== undefined) {
+      if (!['servicos', 'comercio'].includes(workspaceMode)) {
+        return res.status(400).json({ error: 'Workspace inválido. Use servicos ou comercio.' });
+      }
+      data.workspaceMode = workspaceMode;
+    }
 
     const updated = await prisma.user.update({
       where: { id: userId },
       data,
-      select: { id: true, name: true, email: true, plan: true, active: true, permissions: true },
+      select: { id: true, name: true, email: true, plan: true, active: true, permissions: true, workspaceMode: true },
     });
 
     res.json({
@@ -164,7 +170,7 @@ router.post('/impersonate/:userId', async (req, res) => {
 // POST /api/superadmin/users — create a new client account (same as admin but superadmin version)
 router.post('/users', async (req, res) => {
   try {
-    const { name, email, password, plan, permissions } = req.body;
+    const { name, email, password, plan, permissions, workspaceMode } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Nome, email e password são obrigatórios' });
@@ -175,6 +181,9 @@ router.post('/users', async (req, res) => {
 
     if (plan !== undefined && !isSupportedPlan(plan)) {
       return res.status(400).json({ error: 'Plano inválido. Use essencial, profissional ou enterprise.' });
+    }
+    if (workspaceMode !== undefined && !['servicos', 'comercio'].includes(workspaceMode)) {
+      return res.status(400).json({ error: 'Workspace inválido. Use servicos ou comercio.' });
     }
 
     const existing = await prisma.user.findUnique({
@@ -196,13 +205,14 @@ router.post('/users', async (req, res) => {
         active: true,
         mustChangePassword: true,
         plan: plan || DEFAULT_PLAN,
+        workspaceMode: workspaceMode || 'servicos',
         permissions: permissions ? JSON.stringify(permissions) : null,
       },
     });
 
     res.status(201).json({
       id: user.id, name: user.name, email: user.email,
-      plan: normalizePlan(user.plan), active: user.active, createdAt: user.createdAt,
+      plan: normalizePlan(user.plan), active: user.active, workspaceMode: user.workspaceMode, createdAt: user.createdAt,
     });
   } catch (error) {
     console.error('Error creating user:', error);

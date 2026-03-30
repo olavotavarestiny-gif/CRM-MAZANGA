@@ -1013,7 +1013,12 @@ export async function getSuperAdminOrgs(): Promise<SuperAdminOrg[]> {
 
 export async function updateSuperAdminOrg(
   id: number,
-  data: { plan?: PlanName; active?: boolean; permissions?: UserPermissions | null }
+  data: {
+    plan?: PlanName;
+    active?: boolean;
+    permissions?: UserPermissions | null;
+    workspaceMode?: 'servicos' | 'comercio';
+  }
 ): Promise<void> {
   await api.patch(`/api/superadmin/orgs/${id}`, data);
 }
@@ -1076,6 +1081,7 @@ export async function createClientAccount(data: {
   email: string;
   password: string;
   plan?: PlanName;
+  workspaceMode?: 'servicos' | 'comercio';
   permissions?: UserPermissions | null;
 }): Promise<User> {
   const res = await api.post('/api/superadmin/users', data);

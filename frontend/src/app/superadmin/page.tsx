@@ -130,6 +130,7 @@ export default function SuperAdminPage() {
     email: '',
     password: '',
     plan: 'essencial' as PlanName,
+    workspaceMode: 'servicos' as 'servicos' | 'comercio',
   });
   const [createUserForm, setCreateUserForm] = useState({
     name: '',
@@ -216,7 +217,7 @@ export default function SuperAdminPage() {
       qc.invalidateQueries({ queryKey: ['admin-accounts'] });
       qc.invalidateQueries({ queryKey: ['superadmin-orgs'] });
       setShowCreateAccount(false);
-      setCreateAccountForm({ name: '', email: '', password: '', plan: 'essencial' });
+      setCreateAccountForm({ name: '', email: '', password: '', plan: 'essencial', workspaceMode: 'servicos' });
       setAccountError('');
       toast({
         variant: 'success',
@@ -742,6 +743,7 @@ export default function SuperAdminPage() {
                         <th className="w-8 px-4 py-3 text-left font-semibold text-[#0A2540]" />
                         <th className="px-4 py-3 text-left font-semibold text-[#0A2540]">Organização / Utilizador</th>
                         <th className="px-4 py-3 text-left font-semibold text-[#0A2540]">Plano</th>
+                        <th className="px-4 py-3 text-left font-semibold text-[#0A2540]">Workspace</th>
                         <th className="px-4 py-3 text-center font-semibold text-[#0A2540]">Membros</th>
                         <th className="px-4 py-3 text-center font-semibold text-[#0A2540]">Estado</th>
                         <th className="px-4 py-3 text-left font-semibold text-[#0A2540]">Criado</th>
@@ -779,6 +781,24 @@ export default function SuperAdminPage() {
                                     <option value="essencial">Essencial</option>
                                     <option value="profissional">Profissional</option>
                                     <option value="enterprise">Enterprise</option>
+                                  </select>
+                                  <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[#6b7e9a]" />
+                                </div>
+                              </td>
+                              <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+                                <div className="relative inline-block">
+                                  <select
+                                    value={org.workspaceMode || 'servicos'}
+                                    onChange={(event) =>
+                                      orgUpdateMutation.mutate({
+                                        id: org.id,
+                                        data: { workspaceMode: event.target.value as 'servicos' | 'comercio' },
+                                      })
+                                    }
+                                    className="appearance-none rounded-lg border border-[#dde3ec] bg-white py-1 pl-2 pr-6 text-xs font-medium text-[#0A2540] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  >
+                                    <option value="servicos">Serviços</option>
+                                    <option value="comercio">Comércio</option>
                                   </select>
                                   <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[#6b7e9a]" />
                                 </div>
@@ -843,6 +863,7 @@ export default function SuperAdminPage() {
                                     </div>
                                   </td>
                                   <td className="px-4 py-2 text-xs text-[#6b7e9a]">Membro</td>
+                                  <td className="px-4 py-2 text-xs text-[#6b7e9a]">{org.workspaceMode === 'comercio' ? 'Comércio' : 'Serviços'}</td>
                                   <td className="px-4 py-2" />
                                   <td className="px-4 py-2 text-center">
                                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -1044,6 +1065,20 @@ export default function SuperAdminPage() {
                 <option value="essencial">Essencial</option>
                 <option value="profissional">Profissional</option>
                 <option value="enterprise">Enterprise</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0A2540]">Workspace inicial</label>
+              <select
+                value={createAccountForm.workspaceMode}
+                onChange={(event) => setCreateAccountForm({
+                  ...createAccountForm,
+                  workspaceMode: event.target.value as 'servicos' | 'comercio',
+                })}
+                className="w-full rounded-lg border border-[#dde3ec] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="servicos">Serviços</option>
+                <option value="comercio">Comércio</option>
               </select>
             </div>
           </div>
