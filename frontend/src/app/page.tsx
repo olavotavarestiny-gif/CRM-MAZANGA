@@ -226,7 +226,7 @@ export default function Dashboard() {
   });
 
   if (isComercio(currentUser?.workspaceMode)) {
-    return <PainelComercialPage />;
+    return <PainelComercialPage currentUser={currentUser} />;
   }
 
   return <DashboardCrm currentUser={currentUser} />;

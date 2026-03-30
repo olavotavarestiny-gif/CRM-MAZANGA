@@ -88,7 +88,7 @@ function SessionStatCard({
 
 export default function CaixaPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'sessao' | 'historico'>('sessao');
+  const [activeTab, setActiveTab] = useState<'sessao' | 'historico' | 'auditoria'>('sessao');
   const [showAbrirCaixa, setShowAbrirCaixa] = useState(false);
   const [showFecharCaixa, setShowFecharCaixa] = useState(false);
   const [abrirEstabelecimentoId, setAbrirEstabelecimentoId] = useState('');
@@ -103,6 +103,7 @@ export default function CaixaPage() {
   const [historyEstabelecimentoId, setHistoryEstabelecimentoId] = useState('all');
   const [historyPage, setHistoryPage] = useState(1);
   const abrirSelectionTouchedRef = useRef(false);
+  const initialTabResolvedRef = useRef(false);
   const { data: currentUser, isLoading: loadingUser } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
@@ -143,14 +144,22 @@ export default function CaixaPage() {
     isError: historicoError,
     refetch: refetchHistorico,
   } = useQuery({
-    queryKey: ['caixa-sessoes', { status: historyStatus, estabelecimentoId: historyEstabelecimentoId, limit: HISTORY_FETCH_LIMIT }],
+    queryKey: ['caixa-sessoes', {
+      status: activeTab === 'auditoria' ? 'closed' : historyStatus,
+      estabelecimentoId: historyEstabelecimentoId,
+      limit: HISTORY_FETCH_LIMIT,
+    }],
     queryFn: () => getCaixaSessoes({
-      status: historyStatus === 'all' ? undefined : historyStatus,
+      status: activeTab === 'auditoria'
+        ? 'closed'
+        : historyStatus === 'all'
+        ? undefined
+        : historyStatus,
       estabelecimentoId: historyEstabelecimentoId === 'all' ? undefined : historyEstabelecimentoId,
       page: 1,
       limit: HISTORY_FETCH_LIMIT,
     }),
-    enabled: !!currentUser && podeVerCaixa && podeAuditarCaixa && activeTab === 'historico',
+    enabled: !!currentUser && podeVerCaixa && podeAuditarCaixa && activeTab !== 'sessao',
   });
 
   const sessaoAberta = sessao?.status === 'open';
@@ -163,6 +172,16 @@ export default function CaixaPage() {
     if (!historyDate) return true;
     return matchesDate(historyDate, item.openedAt);
   });
+  const auditoriaRows = historicoFiltrado.filter((item) => item.status === 'closed');
+  const auditoriaComDiferenca = auditoriaRows.filter((item) => (item.differenceAmount ?? 0) !== 0);
+  const auditoriaConferidas = auditoriaRows.filter((item) => item.differenceAmount === 0);
+  const auditoriaSemContagem = auditoriaRows.filter((item) => item.closingCountedAmount == null);
+  const totalExcesso = auditoriaComDiferenca
+    .filter((item) => (item.differenceAmount ?? 0) > 0)
+    .reduce((sum, item) => sum + (item.differenceAmount ?? 0), 0);
+  const totalEmFalta = auditoriaComDiferenca
+    .filter((item) => (item.differenceAmount ?? 0) < 0)
+    .reduce((sum, item) => sum + Math.abs(item.differenceAmount ?? 0), 0);
   const totalPages = Math.max(1, Math.ceil(historicoFiltrado.length / HISTORY_PAGE_SIZE));
   const historicoVisivel = historicoFiltrado.slice(
     (historyPage - 1) * HISTORY_PAGE_SIZE,
@@ -190,10 +209,21 @@ export default function CaixaPage() {
   }, [historyPage, totalPages]);
 
   useEffect(() => {
-    if (activeTab === 'historico' && !podeAuditarCaixa) {
+    if ((activeTab === 'historico' || activeTab === 'auditoria') && !podeAuditarCaixa) {
       setActiveTab('sessao');
     }
   }, [activeTab, podeAuditarCaixa]);
+
+  useEffect(() => {
+    if (initialTabResolvedRef.current || loadingUser || loadingSessao) return;
+    if (!currentUser) return;
+
+    if (podeAuditarCaixa && !sessaoAberta) {
+      setActiveTab('historico');
+    }
+
+    initialTabResolvedRef.current = true;
+  }, [currentUser, loadingSessao, loadingUser, podeAuditarCaixa, sessaoAberta]);
 
   const abrirMutation = useMutation({
     mutationFn: () => abrirCaixaSessao({
@@ -225,7 +255,7 @@ export default function CaixaPage() {
       setFecharCounted('');
       setFecharNotes('');
       setFecharErr('');
-      setActiveTab('sessao');
+      setActiveTab(podeAuditarCaixa ? 'historico' : 'sessao');
     },
     onError: (error: Error) => setFecharErr(error.message),
   });
@@ -270,7 +300,7 @@ export default function CaixaPage() {
             variant="outline"
             className="gap-2"
             onClick={() => {
-              if (activeTab === 'historico') {
+              if (activeTab === 'historico' || activeTab === 'auditoria') {
                 refetchHistorico();
                 return;
               }
@@ -320,8 +350,11 @@ export default function CaixaPage() {
             </button>
             <button
               type="button"
-              disabled
-              className="cursor-not-allowed rounded-lg px-4 py-2 text-sm font-semibold text-slate-400"
+              onClick={() => setActiveTab('auditoria')}
+              className={cn(
+                'rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+                activeTab === 'auditoria' ? 'bg-[#0A2540] text-white' : 'text-slate-600 hover:bg-slate-100'
+              )}
             >
               Auditoria
             </button>
@@ -331,7 +364,7 @@ export default function CaixaPage() {
 
       {podeAuditarCaixa ? (
         <p className="text-xs text-slate-500">
-          A aba de auditoria entra com as permissões granulares previstas para a Fase E.
+          Perfis de supervisão podem rever histórico e auditoria mesmo sem uma sessão aberta neste momento.
         </p>
       ) : null}
 
@@ -452,7 +485,7 @@ export default function CaixaPage() {
             </>
           )}
         </>
-      ) : (
+      ) : activeTab === 'historico' ? (
         <>
           <Card className="border-slate-200 p-5 shadow-sm">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -596,6 +629,138 @@ export default function CaixaPage() {
                   </Button>
                 </div>
               </div>
+            </Card>
+          )}
+        </>
+      ) : (
+        <>
+          <Card className="border-slate-200 p-5 shadow-sm">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Sessões Conferidas</p>
+                <p className="mt-3 text-2xl font-black tracking-tight text-[#2c2f31]">{auditoriaConferidas.length}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Com Diferença</p>
+                <p className="mt-3 text-2xl font-black tracking-tight text-[#2c2f31]">{auditoriaComDiferenca.length}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Excesso</p>
+                <p className="mt-3 text-2xl font-black tracking-tight text-blue-700">{formatKz(totalExcesso)}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Em Falta</p>
+                <p className="mt-3 text-2xl font-black tracking-tight text-red-600">{formatKz(totalEmFalta)}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div>
+                <Label className="text-sm">Data</Label>
+                <Input
+                  type="date"
+                  value={historyDate}
+                  onChange={(event) => setHistoryDate(event.target.value)}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label className="text-sm">Ponto de Venda</Label>
+                <Select value={historyEstabelecimentoId} onValueChange={setHistoryEstabelecimentoId}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Todos os pontos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os pontos</SelectItem>
+                    {estabelecimentos.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-end">
+                <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  {auditoriaSemContagem.length} sessão{auditoriaSemContagem.length !== 1 ? 'ões' : ''} fechada{auditoriaSemContagem.length !== 1 ? 's' : ''} sem contagem final.
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {historicoError ? (
+            <ErrorState
+              title="Não foi possível carregar a auditoria"
+              message="Tenta novamente para rever diferenças de fecho e conferência do caixa."
+              onRetry={() => refetchHistorico()}
+            />
+          ) : (
+            <Card className="overflow-hidden border-slate-200 shadow-sm">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Estabelecimento</TableHead>
+                    <TableHead>Esperado</TableHead>
+                    <TableHead>Contado</TableHead>
+                    <TableHead>Diferença</TableHead>
+                    <TableHead>Fechado Por</TableHead>
+                    <TableHead>Estado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loadingHistorico ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-10 text-center text-slate-500">
+                        A carregar auditoria...
+                      </TableCell>
+                    </TableRow>
+                  ) : auditoriaRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-10 text-center text-slate-500">
+                        Não há sessões fechadas para os filtros atuais.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    auditoriaRows.map((item) => {
+                      const difference = item.differenceAmount;
+                      const badgeVariant =
+                        difference == null ? 'secondary' :
+                        difference === 0 ? 'success' :
+                        'destructive';
+
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell>{formatDate(item.closedAt || item.openedAt)}</TableCell>
+                          <TableCell>{item.estabelecimento?.nome || 'Sem ponto de venda'}</TableCell>
+                          <TableCell className="font-medium">{formatKz(item.expectedClosingAmount ?? 0)}</TableCell>
+                          <TableCell>{item.closingCountedAmount == null ? '—' : formatKz(item.closingCountedAmount)}</TableCell>
+                          <TableCell className={cn(
+                            'font-medium',
+                            difference == null
+                              ? 'text-slate-500'
+                              : difference === 0
+                              ? 'text-emerald-600'
+                              : difference > 0
+                              ? 'text-blue-600'
+                              : 'text-red-600'
+                          )}>
+                            {difference == null ? '—' : formatKz(difference)}
+                          </TableCell>
+                          <TableCell>{item.closedBy?.name || '—'}</TableCell>
+                          <TableCell>
+                            <Badge variant={badgeVariant}>
+                              {difference == null ? 'Sem contagem' : difference === 0 ? 'Conferido' : 'Diferença'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
             </Card>
           )}
         </>

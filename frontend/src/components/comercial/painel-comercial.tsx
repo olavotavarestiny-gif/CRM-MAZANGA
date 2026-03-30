@@ -3,12 +3,24 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { BarChart3, PackageX, ShoppingCart, TrendingDown, TrendingUp, Trophy } from 'lucide-react';
-import { getComercialAnalise, getComercialInsights, getComercialResumo, getCurrentUser } from '@/lib/api';
+import {
+  BarChart3, CreditCard, Lock, PackageX, ShoppingCart, Store,
+  TrendingDown, TrendingUp, Trophy, Unlock,
+} from 'lucide-react';
+import { getCaixaSessaoAtual, getComercialAnalise, getComercialInsights, getComercialResumo, getCurrentUser } from '@/lib/api';
+import type { User } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
-import { canComercialDashboardAnalysis, canComercialDashboardBasic } from '@/lib/permissions';
+import {
+  canCaixaOpen,
+  canCaixaView,
+  canComercialDashboardAnalysis,
+  canComercialDashboardBasic,
+  canView,
+  canViewInvoices,
+} from '@/lib/permissions';
 
 function formatKz(value: number) {
   return `${value.toLocaleString('pt-AO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Kz`;
@@ -133,16 +145,133 @@ function PainelAnalise() {
   );
 }
 
-export default function PainelComercialPage() {
+function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
+  const podeVerCaixa = canCaixaView(currentUser);
+  const podeAbrirCaixa = podeVerCaixa && canCaixaOpen(currentUser);
+  const podeVerVendas = canView(currentUser, 'vendas');
+  const podeVerContactos = canView(currentUser, 'contacts');
+
+  const {
+    data: sessao = null,
+    isLoading: loadingSessao,
+  } = useQuery({
+    queryKey: ['caixa-sessao-atual'],
+    queryFn: () => getCaixaSessaoAtual(),
+    enabled: podeVerCaixa,
+    refetchInterval: 30_000,
+  });
+
+  const links = [
+    podeVerCaixa ? { href: '/caixa', label: 'Ir para Caixa', icon: CreditCard } : null,
+    podeVerVendas ? { href: '/vendas-rapidas', label: 'Ir para Venda Rápida', icon: ShoppingCart } : null,
+    podeVerVendas ? { href: '/produtos', label: 'Rever inventário', icon: PackageX } : null,
+    podeVerContactos ? { href: '/contacts', label: 'Ver clientes', icon: Store } : null,
+  ].filter(Boolean) as { href: string; label: string; icon: typeof CreditCard }[];
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Painel Operacional</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Área focada na operação do dia, sem métricas comerciais nem dados de faturação.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+        <Card className="border-slate-200 p-5 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Store className="h-4 w-4 text-[#0A2540]" />
+            <p className="text-sm font-semibold text-[#2c2f31]">Estado Operacional</p>
+          </div>
+
+          {podeVerCaixa ? (
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              {loadingSessao ? (
+                <div className="space-y-2">
+                  <div className="h-4 w-32 animate-pulse rounded-full bg-slate-200" />
+                  <div className="h-4 w-48 animate-pulse rounded-full bg-slate-200" />
+                </div>
+              ) : sessao?.status === 'open' ? (
+                <div className="space-y-2">
+                  <Badge variant="success">Caixa aberto</Badge>
+                  <p className="text-sm font-medium text-[#2c2f31]">{sessao.estabelecimento?.nome}</p>
+                  <p className="text-sm text-slate-500">
+                    Sessão ativa para operação e venda rápida.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Badge variant="secondary">Caixa fechado</Badge>
+                  <p className="text-sm text-slate-500">
+                    O caixa está encerrado. A venda rápida continua protegida até existir uma sessão aberta.
+                  </p>
+                  {podeAbrirCaixa ? (
+                    <div className="inline-flex items-center gap-2 text-sm font-medium text-green-700">
+                      <Unlock className="h-4 w-4" />
+                      Pode abrir caixa na área de Caixa.
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-500">
+                      <Lock className="h-4 w-4" />
+                      Sem permissão para abrir caixa.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              Não tens acesso à supervisão do caixa nesta conta.
+            </div>
+          )}
+        </Card>
+
+        <Card className="border-slate-200 p-5 shadow-sm">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-[#0A2540]" />
+            <p className="text-sm font-semibold text-[#2c2f31]">Acessos Rápidos</p>
+          </div>
+          <div className="mt-4 grid gap-3">
+            {links.map(({ href, label, icon: Icon }) => (
+              <Button key={href} asChild variant="outline" className="justify-start gap-2">
+                <Link href={href}>
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </Link>
+              </Button>
+            ))}
+            {links.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                Não há atalhos operacionais disponíveis para este perfil no momento.
+              </div>
+            ) : null}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+export default function PainelComercialPage({ currentUser: currentUserProp }: { currentUser?: User }) {
   const [modo, setModo] = useState<'resumo' | 'analise'>('resumo');
-  const { data: currentUser, isLoading: loadingUser } = useQuery({
+  const {
+    data: fetchedCurrentUser,
+    isLoading: loadingUser,
+  } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
     retry: false,
+    enabled: !currentUserProp,
   });
+
+  const currentUser = currentUserProp ?? fetchedCurrentUser;
 
   const podeResumo = currentUser ? canComercialDashboardBasic(currentUser) : false;
   const podeAnalise = currentUser ? canComercialDashboardAnalysis(currentUser) : false;
+  const podeVerVendas = currentUser ? canView(currentUser, 'vendas') : false;
+  const podeVerFaturacao = currentUser ? canViewInvoices(currentUser) : false;
 
   const {
     data: resumo,
@@ -184,14 +313,7 @@ export default function PainelComercialPage() {
   }
 
   if (currentUser && !podeResumo) {
-    return (
-      <div className="mx-auto max-w-6xl p-4 md:p-6">
-        <ErrorState
-          title="Acesso restrito"
-          message="Não tem permissão para ver o painel comercial desta conta."
-        />
-      </div>
-    );
+    return <PainelOperacionalReduzido currentUser={currentUser} />;
   }
 
   if (resumoLoading || insightsLoading) {
@@ -317,24 +439,35 @@ export default function PainelComercialPage() {
             <Card className="border-slate-200 p-5 shadow-sm">
               <p className="text-sm font-semibold text-[#2c2f31]">Ações rápidas</p>
               <div className="mt-4 grid gap-3">
-                <Button asChild className="justify-start gap-2">
-                  <Link href="/vendas-rapidas">
-                    <ShoppingCart className="h-4 w-4" />
-                    Ir para Venda Rápida
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="justify-start gap-2">
-                  <Link href="/produtos">
-                    <PackageX className="h-4 w-4" />
-                    Rever inventário
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="justify-start gap-2">
-                  <Link href="/vendas">
-                    <BarChart3 className="h-4 w-4" />
-                    Abrir faturação
-                  </Link>
-                </Button>
+                {podeVerVendas ? (
+                  <Button asChild className="justify-start gap-2">
+                    <Link href="/vendas-rapidas">
+                      <ShoppingCart className="h-4 w-4" />
+                      Ir para Venda Rápida
+                    </Link>
+                  </Button>
+                ) : null}
+                {podeVerVendas ? (
+                  <Button asChild variant="outline" className="justify-start gap-2">
+                    <Link href="/produtos">
+                      <PackageX className="h-4 w-4" />
+                      Rever inventário
+                    </Link>
+                  </Button>
+                ) : null}
+                {podeVerFaturacao ? (
+                  <Button asChild variant="outline" className="justify-start gap-2">
+                    <Link href="/vendas">
+                      <BarChart3 className="h-4 w-4" />
+                      Abrir faturação
+                    </Link>
+                  </Button>
+                ) : null}
+                {!podeVerVendas && !podeVerFaturacao ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                    Não há ações rápidas comerciais disponíveis para este perfil.
+                  </div>
+                ) : null}
               </div>
             </Card>
           </div>
