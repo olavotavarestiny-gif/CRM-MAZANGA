@@ -6,7 +6,7 @@ import {
   ShoppingCart, Search, Plus, Minus, Trash2, X, CheckCircle, Printer,
   AlertCircle, Lock, Unlock, Clock, Store, TrendingUp, Hash,
 } from 'lucide-react';
-import { getProdutos, getQuickSaleDefaults, getEstabelecimentos, emitQuickSale, getCaixaSessaoAtual, abrirCaixaSessao, fecharCaixaSessao } from '@/lib/api';
+import { getProdutos, getQuickSaleDefaults, getEstabelecimentos, emitQuickSale, getCaixaSessaoAtual, abrirCaixaSessao, fecharCaixaSessao, getCurrentUser } from '@/lib/api';
 import type { QuickSaleItem } from '@/lib/api';
 import type { Produto, Factura, Estabelecimento, CaixaSessao } from '@/lib/types';
 import { ClienteAutocomplete } from '@/components/faturacao/cliente-autocomplete';
@@ -112,6 +112,13 @@ export default function VendasRapidasPage() {
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const vendaSelectionTouchedRef = useRef(false);
   const abrirSelectionTouchedRef = useRef(false);
+  const { data: currentUser, isLoading: loadingUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+    retry: false,
+  });
+  const isRestrictedTeamMember = !!currentUser?.accountOwnerId && currentUser.role !== 'admin' && !currentUser.isSuperAdmin;
+  const assignedEstabelecimentoId = isRestrictedTeamMember ? currentUser?.assignedEstabelecimentoId ?? null : null;
 
   // ── Sessão actual ──────────────────────────────────────────────────────────
   const { data: sessao = null, isLoading: loadingSessao } = useQuery<CaixaSessao | null>({
@@ -120,6 +127,16 @@ export default function VendasRapidasPage() {
   });
 
   const sessaoAberta = sessao?.status === 'open';
+  const abrirEstabelecimentos = assignedEstabelecimentoId
+    ? estabelecimentos.filter((item) => item.id === assignedEstabelecimentoId)
+    : isRestrictedTeamMember
+    ? []
+    : estabelecimentos;
+  const assignedEstabelecimento = assignedEstabelecimentoId
+    ? estabelecimentos.find((item) => item.id === assignedEstabelecimentoId) ?? null
+    : null;
+  const membroSemPontoAtribuido = isRestrictedTeamMember && !assignedEstabelecimentoId;
+  const membroComPontoAtribuidoIndisponivel = isRestrictedTeamMember && !!assignedEstabelecimentoId && !assignedEstabelecimento;
 
   // ── Mutations de sessão ────────────────────────────────────────────────────
   const abrirMutation = useMutation({
@@ -202,8 +219,14 @@ export default function VendasRapidasPage() {
 
   useEffect(() => {
     const selectedStillValid = estabelecimentos.some((e) => e.id === selectedEstabelecimentoId);
-    const abrirStillValid = estabelecimentos.some((e) => e.id === abrirEstabelecimentoId);
-    const initial = resolveInitialEstabelecimentoId(estabelecimentos, defaultEstabelecimentoId);
+    const abrirStillValid = abrirEstabelecimentos.some((e) => e.id === abrirEstabelecimentoId);
+    const defaultForUser = isRestrictedTeamMember ? assignedEstabelecimentoId : defaultEstabelecimentoId;
+    const initial = isRestrictedTeamMember && assignedEstabelecimentoId
+      ? assignedEstabelecimentoId
+      : resolveInitialEstabelecimentoId(estabelecimentos, defaultForUser);
+    const abrirInitial = isRestrictedTeamMember && assignedEstabelecimentoId
+      ? assignedEstabelecimentoId
+      : resolveInitialEstabelecimentoId(abrirEstabelecimentos, assignedEstabelecimentoId);
 
     if (!sessaoAberta) {
       if ((!selectedStillValid && selectedEstabelecimentoId !== initial) ||
@@ -212,14 +235,17 @@ export default function VendasRapidasPage() {
       }
     }
 
-    if ((!abrirStillValid && abrirEstabelecimentoId !== initial) ||
-      (!abrirSelectionTouchedRef.current && initial && abrirEstabelecimentoId !== initial)) {
-      setAbrirEstabelecimentoId(initial);
+    if ((!abrirStillValid && abrirEstabelecimentoId !== abrirInitial) ||
+      (!abrirSelectionTouchedRef.current && abrirInitial && abrirEstabelecimentoId !== abrirInitial)) {
+      setAbrirEstabelecimentoId(abrirInitial);
     }
   }, [
     abrirEstabelecimentoId,
+    abrirEstabelecimentos,
+    assignedEstabelecimentoId,
     defaultEstabelecimentoId,
     estabelecimentos,
+    isRestrictedTeamMember,
     selectedEstabelecimentoId,
     sessaoAberta,
   ]);
@@ -317,7 +343,7 @@ export default function VendasRapidasPage() {
     () => estabelecimentos.find((e) => e.id === abrirEstabelecimentoId) || null,
     [abrirEstabelecimentoId, estabelecimentos]
   );
-  const hasSelectableEstabelecimento = useMemo(() => estabelecimentos.some((e) => Boolean(e.defaultSerieId)), [estabelecimentos]);
+  const hasSelectableEstabelecimento = useMemo(() => abrirEstabelecimentos.some((e) => Boolean(e.defaultSerieId)), [abrirEstabelecimentos]);
   const configReady = Boolean(selectedEstabelecimento?.defaultSerieId);
 
   // Fechar caixa — cálculo preview
@@ -347,7 +373,7 @@ export default function VendasRapidasPage() {
   };
 
   // ── Loading ────────────────────────────────────────────────────────────────
-  if (loadingConfig || loadingSessao) {
+  if (loadingConfig || loadingSessao || loadingUser) {
     return <div className="min-h-screen bg-[#f5f7f9]" />;
   }
 
@@ -374,7 +400,7 @@ export default function VendasRapidasPage() {
           <div>
             <h2 className="text-lg font-bold text-[#2c2f31]">Caixa fechado</h2>
             <p className="mt-1 text-sm text-slate-500 max-w-sm">
-              Precisa de abrir o caixa para começar a vender. Defina o saldo inicial e selecione o ponto de venda.
+              Precisa de abrir o caixa para começar a vender. Defina o saldo inicial e use o ponto de venda autorizado para este utilizador.
             </p>
           </div>
           <Button onClick={() => { setAbrirErr(''); setShowAbrirCaixa(true); }} className="gap-2 px-6" size="lg">
@@ -391,10 +417,14 @@ export default function VendasRapidasPage() {
               {abrirErr && <p className="text-red-500 text-sm">{abrirErr}</p>}
               <div>
                 <Label className="text-sm">Ponto de Venda *</Label>
-                <Select value={abrirEstabelecimentoId} onValueChange={handleAbrirEstabelecimentoChange}>
+                <Select
+                  value={abrirEstabelecimentoId}
+                  onValueChange={handleAbrirEstabelecimentoChange}
+                  disabled={isRestrictedTeamMember || membroSemPontoAtribuido || membroComPontoAtribuidoIndisponivel}
+                >
                   <SelectTrigger className="mt-1"><SelectValue placeholder="Selecionar..." /></SelectTrigger>
                   <SelectContent>
-                    {estabelecimentos.map((e) => (
+                    {abrirEstabelecimentos.map((e) => (
                       <SelectItem key={e.id} value={e.id}>
                         {e.nome}{!e.defaultSerieId ? ' · sem série' : ''}
                       </SelectItem>
@@ -406,7 +436,22 @@ export default function VendasRapidasPage() {
                     {estabelecimentosError}
                   </p>
                 )}
-                {!estabelecimentosError && estabelecimentos.length === 0 && (
+                {!estabelecimentosError && membroSemPontoAtribuido && (
+                  <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    Este membro da equipa ainda não tem um ponto de venda atribuído. O dono da conta precisa de defini-lo em Configurações → Equipa.
+                  </p>
+                )}
+                {!estabelecimentosError && membroComPontoAtribuidoIndisponivel && (
+                  <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                    O ponto de venda atribuído a este membro já não está disponível nesta conta.
+                  </p>
+                )}
+                {!estabelecimentosError && assignedEstabelecimento && isRestrictedTeamMember && (
+                  <p className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                    Este membro só pode abrir caixa em {assignedEstabelecimento.nome}.
+                  </p>
+                )}
+                {!estabelecimentosError && abrirEstabelecimentos.length === 0 && !membroSemPontoAtribuido && !membroComPontoAtribuidoIndisponivel && (
                   <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                     Ainda não existem pontos de venda. Crie o primeiro em{' '}
                     <a href="/configuracoes?tab=empresa&section=faturacao" className="font-medium underline">
@@ -414,7 +459,7 @@ export default function VendasRapidasPage() {
                     </a>.
                   </p>
                 )}
-                {!estabelecimentosError && estabelecimentos.length > 0 && !hasSelectableEstabelecimento && (
+                {!estabelecimentosError && abrirEstabelecimentos.length > 0 && !hasSelectableEstabelecimento && (
                   <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                     Os pontos de venda já existem, mas ainda não têm série padrão. Pode abrir o caixa, porém a emissão só ficará disponível após configurar a série em{' '}
                     <a href="/configuracoes?tab=empresa&section=faturacao" className="font-medium underline">
@@ -441,7 +486,7 @@ export default function VendasRapidasPage() {
               <Button variant="outline" onClick={() => setShowAbrirCaixa(false)}>Cancelar</Button>
               <Button
                 onClick={() => abrirMutation.mutate()}
-                disabled={abrirMutation.isPending || !abrirEstabelecimentoId}
+                disabled={abrirMutation.isPending || !abrirEstabelecimentoId || membroSemPontoAtribuido || membroComPontoAtribuidoIndisponivel}
                 className="bg-green-600 text-white hover:bg-green-700"
               >
                 {abrirMutation.isPending ? 'A abrir...' : 'Abrir caixa'}

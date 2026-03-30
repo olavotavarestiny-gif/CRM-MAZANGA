@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { setMemberPermissions } from '@/lib/api';
+import { ErrorState } from '@/components/ui/error-state';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getEstabelecimentos, setMemberPermissions } from '@/lib/api';
 import type { User, UserPermissions } from '@/lib/api';
 
 interface Props {
@@ -132,6 +134,18 @@ export default function MemberPermissionsModal({
   const [perms, setPerms] = useState<UserPermissions>(initPerms(member));
   const isComercioWorkspace = workspaceMode === 'comercio';
   const visibleSimpleModules = isComercioWorkspace ? COMERCIO_SIMPLE_MODULES : SERVICOS_SIMPLE_MODULES;
+  const [assignedEstabelecimentoId, setAssignedEstabelecimentoId] = useState(member.assignedEstabelecimentoId ?? 'unassigned');
+
+  const {
+    data: estabelecimentos = [],
+    isLoading: loadingEstabelecimentos,
+    isError: estabelecimentosError,
+    refetch: refetchEstabelecimentos,
+  } = useQuery({
+    queryKey: ['member-permissions-estabelecimentos'],
+    queryFn: getEstabelecimentos,
+    enabled: isComercioWorkspace,
+  });
 
   const setModule = (key: keyof Omit<UserPermissions, 'finances'>, level: SimpleLevel) => {
     setPerms((prev) => ({ ...prev, [key]: level }));
@@ -197,7 +211,13 @@ export default function MemberPermissionsModal({
   };
 
   const mutation = useMutation({
-    mutationFn: () => setMemberPermissions(member.id, perms),
+    mutationFn: () => setMemberPermissions(
+      member.id,
+      perms,
+      isComercioWorkspace
+        ? (assignedEstabelecimentoId === 'unassigned' ? null : assignedEstabelecimentoId)
+        : member.assignedEstabelecimentoId
+    ),
     onSuccess: () => { onSaved(); onClose(); },
   });
 
@@ -217,6 +237,41 @@ export default function MemberPermissionsModal({
           {isComercioWorkspace ? (
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
               Estás a editar as permissões do workspace de comércio. Esta vista segue as abas reais desse modo.
+            </div>
+          ) : null}
+
+          {isComercioWorkspace ? (
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#6b7e9a]">Ponto de Venda Atribuído</p>
+              <div className="space-y-3 rounded-xl border border-[#dde3ec] bg-[#f8fafc] p-3">
+                {estabelecimentosError ? (
+                  <ErrorState
+                    compact
+                    title="Não foi possível carregar os pontos de venda"
+                    message="Tenta novamente para definir o ponto atribuído deste membro."
+                    onRetry={() => refetchEstabelecimentos()}
+                  />
+                ) : (
+                  <>
+                    <Select value={assignedEstabelecimentoId} onValueChange={setAssignedEstabelecimentoId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={loadingEstabelecimentos ? 'A carregar...' : 'Selecionar ponto de venda'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Sem atribuição</SelectItem>
+                        {estabelecimentos.map((item) => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-slate-600">
+                      Sem atribuição, este membro não consegue abrir caixa até o ponto de venda ser definido.
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
           ) : null}
 

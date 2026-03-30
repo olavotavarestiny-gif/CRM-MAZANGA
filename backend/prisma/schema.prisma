@@ -25,6 +25,7 @@ model User {
   permissions          String?    // JSON: null = full access; see permissions structure in lib/permissions.js
   mustChangePassword   Boolean    @default(false)
   accountOwnerId       Int?       // null = owner of their own account; Int = member of another account
+  assignedEstabelecimentoId String?
   workspaceMode        String     @default("servicos") // "servicos" | "comercio"
   createdAt            DateTime   @default(now())
   loginLogs            LoginLog[]
@@ -54,9 +55,12 @@ model User {
   configuracaoFaturacao ConfiguracaoFaturacao? @relation("ConfigFaturacaoUser")
   accountOwner         User?      @relation("AccountMembers", fields: [accountOwnerId], references: [id], onDelete: SetNull)
   accountMembers       User[]     @relation("AccountMembers")
+  assignedEstabelecimento Estabelecimento? @relation("AssignedEstabelecimento", fields: [assignedEstabelecimentoId], references: [id], onDelete: SetNull)
   chatChannelMemberships ChatChannelMember[] @relation("ChatMemberUser")
   chatMessagesSent       ChatMessage[]       @relation("ChatSenderUser")
   contactNotes           ContactNote[]       @relation("NoteAuthor")
+
+  @@index([assignedEstabelecimentoId])
 }
 
 model LoginLog {
@@ -314,6 +318,7 @@ model Estabelecimento {
   facturas             Factura[]
   facturaRecorrentes   FacturaRecorrente[]
   caixaSessoes         CaixaSessao[]
+  assignedUsers        User[]    @relation("AssignedEstabelecimento")
 }
 
 model Serie {

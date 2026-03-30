@@ -452,6 +452,8 @@ export interface User {
   isSuperAdmin?: boolean;
   permissions?: UserPermissions | null; // null = full access (no restrictions)
   accountOwnerId?: number | null;
+  assignedEstabelecimentoId?: string | null;
+  assignedEstabelecimento?: { id: string; nome: string } | null;
   accountOwnerName?: string | null;
   impersonatedBy?: number | null;
   mustChangePassword?: boolean;
@@ -987,8 +989,15 @@ export async function getPlanUsage(): Promise<PlanUsage> {
 // ============================================
 
 // Account owner: set granular permissions for a team member (null = full access)
-export async function setMemberPermissions(memberId: number, permissions: UserPermissions | null): Promise<void> {
-  await api.patch(`/api/account/team/${memberId}/permissions`, { permissions });
+export async function setMemberPermissions(
+  memberId: number,
+  permissions: UserPermissions | null,
+  assignedEstabelecimentoId?: string | null
+): Promise<void> {
+  await api.patch(`/api/account/team/${memberId}/permissions`, {
+    permissions,
+    assignedEstabelecimentoId: assignedEstabelecimentoId ?? null,
+  });
 }
 
 // SuperAdmin: list all orgs (account owners)

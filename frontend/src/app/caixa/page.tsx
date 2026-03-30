@@ -113,6 +113,8 @@ export default function CaixaPage() {
   const podeAbrirCaixa = currentUser ? canCaixaOpen(currentUser) : false;
   const podeFecharCaixa = currentUser ? canCaixaClose(currentUser) : false;
   const podeAuditarCaixa = currentUser ? canCaixaAudit(currentUser) : false;
+  const isRestrictedTeamMember = !!currentUser?.accountOwnerId && currentUser.role !== 'admin' && !currentUser.isSuperAdmin;
+  const assignedEstabelecimentoId = isRestrictedTeamMember ? currentUser?.assignedEstabelecimentoId ?? null : null;
 
   const {
     data: estabelecimentos = [],
@@ -163,8 +165,18 @@ export default function CaixaPage() {
   });
 
   const sessaoAberta = sessao?.status === 'open';
+  const abrirEstabelecimentos = assignedEstabelecimentoId
+    ? estabelecimentos.filter((item) => item.id === assignedEstabelecimentoId)
+    : isRestrictedTeamMember
+    ? []
+    : estabelecimentos;
+  const assignedEstabelecimento = assignedEstabelecimentoId
+    ? estabelecimentos.find((item) => item.id === assignedEstabelecimentoId) ?? null
+    : null;
+  const membroSemPontoAtribuido = isRestrictedTeamMember && !assignedEstabelecimentoId;
+  const membroComPontoAtribuidoIndisponivel = isRestrictedTeamMember && !!assignedEstabelecimentoId && !assignedEstabelecimento;
   const abrirEstabelecimento = estabelecimentos.find((item) => item.id === abrirEstabelecimentoId) ?? null;
-  const hasSelectableEstabelecimento = estabelecimentos.some((item) => Boolean(item.defaultSerieId));
+  const hasSelectableEstabelecimento = abrirEstabelecimentos.some((item) => Boolean(item.defaultSerieId));
   const expectedClosing = sessao ? sessao.openingBalance + sessao.totalSalesAmount : 0;
   const diferencaPreview = fecharCounted !== '' ? Number(fecharCounted) - expectedClosing : null;
 
@@ -189,14 +201,14 @@ export default function CaixaPage() {
   );
 
   useEffect(() => {
-    const initial = resolveInitialEstabelecimentoId(estabelecimentos);
-    const selectedStillValid = estabelecimentos.some((item) => item.id === abrirEstabelecimentoId);
+    const initial = resolveInitialEstabelecimentoId(abrirEstabelecimentos);
+    const selectedStillValid = abrirEstabelecimentos.some((item) => item.id === abrirEstabelecimentoId);
 
     if ((!selectedStillValid && abrirEstabelecimentoId !== initial) ||
       (!abrirSelectionTouchedRef.current && initial && abrirEstabelecimentoId !== initial)) {
       setAbrirEstabelecimentoId(initial);
     }
-  }, [abrirEstabelecimentoId, estabelecimentos]);
+  }, [abrirEstabelecimentoId, abrirEstabelecimentos]);
 
   useEffect(() => {
     setHistoryPage(1);
@@ -786,12 +798,13 @@ export default function CaixaPage() {
                   abrirSelectionTouchedRef.current = true;
                   setAbrirEstabelecimentoId(value);
                 }}
+                disabled={isRestrictedTeamMember || membroSemPontoAtribuido || membroComPontoAtribuidoIndisponivel}
               >
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Selecionar..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {estabelecimentos.map((item) => (
+                  {abrirEstabelecimentos.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.nome}{!item.defaultSerieId ? ' · sem série' : ''}
                     </SelectItem>
@@ -805,7 +818,25 @@ export default function CaixaPage() {
                 </p>
               ) : null}
 
-              {!estabelecimentosError && !loadingEstabelecimentos && estabelecimentos.length === 0 ? (
+              {!estabelecimentosError && membroSemPontoAtribuido ? (
+                <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Este membro da equipa ainda não tem um ponto de venda atribuído. O dono da conta precisa de defini-lo em Configurações → Equipa.
+                </p>
+              ) : null}
+
+              {!estabelecimentosError && membroComPontoAtribuidoIndisponivel ? (
+                <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  O ponto de venda atribuído a este membro já não está disponível nesta conta.
+                </p>
+              ) : null}
+
+              {!estabelecimentosError && assignedEstabelecimento && isRestrictedTeamMember ? (
+                <p className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                  Este membro só pode abrir caixa em {assignedEstabelecimento.nome}.
+                </p>
+              ) : null}
+
+              {!estabelecimentosError && !loadingEstabelecimentos && abrirEstabelecimentos.length === 0 && !membroSemPontoAtribuido && !membroComPontoAtribuidoIndisponivel ? (
                 <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                   Ainda não existem pontos de venda. Crie o primeiro em{' '}
                   <Link href="/configuracoes?tab=empresa&section=faturacao" className="font-medium underline">
@@ -814,7 +845,7 @@ export default function CaixaPage() {
                 </p>
               ) : null}
 
-              {!estabelecimentosError && estabelecimentos.length > 0 && !hasSelectableEstabelecimento ? (
+              {!estabelecimentosError && abrirEstabelecimentos.length > 0 && !hasSelectableEstabelecimento ? (
                 <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                   Os pontos de venda já existem, mas ainda não têm série padrão. Pode abrir o caixa, porém a emissão só ficará disponível após configurar a série.
                 </p>
@@ -857,7 +888,7 @@ export default function CaixaPage() {
             </Button>
             <Button
               onClick={() => abrirMutation.mutate()}
-              disabled={abrirMutation.isPending || !abrirEstabelecimentoId}
+              disabled={abrirMutation.isPending || !abrirEstabelecimentoId || membroSemPontoAtribuido || membroComPontoAtribuidoIndisponivel}
               className="bg-green-600 text-white hover:bg-green-700"
             >
               {abrirMutation.isPending ? 'A abrir...' : 'Abrir caixa'}

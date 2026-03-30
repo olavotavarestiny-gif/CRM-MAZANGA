@@ -30,9 +30,11 @@ const CURRENT_USER_BASE_SELECT = {
   permissions: true,
   mustChangePassword: true,
   accountOwnerId: true,
+  assignedEstabelecimentoId: true,
   workspaceMode: true,
   createdAt: true,
   isSuperAdmin: true,
+  assignedEstabelecimento: { select: { id: true, nome: true } },
 };
 
 function isMissingJobTitleColumn(error) {

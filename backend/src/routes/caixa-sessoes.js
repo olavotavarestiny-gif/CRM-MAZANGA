@@ -25,6 +25,25 @@ router.post('/sessoes', requireCaixaPermission('open'), async (req, res) => {
       return res.status(400).json({ error: 'Ponto de venda obrigatório' });
     }
 
+    if (!req.user.isAccountOwner && req.user.role !== 'admin' && !req.user.isSuperAdmin) {
+      const member = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { assignedEstabelecimentoId: true },
+      });
+
+      if (!member?.assignedEstabelecimentoId) {
+        return res.status(403).json({
+          error: 'Este membro da equipa precisa de um ponto de venda atribuído para abrir caixa.',
+        });
+      }
+
+      if (member.assignedEstabelecimentoId !== estabelecimentoId) {
+        return res.status(403).json({
+          error: 'Este membro da equipa só pode abrir caixa no ponto de venda que lhe foi atribuído.',
+        });
+      }
+    }
+
     // Validar que o estabelecimento pertence ao utilizador
     const estab = await prisma.estabelecimento.findFirst({
       where: { id: estabelecimentoId, userId },

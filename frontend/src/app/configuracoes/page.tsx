@@ -988,6 +988,9 @@ function ConfiguracoesContent() {
                   <tr className="border-b border-gray-200">
                     <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Nome</th>
                     <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Email</th>
+                    {isComercioWorkspace ? (
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Ponto de venda</th>
+                    ) : null}
                     <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Páginas</th>
                     <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Estado</th>
                     <th className="text-left py-3 px-4 text-gray-500 font-medium text-sm">Último Login</th>
@@ -1002,6 +1005,11 @@ function ConfiguracoesContent() {
                     <tr key={member.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
                       <td className="py-3 px-4 text-gray-900 text-sm">{member.name}</td>
                       <td className="py-3 px-4 text-gray-500 text-sm">{member.email}</td>
+                      {isComercioWorkspace ? (
+                        <td className="py-3 px-4 text-sm text-gray-500">
+                          {member.assignedEstabelecimento?.nome || 'Sem atribuição'}
+                        </td>
+                      ) : null}
                       <td className="py-3 px-4">
                         <button
                           onClick={() => setPermMember(member)}

@@ -31,6 +31,8 @@ router.get('/team', requireAccountOwner, async (req, res) => {
         email: true,
         active: true,
         permissions: true,
+        assignedEstabelecimentoId: true,
+        assignedEstabelecimento: { select: { id: true, nome: true } },
         createdAt: true,
         loginLogs: {
           take: 1,
@@ -128,7 +130,7 @@ router.patch('/team/:memberId/permissions', requireAccountOwner, async (req, res
   try {
     const memberId = parseInt(req.params.memberId);
     const accountOwnerId = req.user.effectiveUserId;
-    const { permissions } = req.body; // UserPermissions object | null
+    const { permissions, assignedEstabelecimentoId } = req.body; // UserPermissions object | null
 
     const member = await prisma.user.findFirst({
       where: { id: memberId, accountOwnerId },
@@ -144,12 +146,38 @@ router.patch('/team/:memberId/permissions', requireAccountOwner, async (req, res
     const memberPerms = parsePermissions(permissions ? JSON.stringify(permissions) : null);
     const finalPerms = intersectPermissions(orgPerms, memberPerms);
 
-    await prisma.user.update({
+    let finalAssignedEstabelecimentoId = null;
+    if (assignedEstabelecimentoId) {
+      const assignedEstabelecimento = await prisma.estabelecimento.findFirst({
+        where: { id: assignedEstabelecimentoId, userId: accountOwnerId },
+        select: { id: true },
+      });
+
+      if (!assignedEstabelecimento) {
+        return res.status(404).json({ error: 'Ponto de venda atribuído não encontrado nesta conta' });
+      }
+
+      finalAssignedEstabelecimentoId = assignedEstabelecimento.id;
+    }
+
+    const updated = await prisma.user.update({
       where: { id: memberId },
-      data: { permissions: finalPerms ? JSON.stringify(finalPerms) : null },
+      data: {
+        permissions: finalPerms ? JSON.stringify(finalPerms) : null,
+        assignedEstabelecimentoId: finalAssignedEstabelecimentoId,
+      },
+      select: {
+        permissions: true,
+        assignedEstabelecimentoId: true,
+        assignedEstabelecimento: { select: { id: true, nome: true } },
+      },
     });
 
-    res.json({ permissions: finalPerms });
+    res.json({
+      permissions: updated.permissions ? JSON.parse(updated.permissions) : null,
+      assignedEstabelecimentoId: updated.assignedEstabelecimentoId,
+      assignedEstabelecimento: updated.assignedEstabelecimento,
+    });
   } catch (error) {
     console.error('Error setting member permissions:', error);
     res.status(500).json({ error: error.message });
