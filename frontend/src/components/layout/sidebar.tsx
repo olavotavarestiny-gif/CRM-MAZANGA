@@ -62,8 +62,8 @@ export default function Sidebar({
   const navItemClass = (active: boolean) => cn(
     'flex items-center gap-3 px-3 py-2 transition-all text-sm font-medium rounded-xl',
     active
-      ? comercio ? 'bg-orange-50 text-[#F06A1A] font-semibold' : 'bg-blue-50 text-[#0049e6] font-semibold'
-      : comercio ? 'text-[#6b7e9a] hover:text-[#F06A1A] hover:bg-orange-50/60' : 'text-[#6b7e9a] hover:text-[#0049e6] hover:bg-blue-50/60'
+      ? comercio ? 'bg-[#FDF2EA] text-[#F06A1A] font-semibold' : 'bg-[#EEF5FC] text-[#1A6FD4] font-semibold'
+      : comercio ? 'text-[#6b7e9a] hover:text-[#F06A1A] hover:bg-[#FDF2EA]' : 'text-[#6b7e9a] hover:text-[#1A6FD4] hover:bg-[#EEF5FC]'
   );
 
   const comercio = isComercio(currentUser?.workspaceMode);

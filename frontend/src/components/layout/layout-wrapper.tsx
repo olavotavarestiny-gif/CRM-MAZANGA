@@ -11,11 +11,12 @@ import WelcomeModal from '@/components/help/welcome-modal';
 import OnboardingChecklist from '@/components/help/onboarding-checklist';
 import { ONBOARDING_OPEN } from '@/lib/onboarding-tasks';
 import ProductTourProvider, { useTour } from '@/components/help/product-tour';
-import KukuGestLogo from '@/components/KukuGestLogo';
+import KukuGestLogo, { KukuGestWorkspaceLogo } from '@/components/KukuGestLogo';
 import { ReactNode } from 'react';
 import { Menu, Eye, Info, LogOut, X } from 'lucide-react';
 import type { User } from '@/lib/api';
 import { canAccessWorkspaceRoute, getWorkspaceFallbackRoute, hasFeature } from '@/lib/permissions';
+import { isComercio } from '@/lib/business-modes';
 
 const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
 
@@ -79,6 +80,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
   const [showWelcome, setShowWelcome] = useState(false);
   const [accessNotice, setAccessNotice] = useState<AccessNotice | null>(null);
   const [routeTransitioning, setRouteTransitioning] = useState(false);
+  const comercio = isComercio(currentUser?.workspaceMode);
   const [showTopProgress, setShowTopProgress] = useState(false);
   const authChecked = useRef(false);
   const currentSessionRef = useRef<string | null>(null);
@@ -269,9 +271,9 @@ function LayoutInner({ children }: { children: ReactNode }) {
     <div className="flex h-screen bg-[#f5f7f9]">
       <div className="pointer-events-none fixed inset-x-0 top-0 z-[80]">
         <div
-          className={`h-1 origin-left bg-[#0A2540] transition-all duration-300 ease-out ${
+          className={`h-1 origin-left transition-all duration-300 ease-out ${
             showTopProgress ? 'opacity-100' : 'opacity-0'
-          } ${routeTransitioning || fetchingCount > 0 ? 'w-2/3' : 'w-full'}`}
+          } ${routeTransitioning || fetchingCount > 0 ? 'w-2/3' : 'w-full'} ${comercio ? 'bg-[#F06A1A]' : 'bg-[#1A6FD4]'}`}
         />
       </div>
       {/* Sidebar Desktop */}
@@ -319,7 +321,16 @@ function LayoutInner({ children }: { children: ReactNode }) {
               <span className="text-sm font-medium text-[#2c2f31]">Menu</span>
             </button>
             <div className="min-w-0 overflow-hidden">
-              <KukuGestLogo height={24} className="max-w-full" />
+              {currentUser ? (
+                <KukuGestWorkspaceLogo
+                  workspace={comercio ? 'comercio' : 'servicos'}
+                  height={30}
+                  compact
+                  className="max-w-full"
+                />
+              ) : (
+                <KukuGestLogo height={24} className="max-w-full" />
+              )}
             </div>
           </div>
           <UserWidget user={currentUser} compact />
@@ -388,6 +399,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
 
 function UserWidget({ user, compact = false }: { user: User | null; compact?: boolean }) {
   if (!user) return null;
+  const comercio = isComercio(user.workspaceMode);
   const initials = user.name
     .split(' ')
     .map((w) => w[0])
@@ -411,7 +423,14 @@ function UserWidget({ user, compact = false }: { user: User | null; compact?: bo
           {secondaryLabel}
         </span>
       </div>
-      <div className={`rounded-full bg-gradient-to-br from-[#0049e6] to-[#829bff] flex items-center justify-center flex-shrink-0 ${compact ? 'h-8 w-8' : 'w-9 h-9'}`}>
+      <div
+        className={`rounded-full flex items-center justify-center flex-shrink-0 ${compact ? 'h-8 w-8' : 'w-9 h-9'}`}
+        style={{
+          background: comercio
+            ? 'linear-gradient(135deg, #F06A1A 0%, #FFA040 100%)'
+            : 'linear-gradient(135deg, #1A6FD4 0%, #5EB0F5 100%)',
+        }}
+      >
         <span className={`text-white font-bold ${compact ? 'text-[11px]' : 'text-xs'}`}>{initials}</span>
       </div>
     </div>

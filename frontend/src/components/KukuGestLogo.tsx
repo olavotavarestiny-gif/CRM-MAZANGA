@@ -1,9 +1,21 @@
 import * as React from 'react';
 
-const BLUE = '#1A6FD4';
-const ORANGE = '#F06A1A';
-const ORANGE_SOFT = '#FFA040';
-const DARK = '#0D1C33';
+const SERVICES_PRIMARY = '#1A6FD4';
+const SERVICES_DARK = '#0D3F7A';
+const SERVICES_LIGHT = '#5EB0F5';
+const SERVICES_BADGE_LIGHT = '#2D9BFF';
+const SERVICES_BG = '#EEF5FC';
+const SERVICES_BORDER = '#B5D4F4';
+
+const COMMERCE_PRIMARY = '#F06A1A';
+const COMMERCE_DARK = '#B84D0E';
+const COMMERCE_LIGHT = '#FFA040';
+const COMMERCE_BG = '#FDF2EA';
+const COMMERCE_BORDER = '#FAC775';
+
+const BLUE = SERVICES_PRIMARY;
+const ORANGE = COMMERCE_PRIMARY;
+const ORANGE_SOFT = COMMERCE_LIGHT;
 const LIGHT = '#F8F8F8';
 const BORDER = '#E5E5E5';
 const TAGLINE = '#8A8F98';
@@ -41,7 +53,7 @@ export function KukuGestIcon({
   size = 48,
   color = BLUE,
   accentColor = ORANGE,
-  bg = DARK,
+  bg = SERVICES_DARK,
   borderColor,
 }: KIconProps) {
   return (
@@ -153,15 +165,113 @@ interface KukuGestNavLogoProps {
   className?: string;
 }
 
+type WorkspaceMode = 'servicos' | 'comercio';
+
+interface KukuGestWorkspaceLogoProps {
+  workspace: WorkspaceMode;
+  height?: number;
+  compact?: boolean;
+  className?: string;
+}
+
+function WorkspaceMark({
+  workspace,
+  compact = false,
+}: {
+  workspace: WorkspaceMode;
+  compact?: boolean;
+}) {
+  const color = workspace === 'comercio' ? COMMERCE_PRIMARY : SERVICES_PRIMARY;
+  const accent = workspace === 'comercio' ? COMMERCE_LIGHT : SERVICES_BADGE_LIGHT;
+  const baseX = compact ? 18 : 24;
+  const baseY = compact ? 10 : 20;
+
+  return (
+    <>
+      <rect x={baseX} y={baseY} width="7" height="36" rx="2" fill={color} />
+      <polygon points={`${baseX + 7},${baseY + 18} ${baseX + 20},${baseY} ${baseX + 28},${baseY} ${baseX + 18},${baseY + 12} ${baseX + 7},${baseY + 18}`} fill={color} />
+      <polygon points={`${baseX + 18},${baseY + 12} ${baseX + 28},${baseY} ${baseX + 33},${baseY} ${baseX + 24},${baseY + 10}`} fill={accent} />
+      <polygon points={`${baseX + 7},${baseY + 20} ${baseX + 18},${baseY + 24} ${baseX + 28},${baseY + 36} ${baseX + 22},${baseY + 36} ${baseX + 7},${baseY + 22}`} fill={color} />
+      <polygon points={`${baseX + 18},${baseY + 24} ${baseX + 28},${baseY + 36} ${baseX + 33},${baseY + 36} ${baseX + 24},${baseY + 28}`} fill={accent} />
+      <circle cx={baseX + 11} cy={baseY + 19} r="2.5" fill={accent} />
+    </>
+  );
+}
+
+export function KukuGestWorkspaceLogo({
+  workspace,
+  height = 48,
+  compact = false,
+  className,
+}: KukuGestWorkspaceLogoProps) {
+  const isComercio = workspace === 'comercio';
+  const viewBoxWidth = compact ? 188 : 270;
+  const viewBoxHeight = compact ? 56 : 96;
+  const titleColor = isComercio ? COMMERCE_PRIMARY : SERVICES_PRIMARY;
+  const bg = isComercio ? COMMERCE_BG : SERVICES_BG;
+  const border = isComercio ? COMMERCE_BORDER : SERVICES_BORDER;
+  const subtitleColor = isComercio ? '#D4853A' : '#5C9BD6';
+  const workspaceLabel = isComercio ? 'Comércio' : 'Serviços';
+  const description = isComercio ? 'Vendas · Stock · Faturas' : 'Faturação · CRM · Orçamentos';
+
+  return (
+    <svg
+      width={(viewBoxWidth / viewBoxHeight) * height}
+      height={height}
+      viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label={`KukuGest ${workspaceLabel}`}
+      className={className}
+    >
+      <rect x="0.5" y="0.5" width={viewBoxWidth - 1} height={viewBoxHeight - 1} rx={compact ? 12 : 14} fill={bg} stroke={border} />
+      <WorkspaceMark workspace={workspace} compact={compact} />
+      <text
+        x={compact ? '70' : '70'}
+        y={compact ? '24' : '35'}
+        fontFamily="'Montserrat', sans-serif"
+        fontSize={compact ? '15' : '15'}
+        fontWeight="800"
+        fill={titleColor}
+      >
+        KukuGest
+      </text>
+      <text
+        x={compact ? '70' : '70'}
+        y={compact ? '42' : '57'}
+        fontFamily="'Montserrat', sans-serif"
+        fontSize={compact ? '12' : '13'}
+        fontWeight="600"
+        fill={titleColor}
+      >
+        {workspaceLabel}
+      </text>
+      {!compact && (
+        <text
+          x="70"
+          y="78"
+          fontFamily="'Montserrat', sans-serif"
+          fontSize="9.5"
+          fontWeight="500"
+          fill={subtitleColor}
+          letterSpacing="0.04em"
+        >
+          {description}
+        </text>
+      )}
+    </svg>
+  );
+}
+
 export function KukuGestNavLogo({
   iconSize = 36,
   className,
 }: KukuGestNavLogoProps) {
-  const logoHeight = Math.max(32, iconSize + 6);
+  const logoHeight = Math.max(40, iconSize + 8);
 
   return (
     <div className={className}>
-      <KukuGestLogo height={logoHeight} />
+      <KukuGestWorkspaceLogo workspace="servicos" height={logoHeight} />
     </div>
   );
 }
@@ -175,11 +285,11 @@ export function KukuGestNavLogoComercio({
   iconSize = 36,
   className,
 }: KukuGestNavLogoComercioProps) {
-  const logoHeight = Math.max(32, iconSize + 6);
+  const logoHeight = Math.max(40, iconSize + 8);
 
   return (
     <div className={className}>
-      <KukuGestLogo height={logoHeight} />
+      <KukuGestWorkspaceLogo workspace="comercio" height={logoHeight} />
     </div>
   );
 }
