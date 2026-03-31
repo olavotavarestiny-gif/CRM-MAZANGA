@@ -438,7 +438,7 @@ export default function CaixaPage() {
                   value={String(sessao?.salesCount ?? 0)}
                   hint="Faturas ligadas à sessão"
                   icon={History}
-                  accentClass="bg-blue-100 text-blue-700"
+                  accentClass="bg-[#FDF2EA] text-[#B84D0E]"
                 />
                 <SessionStatCard
                   title="Numerário"
@@ -612,7 +612,7 @@ export default function CaixaPage() {
                             : item.differenceAmount === 0
                             ? 'text-emerald-600'
                             : item.differenceAmount > 0
-                            ? 'text-blue-600'
+                            ? 'text-[#F06A1A]'
                             : 'text-red-600'
                         )}>
                           {item.differenceAmount == null ? '—' : formatKz(item.differenceAmount)}
@@ -658,7 +658,7 @@ export default function CaixaPage() {
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Excesso</p>
-                <p className="mt-3 text-2xl font-black tracking-tight text-blue-700">{formatKz(totalExcesso)}</p>
+                <p className="mt-3 text-2xl font-black tracking-tight text-[#B84D0E]">{formatKz(totalExcesso)}</p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Em Falta</p>
@@ -756,7 +756,7 @@ export default function CaixaPage() {
                               : difference === 0
                               ? 'text-emerald-600'
                               : difference > 0
-                              ? 'text-blue-600'
+                              ? 'text-[#F06A1A]'
                               : 'text-red-600'
                           )}>
                             {difference == null ? '—' : formatKz(difference)}
@@ -831,7 +831,7 @@ export default function CaixaPage() {
               ) : null}
 
               {!estabelecimentosError && assignedEstabelecimento && isRestrictedTeamMember ? (
-                <p className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                <p className="mt-2 rounded-lg border border-[#FAC775] bg-[#FDF2EA] px-3 py-2 text-xs text-[#B84D0E]">
                   Este membro só pode abrir caixa em {assignedEstabelecimento.nome}.
                 </p>
               ) : null}
@@ -939,7 +939,7 @@ export default function CaixaPage() {
                 {diferencaPreview != null ? (
                   <p className={cn(
                     'mt-1 text-xs font-medium',
-                    diferencaPreview === 0 ? 'text-emerald-600' : diferencaPreview > 0 ? 'text-blue-600' : 'text-red-600'
+                    diferencaPreview === 0 ? 'text-emerald-600' : diferencaPreview > 0 ? 'text-[#F06A1A]' : 'text-red-600'
                   )}>
                     Diferença: {diferencaPreview > 0 ? '+' : ''}{formatKz(diferencaPreview)}
                   </p>

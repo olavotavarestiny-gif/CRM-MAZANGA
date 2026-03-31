@@ -24,7 +24,7 @@ const PRODUCT_TYPES = [
 
 const STATUS_MAP: Record<string, { label: string; className: string }> = {
   A: { label: 'Ativa', className: 'bg-green-100 text-green-700 border-green-200' },
-  U: { label: 'Em uso', className: 'bg-blue-100 text-blue-700 border-blue-200' },
+  U: { label: 'Em uso', className: 'bg-[#FDF2EA] text-[#B84D0E] border-[#FAC775]' },
   F: { label: 'Fechada', className: 'bg-gray-100 text-gray-500 border-gray-200' },
 };
 
@@ -402,7 +402,7 @@ export default function ProdutosPage() {
                       disabled={!podeEditarStock}
                     >
                       <StockBadge product={p} />
-                      <PlusCircle className="w-3 h-3 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                      <PlusCircle className="w-3 h-3 text-gray-300 group-hover:text-[#F06A1A] transition-colors" />
                     </button>
                   ) : (
                     <StockBadge product={p} />
@@ -721,7 +721,7 @@ export default function ProdutosPage() {
             <Button
               onClick={() => addStockMutation.mutate()}
               disabled={addStockMutation.isPending || !stockQty || Number(stockQty) <= 0}
-              className="bg-blue-600 text-white hover:bg-blue-700"
+              className="bg-[#B84D0E] text-white hover:bg-[#9a3d0a]"
             >
               {addStockMutation.isPending ? 'A guardar...' : 'Confirmar entrada'}
             </Button>

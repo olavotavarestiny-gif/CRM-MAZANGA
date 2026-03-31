@@ -447,7 +447,7 @@ export default function VendasRapidasPage() {
                   </p>
                 )}
                 {!estabelecimentosError && assignedEstabelecimento && isRestrictedTeamMember && (
-                  <p className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                  <p className="mt-2 rounded-lg border border-[#FAC775] bg-[#FDF2EA] px-3 py-2 text-xs text-[#B84D0E]">
                     Este membro só pode abrir caixa em {assignedEstabelecimento.nome}.
                   </p>
                 )}
@@ -576,7 +576,7 @@ export default function VendasRapidasPage() {
         {/* Left: search + cart */}
         <div className="space-y-4">
           <div className="relative" ref={dropdownRef}>
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-[#0049e6]/30">
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-[#B84D0E]/30">
               <Search className="h-4 w-4 shrink-0 text-[#6b7e9a]" />
               <input
                 ref={searchRef} type="text"
@@ -595,13 +595,13 @@ export default function VendasRapidasPage() {
                   <button
                     key={p.id} ref={(el) => { itemRefs.current[idx] = el; }}
                     onClick={() => addProduct(p)}
-                    className={`flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors ${idx === highlightedIndex ? 'bg-blue-50 text-[#0049e6]' : 'hover:bg-slate-50'}`}
+                    className={`flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors ${idx === highlightedIndex ? 'bg-[#FDF2EA] text-[#B84D0E]' : 'hover:bg-slate-50'}`}
                   >
                     <div>
-                      <p className={`text-sm font-medium ${idx === highlightedIndex ? 'text-[#0049e6]' : 'text-[#B84D0E]'}`}>{p.productDescription}</p>
+                      <p className={`text-sm font-medium ${idx === highlightedIndex ? 'text-[#B84D0E]' : 'text-[#B84D0E]'}`}>{p.productDescription}</p>
                       <p className="text-xs text-slate-500">{p.productCode} · IVA {p.taxPercentage}%{p.stock != null ? ` · Stock: ${p.stock}` : ''}</p>
                     </div>
-                    <span className="ml-4 text-sm font-semibold text-[#0049e6]">{formatKz(p.unitPrice)}</span>
+                    <span className="ml-4 text-sm font-semibold text-[#B84D0E]">{formatKz(p.unitPrice)}</span>
                   </button>
                 ))}
               </div>
@@ -679,7 +679,7 @@ export default function VendasRapidasPage() {
                   <p className="text-xs text-slate-500">NIF: {customerTaxID}</p>
                 </div>
                 <div className="flex gap-1.5 shrink-0">
-                  <button onClick={() => setShowClientePicker(true)} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#0049e6] hover:bg-blue-50 transition-colors">Alterar</button>
+                  <button onClick={() => setShowClientePicker(true)} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#B84D0E] hover:bg-[#FDF2EA] transition-colors">Alterar</button>
                   {customerTaxID !== DEFAULT_CUSTOMER_TAX_ID && (
                     <button onClick={resetCustomer} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 transition-colors">Limpar</button>
                   )}
@@ -766,7 +766,7 @@ export default function VendasRapidasPage() {
                   autoFocus
                 />
                 {diferenca !== null && (
-                  <p className={`text-xs mt-1 font-medium ${diferenca === 0 ? 'text-green-600' : diferenca > 0 ? 'text-blue-600' : 'text-red-500'}`}>
+                  <p className={`text-xs mt-1 font-medium ${diferenca === 0 ? 'text-green-600' : diferenca > 0 ? 'text-[#F06A1A]' : 'text-red-500'}`}>
                     Diferença: {diferenca >= 0 ? '+' : ''}{formatKz(diferenca)}
                     {diferenca > 0 ? ' (excesso)' : diferenca < 0 ? ' (em falta)' : ' (conferido)'}
                   </p>
