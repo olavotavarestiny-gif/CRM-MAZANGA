@@ -150,73 +150,36 @@ export function KukuGestLogo({
 
 interface KukuGestNavLogoProps {
   iconSize?: number;
-  label?: string;
-  labelColor?: string;
   className?: string;
-}
-
-function WorkspaceLabel({
-  label,
-  color,
-  background,
-}: {
-  label: string;
-  color: string;
-  background: string;
-}) {
-  return (
-    <span
-      className="inline-flex w-fit items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]"
-      style={{ color, backgroundColor: background }}
-    >
-      {label}
-    </span>
-  );
 }
 
 export function KukuGestNavLogo({
   iconSize = 36,
-  label,
-  labelColor = BLUE,
   className,
 }: KukuGestNavLogoProps) {
-  const logoHeight = Math.max(30, iconSize + 2);
+  const logoHeight = Math.max(32, iconSize + 6);
 
   return (
-    <div className={className} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-      <KukuGestIcon size={iconSize} color={BLUE} accentColor={ORANGE} bg={DARK} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
-        <KukuGestLogo height={logoHeight} />
-        {label ? (
-          <WorkspaceLabel label={label} color={labelColor} background="#EEF5FC" />
-        ) : null}
-      </div>
+    <div className={className}>
+      <KukuGestLogo height={logoHeight} />
     </div>
   );
 }
 
 interface KukuGestNavLogoComercioProps {
   iconSize?: number;
-  label?: string;
   className?: string;
 }
 
 export function KukuGestNavLogoComercio({
   iconSize = 36,
-  label = 'Comércio',
   className,
 }: KukuGestNavLogoComercioProps) {
-  const logoHeight = Math.max(30, iconSize + 2);
+  const logoHeight = Math.max(32, iconSize + 6);
 
   return (
-    <div className={className} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-      <KukuGestIconComercio size={iconSize} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
-        <KukuGestLogo height={logoHeight} />
-        {label ? (
-          <WorkspaceLabel label={label} color={ORANGE} background="#FDF2EA" />
-        ) : null}
-      </div>
+    <div className={className}>
+      <KukuGestLogo height={logoHeight} />
     </div>
   );
 }
