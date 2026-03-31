@@ -364,11 +364,14 @@ function ConfiguracoesContent() {
     { id: 'equipa' as TabId, label: 'Equipa', icon: Users, show: !!isOwner },
   ].filter(t => t.show);
 
+  const activeBtnBg = isComercioWorkspace ? 'bg-[#B84D0E]' : 'bg-[#0A2540]';
+  const activeBtnText = isComercioWorkspace ? 'hover:text-[#B84D0E]' : 'hover:text-[#0A2540]';
+
   const tabBtn = (id: TabId) =>
     `flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
       activeTab === id
-        ? 'bg-[#B84D0E] text-white shadow-sm'
-        : 'text-gray-500 hover:bg-slate-50 hover:text-[#B84D0E]'
+        ? `${activeBtnBg} text-white shadow-sm`
+        : `text-gray-500 hover:bg-slate-50 ${activeBtnText}`
     }`;
 
   return (
@@ -451,7 +454,7 @@ function ConfiguracoesContent() {
                 disabled={profileMutation.isPending}
                 loading={profileMutation.isPending}
                 loadingLabel="A guardar..."
-                className="w-full bg-[#B84D0E] text-white hover:bg-[#9a3d0a]"
+                className={`w-full text-white ${isComercioWorkspace ? 'bg-[#B84D0E] hover:bg-[#9a3d0a]' : 'bg-[#0A2540] hover:bg-[#0d3060]'}`}
               >
                 {profileSaved ? 'Perfil guardado' : 'Guardar Perfil'}
               </LoadingButton>
@@ -480,11 +483,13 @@ function ConfiguracoesContent() {
                         disabled={workspaceSaving}
                         className={`flex flex-col items-start gap-1.5 rounded-xl border p-4 text-left transition-all ${
                           active
-                            ? 'border-[#B84D0E] bg-[#FDF2EA] ring-2 ring-[#B84D0E]/20'
+                            ? isComercioWorkspace
+                              ? 'border-[#B84D0E] bg-[#FDF2EA] ring-2 ring-[#B84D0E]/20'
+                              : 'border-[#0A2540] bg-[#EEF5FC] ring-2 ring-[#0A2540]/20'
                             : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                         }`}
                       >
-                        <span className={`text-sm font-semibold ${active ? 'text-[#B84D0E]' : 'text-[#2c2f31]'}`}>
+                        <span className={`text-sm font-semibold ${active ? (isComercioWorkspace ? 'text-[#B84D0E]' : 'text-[#0A2540]') : 'text-[#2c2f31]'}`}>
                           {mode === 'servicos' ? 'Serviços' : 'Comércio'}
                         </span>
                         <span className="text-xs text-slate-500">
@@ -526,7 +531,7 @@ function ConfiguracoesContent() {
                   <Label className="text-gray-700">Confirmar Password</Label>
                   <Input type="password" placeholder="••••••••" value={pwForm.confirm} onChange={e => setPwForm(p => ({ ...p, confirm: e.target.value }))} required className="mt-1" />
                 </div>
-                <LoadingButton type="submit" disabled={pwSubmitting} loading={pwSubmitting} loadingLabel="A alterar..." className="w-full bg-[#B84D0E] text-white hover:bg-[#9a3d0a]">
+                <LoadingButton type="submit" disabled={pwSubmitting} loading={pwSubmitting} loadingLabel="A alterar..." className={`w-full text-white ${isComercioWorkspace ? 'bg-[#B84D0E] hover:bg-[#9a3d0a]' : 'bg-[#0A2540] hover:bg-[#0d3060]'}`}>
                   Alterar Password
                 </LoadingButton>
               </form>
@@ -614,8 +619,8 @@ function ConfiguracoesContent() {
                     onClick={() => setSelectedBilling((prev) => ({ ...prev, [currentPlan]: billing }))}
                     className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                       (selectedBilling[currentPlan] || getPlanBillingOptions(currentPlan)[0]) === billing
-                        ? 'border-[#B84D0E] bg-[#B84D0E] text-white'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-[#B84D0E]'
+                        ? isComercioWorkspace ? 'border-[#B84D0E] bg-[#B84D0E] text-white' : 'border-[#0A2540] bg-[#0A2540] text-white'
+                        : isComercioWorkspace ? 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-[#B84D0E]' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-[#0A2540]'
                     }`}
                   >
                     {billing}
@@ -677,7 +682,7 @@ function ConfiguracoesContent() {
         <div className="space-y-4 max-w-3xl">
           <Card
             ref={faturacaoSectionRef}
-            className={`border-slate-200 shadow-sm ${requestedSection === 'faturacao' ? 'ring-2 ring-[#B84D0E]/20 border-[#B84D0E]/30' : ''}`}
+            className={`border-slate-200 shadow-sm ${requestedSection === 'faturacao' ? 'ring-2 ring-[#0A2540]/20 border-[#0A2540]/30' : ''}`}
           >
             <div className="p-6 space-y-4">
               <h2 className="text-base font-semibold text-[#0A2540] flex items-center gap-2">
@@ -836,7 +841,7 @@ function ConfiguracoesContent() {
                   secondaryAction={{ label: 'Fechar', onClick: () => setConfigError('') }}
                 />
               )}
-              <LoadingButton onClick={() => { setConfigError(''); saveMutation.mutate(); }} disabled={saveMutation.isPending} loading={saveMutation.isPending} loadingLabel="A guardar..." className="w-full bg-[#B84D0E] text-white hover:bg-[#9a3d0a]">
+              <LoadingButton onClick={() => { setConfigError(''); saveMutation.mutate(); }} disabled={saveMutation.isPending} loading={saveMutation.isPending} loadingLabel="A guardar..." className={`w-full text-white ${isComercioWorkspace ? 'bg-[#B84D0E] hover:bg-[#9a3d0a]' : 'bg-[#0A2540] hover:bg-[#0d3060]'}`}>
                 {configSaved ? <><CheckCircle2 className="w-4 h-4 mr-2" /> Guardado!</> : 'Guardar Configurações'}
               </LoadingButton>
             </div>
@@ -914,7 +919,7 @@ function ConfiguracoesContent() {
                           </p>
                         )}
                       </div>
-                      {e.isPrincipal && <span className="px-2 py-0.5 rounded-full text-xs bg-[#FDF2EA] text-[#B84D0E] border border-[#FAC775]">{isComercioWorkspace ? 'Padrão' : 'Principal'}</span>}
+                      {e.isPrincipal && <span className={`px-2 py-0.5 rounded-full text-xs border ${isComercioWorkspace ? 'bg-[#FDF2EA] text-[#B84D0E] border-[#FAC775]' : 'bg-[#EEF5FC] text-[#1A6FD4] border-[#B5D4F4]'}`}>{isComercioWorkspace ? 'Padrão' : 'Principal'}</span>}
                     </div>
                   ))}
                 </div>
@@ -1013,7 +1018,7 @@ function ConfiguracoesContent() {
                       <td className="py-3 px-4">
                         <button
                           onClick={() => setPermMember(member)}
-                          className="flex items-center gap-1 text-xs text-[#0A2540] hover:text-[#B84D0E] transition"
+                          className="flex items-center gap-1 text-xs text-[#0A2540] hover:text-[#0A2540] transition"
                           title="Editar permissões"
                         >
                           <span className="font-mono">{pagesLabel}</span>
@@ -1093,7 +1098,7 @@ function ConfiguracoesContent() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEstab(false)}>Cancelar</Button>
-            <LoadingButton onClick={() => estabMutation.mutate()} disabled={estabMutation.isPending} loading={estabMutation.isPending} loadingLabel="A criar..." className="bg-[#B84D0E] text-white hover:bg-[#9a3d0a]">
+            <LoadingButton onClick={() => estabMutation.mutate()} disabled={estabMutation.isPending} loading={estabMutation.isPending} loadingLabel="A criar..." className={`text-white ${isComercioWorkspace ? 'bg-[#B84D0E] hover:bg-[#9a3d0a]' : 'bg-[#0A2540] hover:bg-[#0d3060]'}`}>
               Criar
             </LoadingButton>
           </DialogFooter>
@@ -1131,7 +1136,7 @@ function ConfiguracoesContent() {
                 </div>
                 <div className="flex gap-3 pt-2">
                   <Button type="button" variant="outline" onClick={() => setShowAddMember(false)} className="flex-1">Cancelar</Button>
-                  <LoadingButton type="submit" disabled={addMemberMutation.isPending} loading={addMemberMutation.isPending} loadingLabel="A criar..." className="flex-1 bg-[#B84D0E] text-white hover:bg-[#9a3d0a]">
+                  <LoadingButton type="submit" disabled={addMemberMutation.isPending} loading={addMemberMutation.isPending} loadingLabel="A criar..." className={`flex-1 text-white ${isComercioWorkspace ? 'bg-[#B84D0E] hover:bg-[#9a3d0a]' : 'bg-[#0A2540] hover:bg-[#0d3060]'}`}>
                     Adicionar
                   </LoadingButton>
                 </div>

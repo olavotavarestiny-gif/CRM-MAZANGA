@@ -9,12 +9,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default:     "rounded-lg bg-[#B84D0E] text-white hover:bg-[#9a3d0a]",
+        default:     "rounded-lg bg-[#0A2540] text-white hover:bg-[#0d3060]",
         destructive: "rounded-lg bg-red-600 text-white hover:bg-red-700",
-        outline:     "rounded-lg border border-[#B84D0E] bg-white text-[#B84D0E] hover:bg-[#B84D0E] hover:text-white",
-        secondary:   "rounded-lg bg-white text-[#B84D0E] border border-[#dde3ec] hover:bg-[#FDF2EA]",
-        ghost:       "rounded-lg text-[#B84D0E] hover:bg-[#FDF2EA]",
-        link:        "text-[#B84D0E] underline-offset-4 hover:underline",
+        outline:     "rounded-lg border border-[#0A2540] bg-white text-[#0A2540] hover:bg-[#0A2540] hover:text-white",
+        secondary:   "rounded-lg bg-white text-[#0A2540] border border-[#dde3ec] hover:bg-[#f5f7fa]",
+        ghost:       "rounded-lg text-[#0A2540] hover:bg-[#f5f7fa]",
+        link:        "text-[#0A2540] underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-5 py-2",
