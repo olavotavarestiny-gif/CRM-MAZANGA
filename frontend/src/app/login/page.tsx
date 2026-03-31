@@ -7,7 +7,7 @@ import { getCurrentUserWithToken } from '@/lib/api';
 import Link from 'next/link';
 import { Mail, Lock } from 'lucide-react';
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
-import KukuGestLogo from '@/components/KukuGestLogo';
+import { KukuGestIcon } from '@/components/KukuGestLogo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -74,8 +74,8 @@ export default function LoginPage() {
             <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.22),transparent_32%,transparent_68%,rgba(255,255,255,0.08))]" />
 
             <div className="relative text-center">
-              <div className="mx-auto mb-4 inline-flex max-w-full items-center justify-center rounded-[1.4rem] border border-white/45 bg-white/92 px-4 py-3 shadow-[0_14px_30px_rgba(6,16,36,0.16),inset_0_1px_0_rgba(255,255,255,0.7)]">
-                <KukuGestLogo height={52} showTagline />
+              <div className="mx-auto mb-4 inline-flex h-24 w-24 items-center justify-center rounded-[1.6rem] border border-white/45 bg-white/92 shadow-[0_14px_30px_rgba(6,16,36,0.16),inset_0_1px_0_rgba(255,255,255,0.7)]">
+                <KukuGestIcon size={62} />
               </div>
               <p className="mt-1.5 text-sm text-white/80 sm:text-base">Bem-vindo de volta</p>
             </div>
