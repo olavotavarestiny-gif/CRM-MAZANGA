@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { getCaixaSessaoAtual, getComercialAnalise, getComercialInsights, getComercialResumo, getCurrentUser } from '@/lib/api';
 import type { User } from '@/lib/api';
-import { Button } from '@/components/ui/button';
+import { CommerceButton as Button } from '@/components/ui/button-commerce';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
@@ -184,7 +184,7 @@ function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.05fr]">
         <Card className="border-slate-200 p-5 shadow-sm">
           <div className="flex items-center gap-2">
-            <Store className="h-4 w-4 text-[#0A2540]" />
+            <Store className="h-4 w-4 text-[#B84D0E]" />
             <p className="text-sm font-semibold text-[#2c2f31]">Estado Operacional</p>
           </div>
 
@@ -232,7 +232,7 @@ function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
 
         <Card className="border-slate-200 p-5 shadow-sm">
           <div className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-[#0A2540]" />
+            <BarChart3 className="h-4 w-4 text-[#B84D0E]" />
             <p className="text-sm font-semibold text-[#2c2f31]">Acessos Rápidos</p>
           </div>
           <div className="mt-4 grid gap-3">
@@ -369,14 +369,14 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
             <button
               type="button"
               onClick={() => setModo('resumo')}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${modo === 'resumo' ? 'bg-[#0A2540] text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${modo === 'resumo' ? 'bg-[#B84D0E] text-white' : 'text-slate-600 hover:bg-slate-100'}`}
             >
               Resumo
             </button>
             <button
               type="button"
               onClick={() => setModo('analise')}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${modo === 'analise' ? 'bg-[#0A2540] text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${modo === 'analise' ? 'bg-[#B84D0E] text-white' : 'text-slate-600 hover:bg-slate-100'}`}
             >
               Análise
             </button>
@@ -422,7 +422,7 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
             <Card className="border-slate-200 p-5 shadow-sm">
               <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-[#0A2540]" />
+                <BarChart3 className="h-4 w-4 text-[#B84D0E]" />
                 <p className="text-sm font-semibold text-[#2c2f31]">Insights do Dia</p>
               </div>
               <div className="mt-4 space-y-3">

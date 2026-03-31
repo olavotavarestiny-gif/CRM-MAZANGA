@@ -11,6 +11,7 @@ import {
   getClientAccounts,
   getCurrentUser,
   getLoginLogs,
+  getSuperAdminDashboard,
   getSuperAdminOrgs,
   getSuperAdminStorage,
   getSuperAdminUsage,
@@ -23,6 +24,7 @@ import {
 import type {
   LoginLog,
   PlanName,
+  SuperAdminDashboard,
   SuperAdminOrg,
   SuperAdminStorageStat,
   SuperAdminUsageStat,
@@ -30,6 +32,7 @@ import type {
 } from '@/lib/api';
 import type { ClientAccount } from '@/lib/types';
 import {
+  Activity,
   BarChart3,
   Building2,
   ChevronDown,
@@ -38,6 +41,7 @@ import {
   EyeOff,
   HardDrive,
   History,
+  LayoutDashboard,
   Plus,
   RefreshCw,
   Search,
@@ -68,7 +72,8 @@ const ADMIN_SECTIONS = [
 ] as const;
 
 const SUPERADMIN_SECTIONS = [
-  { id: 'organizations', label: 'Organizações', icon: ShieldCheck },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'clientes', label: 'Clientes', icon: ShieldCheck },
   { id: 'usage', label: 'Utilização', icon: BarChart3 },
   { id: 'storage', label: 'Armazenamento', icon: HardDrive },
 ] as const;
@@ -101,7 +106,7 @@ export default function SuperAdminPage() {
     [isSuperAdmin]
   );
 
-  const fallbackSection: SectionId = isSuperAdmin ? 'organizations' : 'users';
+  const fallbackSection: SectionId = isSuperAdmin ? 'dashboard' : 'users';
   const currentSection: SectionId =
     requestedSection && allowedSections.includes(requestedSection as SectionId)
       ? (requestedSection as SectionId)
@@ -158,10 +163,16 @@ export default function SuperAdminPage() {
     enabled: isSuperAdmin && currentSection === 'logins',
   });
 
+  const { data: dashboard, isLoading: dashboardLoading, isError: dashboardError, refetch: refetchDashboard } = useQuery({
+    queryKey: ['superadmin-dashboard'],
+    queryFn: getSuperAdminDashboard,
+    enabled: isSuperAdmin && currentSection === 'dashboard',
+  });
+
   const { data: orgs = [], isLoading: orgsLoading, isError: orgsError, refetch: refetchOrgs } = useQuery({
     queryKey: ['superadmin-orgs'],
     queryFn: getSuperAdminOrgs,
-    enabled: isSuperAdmin && currentSection === 'organizations',
+    enabled: isSuperAdmin && (currentSection === 'clientes'),
   });
 
   const { data: usage = [], isLoading: usageLoading, isError: usageError, refetch: refetchUsage } = useQuery({
@@ -336,35 +347,20 @@ export default function SuperAdminPage() {
     currentSection === 'users' ? usersError :
     currentSection === 'accounts' ? accountsError :
     currentSection === 'logins' ? loginLogsError :
-    currentSection === 'organizations' ? orgsError :
+    currentSection === 'dashboard' ? dashboardError :
+    currentSection === 'clientes' ? orgsError :
     currentSection === 'usage' ? usageError :
     currentSection === 'storage' ? storageError :
     false;
 
   const retryCurrentSection = () => {
-    if (currentSection === 'users') {
-      refetchUsers();
-      return;
-    }
-    if (currentSection === 'accounts') {
-      refetchAccounts();
-      return;
-    }
-    if (currentSection === 'logins') {
-      refetchLoginLogs();
-      return;
-    }
-    if (currentSection === 'organizations') {
-      refetchOrgs();
-      return;
-    }
-    if (currentSection === 'usage') {
-      refetchUsage();
-      return;
-    }
-    if (currentSection === 'storage') {
-      refetchStorage();
-    }
+    if (currentSection === 'users') { refetchUsers(); return; }
+    if (currentSection === 'accounts') { refetchAccounts(); return; }
+    if (currentSection === 'logins') { refetchLoginLogs(); return; }
+    if (currentSection === 'dashboard') { refetchDashboard(); return; }
+    if (currentSection === 'clientes') { refetchOrgs(); return; }
+    if (currentSection === 'usage') { refetchUsage(); return; }
+    if (currentSection === 'storage') { refetchStorage(); }
   };
 
   if (userLoading || !currentUser) {
@@ -407,7 +403,7 @@ export default function SuperAdminPage() {
           </div>
         </div>
 
-        {isSuperAdmin && (currentSection === 'organizations' || currentSection === 'accounts') && (
+        {isSuperAdmin && (currentSection === 'clientes' || currentSection === 'accounts') && (
           <Button onClick={() => setShowCreateAccount(true)} className="gap-2">
             <Plus className="h-4 w-4" />
             Nova Conta
@@ -695,14 +691,97 @@ export default function SuperAdminPage() {
           </Card>
         )}
 
-        {currentSection === 'organizations' && isSuperAdmin && !currentSectionError && (
+        {currentSection === 'dashboard' && isSuperAdmin && !currentSectionError && (
+          <div className="space-y-6">
+            {dashboardLoading ? (
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="h-28 animate-pulse rounded-2xl bg-slate-100" />
+                ))}
+              </div>
+            ) : dashboard ? (
+              <>
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Clientes Activos</p>
+                    <p className="mt-3 text-3xl font-black text-[#2c2f31]">{dashboard.activeOrgs}</p>
+                    <p className="mt-1 text-xs text-slate-500">de {dashboard.totalOrgs} total</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Novos este Mês</p>
+                    <p className="mt-3 text-3xl font-black text-[#2c2f31]">{dashboard.newOrgsThisMonth}</p>
+                    <p className="mt-1 text-xs text-slate-500">contas criadas</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Total Contactos</p>
+                    <p className="mt-3 text-3xl font-black text-[#2c2f31]">{dashboard.totalContacts.toLocaleString('pt-PT')}</p>
+                    <p className="mt-1 text-xs text-slate-500">na plataforma</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Armazenamento</p>
+                    <p className="mt-3 text-3xl font-black text-[#2c2f31]">{dashboard.totalStorageMb} MB</p>
+                    <p className="mt-1 text-xs text-slate-500">total de ficheiros</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">Workspace</p>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2.5 w-2.5 rounded-full bg-[#1A6FD4]" />
+                          <span className="text-sm text-slate-600">Serviços</span>
+                        </div>
+                        <span className="text-sm font-bold text-[#2c2f31]">{dashboard.workspaceMix.servicos}%</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2.5 w-2.5 rounded-full bg-[#F06A1A]" />
+                          <span className="text-sm text-slate-600">Comércio</span>
+                        </div>
+                        <span className="text-sm font-bold text-[#2c2f31]">{dashboard.workspaceMix.comercio}%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">Planos</p>
+                    <div className="space-y-3">
+                      {Object.entries(dashboard.planDistribution).map(([plan, count]) => (
+                        <div key={plan} className="flex items-center justify-between">
+                          <span className="text-sm capitalize text-slate-600">{plan}</span>
+                          <span className="text-sm font-bold text-[#2c2f31]">{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {dashboard.mostActiveOrg && (
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">Mais Activo (30d)</p>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100">
+                          <Activity className="h-5 w-5 text-[#0A2540]" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-[#2c2f31]">{dashboard.mostActiveOrg.name}</p>
+                          <p className="text-xs text-slate-500">{dashboard.mostActiveOrg.logins30d} logins nos últimos 30 dias</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : null}
+          </div>
+        )}
+
+        {currentSection === 'clientes' && isSuperAdmin && !currentSectionError && (
           <div className="space-y-4">
             <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <h2 className="text-base font-semibold text-[#0A2540]">Organizações</h2>
+                  <h2 className="text-base font-semibold text-[#0A2540]">Clientes KukuGest</h2>
                   <p className="text-sm text-[#6b7e9a]">
-                    {orgs.length} organizações · {totalUsers} utilizadores no total
+                    {orgs.length} clientes · {totalUsers} utilizadores no total
                   </p>
                 </div>
                 <div className="relative w-full md:w-80">

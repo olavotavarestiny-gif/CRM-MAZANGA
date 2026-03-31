@@ -62,8 +62,9 @@ const USER_SELECT = {
   isSuperAdmin: true, permissions: true, supabaseUid: true,
 };
 
-// Bootstrap: email that always gets superadmin regardless of DB field value
+// Bootstrap: emails that always get superadmin regardless of DB field value
 const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'olavo@mazanga.digital';
+const SUPER_ADMIN_EMAILS = [SUPER_ADMIN_EMAIL, 'olavo@kukugest.ao'];
 
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -91,7 +92,7 @@ async function requireAuth(req, res, next) {
         email: targetUser.email,
         name: targetUser.name,
         role: targetUser.role,
-        isSuperAdmin: targetUser.isSuperAdmin || targetUser.email === SUPER_ADMIN_EMAIL,
+        isSuperAdmin: targetUser.isSuperAdmin || SUPER_ADMIN_EMAILS.includes(targetUser.email),
         permissionsJson: targetUser.permissions,
         accountOwnerId: targetUser.accountOwnerId || null,
         supabaseUid: targetUser.supabaseUid || null,
@@ -150,7 +151,7 @@ async function requireAuth(req, res, next) {
       email: user.email,
       name: user.name,
       role: user.role,
-      isSuperAdmin: user.isSuperAdmin || user.email === SUPER_ADMIN_EMAIL,
+      isSuperAdmin: user.isSuperAdmin || SUPER_ADMIN_EMAILS.includes(user.email),
       permissionsJson: user.permissions,
       accountOwnerId: user.accountOwnerId || null,
       supabaseUid,

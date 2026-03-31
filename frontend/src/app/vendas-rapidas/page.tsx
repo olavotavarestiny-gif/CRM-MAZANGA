@@ -11,7 +11,7 @@ import type { QuickSaleItem } from '@/lib/api';
 import type { Produto, Factura, Estabelecimento, CaixaSessao } from '@/lib/types';
 import { ClienteAutocomplete } from '@/components/faturacao/cliente-autocomplete';
 import type { ClienteFaturacao } from '@/lib/types';
-import { Button } from '@/components/ui/button';
+import { CommerceButton as Button } from '@/components/ui/button-commerce';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';

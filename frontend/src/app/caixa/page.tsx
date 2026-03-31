@@ -10,7 +10,7 @@ import {
 import { abrirCaixaSessao, fecharCaixaSessao, getCaixaSessaoAtual, getCaixaSessoes, getCurrentUser, getEstabelecimentos } from '@/lib/api';
 import type { CaixaSessao, Estabelecimento } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { CommerceButton as Button } from '@/components/ui/button-commerce';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ErrorState } from '@/components/ui/error-state';

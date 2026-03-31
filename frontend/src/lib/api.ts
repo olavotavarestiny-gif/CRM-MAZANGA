@@ -1064,6 +1064,23 @@ export async function getSuperAdminStorage(): Promise<SuperAdminStorageStat[]> {
   return res.data;
 }
 
+// SuperAdmin: platform dashboard KPIs
+export interface SuperAdminDashboard {
+  totalOrgs: number;
+  activeOrgs: number;
+  newOrgsThisMonth: number;
+  totalContacts: number;
+  totalStorageMb: number;
+  workspaceMix: { servicos: number; comercio: number };
+  planDistribution: { essencial: number; profissional: number; enterprise: number };
+  mostActiveOrg: { name: string; logins30d: number } | null;
+}
+
+export async function getSuperAdminDashboard(): Promise<SuperAdminDashboard> {
+  const res = await api.get('/api/superadmin/dashboard');
+  return res.data;
+}
+
 // Admin: list all client accounts
 export async function getClientAccounts(): Promise<import('./types').ClientAccount[]> {
   const res = await api.get('/api/admin/accounts');

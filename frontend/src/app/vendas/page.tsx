@@ -8,7 +8,7 @@ import { TabSaft } from '@/components/finances/tab-saft';
 import { TabRelatorios } from '@/components/finances/tab-relatorios';
 import { RecorrentesTab } from '@/components/faturacao/recorrentes-tab';
 import ProdutosPage from '@/app/produtos/page';
-import { Button } from '@/components/ui/button';
+import { CommerceButton as Button } from '@/components/ui/button-commerce';
 
 const TABS = [
   { id: 'faturas',      label: 'Faturas' },

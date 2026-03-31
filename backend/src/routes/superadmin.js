@@ -312,4 +312,80 @@ router.get('/storage', async (req, res) => {
   }
 });
 
+// GET /api/superadmin/dashboard — aggregate platform KPIs
+router.get('/dashboard', async (req, res) => {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const orgs = await prisma.user.findMany({
+      where: { accountOwnerId: null, isSuperAdmin: false },
+      select: {
+        id: true, active: true, plan: true, workspaceMode: true, createdAt: true,
+        accountMembers: { select: { id: true } },
+        loginLogs: { take: 1, orderBy: { createdAt: 'desc' }, select: { createdAt: true } },
+        _count: { select: { contacts: true } },
+      },
+    });
+
+    const totalOrgs = orgs.length;
+    const activeOrgs = orgs.filter(o => o.active).length;
+    const newOrgsThisMonth = orgs.filter(o => new Date(o.createdAt) >= startOfMonth).length;
+    const totalContacts = orgs.reduce((s, o) => s + o._count.contacts, 0);
+
+    const planDistribution = { essencial: 0, profissional: 0, enterprise: 0 };
+    const workspaceMixCount = { servicos: 0, comercio: 0 };
+    for (const o of orgs) {
+      const p = normalizePlan(o.plan);
+      if (p in planDistribution) planDistribution[p]++;
+      const w = o.workspaceMode || 'servicos';
+      workspaceMixCount[w] = (workspaceMixCount[w] || 0) + 1;
+    }
+
+    // Storage total
+    const contactsWithDocs = await prisma.contact.findMany({
+      select: { documents: true },
+    });
+    let totalStorageBytes = 0;
+    for (const c of contactsWithDocs) {
+      try {
+        const docs = JSON.parse(c.documents || '[]');
+        if (Array.isArray(docs)) {
+          totalStorageBytes += docs.reduce((s, d) => s + (typeof d.size === 'number' ? d.size : 0), 0);
+        }
+      } catch { /* skip */ }
+    }
+
+    // Most active org (last 30 days logins)
+    const orgLogins = await Promise.all(orgs.map(async (org) => {
+      const userIds = [org.id, ...org.accountMembers.map(m => m.id)];
+      const count = await prisma.loginLog.count({
+        where: { userId: { in: userIds }, createdAt: { gte: thirtyDaysAgo } },
+      });
+      return { name: org.name || org.email, logins30d: count };
+    }));
+    const mostActiveOrg = orgLogins.sort((a, b) => b.logins30d - a.logins30d)[0] || null;
+
+    res.json({
+      totalOrgs,
+      activeOrgs,
+      newOrgsThisMonth,
+      totalContacts,
+      totalStorageMb: Math.round(totalStorageBytes / (1024 * 1024) * 100) / 100,
+      workspaceMix: {
+        servicos: totalOrgs > 0 ? Math.round((workspaceMixCount.servicos / totalOrgs) * 100) : 0,
+        comercio: totalOrgs > 0 ? Math.round((workspaceMixCount.comercio / totalOrgs) * 100) : 0,
+      },
+      planDistribution,
+      mostActiveOrg,
+    });
+  } catch (error) {
+    console.error('[superadmin] dashboard error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

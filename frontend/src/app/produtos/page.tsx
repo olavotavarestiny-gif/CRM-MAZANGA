@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
+import { CommerceButton as Button } from '@/components/ui/button-commerce';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -646,7 +646,6 @@ export default function ProdutosPage() {
             <Button
               onClick={() => editing ? editProdMutation.mutate() : createProdMutation.mutate()}
               disabled={createProdMutation.isPending || editProdMutation.isPending}
-              className="bg-[#B84D0E] text-white hover:bg-[#B84D0E]/90"
             >
               {(createProdMutation.isPending || editProdMutation.isPending) ? 'A guardar...' : 'Guardar'}
             </Button>
@@ -721,7 +720,7 @@ export default function ProdutosPage() {
             <Button
               onClick={() => addStockMutation.mutate()}
               disabled={addStockMutation.isPending || !stockQty || Number(stockQty) <= 0}
-              className="bg-[#B84D0E] text-white hover:bg-[#9a3d0a]"
+              className=""
             >
               {addStockMutation.isPending ? 'A guardar...' : 'Confirmar entrada'}
             </Button>
@@ -827,7 +826,6 @@ export default function ProdutosPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNewSerie(false)}>Cancelar</Button>
             <Button onClick={() => createSerieMutation.mutate()} disabled={createSerieMutation.isPending}
-              className="bg-[#B84D0E] text-white hover:bg-[#B84D0E]/90">
               {createSerieMutation.isPending ? 'A criar...' : 'Criar Série'}
             </Button>
           </DialogFooter>
