@@ -41,6 +41,7 @@ type CommerceRoute =
   | '/contacts'
   | '/produtos'
   | '/vendas'
+  | '/finances'
   | '/configuracoes';
 
 const SERVICOS_ROUTE_TO_MODULE: Array<{ prefix: string; module: ModuleKey }> = [
@@ -66,6 +67,7 @@ const COMERCIO_FALLBACK_ROUTES: CommerceRoute[] = [
   '/contacts',
   '/produtos',
   '/vendas',
+  '/finances',
   '/configuracoes',
 ];
 
@@ -231,6 +233,7 @@ export function canAccessCommerceRoute(user: User, pathname: string): boolean {
   if (path.startsWith('/vendas-rapidas')) return canView(user, 'vendas');
   if (path.startsWith('/contacts')) return canView(user, 'contacts');
   if (path.startsWith('/produtos')) return canStockView(user);
+  if (path.startsWith('/finances')) return canView(user, 'finances');
   if (path.startsWith('/vendas') || path.startsWith('/faturacao')) return canAccessBilling(user);
   if (path.startsWith('/configuracoes')) return true;
 

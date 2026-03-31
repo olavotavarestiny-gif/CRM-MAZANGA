@@ -115,6 +115,7 @@ export default function Sidebar({
   // COMERCIO: grupo "Gestão interna" — ferramentas de gestão e back-office
   const comercioGestaoInternaLinks = comercio ? [
     { href: '/vendas', label: 'Faturação', icon: ShoppingBag, module: 'vendas' as const },
+    { href: '/finances', label: 'Finanças', icon: DollarSign, module: 'finances' as const },
     { href: '/configuracoes', label: 'Configurações', icon: Settings },
   ].filter(l => isVisible(l.href)) : [];
 
