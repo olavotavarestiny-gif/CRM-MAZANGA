@@ -206,13 +206,11 @@ export function KukuGestWorkspaceLogo({
 }: KukuGestWorkspaceLogoProps) {
   const isComercio = workspace === 'comercio';
   const viewBoxWidth = compact ? 212 : 292;
-  const viewBoxHeight = compact ? 60 : 102;
+  const viewBoxHeight = compact ? 60 : 88;
   const titleColor = isComercio ? COMMERCE_PRIMARY : SERVICES_PRIMARY;
   const bg = isComercio ? COMMERCE_BG : SERVICES_BG;
   const border = isComercio ? COMMERCE_BORDER : SERVICES_BORDER;
-  const subtitleColor = isComercio ? '#D4853A' : '#5C9BD6';
   const workspaceLabel = isComercio ? 'Comércio' : 'Serviços';
-  const description = isComercio ? 'Vendas · Stock · Faturas' : 'Faturação · CRM · Orçamentos';
 
   return (
     <svg
@@ -228,9 +226,9 @@ export function KukuGestWorkspaceLogo({
       <WorkspaceMark workspace={workspace} compact={compact} />
       <text
         x={compact ? '78' : '76'}
-        y={compact ? '26' : '37'}
+        y={compact ? '26' : '34'}
         fontFamily="'Montserrat', sans-serif"
-        fontSize={compact ? '17' : '17'}
+        fontSize={compact ? '17' : '19'}
         fontWeight="800"
         fill={titleColor}
       >
@@ -238,27 +236,14 @@ export function KukuGestWorkspaceLogo({
       </text>
       <text
         x={compact ? '78' : '76'}
-        y={compact ? '46' : '61'}
+        y={compact ? '46' : '60'}
         fontFamily="'Montserrat', sans-serif"
-        fontSize={compact ? '13.5' : '14'}
-        fontWeight="600"
+        fontSize={compact ? '13.5' : '16'}
+        fontWeight="700"
         fill={titleColor}
       >
         {workspaceLabel}
       </text>
-      {!compact && (
-        <text
-          x="76"
-          y="84"
-          fontFamily="'Montserrat', sans-serif"
-          fontSize="10.5"
-          fontWeight="500"
-          fill={subtitleColor}
-          letterSpacing="0.04em"
-        >
-          {description}
-        </text>
-      )}
     </svg>
   );
 }
