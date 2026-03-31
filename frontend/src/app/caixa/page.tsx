@@ -343,7 +343,7 @@ export default function CaixaPage() {
           onClick={() => setActiveTab('sessao')}
           className={cn(
             'rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
-            activeTab === 'sessao' ? 'bg-[#0A2540] text-white' : 'text-slate-600 hover:bg-slate-100'
+            activeTab === 'sessao' ? 'bg-[#B84D0E] text-white' : 'text-slate-600 hover:bg-slate-100'
           )}
         >
           Sessão Atual
@@ -355,7 +355,7 @@ export default function CaixaPage() {
               onClick={() => setActiveTab('historico')}
               className={cn(
                 'rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
-                activeTab === 'historico' ? 'bg-[#0A2540] text-white' : 'text-slate-600 hover:bg-slate-100'
+                activeTab === 'historico' ? 'bg-[#B84D0E] text-white' : 'text-slate-600 hover:bg-slate-100'
               )}
             >
               Histórico
@@ -365,7 +365,7 @@ export default function CaixaPage() {
               onClick={() => setActiveTab('auditoria')}
               className={cn(
                 'rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
-                activeTab === 'auditoria' ? 'bg-[#0A2540] text-white' : 'text-slate-600 hover:bg-slate-100'
+                activeTab === 'auditoria' ? 'bg-[#B84D0E] text-white' : 'text-slate-600 hover:bg-slate-100'
               )}
             >
               Auditoria

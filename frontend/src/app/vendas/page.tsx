@@ -28,7 +28,7 @@ export default function VendasPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100">
-            <ShoppingBag className="h-5 w-5 text-[#0A2540]" />
+            <ShoppingBag className="h-5 w-5 text-[#B84D0E]" />
           </div>
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Vendas</h1>
@@ -52,8 +52,8 @@ export default function VendasPage() {
             onClick={() => setActiveTab(tab.id)}
             className={`rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
               activeTab === tab.id
-                ? 'bg-[#0A2540] text-white shadow-sm'
-                : 'text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540]'
+                ? 'bg-[#B84D0E] text-white shadow-sm'
+                : 'text-[#6b7e9a] hover:bg-slate-50 hover:text-[#B84D0E]'
             }`}
           >
             {tab.label}

@@ -11,7 +11,7 @@ import {
   ChevronDown, CreditCard,
 } from 'lucide-react';
 import { isComercio } from '@/lib/business-modes';
-import { KukuGestNavLogo, KukuGestNavLogoComercio } from '@/components/KukuGestLogo';
+import KukuGestLogo from '@/components/KukuGestLogo';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
 import { getChatUnreadCount } from '@/lib/api';
@@ -138,10 +138,7 @@ export default function Sidebar({
     >
       {/* Logo */}
       <div className="px-4 py-4 flex items-center justify-between flex-shrink-0 border-b border-slate-100">
-        {comercio
-          ? <KukuGestNavLogoComercio iconSize={48} className="max-w-[calc(100%-2rem)]" />
-          : <KukuGestNavLogo iconSize={48} className="max-w-[calc(100%-2rem)]" />
-        }
+        <KukuGestLogo height={52} className="max-w-[calc(100%-2rem)]" />
         <button onClick={onClose} className="md:hidden p-1 hover:bg-slate-100 rounded transition-colors">
           <X className="w-4 h-4 text-[#6b7e9a]" />
         </button>

@@ -410,11 +410,11 @@ export default function ProdutosPage() {
                 </span>
                 <div className="col-span-2 flex justify-end gap-1">
                   {p.productType === 'P' && (
-                    <Button variant="ghost" size="sm" onClick={() => setMovementsTarget(p)} className="text-gray-400 hover:text-[#0A2540] h-7 w-7 p-0" title="Histórico de stock">
+                    <Button variant="ghost" size="sm" onClick={() => setMovementsTarget(p)} className="text-gray-400 hover:text-[#B84D0E] h-7 w-7 p-0" title="Histórico de stock">
                       <ClipboardList className="w-3.5 h-3.5" />
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" onClick={() => openEdit(p)} className="text-gray-400 hover:text-[#0A2540] h-7 w-7 p-0">
+                  <Button variant="ghost" size="sm" onClick={() => openEdit(p)} className="text-gray-400 hover:text-[#B84D0E] h-7 w-7 p-0">
                     <Pencil className="w-3.5 h-3.5" />
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => deleteProdMutation.mutate(p.id)} className="text-gray-400 hover:text-red-500 h-7 w-7 p-0">
@@ -646,7 +646,7 @@ export default function ProdutosPage() {
             <Button
               onClick={() => editing ? editProdMutation.mutate() : createProdMutation.mutate()}
               disabled={createProdMutation.isPending || editProdMutation.isPending}
-              className="bg-[#0A2540] text-white hover:bg-[#0A2540]/90"
+              className="bg-[#B84D0E] text-white hover:bg-[#B84D0E]/90"
             >
               {(createProdMutation.isPending || editProdMutation.isPending) ? 'A guardar...' : 'Guardar'}
             </Button>
@@ -659,7 +659,7 @@ export default function ProdutosPage() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ArrowUpCircle className="w-5 h-5 text-blue-600" />
+              <ArrowUpCircle className="w-5 h-5 text-[#F06A1A]" />
               Adicionar Stock
             </DialogTitle>
           </DialogHeader>
@@ -827,7 +827,7 @@ export default function ProdutosPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNewSerie(false)}>Cancelar</Button>
             <Button onClick={() => createSerieMutation.mutate()} disabled={createSerieMutation.isPending}
-              className="bg-[#0A2540] text-white hover:bg-[#0A2540]/90">
+              className="bg-[#B84D0E] text-white hover:bg-[#B84D0E]/90">
               {createSerieMutation.isPending ? 'A criar...' : 'Criar Série'}
             </Button>
           </DialogFooter>
