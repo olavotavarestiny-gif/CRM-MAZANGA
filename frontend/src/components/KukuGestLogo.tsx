@@ -160,6 +160,52 @@ export function KukuGestLogo({
   );
 }
 
+export function KukuGestLoginLogo({
+  showTagline = false,
+  className,
+}: {
+  showTagline?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={className} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+      <KukuGestIcon size={72} color="white" accentColor={ORANGE} bg={SERVICES_DARK} />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline' }}>
+          <span style={{
+            fontFamily: "'Montserrat', sans-serif",
+            fontWeight: 300,
+            fontSize: 26,
+            color: 'rgba(255,255,255,0.92)',
+            letterSpacing: '0.16em',
+          }}>KUKU</span>
+          <span style={{
+            fontFamily: "'Montserrat', sans-serif",
+            fontWeight: 900,
+            fontSize: 26,
+            color: 'white',
+            letterSpacing: '-0.01em',
+          }}>GEST</span>
+        </div>
+        <div style={{ width: 28, height: 2, background: ORANGE, borderRadius: 1, marginTop: 4 }} />
+        {showTagline && (
+          <span style={{
+            fontFamily: "'Montserrat', sans-serif",
+            fontWeight: 600,
+            fontSize: 8,
+            color: 'rgba(255,255,255,0.42)',
+            letterSpacing: '0.24em',
+            marginTop: 9,
+            textTransform: 'uppercase' as const,
+          }}>
+            GESTÃO INTELIGENTE
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface KukuGestNavLogoProps {
   iconSize?: number;
   className?: string;
@@ -252,11 +298,33 @@ export function KukuGestNavLogo({
   iconSize = 48,
   className,
 }: KukuGestNavLogoProps) {
-  const logoHeight = Math.max(54, iconSize + 10);
+  const size = Math.max(34, Math.round(iconSize * 0.78));
 
   return (
-    <div className={className}>
-      <KukuGestWorkspaceLogo workspace="servicos" height={logoHeight} />
+    <div className={className} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <KukuGestIcon size={size} color="white" accentColor={ORANGE} bg={SERVICES_DARK} />
+      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
+        <span style={{
+          fontFamily: "'Montserrat', sans-serif",
+          fontWeight: 900,
+          color: 'white',
+          fontSize: Math.round(size * 0.44),
+          letterSpacing: '0.05em',
+        }}>
+          KUKUGEST
+        </span>
+        <span style={{
+          fontFamily: "'Montserrat', sans-serif",
+          fontWeight: 600,
+          color: SERVICES_PRIMARY,
+          fontSize: Math.round(size * 0.27),
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase' as const,
+          marginTop: 3,
+        }}>
+          Serviços
+        </span>
+      </div>
     </div>
   );
 }
@@ -270,11 +338,33 @@ export function KukuGestNavLogoComercio({
   iconSize = 48,
   className,
 }: KukuGestNavLogoComercioProps) {
-  const logoHeight = Math.max(54, iconSize + 10);
+  const size = Math.max(34, Math.round(iconSize * 0.78));
 
   return (
-    <div className={className}>
-      <KukuGestWorkspaceLogo workspace="comercio" height={logoHeight} />
+    <div className={className} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <KukuGestIcon size={size} color={COMMERCE_PRIMARY} accentColor={SERVICES_LIGHT} bg={SERVICES_DARK} />
+      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
+        <span style={{
+          fontFamily: "'Montserrat', sans-serif",
+          fontWeight: 900,
+          color: 'white',
+          fontSize: Math.round(size * 0.44),
+          letterSpacing: '0.05em',
+        }}>
+          KUKUGEST
+        </span>
+        <span style={{
+          fontFamily: "'Montserrat', sans-serif",
+          fontWeight: 600,
+          color: COMMERCE_PRIMARY,
+          fontSize: Math.round(size * 0.27),
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase' as const,
+          marginTop: 3,
+        }}>
+          Comércio
+        </span>
+      </div>
     </div>
   );
 }
