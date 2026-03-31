@@ -11,6 +11,7 @@ import WelcomeModal from '@/components/help/welcome-modal';
 import OnboardingChecklist from '@/components/help/onboarding-checklist';
 import { ONBOARDING_OPEN } from '@/lib/onboarding-tasks';
 import ProductTourProvider, { useTour } from '@/components/help/product-tour';
+import KukuGestLogo from '@/components/KukuGestLogo';
 import { ReactNode } from 'react';
 import { Menu, Eye, Info, LogOut, X } from 'lucide-react';
 import type { User } from '@/lib/api';
@@ -317,7 +318,9 @@ function LayoutInner({ children }: { children: ReactNode }) {
               <Menu className="w-5 h-5 text-[#2c2f31]" />
               <span className="text-sm font-medium text-[#2c2f31]">Menu</span>
             </button>
-            <h1 className="truncate text-lg font-semibold text-[#2c2f31]">KukuGest</h1>
+            <div className="min-w-0 overflow-hidden">
+              <KukuGestLogo height={24} className="max-w-full" />
+            </div>
           </div>
           <UserWidget user={currentUser} compact />
         </div>
