@@ -75,7 +75,7 @@ export default function LoginPage() {
 
             <div className="relative text-center">
               <div className="mx-auto mb-4 inline-flex h-24 w-24 items-center justify-center rounded-[1.6rem] border border-white/45 bg-white/92 shadow-[0_14px_30px_rgba(6,16,36,0.16),inset_0_1px_0_rgba(255,255,255,0.7)]">
-                <KukuGestIcon size={88} />
+                <KukuGestIcon size={88} color="#FFFFFF" accentColor="#F06A1A" bg="#0D3F7A" />
               </div>
               <p className="mt-1.5 text-sm text-white/80 sm:text-base">Bem-vindo de volta</p>
             </div>
