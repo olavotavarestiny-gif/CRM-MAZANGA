@@ -825,7 +825,7 @@ export default function ProdutosPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNewSerie(false)}>Cancelar</Button>
-            <Button onClick={() => createSerieMutation.mutate()} disabled={createSerieMutation.isPending}
+            <Button onClick={() => createSerieMutation.mutate()} disabled={createSerieMutation.isPending}>
               {createSerieMutation.isPending ? 'A criar...' : 'Criar Série'}
             </Button>
           </DialogFooter>
