@@ -66,7 +66,7 @@ export function KukuGestIcon({
       aria-label="KukuGest icon"
     >
       <rect x="1" y="1" width="98" height="98" rx="20" fill={bg} stroke={borderColor} />
-      <g transform="translate(16 0) scale(0.68)">
+      <g transform="translate(16 16) scale(0.68)">
         <KukuGestMark color={color} accentColor={accentColor} />
       </g>
     </svg>
@@ -306,20 +306,19 @@ export function KukuGestNavLogo({
       <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
         <span style={{
           fontFamily: "'Montserrat', sans-serif",
-          fontWeight: 900,
+          fontWeight: 800,
           color: 'white',
           fontSize: Math.round(size * 0.44),
-          letterSpacing: '0.05em',
+          letterSpacing: '0.01em',
         }}>
-          KUKUGEST
+          KukuGest
         </span>
         <span style={{
           fontFamily: "'Montserrat', sans-serif",
           fontWeight: 600,
           color: SERVICES_PRIMARY,
           fontSize: Math.round(size * 0.27),
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase' as const,
+          letterSpacing: '0.06em',
           marginTop: 3,
         }}>
           Serviços
@@ -346,20 +345,19 @@ export function KukuGestNavLogoComercio({
       <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
         <span style={{
           fontFamily: "'Montserrat', sans-serif",
-          fontWeight: 900,
+          fontWeight: 800,
           color: 'white',
           fontSize: Math.round(size * 0.44),
-          letterSpacing: '0.05em',
+          letterSpacing: '0.01em',
         }}>
-          KUKUGEST
+          KukuGest
         </span>
         <span style={{
           fontFamily: "'Montserrat', sans-serif",
           fontWeight: 600,
           color: COMMERCE_PRIMARY,
           fontSize: Math.round(size * 0.27),
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase' as const,
+          letterSpacing: '0.06em',
           marginTop: 3,
         }}>
           Comércio
