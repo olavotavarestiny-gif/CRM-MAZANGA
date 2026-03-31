@@ -68,7 +68,7 @@ router.get('/users', async (req, res) => {
 router.get('/accounts', async (req, res) => {
   try {
     const accounts = await prisma.user.findMany({
-      where: { accountOwnerId: null, isSuperAdmin: false },
+      where: { accountOwnerId: null, isSuperAdmin: true },
       select: {
         id: true,
         name: true,
