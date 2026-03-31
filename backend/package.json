@@ -1,7 +1,7 @@
 {
-  "name": "ulu-gestao-backend",
+  "name": "kuku-gestao-backend",
   "version": "1.0.0",
-  "description": "CRM backend with WhatsApp integration",
+  "description": "CRM backend",
   "main": "src/index.js",
   "scripts": {
     "build": "npx prisma generate && npx prisma db push",
