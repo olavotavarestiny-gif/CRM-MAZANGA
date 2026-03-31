@@ -311,7 +311,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
         </div>
 
         {/* Top Bar Mobile */}
-        <div className="md:hidden flex items-center justify-between gap-3 h-14 px-4 border-b border-slate-100 bg-white">
+        <div className="md:hidden flex items-center justify-between gap-3 h-16 px-4 border-b border-slate-100 bg-white">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -324,7 +324,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
               {currentUser ? (
                 <KukuGestWorkspaceLogo
                   workspace={comercio ? 'comercio' : 'servicos'}
-                  height={30}
+                  height={36}
                   compact
                   className="max-w-full"
                 />

@@ -205,8 +205,8 @@ export function KukuGestWorkspaceLogo({
   className,
 }: KukuGestWorkspaceLogoProps) {
   const isComercio = workspace === 'comercio';
-  const viewBoxWidth = compact ? 188 : 270;
-  const viewBoxHeight = compact ? 56 : 96;
+  const viewBoxWidth = compact ? 212 : 292;
+  const viewBoxHeight = compact ? 60 : 102;
   const titleColor = isComercio ? COMMERCE_PRIMARY : SERVICES_PRIMARY;
   const bg = isComercio ? COMMERCE_BG : SERVICES_BG;
   const border = isComercio ? COMMERCE_BORDER : SERVICES_BORDER;
@@ -227,20 +227,20 @@ export function KukuGestWorkspaceLogo({
       <rect x="0.5" y="0.5" width={viewBoxWidth - 1} height={viewBoxHeight - 1} rx={compact ? 12 : 14} fill={bg} stroke={border} />
       <WorkspaceMark workspace={workspace} compact={compact} />
       <text
-        x={compact ? '70' : '70'}
-        y={compact ? '24' : '35'}
+        x={compact ? '78' : '76'}
+        y={compact ? '26' : '37'}
         fontFamily="'Montserrat', sans-serif"
-        fontSize={compact ? '15' : '15'}
+        fontSize={compact ? '17' : '17'}
         fontWeight="800"
         fill={titleColor}
       >
         KukuGest
       </text>
       <text
-        x={compact ? '70' : '70'}
-        y={compact ? '42' : '57'}
+        x={compact ? '78' : '76'}
+        y={compact ? '46' : '61'}
         fontFamily="'Montserrat', sans-serif"
-        fontSize={compact ? '12' : '13'}
+        fontSize={compact ? '13.5' : '14'}
         fontWeight="600"
         fill={titleColor}
       >
@@ -248,10 +248,10 @@ export function KukuGestWorkspaceLogo({
       </text>
       {!compact && (
         <text
-          x="70"
-          y="78"
+          x="76"
+          y="84"
           fontFamily="'Montserrat', sans-serif"
-          fontSize="9.5"
+          fontSize="10.5"
           fontWeight="500"
           fill={subtitleColor}
           letterSpacing="0.04em"
@@ -264,10 +264,10 @@ export function KukuGestWorkspaceLogo({
 }
 
 export function KukuGestNavLogo({
-  iconSize = 36,
+  iconSize = 48,
   className,
 }: KukuGestNavLogoProps) {
-  const logoHeight = Math.max(40, iconSize + 8);
+  const logoHeight = Math.max(54, iconSize + 10);
 
   return (
     <div className={className}>
@@ -282,10 +282,10 @@ interface KukuGestNavLogoComercioProps {
 }
 
 export function KukuGestNavLogoComercio({
-  iconSize = 36,
+  iconSize = 48,
   className,
 }: KukuGestNavLogoComercioProps) {
-  const logoHeight = Math.max(40, iconSize + 8);
+  const logoHeight = Math.max(54, iconSize + 10);
 
   return (
     <div className={className}>
