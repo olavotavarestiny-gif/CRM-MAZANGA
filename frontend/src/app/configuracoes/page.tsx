@@ -367,8 +367,8 @@ function ConfiguracoesContent() {
   const tabBtn = (id: TabId) =>
     `flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
       activeTab === id
-        ? 'bg-[#0A2540] text-white shadow-sm'
-        : 'text-gray-500 hover:bg-slate-50 hover:text-[#0A2540]'
+        ? 'bg-[#B84D0E] text-white shadow-sm'
+        : 'text-gray-500 hover:bg-slate-50 hover:text-[#B84D0E]'
     }`;
 
   return (
@@ -451,7 +451,7 @@ function ConfiguracoesContent() {
                 disabled={profileMutation.isPending}
                 loading={profileMutation.isPending}
                 loadingLabel="A guardar..."
-                className="w-full bg-[#0A2540] text-white hover:bg-[#0A2540]/90"
+                className="w-full bg-[#B84D0E] text-white hover:bg-[#9a3d0a]"
               >
                 {profileSaved ? 'Perfil guardado' : 'Guardar Perfil'}
               </LoadingButton>
@@ -480,11 +480,11 @@ function ConfiguracoesContent() {
                         disabled={workspaceSaving}
                         className={`flex flex-col items-start gap-1.5 rounded-xl border p-4 text-left transition-all ${
                           active
-                            ? 'border-[#0049e6] bg-blue-50 ring-2 ring-[#0049e6]/20'
+                            ? 'border-[#B84D0E] bg-[#FDF2EA] ring-2 ring-[#B84D0E]/20'
                             : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                         }`}
                       >
-                        <span className={`text-sm font-semibold ${active ? 'text-[#0049e6]' : 'text-[#2c2f31]'}`}>
+                        <span className={`text-sm font-semibold ${active ? 'text-[#B84D0E]' : 'text-[#2c2f31]'}`}>
                           {mode === 'servicos' ? 'Serviços' : 'Comércio'}
                         </span>
                         <span className="text-xs text-slate-500">
@@ -526,7 +526,7 @@ function ConfiguracoesContent() {
                   <Label className="text-gray-700">Confirmar Password</Label>
                   <Input type="password" placeholder="••••••••" value={pwForm.confirm} onChange={e => setPwForm(p => ({ ...p, confirm: e.target.value }))} required className="mt-1" />
                 </div>
-                <LoadingButton type="submit" disabled={pwSubmitting} loading={pwSubmitting} loadingLabel="A alterar..." className="w-full bg-[#0A2540] text-white hover:bg-[#0A2540]/90">
+                <LoadingButton type="submit" disabled={pwSubmitting} loading={pwSubmitting} loadingLabel="A alterar..." className="w-full bg-[#B84D0E] text-white hover:bg-[#9a3d0a]">
                   Alterar Password
                 </LoadingButton>
               </form>
@@ -614,8 +614,8 @@ function ConfiguracoesContent() {
                     onClick={() => setSelectedBilling((prev) => ({ ...prev, [currentPlan]: billing }))}
                     className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                       (selectedBilling[currentPlan] || getPlanBillingOptions(currentPlan)[0]) === billing
-                        ? 'border-[#0A2540] bg-[#0A2540] text-white'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-[#0A2540]'
+                        ? 'border-[#B84D0E] bg-[#B84D0E] text-white'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-[#B84D0E]'
                     }`}
                   >
                     {billing}
@@ -677,7 +677,7 @@ function ConfiguracoesContent() {
         <div className="space-y-4 max-w-3xl">
           <Card
             ref={faturacaoSectionRef}
-            className={`border-slate-200 shadow-sm ${requestedSection === 'faturacao' ? 'ring-2 ring-[#0049e6]/20 border-[#0049e6]/30' : ''}`}
+            className={`border-slate-200 shadow-sm ${requestedSection === 'faturacao' ? 'ring-2 ring-[#B84D0E]/20 border-[#B84D0E]/30' : ''}`}
           >
             <div className="p-6 space-y-4">
               <h2 className="text-base font-semibold text-[#0A2540] flex items-center gap-2">
@@ -836,7 +836,7 @@ function ConfiguracoesContent() {
                   secondaryAction={{ label: 'Fechar', onClick: () => setConfigError('') }}
                 />
               )}
-              <LoadingButton onClick={() => { setConfigError(''); saveMutation.mutate(); }} disabled={saveMutation.isPending} loading={saveMutation.isPending} loadingLabel="A guardar..." className="w-full bg-[#0A2540] text-white hover:bg-[#0A2540]/90">
+              <LoadingButton onClick={() => { setConfigError(''); saveMutation.mutate(); }} disabled={saveMutation.isPending} loading={saveMutation.isPending} loadingLabel="A guardar..." className="w-full bg-[#B84D0E] text-white hover:bg-[#9a3d0a]">
                 {configSaved ? <><CheckCircle2 className="w-4 h-4 mr-2" /> Guardado!</> : 'Guardar Configurações'}
               </LoadingButton>
             </div>
@@ -914,7 +914,7 @@ function ConfiguracoesContent() {
                           </p>
                         )}
                       </div>
-                      {e.isPrincipal && <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 border border-blue-200">{isComercioWorkspace ? 'Padrão' : 'Principal'}</span>}
+                      {e.isPrincipal && <span className="px-2 py-0.5 rounded-full text-xs bg-[#FDF2EA] text-[#B84D0E] border border-[#FAC775]">{isComercioWorkspace ? 'Padrão' : 'Principal'}</span>}
                     </div>
                   ))}
                 </div>
@@ -1013,7 +1013,7 @@ function ConfiguracoesContent() {
                       <td className="py-3 px-4">
                         <button
                           onClick={() => setPermMember(member)}
-                          className="flex items-center gap-1 text-xs text-[#0A2540] hover:text-blue-600 transition"
+                          className="flex items-center gap-1 text-xs text-[#0A2540] hover:text-[#B84D0E] transition"
                           title="Editar permissões"
                         >
                           <span className="font-mono">{pagesLabel}</span>
@@ -1093,7 +1093,7 @@ function ConfiguracoesContent() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEstab(false)}>Cancelar</Button>
-            <LoadingButton onClick={() => estabMutation.mutate()} disabled={estabMutation.isPending} loading={estabMutation.isPending} loadingLabel="A criar..." className="bg-[#0A2540] text-white hover:bg-[#0A2540]/90">
+            <LoadingButton onClick={() => estabMutation.mutate()} disabled={estabMutation.isPending} loading={estabMutation.isPending} loadingLabel="A criar..." className="bg-[#B84D0E] text-white hover:bg-[#9a3d0a]">
               Criar
             </LoadingButton>
           </DialogFooter>
@@ -1131,7 +1131,7 @@ function ConfiguracoesContent() {
                 </div>
                 <div className="flex gap-3 pt-2">
                   <Button type="button" variant="outline" onClick={() => setShowAddMember(false)} className="flex-1">Cancelar</Button>
-                  <LoadingButton type="submit" disabled={addMemberMutation.isPending} loading={addMemberMutation.isPending} loadingLabel="A criar..." className="flex-1 bg-[#0A2540] text-white hover:bg-[#0A2540]/90">
+                  <LoadingButton type="submit" disabled={addMemberMutation.isPending} loading={addMemberMutation.isPending} loadingLabel="A criar..." className="flex-1 bg-[#B84D0E] text-white hover:bg-[#9a3d0a]">
                     Adicionar
                   </LoadingButton>
                 </div>
