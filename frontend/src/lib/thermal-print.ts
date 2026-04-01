@@ -49,7 +49,8 @@ function buildReciboHtml(factura: FacturaWithRelations, config: FaturacaoConfig)
 
   const dt = fmtDateTime(factura.documentDate || factura.createdAt);
   const docLabel = DOC_LABELS[factura.documentType] ?? factura.documentType;
-  const payLabel = PAY_LABELS[factura.paymentMethod] ?? factura.paymentMethod;
+  const rawMethod = factura.paymentMethod ?? '';
+  const payLabel = PAY_LABELS[rawMethod] ?? (rawMethod || 'Numerário');
   const isConsumidorFinal = !factura.customerTaxID || factura.customerTaxID === '000000000';
 
   const itemsHtml = lines
