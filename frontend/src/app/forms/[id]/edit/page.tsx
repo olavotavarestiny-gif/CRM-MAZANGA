@@ -22,7 +22,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { X, Plus, GripVertical, Trash2, Check, Upload, Palette, Image as ImageIcon } from 'lucide-react';
+import { X, Plus, GripVertical, Trash2, Check, Upload, Palette, Image as ImageIcon, BarChart2 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -144,7 +144,7 @@ function BrandingPreview({ brandColor, bgColor, logoUrl, title }: {
 
 export default function FormEditPage({ params }: { params: { id: string } }) {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'builder' | 'branding' | 'submissions'>('builder');
+  const [activeTab, setActiveTab] = useState<'builder' | 'branding' | 'tracking' | 'submissions'>('builder');
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [formSettings, setFormSettings] = useState<{
@@ -153,8 +153,14 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
   const [branding, setBranding] = useState<{ brandColor: string; bgColor: string; logoUrl: string }>({
     brandColor: '#635BFF', bgColor: '#FFFFFF', logoUrl: '',
   });
+  const [tracking, setTracking] = useState({
+    metaPixelEnabled: false, metaPixelId: '',
+    googleTagEnabled: false, googleTagId: '',
+    trackSubmitAsLead: true,
+  });
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [brandingSaved, setBrandingSaved] = useState(false);
+  const [trackingSaved, setTrackingSaved] = useState(false);
   const [newOptionValue, setNewOptionValue] = useState('');
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -182,6 +188,13 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
         bgColor: form.bgColor || '#FFFFFF',
         logoUrl: form.logoUrl || '',
       });
+      setTracking({
+        metaPixelEnabled: form.metaPixelEnabled ?? false,
+        metaPixelId:      form.metaPixelId ?? '',
+        googleTagEnabled: form.googleTagEnabled ?? false,
+        googleTagId:      form.googleTagId ?? '',
+        trackSubmitAsLead: form.trackSubmitAsLead ?? true,
+      });
       if (form.fields && form.fields.length > 0 && !selectedFieldId) {
         setSelectedFieldId(form.fields[0].id);
       }
@@ -207,6 +220,15 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
       queryClient.invalidateQueries({ queryKey: ['form', params.id] });
       setBrandingSaved(true);
       setTimeout(() => setBrandingSaved(false), 2000);
+    },
+  });
+
+  const updateTrackingMutation = useMutation({
+    mutationFn: (data: Partial<CRMForm>) => updateForm(params.id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['form', params.id] });
+      setTrackingSaved(true);
+      setTimeout(() => setTrackingSaved(false), 2000);
     },
   });
 
@@ -316,6 +338,9 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
   const TABS = [
     { key: 'builder', label: 'Construtor' },
     { key: 'branding', label: 'Identidade Visual' },
+    ...(currentUser?.workspaceMode === 'servicos'
+      ? [{ key: 'tracking' as const, label: 'Tracking' }]
+      : []),
     { key: 'submissions', label: 'Submissões', badge: form?._count?.submissions },
   ] as const;
 
@@ -619,6 +644,98 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
               title={formSettings.title}
             />
             <p className="text-xs text-[#6b7e9a] text-center">As alterações são aplicadas em tempo real na pré-visualização</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── TRACKING TAB ── */}
+      {activeTab === 'tracking' && currentUser?.workspaceMode === 'servicos' && (
+        <div className="max-w-2xl space-y-6">
+          {/* Meta Pixel */}
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <BarChart2 className="h-4 w-4" /> Meta Pixel
+              </CardTitle>
+              <p className="text-sm text-slate-500">Configure o rastreamento de conversões com o Meta Pixel.</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>Ativar Meta Pixel</Label>
+                <Switch
+                  checked={tracking.metaPixelEnabled}
+                  onCheckedChange={(v) => setTracking((t) => ({ ...t, metaPixelEnabled: v }))}
+                />
+              </div>
+              <div>
+                <Label>Pixel ID</Label>
+                <Input
+                  placeholder="Ex: 1234567890123456"
+                  value={tracking.metaPixelId}
+                  disabled={!tracking.metaPixelEnabled}
+                  onChange={(e) => setTracking((t) => ({ ...t, metaPixelId: e.target.value }))}
+                  className="mt-1"
+                />
+                <p className="mt-1 text-xs text-slate-400">Apenas dígitos. Encontra no Gestor de Eventos do Meta.</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Google Tag */}
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <BarChart2 className="h-4 w-4" /> Google Tag
+              </CardTitle>
+              <p className="text-sm text-slate-500">Configure o rastreamento com Google Analytics 4 ou Google Tag Manager.</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>Ativar Google Tag</Label>
+                <Switch
+                  checked={tracking.googleTagEnabled}
+                  onCheckedChange={(v) => setTracking((t) => ({ ...t, googleTagEnabled: v }))}
+                />
+              </div>
+              <div>
+                <Label>Google Tag ID</Label>
+                <Input
+                  placeholder="Ex: G-XXXXXXXXXX ou GTM-XXXXXXX"
+                  value={tracking.googleTagId}
+                  disabled={!tracking.googleTagEnabled}
+                  onChange={(e) => setTracking((t) => ({ ...t, googleTagId: e.target.value }))}
+                  className="mt-1"
+                />
+                <p className="mt-1 text-xs text-slate-400">Formatos aceites: G-XXXXXXX (GA4), GTM-XXXXXXX, AW-XXXXXXX.</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Options */}
+          <Card className="border-slate-200 shadow-sm">
+            <CardContent className="pt-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Rastrear envio como Lead</Label>
+                  <p className="text-xs text-slate-400 mt-0.5">Dispara evento Lead/generate_lead ao submeter o formulário.</p>
+                </div>
+                <Switch
+                  checked={tracking.trackSubmitAsLead}
+                  onCheckedChange={(v) => setTracking((t) => ({ ...t, trackSubmitAsLead: v }))}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => updateTrackingMutation.mutate(tracking)}
+              disabled={updateTrackingMutation.isPending}
+            >
+              {trackingSaved ? (
+                <><Check className="h-4 w-4 mr-1" />Guardado</>
+              ) : 'Guardar Tracking'}
+            </Button>
           </div>
         </div>
       )}

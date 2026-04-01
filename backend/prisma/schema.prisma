@@ -208,8 +208,13 @@ model Form {
   thankYouUrl String?
   brandColor  String?  // hex — cor principal (botões, barra de progresso)
   bgColor     String?  // hex — cor de fundo
-  logoUrl     String?  // base64 data URL do logotipo
-  createdAt   DateTime @default(now())
+  logoUrl            String?  // base64 data URL do logotipo
+  metaPixelEnabled   Boolean  @default(false)
+  metaPixelId        String?
+  googleTagEnabled   Boolean  @default(false)
+  googleTagId        String?
+  trackSubmitAsLead  Boolean  @default(true)
+  createdAt          DateTime @default(now())
   updatedAt   DateTime @updatedAt
   user        User?    @relation("FormUser", fields: [userId], references: [id], onDelete: SetNull)
   fields      FormField[]

@@ -148,6 +148,11 @@ export interface CRMForm {
   updatedAt: string;
   fields: FormField[];
   _count?: { submissions: number };
+  metaPixelEnabled?: boolean;
+  metaPixelId?: string;
+  googleTagEnabled?: boolean;
+  googleTagId?: string;
+  trackSubmitAsLead?: boolean;
 }
 
 // Calendar types

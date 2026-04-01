@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { getForm, submitForm } from '@/lib/api';
 import { Label } from '@/components/ui/label';
@@ -11,11 +11,52 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
+  const pixelLoadedRef = useRef(false);
+  const gtagLoadedRef  = useRef(false);
 
   const { data: form, isLoading } = useQuery({
     queryKey: ['publicForm', params.id],
     queryFn: () => getForm(params.id),
   });
+
+  // Inject tracking scripts once the form config is loaded
+  useEffect(() => {
+    if (!form) return;
+
+    // ── Meta Pixel ────────────────────────────────────────────────
+    if (form.metaPixelEnabled && form.metaPixelId && !pixelLoadedRef.current) {
+      pixelLoadedRef.current = true;
+      const script = document.createElement('script');
+      script.innerHTML = `
+        !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+        n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+        document,'script','https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', '${form.metaPixelId}');
+        fbq('track', 'PageView');
+      `;
+      document.head.appendChild(script);
+    }
+
+    // ── Google Tag ────────────────────────────────────────────────
+    if (form.googleTagEnabled && form.googleTagId && !gtagLoadedRef.current) {
+      gtagLoadedRef.current = true;
+      const scriptSrc = document.createElement('script');
+      scriptSrc.async = true;
+      scriptSrc.src = `https://www.googletagmanager.com/gtag/js?id=${form.googleTagId}`;
+      document.head.appendChild(scriptSrc);
+
+      const scriptInit = document.createElement('script');
+      scriptInit.innerHTML = `
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', '${form.googleTagId}');
+      `;
+      document.head.appendChild(scriptInit);
+    }
+  }, [form]);
 
   const submitMutation = useMutation({
     mutationFn: () => {
@@ -28,6 +69,18 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
     },
     onSuccess: () => {
       setSubmitted(true);
+      // Conversion tracking
+      if (form?.trackSubmitAsLead !== false) {
+        if (form?.metaPixelEnabled && form?.metaPixelId && typeof window !== 'undefined' && (window as any).fbq) {
+          (window as any).fbq('track', 'Lead');
+        }
+        if (form?.googleTagEnabled && form?.googleTagId && typeof window !== 'undefined' && (window as any).gtag) {
+          (window as any).gtag('event', 'generate_lead', {
+            form_id: form?.id,
+            form_name: form?.title,
+          });
+        }
+      }
       if (form?.thankYouUrl) {
         setTimeout(() => { window.location.href = form.thankYouUrl!; }, 1500);
       }

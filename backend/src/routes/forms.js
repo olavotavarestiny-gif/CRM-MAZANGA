@@ -86,7 +86,23 @@ router.put('/:id', requireAuth, requirePlanFeature('formularios'), requirePermis
       return res.status(404).json({ error: 'Form not found' });
     }
 
-    const { title, description, mode, thankYouUrl, brandColor, bgColor, logoUrl } = req.body;
+    const { title, description, mode, thankYouUrl, brandColor, bgColor, logoUrl,
+            metaPixelEnabled, metaPixelId, googleTagEnabled, googleTagId, trackSubmitAsLead } = req.body;
+
+    // Tracking validation
+    if (metaPixelEnabled && !metaPixelId?.trim()) {
+      return res.status(400).json({ error: 'Pixel ID é obrigatório quando o Meta Pixel está ativo.' });
+    }
+    if (googleTagEnabled && !googleTagId?.trim()) {
+      return res.status(400).json({ error: 'Google Tag ID é obrigatório quando o Google Tag está ativo.' });
+    }
+    if (metaPixelId?.trim() && !/^\d+$/.test(metaPixelId.trim())) {
+      return res.status(400).json({ error: 'Meta Pixel ID deve conter apenas números.' });
+    }
+    if (googleTagId?.trim() && !/^(G-|GTM-|AW-)[A-Z0-9]+$/.test(googleTagId.trim())) {
+      return res.status(400).json({ error: 'Google Tag ID inválido. Use o formato G-XXXXXXX, GTM-XXXXXXX ou AW-XXXXXXX.' });
+    }
+
     const updatedForm = await prisma.form.update({
       where: { id: req.params.id },
       data: {
@@ -97,6 +113,11 @@ router.put('/:id', requireAuth, requirePlanFeature('formularios'), requirePermis
         ...(brandColor !== undefined && { brandColor: brandColor || null }),
         ...(bgColor !== undefined && { bgColor: bgColor || null }),
         ...(logoUrl !== undefined && { logoUrl: logoUrl || null }),
+        ...(metaPixelEnabled !== undefined && { metaPixelEnabled: Boolean(metaPixelEnabled) }),
+        ...(metaPixelId      !== undefined && { metaPixelId: metaPixelEnabled ? (metaPixelId?.trim() || null) : null }),
+        ...(googleTagEnabled !== undefined && { googleTagEnabled: Boolean(googleTagEnabled) }),
+        ...(googleTagId      !== undefined && { googleTagId: googleTagEnabled ? (googleTagId?.trim() || null) : null }),
+        ...(trackSubmitAsLead !== undefined && { trackSubmitAsLead: Boolean(trackSubmitAsLead) }),
       },
     });
     res.json(updatedForm);
