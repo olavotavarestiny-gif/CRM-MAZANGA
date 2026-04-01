@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Banknote, CreditCard, History, Lock, RefreshCw,
-  Store, TrendingUp, Unlock, Wallet,
+  Smartphone, Store, TrendingUp, Unlock, Wallet,
 } from 'lucide-react';
 import { abrirCaixaSessao, fecharCaixaSessao, getCaixaSessaoAtual, getCaixaSessoes, getCurrentUser, getEstabelecimentos } from '@/lib/api';
 import type { CaixaSessao, Estabelecimento } from '@/lib/types';
@@ -136,7 +136,7 @@ export default function CaixaPage() {
     queryKey: ['caixa-sessao-atual'],
     queryFn: () => getCaixaSessaoAtual(),
     retry: false,
-    refetchInterval: activeTab === 'sessao' ? 30_000 : false,
+    refetchInterval: activeTab === 'sessao' ? 10_000 : false,
     enabled: !!currentUser && podeVerCaixa,
   });
 
@@ -425,7 +425,8 @@ export default function CaixaPage() {
                 </div>
               </Card>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {/* Linha 1 — totais gerais */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <SessionStatCard
                   title="Total Vendido"
                   value={formatKz(sessao?.totalSalesAmount ?? 0)}
@@ -440,20 +441,42 @@ export default function CaixaPage() {
                   icon={History}
                   accentClass="bg-[#FDF2EA] text-[#B84D0E]"
                 />
-                <SessionStatCard
-                  title="Numerário"
-                  value={formatKz(sessao?.totalCash ?? 0)}
-                  hint="Pagamentos em dinheiro"
-                  icon={Banknote}
-                  accentClass="bg-amber-100 text-amber-700"
-                />
-                <SessionStatCard
-                  title="Multicaixa"
-                  value={formatKz(sessao?.totalMulticaixa ?? 0)}
-                  hint="Pagamentos eletrónicos"
-                  icon={CreditCard}
-                  accentClass="bg-violet-100 text-violet-700"
-                />
+              </div>
+
+              {/* Linha 2 — breakdown por método de pagamento */}
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+                  Quebra por método de pagamento
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <SessionStatCard
+                    title="Numerário"
+                    value={formatKz(sessao?.totalCash ?? 0)}
+                    hint="Pagamentos em dinheiro"
+                    icon={Banknote}
+                    accentClass="bg-amber-100 text-amber-700"
+                  />
+                  <SessionStatCard
+                    title="Multicaixa"
+                    value={formatKz(sessao?.totalMulticaixa ?? 0)}
+                    hint="Pagamentos por Multicaixa"
+                    icon={Smartphone}
+                    accentClass="bg-violet-100 text-violet-700"
+                  />
+                  <SessionStatCard
+                    title="TPA"
+                    value={formatKz(sessao?.totalTpa ?? 0)}
+                    hint="Pagamentos por TPA / cartão"
+                    icon={CreditCard}
+                    accentClass="bg-sky-100 text-sky-700"
+                  />
+                </div>
+                {(sessao?.totalTransferencia ?? 0) > 0 && (
+                  <div className="mt-2 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm">
+                    <span className="text-slate-500">Transferência / Outros</span>
+                    <span className="font-semibold">{formatKz(sessao?.totalTransferencia ?? 0)}</span>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
@@ -465,8 +488,8 @@ export default function CaixaPage() {
                       <strong>{formatKz(sessao?.openingBalance ?? 0)}</strong>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-500">Transferência</span>
-                      <strong>{formatKz(sessao?.totalTransferencia ?? 0)}</strong>
+                      <span className="text-slate-500">Eletrónicos (MC + TPA)</span>
+                      <strong>{formatKz((sessao?.totalMulticaixa ?? 0) + (sessao?.totalTpa ?? 0))}</strong>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-slate-500">Esperado em caixa</span>

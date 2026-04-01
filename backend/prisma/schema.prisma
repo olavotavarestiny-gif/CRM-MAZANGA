@@ -477,6 +477,7 @@ model CaixaSessao {
   salesCount            Int             @default(0)
   totalCash             Float           @default(0)
   totalMulticaixa       Float           @default(0)
+  totalTpa              Float           @default(0)
   totalTransferencia    Float           @default(0)
   status                String          @default("open")  // "open" | "closed"
   notes                 String?

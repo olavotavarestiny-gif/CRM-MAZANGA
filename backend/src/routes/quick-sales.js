@@ -83,7 +83,16 @@ router.post('/emit', async (req, res) => {
         status: 'open',
         ...(estabelecimentoId ? { estabelecimentoId } : {}),
       },
-      select: { id: true, totalSalesAmount: true, salesCount: true, estabelecimentoId: true },
+      select: {
+        id: true,
+        totalSalesAmount: true,
+        salesCount: true,
+        estabelecimentoId: true,
+        totalCash: true,
+        totalMulticaixa: true,
+        totalTpa: true,
+        totalTransferencia: true,
+      },
     });
 
     // Phase 4: when a session is open, the estabelecimento is locked to it.
@@ -205,12 +214,21 @@ router.post('/emit', async (req, res) => {
 
     // Actualizar totais da sessão após emissão bem-sucedida
     if (sessaoAberta) {
+      // Incrementar o total do método de pagamento correcto em tempo real
+      const method = (paymentMethod || 'CASH').toUpperCase();
+      const paymentIncrement = {
+        totalSalesAmount: sessaoAberta.totalSalesAmount + factura.grossTotal,
+        salesCount:       sessaoAberta.salesCount + 1,
+        ...(method === 'CASH'       && { totalCash:          sessaoAberta.totalCash          + factura.grossTotal }),
+        ...(method === 'MULTICAIXA' && { totalMulticaixa:    sessaoAberta.totalMulticaixa    + factura.grossTotal }),
+        ...(method === 'TPA'        && { totalTpa:           sessaoAberta.totalTpa           + factura.grossTotal }),
+        ...(method !== 'CASH' && method !== 'MULTICAIXA' && method !== 'TPA'
+                                    && { totalTransferencia: sessaoAberta.totalTransferencia + factura.grossTotal }),
+      };
+
       await prisma.caixaSessao.update({
         where: { id: sessaoAberta.id },
-        data: {
-          totalSalesAmount: sessaoAberta.totalSalesAmount + factura.grossTotal,
-          salesCount: sessaoAberta.salesCount + 1,
-        },
+        data: paymentIncrement,
       });
       // Ligar a factura à sessão
       await prisma.factura.update({

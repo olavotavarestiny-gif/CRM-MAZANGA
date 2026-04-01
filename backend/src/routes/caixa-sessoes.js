@@ -150,8 +150,11 @@ router.patch('/sessoes/:id/fechar', requireCaixaPermission('close'), async (req,
     const totalMulticaixa = facturasDaSessao
       .filter((f) => f.paymentMethod === 'MULTICAIXA')
       .reduce((sum, f) => sum + f.grossTotal, 0);
+    const totalTpa = facturasDaSessao
+      .filter((f) => f.paymentMethod === 'TPA')
+      .reduce((sum, f) => sum + f.grossTotal, 0);
     const totalTransferencia = facturasDaSessao
-      .filter((f) => !['CASH', 'MULTICAIXA'].includes(f.paymentMethod))
+      .filter((f) => !['CASH', 'MULTICAIXA', 'TPA'].includes(f.paymentMethod))
       .reduce((sum, f) => sum + f.grossTotal, 0);
 
     const updated = await prisma.caixaSessao.update({
@@ -165,6 +168,7 @@ router.patch('/sessoes/:id/fechar', requireCaixaPermission('close'), async (req,
         differenceAmount: difference,
         totalCash,
         totalMulticaixa,
+        totalTpa,
         totalTransferencia,
         notes: notes || null,
       },

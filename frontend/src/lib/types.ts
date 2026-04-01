@@ -409,6 +409,7 @@ export interface CaixaSessao {
   salesCount: number;
   totalCash: number;
   totalMulticaixa: number;
+  totalTpa: number;
   totalTransferencia: number;
   status: 'open' | 'closed';
   notes?: string | null;
