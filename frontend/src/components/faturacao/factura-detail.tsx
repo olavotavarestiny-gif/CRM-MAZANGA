@@ -9,9 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { CheckCircle2, Clock, XCircle, AlertCircle, FileDown, Ban } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, AlertCircle, FileDown, Ban, Printer } from 'lucide-react';
 import { anularFactura, downloadFacturaPdf, getCurrentUser, getFaturacaoConfig } from '@/lib/api';
 import type { Factura, IBANEntry } from '@/lib/types';
+import { printThermalRecibo } from '@/lib/thermal-print';
 
 const CURRENCY_SYMBOLS: Record<string, string> = { AOA: 'Kz', USD: '$', EUR: '€', GBP: '£', CHF: 'Fr', CNY: '¥' };
 
@@ -76,6 +77,11 @@ export function FacturaDetail({ factura, isMock, ibans }: Props) {
     finally { setPdfLoading(false); }
   };
 
+  const handlePrintRecibo = () => {
+    if (!faturacaoConfig) return;
+    printThermalRecibo(factura, faturacaoConfig);
+  };
+
   const lines = typeof factura.lines === 'string' ? JSON.parse(factura.lines as unknown as string) : factura.lines;
 
   const anularMutation = useMutation({
@@ -106,6 +112,9 @@ export function FacturaDetail({ factura, isMock, ibans }: Props) {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handlePrintRecibo} disabled={!faturacaoConfig} className="border-gray-200 text-gray-700 hover:bg-gray-50">
+            <Printer className="w-3.5 h-3.5 mr-1" /> Imprimir Recibo
+          </Button>
           <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={pdfLoading} className="border-gray-200 text-gray-700 hover:bg-gray-50">
             <FileDown className="w-3.5 h-3.5 mr-1" /> {pdfLoading ? 'A gerar...' : 'Exportar PDF'}
           </Button>

@@ -4,11 +4,12 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ShoppingCart, Search, Plus, Minus, Trash2, X, CheckCircle, Printer,
-  AlertCircle, Lock, Unlock, Clock, Store, TrendingUp, Hash,
+  AlertCircle, Lock, Unlock, Clock, Store, TrendingUp, Hash, Download, ExternalLink,
 } from 'lucide-react';
-import { getProdutos, getQuickSaleDefaults, getEstabelecimentos, emitQuickSale, getCaixaSessaoAtual, abrirCaixaSessao, fecharCaixaSessao, getCurrentUser } from '@/lib/api';
+import { getProdutos, getQuickSaleDefaults, getEstabelecimentos, emitQuickSale, getCaixaSessaoAtual, abrirCaixaSessao, fecharCaixaSessao, getCurrentUser, downloadFacturaPdf, openFacturaPdfInTab, getFaturacaoConfig } from '@/lib/api';
 import type { QuickSaleItem } from '@/lib/api';
-import type { Produto, Factura, Estabelecimento, CaixaSessao } from '@/lib/types';
+import type { Produto, Factura, Estabelecimento, CaixaSessao, FaturacaoConfig } from '@/lib/types';
+import { printThermalRecibo } from '@/lib/thermal-print';
 import { ClienteAutocomplete } from '@/components/faturacao/cliente-autocomplete';
 import type { ClienteFaturacao } from '@/lib/types';
 import { CommerceButton as Button } from '@/components/ui/button-commerce';
@@ -93,6 +94,9 @@ export default function VendasRapidasPage() {
   const [emitting, setEmitting] = useState(false);
   const [successFactura, setSuccessFactura] = useState<Factura | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [faturacaoConfig, setFaturacaoConfig] = useState<FaturacaoConfig | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [printBlocked, setPrintBlocked] = useState(false);
 
   // Abrir caixa modal
   const [showAbrirCaixa, setShowAbrirCaixa] = useState(false);
@@ -215,6 +219,10 @@ export default function VendasRapidasPage() {
       });
 
     return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    getFaturacaoConfig().then(setFaturacaoConfig).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -370,6 +378,35 @@ export default function VendasRapidasPage() {
     } finally {
       setEmitting(false);
     }
+  };
+
+  // ── Handlers de saída pós-venda ───────────────────────────────────────────
+  const handlePrintRecibo = () => {
+    if (!successFactura || !faturacaoConfig) return;
+    const ok = printThermalRecibo(successFactura, faturacaoConfig);
+    if (!ok) setPrintBlocked(true);
+  };
+
+  const handleAbrirPdf = async () => {
+    if (!successFactura) return;
+    setPdfLoading(true);
+    try { await openFacturaPdfInTab(successFactura.id); }
+    catch { /* silent — o utilizador verá o popup de erro do browser */ }
+    finally { setPdfLoading(false); }
+  };
+
+  const handleDescarregarPdf = async () => {
+    if (!successFactura) return;
+    setPdfLoading(true);
+    try { await downloadFacturaPdf(successFactura.id); }
+    catch { /* silent */ }
+    finally { setPdfLoading(false); }
+  };
+
+  const handleNovaVenda = () => {
+    setSuccessFactura(null);
+    setPrintBlocked(false);
+    setPdfLoading(false);
   };
 
   // ── Loading ────────────────────────────────────────────────────────────────
@@ -712,21 +749,55 @@ export default function VendasRapidasPage() {
         </div>
       </div>
 
-      {/* Success Modal */}
+      {/* Modal de Sucesso Pós-Venda */}
       {successFactura && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
             <div className="flex flex-col items-center text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 mb-4"><CheckCircle className="h-7 w-7 text-green-600" /></div>
-              <h2 className="text-lg font-bold text-[#2c2f31]">Fatura emitida!</h2>
-              <p className="mt-1 text-sm text-slate-500">{successFactura.documentNo}</p>
-              {successFactura.qrCodeImage && <img src={successFactura.qrCodeImage} alt="QR Code" className="mt-4 h-32 w-32 rounded-xl border border-slate-100 p-1" />}
-              <div className="mt-5 flex w-full gap-3">
-                <Button variant="outline" className="flex-1 gap-2" onClick={() => { const u = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/faturacao/facturas/${successFactura.id}/pdf`; window.open(u, '_blank'); }}>
-                  <Printer className="h-4 w-4" />PDF
-                </Button>
-                <Button className="flex-1" onClick={() => setSuccessFactura(null)}>Nova venda</Button>
+              {/* Ícone + Info */}
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 mb-3">
+                <CheckCircle className="h-7 w-7 text-green-600" />
               </div>
+              <h2 className="text-lg font-bold text-[#2c2f31]">Venda concluída!</h2>
+              <p className="mt-0.5 text-sm text-slate-500">{successFactura.documentNo}</p>
+              <p className="text-sm font-semibold text-[#2c2f31]">{formatKz(successFactura.grossTotal)}</p>
+
+              {/* QR Code */}
+              {successFactura.qrCodeImage && (
+                <img src={successFactura.qrCodeImage} alt="QR Code AGT" className="mt-3 h-28 w-28 rounded-xl border border-slate-100 p-1" />
+              )}
+
+              {/* Aviso popup bloqueado */}
+              {printBlocked && (
+                <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 text-left w-full">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>Popups bloqueados. Permita popups para este site e tente novamente.</span>
+                </div>
+              )}
+
+              {/* 3 botões de saída */}
+              <div className="mt-4 grid w-full grid-cols-3 gap-2">
+                <Button variant="outline" size="sm" className="flex-col gap-1 h-auto py-2.5 text-xs"
+                  onClick={handlePrintRecibo} disabled={!faturacaoConfig}>
+                  <Printer className="h-4 w-4" />
+                  Imprimir Recibo
+                </Button>
+                <Button variant="outline" size="sm" className="flex-col gap-1 h-auto py-2.5 text-xs"
+                  onClick={handleAbrirPdf} disabled={pdfLoading}>
+                  <ExternalLink className="h-4 w-4" />
+                  Abrir PDF
+                </Button>
+                <Button variant="outline" size="sm" className="flex-col gap-1 h-auto py-2.5 text-xs"
+                  onClick={handleDescarregarPdf} disabled={pdfLoading}>
+                  <Download className="h-4 w-4" />
+                  Descarregar
+                </Button>
+              </div>
+
+              {/* CTA principal */}
+              <Button className="mt-3 w-full" onClick={handleNovaVenda}>
+                Nova Venda
+              </Button>
             </div>
           </div>
         </div>

@@ -134,7 +134,7 @@ router.post('/emit', async (req, res) => {
     }
 
     const facturaBody = {
-      documentType: 'FT',
+      documentType: 'FR',
       serieId: resolvedSerieId,
       estabelecimentoId: targetEstabelecimentoId,
       customerTaxID: customerTaxID || '000000000',

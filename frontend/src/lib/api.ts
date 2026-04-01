@@ -658,6 +658,19 @@ export async function downloadFacturaPdf(id: string): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
+export async function openFacturaPdfInTab(id: string): Promise<void> {
+  const res = await api.get(`/api/faturacao/facturas/${id}/pdf`, { responseType: 'blob' });
+  const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+  const win = window.open(url, '_blank');
+  if (!win) {
+    // Fallback se popups bloqueados: faz download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `factura-${id}.pdf`;
+    a.click();
+  }
+}
+
 export async function anularFactura(id: string, motivo: string): Promise<Factura> {
   const res = await api.post(`/api/faturacao/facturas/${id}/anular`, { motivo });
   return res.data;
