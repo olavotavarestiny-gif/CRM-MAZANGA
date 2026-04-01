@@ -19,15 +19,17 @@ const securityHeaders = [
   { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
   // Content Security Policy (alerts 2 & 3)
   // 'unsafe-inline' and 'unsafe-eval' required by Next.js 14 inline script injection
+  // Tracking domains (Meta Pixel, Google Tag) included globally — scripts only load
+  // on public form pages (/f/*) when configured, so no security regression elsewhere.
   {
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://*.supabase.co",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://*.supabase.co https://connect.facebook.net https://www.googletagmanager.com https://www.google-analytics.com https://ssl.google-analytics.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",
-      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://va.vercel-scripts.com ${API_URL}`,
+      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://va.vercel-scripts.com ${API_URL} https://www.facebook.com https://connect.facebook.net https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -38,27 +40,6 @@ const securityHeaders = [
   { key: 'Pragma',        value: 'no-cache' },
   { key: 'Expires',       value: '0' },
 ];
-
-// Relaxed CSP for public form pages (/f/*) — allows Meta Pixel + Google Tag
-// Next.js applies headers in order; later matching rules overwrite same-key headers,
-// so this entry overrides the global CSP only for public form URLs.
-const publicFormCSP = {
-  key: 'Content-Security-Policy',
-  value: [
-    "default-src 'self'",
-    // Next.js internals + Meta Pixel base code + Google Tag
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://*.supabase.co https://connect.facebook.net https://www.googletagmanager.com https://www.google-analytics.com https://ssl.google-analytics.com",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com data:",
-    // img-src: pixel beacon + GA measurement protocol
-    "img-src 'self' data: blob: https: https://www.facebook.com https://www.google-analytics.com https://stats.g.doubleclick.net",
-    // connect-src: pixel events + GA hits
-    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://va.vercel-scripts.com ${API_URL} https://www.facebook.com https://connect.facebook.net https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com`,
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-  ].join('; '),
-};
 
 const nextConfig = {
   async redirects() {
@@ -73,14 +54,8 @@ const nextConfig = {
   async headers() {
     return [
       {
-        // Strict CSP for all routes
         source: '/(.*)',
         headers: securityHeaders,
-      },
-      {
-        // Public form pages: override CSP to allow tracking pixels
-        source: '/f/(.*)',
-        headers: [publicFormCSP],
       },
     ];
   },
