@@ -114,9 +114,9 @@ router.put('/:id', requireAuth, requirePlanFeature('formularios'), requirePermis
         ...(bgColor !== undefined && { bgColor: bgColor || null }),
         ...(logoUrl !== undefined && { logoUrl: logoUrl || null }),
         ...(metaPixelEnabled !== undefined && { metaPixelEnabled: Boolean(metaPixelEnabled) }),
-        ...(metaPixelId      !== undefined && { metaPixelId: metaPixelEnabled ? (metaPixelId?.trim() || null) : null }),
+        ...(metaPixelId      !== undefined && { metaPixelId: metaPixelId?.trim() || null }),
         ...(googleTagEnabled !== undefined && { googleTagEnabled: Boolean(googleTagEnabled) }),
-        ...(googleTagId      !== undefined && { googleTagId: googleTagEnabled ? (googleTagId?.trim() || null) : null }),
+        ...(googleTagId      !== undefined && { googleTagId: googleTagId?.trim() || null }),
         ...(trackSubmitAsLead !== undefined && { trackSubmitAsLead: Boolean(trackSubmitAsLead) }),
       },
     });
@@ -256,12 +256,12 @@ router.post('/:id/fields/reorder', requireAuth, requirePlanFeature('formularios'
     }
 
     const { fields } = req.body; // [{id, order}, ...]
-    for (const f of fields) {
-      await prisma.formField.update({
-        where: { id: f.id },
-        data: { order: f.order },
-      });
-    }
+    await prisma.$transaction(
+      fields.map((field) => prisma.formField.update({
+        where: { id: field.id },
+        data: { order: field.order },
+      })),
+    );
     res.json({ message: 'Fields reordered' });
   } catch (error) {
     console.error('Error reordering fields:', error);

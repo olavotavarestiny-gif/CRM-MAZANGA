@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getForm,
@@ -22,19 +22,12 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { X, Plus, GripVertical, Trash2, Check, Upload, Palette, Image as ImageIcon, BarChart2 } from 'lucide-react';
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { X, Check, Upload, Palette, Image as ImageIcon, BarChart2 } from 'lucide-react';
+import type { DropResult } from '@hello-pangea/dnd';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
-const CONTACT_FIELD_OPTIONS = [
-  { value: 'name', label: 'Nome' },
-  { value: 'phone', label: 'Telefone' },
-  { value: 'email', label: 'Email' },
-  { value: 'company', label: 'Empresa' },
-  { value: 'sector', label: 'Setor' },
-  { value: 'revenue', label: 'Faturamento' },
-];
+import { FormFieldList } from '@/components/forms/form-field-list';
+import { FormFieldEditor } from '@/components/forms/form-field-editor';
 
 const PRESET_BRAND_COLORS = [
   '#635BFF', '#0A2540', '#10B981', '#F59E0B',
@@ -147,6 +140,7 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState<'builder' | 'branding' | 'tracking' | 'submissions'>('builder');
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [fields, setFields] = useState<FormField[]>([]);
   const [formSettings, setFormSettings] = useState<{
     title: string; description: string; mode: 'step' | 'single'; thankYouUrl: string;
   }>({ title: '', description: '', mode: 'step', thankYouUrl: '' });
@@ -161,8 +155,13 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [brandingSaved, setBrandingSaved] = useState(false);
   const [trackingSaved, setTrackingSaved] = useState(false);
-  const [newOptionValue, setNewOptionValue] = useState('');
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const initializedFormIdRef = useRef<string | null>(null);
+  const selectedFieldIdRef = useRef<string | null>(null);
+  const fieldsRef = useRef<FormField[]>([]);
+  const pendingFieldUpdatesRef = useRef<Record<string, Partial<FormField>>>({});
+  const fieldSaveTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const discardedTempFieldIdsRef = useRef<Set<string>>(new Set());
 
   const { data: form } = useQuery({
     queryKey: ['form', params.id],
@@ -175,31 +174,68 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
     enabled: activeTab === 'submissions',
   });
 
+  const setBuilderFields = useCallback((updater: FormField[] | ((prev: FormField[]) => FormField[])) => {
+    setFields((prev) => {
+      const next = typeof updater === 'function'
+        ? (updater as (currentFields: FormField[]) => FormField[])(prev)
+        : updater;
+
+      fieldsRef.current = next;
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
-    if (form) {
-      setFormSettings({
-        title: form.title,
-        description: form.description || '',
-        mode: form.mode as 'step' | 'single',
-        thankYouUrl: form.thankYouUrl || '',
-      });
-      setBranding({
-        brandColor: form.brandColor || '#635BFF',
-        bgColor: form.bgColor || '#FFFFFF',
-        logoUrl: form.logoUrl || '',
-      });
-      setTracking({
-        metaPixelEnabled: form.metaPixelEnabled ?? false,
-        metaPixelId:      form.metaPixelId ?? '',
-        googleTagEnabled: form.googleTagEnabled ?? false,
-        googleTagId:      form.googleTagId ?? '',
-        trackSubmitAsLead: form.trackSubmitAsLead ?? true,
-      });
-      if (form.fields && form.fields.length > 0 && !selectedFieldId) {
-        setSelectedFieldId(form.fields[0].id);
-      }
+    selectedFieldIdRef.current = selectedFieldId;
+  }, [selectedFieldId]);
+
+  useEffect(() => {
+    fieldsRef.current = fields;
+  }, [fields]);
+
+  useEffect(() => {
+    if (!form) {
+      return;
     }
-  }, [form, selectedFieldId]);
+
+    setFormSettings({
+      title: form.title,
+      description: form.description || '',
+      mode: form.mode as 'step' | 'single',
+      thankYouUrl: form.thankYouUrl || '',
+    });
+    setBranding({
+      brandColor: form.brandColor || '#635BFF',
+      bgColor: form.bgColor || '#FFFFFF',
+      logoUrl: form.logoUrl || '',
+    });
+    setTracking({
+      metaPixelEnabled: form.metaPixelEnabled ?? false,
+      metaPixelId: form.metaPixelId ?? '',
+      googleTagEnabled: form.googleTagEnabled ?? false,
+      googleTagId: form.googleTagId ?? '',
+      trackSubmitAsLead: form.trackSubmitAsLead ?? true,
+    });
+  }, [form]);
+
+  useEffect(() => {
+    if (!form) {
+      return;
+    }
+
+    if (initializedFormIdRef.current !== form.id) {
+      const nextFields = form.fields || [];
+      initializedFormIdRef.current = form.id;
+      setBuilderFields(nextFields);
+      setSelectedFieldId((currentSelectedFieldId) => {
+        if (currentSelectedFieldId && nextFields.some((field) => field.id === currentSelectedFieldId)) {
+          return currentSelectedFieldId;
+        }
+
+        return nextFields[0]?.id ?? null;
+      });
+    }
+  }, [form, setBuilderFields]);
 
   useEffect(() => {
     getCurrentUser().then(setCurrentUser).catch(() => {});
@@ -230,49 +266,270 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
       setTrackingSaved(true);
       setTimeout(() => setTrackingSaved(false), 2000);
     },
-  });
-
-  const addFieldMutation = useMutation({
-    mutationFn: (data: any) => addField(params.id, data),
-    onSuccess: (newField) => {
-      queryClient.invalidateQueries({ queryKey: ['form', params.id] });
-      setSelectedFieldId(newField.id);
+    onError: (err: any) => {
+      alert(err?.response?.data?.error || 'Erro ao guardar as configurações de tracking. Verifique os dados e tente novamente.');
     },
   });
 
+  const reloadFormFields = useCallback(async () => {
+    const freshForm = await queryClient.fetchQuery({
+      queryKey: ['form', params.id],
+      queryFn: () => getForm(params.id),
+    });
+
+    setBuilderFields(freshForm.fields || []);
+    setSelectedFieldId((currentSelectedFieldId) => {
+      if (currentSelectedFieldId && freshForm.fields?.some((field) => field.id === currentSelectedFieldId)) {
+        return currentSelectedFieldId;
+      }
+
+      return freshForm.fields?.[0]?.id ?? null;
+    });
+  }, [params.id, queryClient, setBuilderFields]);
+
   const updateFieldMutation = useMutation({
-    mutationFn: (data: any) => updateField(params.id, data.fieldId, data.updates),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['form', params.id] }),
+    mutationFn: (data: { fieldId: string; updates: Partial<FormField> }) => updateField(params.id, data.fieldId, data.updates),
+    onError: () => {
+      void reloadFormFields();
+    },
+  });
+
+  const clearFieldSaveTimer = useCallback((fieldId: string) => {
+    const timer = fieldSaveTimersRef.current[fieldId];
+
+    if (!timer) {
+      return;
+    }
+
+    clearTimeout(timer);
+    delete fieldSaveTimersRef.current[fieldId];
+  }, []);
+
+  const clearPendingFieldUpdate = useCallback((fieldId: string) => {
+    clearFieldSaveTimer(fieldId);
+    delete pendingFieldUpdatesRef.current[fieldId];
+  }, [clearFieldSaveTimer]);
+
+  const flushFieldUpdates = useCallback(async (fieldId: string) => {
+    if (!fieldId || fieldId.startsWith('temp-')) {
+      return;
+    }
+
+    clearFieldSaveTimer(fieldId);
+
+    const pendingUpdates = pendingFieldUpdatesRef.current[fieldId];
+    if (!pendingUpdates || Object.keys(pendingUpdates).length === 0) {
+      return;
+    }
+
+    delete pendingFieldUpdatesRef.current[fieldId];
+    await updateFieldMutation.mutateAsync({ fieldId, updates: pendingUpdates });
+  }, [clearFieldSaveTimer, updateFieldMutation]);
+
+  const flushAllFieldUpdates = useCallback(async () => {
+    const pendingIds = Object.keys(pendingFieldUpdatesRef.current).filter((fieldId) => !fieldId.startsWith('temp-'));
+    await Promise.all(pendingIds.map((fieldId) => flushFieldUpdates(fieldId)));
+  }, [flushFieldUpdates]);
+
+  const scheduleFieldPersist = useCallback((fieldId: string, updates: Partial<FormField>) => {
+    pendingFieldUpdatesRef.current[fieldId] = {
+      ...(pendingFieldUpdatesRef.current[fieldId] || {}),
+      ...updates,
+    };
+
+    if (fieldId.startsWith('temp-')) {
+      return;
+    }
+
+    clearFieldSaveTimer(fieldId);
+    fieldSaveTimersRef.current[fieldId] = setTimeout(() => {
+      void flushFieldUpdates(fieldId);
+    }, 400);
+  }, [clearFieldSaveTimer, flushFieldUpdates]);
+
+  const addFieldMutation = useMutation({
+    mutationFn: ({ payload }: { payload: Parameters<typeof addField>[1]; tempId: string }) => addField(params.id, payload),
+    onSuccess: (newField, variables) => {
+      const pendingUpdates = pendingFieldUpdatesRef.current[variables.tempId];
+      clearFieldSaveTimer(variables.tempId);
+      delete pendingFieldUpdatesRef.current[variables.tempId];
+
+      if (discardedTempFieldIdsRef.current.has(variables.tempId)) {
+        discardedTempFieldIdsRef.current.delete(variables.tempId);
+        void deleteField(params.id, newField.id).catch(() => {
+          void reloadFormFields();
+        });
+        return;
+      }
+
+      setBuilderFields((currentFields) => currentFields.map((field) => {
+        if (field.id !== variables.tempId) {
+          return field;
+        }
+
+        return {
+          ...field,
+          ...newField,
+          id: newField.id,
+          formId: newField.formId,
+        };
+      }));
+
+      if (selectedFieldIdRef.current === variables.tempId) {
+        setSelectedFieldId(newField.id);
+      }
+
+      if (pendingUpdates && Object.keys(pendingUpdates).length > 0) {
+        pendingFieldUpdatesRef.current[newField.id] = pendingUpdates;
+        fieldSaveTimersRef.current[newField.id] = setTimeout(() => {
+          void flushFieldUpdates(newField.id);
+        }, 400);
+      }
+    },
+    onError: (_error, variables) => {
+      clearPendingFieldUpdate(variables.tempId);
+
+      const nextFields = fieldsRef.current.filter((field) => field.id !== variables.tempId);
+      setBuilderFields(nextFields);
+
+      if (selectedFieldIdRef.current === variables.tempId) {
+        setSelectedFieldId(nextFields[0]?.id ?? null);
+      }
+
+      void reloadFormFields();
+    },
   });
 
   const deleteFieldMutation = useMutation({
-    mutationFn: (fieldId: string) => deleteField(params.id, fieldId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['form', params.id] });
-      setSelectedFieldId(null);
+    mutationFn: ({ fieldId }: { fieldId: string; rollbackFields: FormField[]; rollbackSelectedFieldId: string | null }) => (
+      deleteField(params.id, fieldId)
+    ),
+    onError: (_error, variables) => {
+      setBuilderFields(variables.rollbackFields);
+      setSelectedFieldId(variables.rollbackSelectedFieldId);
+      void reloadFormFields();
     },
   });
 
   const reorderFieldsMutation = useMutation({
-    mutationFn: (fields: any[]) => reorderFields(params.id, fields),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['form', params.id] }),
+    mutationFn: ({ orderedFields }: { orderedFields: { id: string; order: number }[]; rollbackFields: FormField[] }) => (
+      reorderFields(params.id, orderedFields)
+    ),
+    onError: (_error, variables) => {
+      setBuilderFields(variables.rollbackFields);
+      void reloadFormFields();
+    },
   });
 
-  const handleDragEnd = (result: DropResult) => {
+  useEffect(() => () => {
+    Object.values(fieldSaveTimersRef.current).forEach((timer) => clearTimeout(timer));
+  }, []);
+
+  const handleDragEnd = useCallback((result: DropResult) => {
     const { source, destination } = result;
-    if (!destination || !form) return;
-    const fields = Array.from(form.fields);
-    const [movedField] = fields.splice(source.index, 1);
-    fields.splice(destination.index, 0, movedField);
-    reorderFieldsMutation.mutate(fields.map((f, idx) => ({ id: f.id, order: idx })));
-  };
+    if (!destination || source.index === destination.index) {
+      return;
+    }
 
-  const addNewField = () => {
-    const order = (form?.fields?.length || 0) + 1;
-    addFieldMutation.mutate({ type: 'text', label: 'Novo Campo', required: false, order });
-  };
+    void flushAllFieldUpdates();
 
-  const selectedField = form?.fields?.find((f) => f.id === selectedFieldId);
+    const rollbackFields = fieldsRef.current;
+    const reorderedFields = Array.from(rollbackFields);
+    const [movedField] = reorderedFields.splice(source.index, 1);
+    reorderedFields.splice(destination.index, 0, movedField);
+
+    const nextFields = reorderedFields.map((field, index) => ({ ...field, order: index }));
+    setBuilderFields(nextFields);
+    reorderFieldsMutation.mutate({
+      orderedFields: nextFields.map((field) => ({ id: field.id, order: field.order })),
+      rollbackFields,
+    });
+  }, [flushAllFieldUpdates, reorderFieldsMutation, setBuilderFields]);
+
+  const addNewField = useCallback(() => {
+    const tempId = `temp-${Date.now()}`;
+    const nextOrder = fieldsRef.current.reduce(
+      (highestOrder, field) => Math.max(highestOrder, field.order),
+      -1,
+    ) + 1;
+    const optimisticField: FormField = {
+      id: tempId,
+      formId: params.id,
+      type: 'text',
+      label: 'Novo Campo',
+      required: false,
+      order: nextOrder,
+      options: [],
+      contactField: undefined,
+    };
+
+    setBuilderFields((currentFields) => [...currentFields, optimisticField]);
+    setSelectedFieldId(tempId);
+    addFieldMutation.mutate({
+      tempId,
+      payload: {
+        type: optimisticField.type,
+        label: optimisticField.label,
+        required: optimisticField.required,
+        order: optimisticField.order,
+      },
+    });
+  }, [addFieldMutation, params.id, setBuilderFields]);
+
+  const handleSelectField = useCallback((fieldId: string) => {
+    const currentSelectedFieldId = selectedFieldIdRef.current;
+
+    if (fieldId === currentSelectedFieldId) {
+      return;
+    }
+
+    if (currentSelectedFieldId) {
+      void flushFieldUpdates(currentSelectedFieldId);
+    }
+
+    setSelectedFieldId(fieldId);
+  }, [flushFieldUpdates]);
+
+  const handleFieldChange = useCallback((fieldId: string, updates: Partial<FormField>) => {
+    setBuilderFields((currentFields) => currentFields.map((field) => (
+      field.id === fieldId ? { ...field, ...updates } : field
+    )));
+    scheduleFieldPersist(fieldId, updates);
+  }, [scheduleFieldPersist, setBuilderFields]);
+
+  const handleFieldFlush = useCallback((fieldId: string) => {
+    void flushFieldUpdates(fieldId);
+  }, [flushFieldUpdates]);
+
+  const handleDeleteField = useCallback((fieldId: string) => {
+    clearPendingFieldUpdate(fieldId);
+
+    const rollbackFields = fieldsRef.current;
+    const rollbackSelectedFieldId = selectedFieldIdRef.current;
+    const nextFields = rollbackFields.filter((field) => field.id !== fieldId);
+
+    setBuilderFields(nextFields);
+    if (rollbackSelectedFieldId === fieldId) {
+      setSelectedFieldId(nextFields[0]?.id ?? null);
+    }
+
+    if (fieldId.startsWith('temp-')) {
+      discardedTempFieldIdsRef.current.add(fieldId);
+      return;
+    }
+
+    deleteFieldMutation.mutate({ fieldId, rollbackFields, rollbackSelectedFieldId });
+  }, [clearPendingFieldUpdate, deleteFieldMutation, setBuilderFields]);
+
+  const handleTabChange = useCallback((tabKey: typeof activeTab) => {
+    void flushAllFieldUpdates();
+    setActiveTab(tabKey);
+  }, [flushAllFieldUpdates]);
+
+  const selectedField = useMemo(
+    () => fields.find((field) => field.id === selectedFieldId),
+    [fields, selectedFieldId],
+  );
 
   const handleSaveSettings = () => {
     updateFormMutation.mutate({
@@ -289,24 +546,6 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
       bgColor: branding.bgColor,
       logoUrl: branding.logoUrl || undefined,
     });
-  };
-
-  const handleFieldChange = (updates: Partial<FormField>) => {
-    if (!selectedField) return;
-    updateFieldMutation.mutate({ fieldId: selectedField.id, updates });
-  };
-
-  const handleAddOption = () => {
-    if (!selectedField || !newOptionValue.trim()) return;
-    const options = selectedField.options || [];
-    handleFieldChange({ options: [...options, newOptionValue] });
-    setNewOptionValue('');
-  };
-
-  const handleRemoveOption = (index: number) => {
-    if (!selectedField) return;
-    const options = (selectedField.options || []).filter((_, i) => i !== index);
-    handleFieldChange({ options });
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -359,7 +598,7 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
         {TABS.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => handleTabChange(tab.key)}
             className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
               activeTab === tab.key
                 ? 'bg-[#0A2540] text-white shadow-sm'
@@ -422,132 +661,23 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
           </Card>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Fields list */}
-            <Card className="col-span-1 border-slate-200 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">Campos ({form?.fields?.length || 0})</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <DragDropContext onDragEnd={handleDragEnd}>
-                  <Droppable droppableId="fields">
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={`space-y-2 min-h-48 ${snapshot.isDraggingOver ? 'bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg p-2' : ''}`}
-                      >
-                        {form?.fields?.map((field, index) => (
-                          <Draggable key={field.id} draggableId={field.id} index={index}>
-                            {(provided) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                                  selectedFieldId === field.id
-                                    ? 'border-[#0A2540] bg-[#F8FAFC]'
-                                    : 'border-[#E2E8F0] bg-white hover:bg-[#F8FAFC]'
-                                }`}
-                                onClick={() => setSelectedFieldId(field.id)}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <div {...provided.dragHandleProps} className="text-[#6b7e9a]">
-                                    <GripVertical className="w-4 h-4" />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm text-[#0A2540] truncate font-medium">{field.label}</p>
-                                    <p className="text-xs text-[#6b7e9a]">{field.type === 'text' ? 'Texto' : 'Múltipla Escolha'}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                </DragDropContext>
-                <Button onClick={addNewField} className="w-full" variant="outline">
-                  <Plus className="w-4 h-4 mr-2" /> Adicionar Campo
-                </Button>
-              </CardContent>
-            </Card>
+            <FormFieldList
+              fields={fields}
+              selectedFieldId={selectedFieldId}
+              isAddingField={addFieldMutation.isPending}
+              onAddField={addNewField}
+              onDragEnd={handleDragEnd}
+              onSelectField={handleSelectField}
+            />
 
-            {/* Field editor */}
-            <Card className="col-span-2 border-slate-200 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">
-                  {selectedField ? `Editar: ${selectedField.label}` : 'Selecione um campo'}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {selectedField ? (
-                  <>
-                    <div>
-                      <Label className="text-[#0A2540]">Rótulo</Label>
-                      <Input className="mt-1" value={selectedField.label} onChange={(e) => handleFieldChange({ label: e.target.value })} />
-                    </div>
-                    <div>
-                      <Label className="text-[#0A2540]">Tipo</Label>
-                      <Select value={selectedField.type} onValueChange={(v) => handleFieldChange({ type: v as any })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="text">Texto</SelectItem>
-                          <SelectItem value="multiple_choice">Múltipla Escolha</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch checked={selectedField.required} onCheckedChange={(v) => handleFieldChange({ required: v })} />
-                      <Label className="text-[#0A2540] cursor-pointer">Obrigatório</Label>
-                    </div>
-                    <div>
-                      <Label className="text-[#0A2540]">Mapear para Contacto</Label>
-                      <div className="flex gap-2 mt-1">
-                        <Select value={selectedField.contactField || 'none'} onValueChange={(v) => { if (v !== 'none') handleFieldChange({ contactField: v }); }}>
-                          <SelectTrigger className="flex-1"><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">— Nenhum —</SelectItem>
-                            {CONTACT_FIELD_OPTIONS.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {selectedField.contactField && (
-                          <Button variant="ghost" size="sm" onClick={() => handleFieldChange({ contactField: undefined })}>Limpar</Button>
-                        )}
-                      </div>
-                    </div>
-                    {selectedField.type === 'multiple_choice' && (
-                      <div className="space-y-3 border-t border-[#E2E8F0] pt-4">
-                        <Label className="text-[#0A2540]">Opções</Label>
-                        <div className="space-y-2">
-                          {selectedField.options?.map((opt, idx) => (
-                            <div key={idx} className="flex items-center gap-2">
-                              <Input value={opt} readOnly className="text-sm" />
-                              <Button variant="ghost" size="sm" onClick={() => handleRemoveOption(idx)}><X className="w-4 h-4" /></Button>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex gap-2">
-                          <Input placeholder="Nova opção..." value={newOptionValue} onChange={(e) => setNewOptionValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleAddOption(); }} />
-                          <Button onClick={handleAddOption} size="sm">Adicionar</Button>
-                        </div>
-                      </div>
-                    )}
-                    {!currentUser?.accountOwnerId && (
-                      <div className="border-t border-[#E2E8F0] pt-4">
-                        <Button variant="destructive" onClick={() => deleteFieldMutation.mutate(selectedField.id)} className="w-full">
-                          <Trash2 className="w-4 h-4 mr-2" /> Eliminar Campo
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-center text-[#6b7e9a] py-8">Clique num campo para editar</p>
-                )}
-              </CardContent>
-            </Card>
+            <FormFieldEditor
+              field={selectedField}
+              canDelete={!currentUser?.accountOwnerId}
+              isDeletingField={deleteFieldMutation.isPending}
+              onDeleteField={handleDeleteField}
+              onFieldChange={handleFieldChange}
+              onFieldFlush={handleFieldFlush}
+            />
           </div>
         </>
       )}
@@ -651,6 +781,28 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
       {/* ── TRACKING TAB ── */}
       {activeTab === 'tracking' && currentUser?.workspaceMode === 'servicos' && (
         <div className="max-w-2xl space-y-6">
+
+          {/* Status summary — shows what's actually saved in DB */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm space-y-1">
+            <p className="font-medium text-slate-700">Estado guardado</p>
+            <p className="text-slate-500">
+              Meta Pixel:{' '}
+              {form?.metaPixelEnabled && form?.metaPixelId
+                ? <span className="text-green-600 font-medium">Ativo — ID {form.metaPixelId}</span>
+                : form?.metaPixelId
+                  ? <span className="text-amber-600 font-medium">ID guardado mas desativado</span>
+                  : <span className="text-slate-400">Não configurado</span>}
+            </p>
+            <p className="text-slate-500">
+              Google Tag:{' '}
+              {form?.googleTagEnabled && form?.googleTagId
+                ? <span className="text-green-600 font-medium">Ativo — {form.googleTagId}</span>
+                : form?.googleTagId
+                  ? <span className="text-amber-600 font-medium">ID guardado mas desativado</span>
+                  : <span className="text-slate-400">Não configurado</span>}
+            </p>
+          </div>
+
           {/* Meta Pixel */}
           <Card className="border-slate-200 shadow-sm">
             <CardHeader>
@@ -755,7 +907,7 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
                   <thead>
                     <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
                       <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Data</th>
-                      {form?.fields?.map((field) => (
+                      {fields.map((field) => (
                         <th key={field.id} className="px-4 py-2 text-left text-[#0A2540] font-semibold">{field.label}</th>
                       ))}
                     </tr>
@@ -766,7 +918,7 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
                         <td className="px-4 py-3 text-[#6b7e9a]">
                           {formatDistanceToNow(new Date(submission.submittedAt), { locale: ptBR, addSuffix: true })}
                         </td>
-                        {form?.fields?.map((field) => {
+                        {fields.map((field) => {
                           const answer = submission.answers?.find((a: any) => a.fieldId === field.id);
                           return (
                             <td key={field.id} className="px-4 py-3 text-[#0A2540]">{answer?.value || '—'}</td>
