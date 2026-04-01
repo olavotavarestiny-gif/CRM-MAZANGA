@@ -554,12 +554,13 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const visibleSystem = systemConfigs
     .filter(c => c.visible)
     .filter(c => {
-      if (['name', 'phone', 'company', 'clienteType'].includes(c.fieldKey)) return false;
+      if (['name', 'phone', 'nif', 'company', 'clienteType'].includes(c.fieldKey)) return false;
       if (!isEmpresa && c.fieldKey === 'sector') return false;
       return true;
     })
     .sort((a, b) => a.order - b.order);
 
+  const nifConfig = systemConfigs.find(c => c.fieldKey === 'nif');
   const companyConfig = systemConfigs.find(c => c.fieldKey === 'company');
   const sectorConfig = systemConfigs.find(c => c.fieldKey === 'sector');
 
@@ -575,6 +576,8 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
         return <InlineField key={key} label={cfg.label} value={contact.email ?? ''} onSave={v => save('email', v)} type="email" />;
       case 'phone':
         return <InlineField key={key} label={cfg.label} value={contact.phone ?? ''} onSave={v => save('phone', v)} />;
+      case 'nif':
+        return <InlineField key={key} label={cfg.label} value={contact.nif ?? ''} onSave={v => save('nif', v)} />;
       case 'company':
         return <InlineField key={key} label={cfg.label} value={contact.company ?? ''} onSave={v => save('company', v)} />;
       case 'revenue':
@@ -670,6 +673,11 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
             <CardContent className="space-y-4">
               <InlineField label="Nome" value={contact.name} onSave={v => save('name', v)} />
               <InlineField label="Telefone" value={contact.phone ?? ''} onSave={v => save('phone', v)} />
+              <InlineField
+                label={`${nifConfig?.label || 'NIF'}${isEmpresa ? ' *' : ''}`}
+                value={contact.nif ?? ''}
+                onSave={v => save('nif', v)}
+              />
               {/* Force company + sector for Empresa regardless of visibility config */}
               {isEmpresa && companyConfig && (
                 <InlineField label={companyConfig.label} value={contact.company ?? ''} onSave={v => save('company', v)} />

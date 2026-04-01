@@ -47,7 +47,7 @@ router.get('/defaults', async (req, res) => {
 router.post('/emit', async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
-    const { items, customerTaxID, customerName, paymentMethod, estabelecimentoId } = req.body;
+    const { items, customerTaxID, customerName, paymentMethod, estabelecimentoId, clienteFaturacaoId } = req.body;
 
     if (!items?.length) {
       return res.status(400).json({ error: 'O carrinho está vazio.' });
@@ -148,6 +148,7 @@ router.post('/emit', async (req, res) => {
       estabelecimentoId: targetEstabelecimentoId,
       customerTaxID: customerTaxID || '000000000',
       customerName: customerName || 'Consumidor Final',
+      clienteFaturacaoId: clienteFaturacaoId || null,
       paymentMethod: paymentMethod || 'CASH',
       lines: items.map((item, i) => ({
         lineNumber: i + 1,

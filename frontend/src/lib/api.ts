@@ -726,6 +726,14 @@ export async function createClienteFaturacao(data: {
   return res.data;
 }
 
+export async function importContactToBillingCustomer(data: {
+  contactId: number;
+  customerTaxID?: string;
+}): Promise<ClienteFaturacao> {
+  const res = await api.post('/api/faturacao/clientes/from-contact', data);
+  return res.data;
+}
+
 export async function updateClienteFaturacao(id: string, data: Partial<ClienteFaturacao>): Promise<ClienteFaturacao> {
   const res = await api.put(`/api/faturacao/clientes/${id}`, data);
   return res.data;
@@ -1147,6 +1155,7 @@ export async function emitQuickSale(payload: {
   items: QuickSaleItem[];
   customerTaxID?: string;
   customerName?: string;
+  clienteFaturacaoId?: string;
   paymentMethod?: string;
   estabelecimentoId?: string;
 }): Promise<Factura> {

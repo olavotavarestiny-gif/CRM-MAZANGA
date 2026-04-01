@@ -34,6 +34,17 @@ async function createFactura(userId, body, req = null) {
     paymentMethod,
   } = body;
 
+  if (clienteFaturacaoId) {
+    const billingClient = await prisma.clienteFaturacao.findFirst({
+      where: { id: clienteFaturacaoId, userId },
+      select: { id: true },
+    });
+
+    if (!billingClient) {
+      throw Object.assign(new Error('Cliente de faturação inválido para esta conta.'), { status: 400 });
+    }
+  }
+
   let serieId = inputSerieId;
   if (!serieId && estabelecimentoId) {
     const estabelecimento = await prisma.estabelecimento.findFirst({

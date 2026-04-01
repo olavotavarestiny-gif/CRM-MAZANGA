@@ -22,13 +22,13 @@ function deriveFinanceStatus(documentType, paymentMethod) {
   return IMMEDIATE_PAYMENT_METHODS.has(paymentMethod || '') ? 'pago' : 'pendente';
 }
 
-async function resolveContactId(tx, clienteFaturacaoId) {
+async function resolveContactId(tx, userId, clienteFaturacaoId) {
   if (!clienteFaturacaoId) {
     return null;
   }
 
-  const billingClient = await tx.clienteFaturacao.findUnique({
-    where: { id: clienteFaturacaoId },
+  const billingClient = await tx.clienteFaturacao.findFirst({
+    where: { id: clienteFaturacaoId, userId },
     select: { contactId: true },
   });
 
@@ -53,7 +53,7 @@ async function registerFacturaFinanceEntry(tx, {
     return null;
   }
 
-  const resolvedContactId = await resolveContactId(tx, clienteFaturacaoId);
+  const resolvedContactId = await resolveContactId(tx, userId, clienteFaturacaoId);
   const baseAmount = currencyCode && currencyCode !== 'AOA'
     ? Number(currencyAmount || grossTotal || 0)
     : Number(grossTotal || 0);

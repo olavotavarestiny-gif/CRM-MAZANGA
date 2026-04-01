@@ -136,6 +136,7 @@ export default function ContactForm({
     const base: Record<string, string | string[]> = {
       email: contact?.email ?? '',
       phone: contact?.phone ?? '',
+      nif: contact?.nif ?? '',
       company: contact?.company ?? '',
       revenue: contact?.revenue ?? '',
       sector: contact?.sector ?? '',
@@ -153,6 +154,7 @@ export default function ContactForm({
       setValues({
         email: contact.email ?? '',
         phone: contact.phone ?? '',
+        nif: contact.nif ?? '',
         company: contact.company ?? '',
         revenue: contact.revenue ?? '',
         sector: contact.sector ?? '',
@@ -190,11 +192,12 @@ export default function ContactForm({
 
   const nameConfig = systemConfigs.find(c => c.fieldKey === 'name');
   const phoneConfig = systemConfigs.find(c => c.fieldKey === 'phone');
+  const nifConfig = systemConfigs.find(c => c.fieldKey === 'nif');
   const companyConfig = systemConfigs.find(c => c.fieldKey === 'company');
   const clienteTypeConfig = systemConfigs.find(c => c.fieldKey === 'clienteType');
 
   // Core fields are rendered with dedicated UI, so they should not repeat below.
-  const ALWAYS_SHOWN = new Set(['name', 'phone', 'company', 'clienteType']);
+  const ALWAYS_SHOWN = new Set(['name', 'phone', 'nif', 'company', 'clienteType']);
   const allSystemFieldsSorted = systemConfigs.sort((a, b) => a.order - b.order);
   const visibleSystemFields = allSystemFieldsSorted.filter(c => {
     if (ALWAYS_SHOWN.has(c.fieldKey)) return false; // rendered separately
@@ -208,7 +211,7 @@ export default function ContactForm({
   const mutation = useMutation({
     mutationFn: () => {
       // Separate system field values from custom field values
-      const systemKeys = new Set(['email', 'phone', 'company', 'revenue', 'sector', 'tags']);
+      const systemKeys = new Set(['email', 'phone', 'nif', 'company', 'revenue', 'sector', 'tags']);
       const customFields: Record<string, string> = {};
       for (const [k, v] of Object.entries(values)) {
         if (!systemKeys.has(k)) customFields[k] = v as string;
@@ -219,6 +222,7 @@ export default function ContactForm({
         clienteType: tipoCliente,
         email: (values.email as string) || '',
         phone: (values.phone as string) || '',
+        nif: (values.nif as string) || '',
         company: tipoCliente === 'empresa' ? (values.company as string) || '' : '',
         revenue: (values.revenue as string) || null,
         sector: tipoCliente === 'empresa' ? (values.sector as string) || null : null,
@@ -238,7 +242,7 @@ export default function ContactForm({
       if (!isEditMode) {
         setName('');
         setStage('Novo');
-        setValues({ email: '', phone: '', company: '', revenue: '', sector: '', tags: [] });
+        setValues({ email: '', phone: '', nif: '', company: '', revenue: '', sector: '', tags: [] });
       }
       toast({
         variant: 'success',
@@ -309,6 +313,17 @@ export default function ContactForm({
           onChange={(e) => setValue('phone', e.target.value)}
           placeholder="+244 9xx xxx xxx"
           required={phoneConfig?.required}
+          className="mt-1"
+        />
+      </div>
+
+      <div>
+        <Label>{nifConfig?.label || 'NIF'}{tipoCliente === 'empresa' && <span className="text-red-500 ml-0.5">*</span>}</Label>
+        <Input
+          value={values['nif'] as string}
+          onChange={(e) => setValue('nif', e.target.value)}
+          placeholder={tipoCliente === 'empresa' ? 'NIF obrigatório para empresas' : 'Opcional para particulares'}
+          required={tipoCliente === 'empresa'}
           className="mt-1"
         />
       </div>

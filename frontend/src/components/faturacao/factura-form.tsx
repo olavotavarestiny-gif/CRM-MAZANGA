@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Plus, Trash2 } from 'lucide-react';
@@ -13,19 +13,20 @@ import { Label } from '@/components/ui/label';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast-provider';
-import { AsyncSearchPicker, SearchGroup } from '@/components/search/async-search-picker';
 import {
   createClienteFaturacao,
   createFactura,
   createProduto,
   createSerie,
-  getClientesFaturacao,
-  getContacts,
   getEstabelecimentos,
   getSeries,
+  importContactToBillingCustomer,
   updateProduto,
 } from '@/lib/api';
-import type { ClienteFaturacao, Contact, Produto } from '@/lib/types';
+import type { Produto } from '@/lib/types';
+import type { CommercialCustomerLookupItem } from '@/lib/commercial-customer-lookup';
+import { buildFieldsFromLookupCustomer } from '@/lib/commercial-customer-lookup';
+import { CommercialCustomerPicker } from './commercial-customer-picker';
 import { ProdutoAutocomplete } from './produto-autocomplete';
 
 interface LineState {
@@ -66,19 +67,7 @@ interface SelectedCustomerMeta {
   source: CustomerSource;
   id?: string;
   contactId?: number;
-}
-
-interface CustomerLookupItem {
-  id: string;
-  source: 'crm' | 'faturacao';
-  label: string;
-  customerName: string;
-  customerTaxID: string;
-  customerAddress?: string;
-  customerPhone?: string;
-  customerEmail?: string;
-  company?: string;
-  contactId?: number;
+  requiresContactFix?: boolean;
 }
 
 const DOCUMENT_TYPES = [
@@ -146,60 +135,6 @@ function emptyDialog(lineIndex = 0, description = ''): ProdutoDialogState {
   };
 }
 
-function normalizeLookupValue(value: string | undefined | null) {
-  return (value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-}
-
-function getContactTaxIdFallback(contact: Contact) {
-  const digits = (contact.phone || '').replace(/\D/g, '');
-  return digits || `CONTACT-${contact.id}`;
-}
-
-function rankCustomerOption(option: CustomerLookupItem, query: string) {
-  const normalizedQuery = normalizeLookupValue(query);
-  const fields = [
-    option.customerName,
-    option.customerTaxID,
-    option.customerPhone,
-    option.company,
-    option.customerEmail,
-  ].map(normalizeLookupValue);
-
-  if (fields.some((field) => field === normalizedQuery)) {
-    return 0;
-  }
-
-  if (fields.some((field) => field.startsWith(normalizedQuery))) {
-    return 1;
-  }
-
-  return 2;
-}
-
-function buildFieldsFromBillingClient(cliente: ClienteFaturacao): InvoiceCustomerFields {
-  return {
-    taxId: cliente.customerTaxID || '',
-    name: cliente.customerName || '',
-    address: cliente.customerAddress || '',
-    phone: cliente.customerPhone || '',
-    email: cliente.customerEmail || '',
-  };
-}
-
-function buildFieldsFromContact(contact: Contact): InvoiceCustomerFields {
-  return {
-    taxId: getContactTaxIdFallback(contact),
-    name: contact.company?.trim() || contact.name,
-    address: '',
-    phone: contact.phone || '',
-    email: contact.email || '',
-  };
-}
-
 export function FacturaForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -246,72 +181,6 @@ export function FacturaForm() {
   const estabs = estabsQuery.data || [];
   const selectedEstabelecimento = estabs.find((estabelecimento) => estabelecimento.id === estabelecimentoId);
 
-  const searchCustomers = useMemo(
-    () => async (query: string): Promise<SearchGroup<CustomerLookupItem>[]> => {
-      const [billingData, contacts] = await Promise.all([
-        getClientesFaturacao({ search: query }),
-        getContacts({ search: query }),
-      ]);
-
-      const billingClients = billingData.clientes
-        .map((cliente) => ({
-          id: cliente.id,
-          source: 'faturacao' as const,
-          label: 'Faturação',
-          customerName: cliente.customerName,
-          customerTaxID: cliente.customerTaxID,
-          customerAddress: cliente.customerAddress,
-          customerPhone: cliente.customerPhone,
-          customerEmail: cliente.customerEmail,
-          contactId: cliente.contactId,
-        }))
-        .sort((a, b) => {
-          const rankDiff = rankCustomerOption(a, query) - rankCustomerOption(b, query);
-          return rankDiff || a.customerName.localeCompare(b.customerName);
-        });
-
-      const crmContacts = contacts
-        .map((contact) => ({
-          id: String(contact.id),
-          source: 'crm' as const,
-          label: 'CRM',
-          customerName: contact.company?.trim() || contact.name,
-          customerTaxID: getContactTaxIdFallback(contact),
-          customerPhone: contact.phone,
-          customerEmail: contact.email,
-          company: contact.company,
-          contactId: contact.id,
-        }))
-        .sort((a, b) => {
-          const rankDiff = rankCustomerOption(a, query) - rankCustomerOption(b, query);
-          return rankDiff || a.customerName.localeCompare(b.customerName);
-        });
-
-      return [
-        {
-          id: 'billing',
-          label: 'Clientes de faturação',
-          items: billingClients,
-        },
-        {
-          id: 'crm',
-          label: 'Contactos CRM',
-          items: crmContacts,
-        },
-      ]
-        .filter((group) => group.items.length > 0)
-        .sort((a, b) => {
-          const aRank = a.items.length > 0 ? rankCustomerOption(a.items[0], query) : Number.MAX_SAFE_INTEGER;
-          const bRank = b.items.length > 0 ? rankCustomerOption(b.items[0], query) : Number.MAX_SAFE_INTEGER;
-          if (aRank !== bRank) {
-            return aRank - bRank;
-          }
-          return a.id === 'billing' ? -1 : 1;
-        });
-    },
-    []
-  );
-
   const mutation = useMutation({
     mutationFn: async () => {
       let clienteFaturacaoId: string | undefined;
@@ -332,6 +201,15 @@ export function FacturaForm() {
           customerEmail: customerFields.email.trim() || undefined,
         });
         clienteFaturacaoId = createdCustomer.id;
+      } else if (selectedCustomerMeta?.source === 'crm' && selectedCustomerMeta.contactId) {
+        if (selectedCustomerMeta.requiresContactFix) {
+          throw new Error('Este contacto empresa ainda não tem NIF no CRM. Atualize o contacto antes de emitir a fatura.');
+        }
+
+        const importedCustomer = await importContactToBillingCustomer({
+          contactId: selectedCustomerMeta.contactId,
+        });
+        clienteFaturacaoId = importedCustomer.id;
       } else if (selectedCustomerMeta?.source === 'faturacao') {
         clienteFaturacaoId = selectedCustomerMeta.id;
       }
@@ -613,23 +491,20 @@ export function FacturaForm() {
     });
   }
 
-  function handleCustomerSelect(customer: CustomerLookupItem) {
+  function handleCustomerSelect(customer: CommercialCustomerLookupItem) {
     setCustomerMode('search');
     setSelectedCustomerMeta({
       source: customer.source,
       id: customer.source === 'faturacao' ? customer.id : undefined,
       contactId: customer.contactId,
+      requiresContactFix: customer.requiresContactFix,
     });
-    setCustomerFields({
-      taxId: customer.customerTaxID || '',
-      name: customer.customerName || '',
-      address: customer.customerAddress || '',
-      phone: customer.customerPhone || '',
-      email: customer.customerEmail || '',
-    });
+    setCustomerFields(buildFieldsFromLookupCustomer(customer));
     setCustomerWarning(
-      customer.source === 'crm'
-        ? 'Verifique os dados antes de emitir a fatura. Os dados vieram do CRM e podem precisar de ajuste fiscal.'
+      customer.source === 'crm' && customer.requiresContactFix
+        ? 'Este contacto empresa ainda não tem NIF. Complete o contacto no CRM antes de emitir qualquer documento fiscal.'
+        : customer.source === 'crm'
+        ? 'Nome, NIF e dados de contacto vêm do CRM. Para alterar estes dados, edite primeiro o contacto.'
         : ''
     );
   }
@@ -654,6 +529,7 @@ export function FacturaForm() {
       : 'Manual';
 
   const shouldShowCustomerFields = customerMode === 'manual' || !!selectedCustomerMeta;
+  const crmSelectionLocked = customerMode !== 'manual' && selectedCustomerMeta?.source === 'crm';
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -904,14 +780,8 @@ export function FacturaForm() {
               </p>
             </div>
           ) : (
-            <AsyncSearchPicker
-              label="Cliente (CRM + Faturação)"
-              placeholder="Pesquisar por nome, telefone, NIF ou empresa..."
-              helperText="Pesquisa unificada entre contactos CRM e clientes já registados na faturação."
-              searchFn={searchCustomers}
-              getItemKey={(customer) => `${customer.source}-${customer.id}`}
-              getSelectedLabel={(customer) => customer.customerName}
-              onSelect={handleCustomerSelect}
+            <CommercialCustomerPicker
+              onChange={handleCustomerSelect}
               footerAction={{
                 label: '+ Criar novo cliente',
                 onClick: () => {
@@ -921,25 +791,6 @@ export function FacturaForm() {
                   setCustomerWarning('');
                 },
               }}
-              emptyState={{
-                title: 'Nenhum cliente encontrado',
-                message: 'Tenta outro nome, empresa, telefone ou NIF.',
-              }}
-              renderItem={(customer) => (
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-[#0A2540]">{customer.customerName}</p>
-                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SOURCE_BADGE_STYLES[customer.source]}`}>
-                      {customer.label}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    NIF: {customer.customerTaxID}
-                    {customer.customerPhone ? ` · ${customer.customerPhone}` : ''}
-                    {customer.company ? ` · ${customer.company}` : ''}
-                  </p>
-                </div>
-              )}
             />
           )}
 
@@ -952,7 +803,9 @@ export function FacturaForm() {
                 </span>
               </div>
               <p className="mt-1 text-xs text-slate-500">
-                Podes ajustar os dados abaixo antes de emitir o documento.
+                {crmSelectionLocked
+                  ? 'Os dados fiscais vêm do CRM. Para alterar NIF, nome, telefone ou email, edite primeiro o contacto.'
+                  : 'Podes ajustar os dados abaixo antes de emitir o documento.'}
               </p>
             </div>
           )}
@@ -960,6 +813,14 @@ export function FacturaForm() {
           {customerWarning && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               {customerWarning}
+              {selectedCustomerMeta?.source === 'crm' && selectedCustomerMeta.contactId ? (
+                <>
+                  {' '}
+                  <a href={`/contacts/${selectedCustomerMeta.contactId}`} className="font-medium underline">
+                    Abrir contacto
+                  </a>
+                </>
+              ) : null}
             </div>
           )}
 
@@ -974,6 +835,7 @@ export function FacturaForm() {
                   }
                   placeholder="5000123456"
                   className="mt-1"
+                  disabled={crmSelectionLocked}
                 />
               </div>
               <div>
@@ -985,6 +847,7 @@ export function FacturaForm() {
                   }
                   placeholder="Nome da empresa ou cliente"
                   className="mt-1"
+                  disabled={crmSelectionLocked}
                 />
               </div>
               <div className="sm:col-span-2">
@@ -1007,6 +870,7 @@ export function FacturaForm() {
                   }
                   placeholder="923 000 000"
                   className="mt-1"
+                  disabled={crmSelectionLocked}
                 />
               </div>
               <div>
@@ -1018,6 +882,7 @@ export function FacturaForm() {
                   }
                   placeholder="cliente@empresa.ao"
                   className="mt-1"
+                  disabled={crmSelectionLocked}
                 />
               </div>
             </div>

@@ -79,6 +79,7 @@ model Contact {
   email         String
   phone         String
   company       String
+  nif           String?
   revenue       String?
   sector        String?
   stage         String        @default("Novo")

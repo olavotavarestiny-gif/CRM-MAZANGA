@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { isValidNIF, looksLikePhone } = require('../lib/fiscal/nif-validator');
+const { resolveContactNif } = require('../lib/contact-nif');
+
+function normaliseBillingCustomerName(contact) {
+  return contact.company?.trim() || contact.name;
+}
 
 // GET /api/faturacao/clientes
 router.get('/clientes', async (req, res) => {
@@ -32,6 +37,12 @@ router.post('/clientes', async (req, res) => {
   try {
     const { customerTaxID, customerName, customerAddress, customerPhone, customerEmail, contactId } = req.body;
     if (!customerTaxID || !customerName) return res.status(400).json({ error: 'NIF e nome obrigatórios' });
+    if (looksLikePhone(customerTaxID)) {
+      return res.status(422).json({ error: 'O valor introduzido parece ser um número de telefone, não um NIF.' });
+    }
+    if (!isValidNIF(customerTaxID)) {
+      return res.status(422).json({ error: 'NIF inválido. Verifique o número e o dígito verificador.' });
+    }
     const cliente = await prisma.clienteFaturacao.create({
       data: { userId: req.user.effectiveUserId, customerTaxID, customerName, customerAddress, customerPhone, customerEmail, contactId: contactId || null },
     });
@@ -73,12 +84,11 @@ router.post('/clientes/from-contact', async (req, res) => {
     });
     if (!contact) return res.status(404).json({ error: 'Contacto não encontrado' });
 
-    // Validar NIF fornecido explicitamente
-    const nif = (customerTaxID || '').trim();
+    const nif = (customerTaxID || resolveContactNif(contact) || '').trim();
     if (!nif) {
       return res.status(422).json({
         error: 'NIF obrigatório para criar cliente de faturação.',
-        hint: 'Introduza o NIF do cliente antes de importar para faturação. O número de telefone não pode ser usado como NIF.',
+        hint: 'Complete primeiro o NIF no contacto CRM. O número de telefone não pode ser usado como NIF.',
       });
     }
     if (looksLikePhone(nif)) {
@@ -99,13 +109,18 @@ router.post('/clientes/from-contact', async (req, res) => {
       create: {
         userId: req.user.effectiveUserId,
         customerTaxID: nif,
-        customerName: contact.name,
+        customerName: normaliseBillingCustomerName(contact),
         customerAddress: '',
         customerPhone: contact.phone,
         customerEmail: contact.email,
         contactId: Number(contactId),
       },
-      update: { customerName: contact.name, customerPhone: contact.phone, customerEmail: contact.email },
+      update: {
+        customerName: normaliseBillingCustomerName(contact),
+        customerPhone: contact.phone,
+        customerEmail: contact.email,
+        contactId: Number(contactId),
+      },
     });
     res.json(cliente);
   } catch (err) {

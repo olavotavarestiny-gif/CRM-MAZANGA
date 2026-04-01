@@ -9,7 +9,8 @@
     "start": "node src/index.js",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.js",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:backfill-contact-nif": "node scripts/backfill-contact-nif.js"
   },
   "keywords": [],
   "author": "",

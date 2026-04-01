@@ -203,7 +203,7 @@ export default function ContactsPage() {
       <Card data-tour="contacts-filters" className="border-slate-200 shadow-sm">
         <div className="p-4 flex flex-col sm:flex-row gap-4">
           <Input
-            placeholder="Pesquisar por nome, telefone, empresa..."
+            placeholder="Pesquisar por nome, telefone, empresa ou NIF..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="flex-1 w-full"

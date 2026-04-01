@@ -7,12 +7,12 @@ import {
   AlertCircle, Lock, Unlock, Clock, Store, TrendingUp, Hash, Download, ExternalLink,
   Banknote, CreditCard, Smartphone,
 } from 'lucide-react';
-import { getProdutos, getQuickSaleDefaults, getEstabelecimentos, emitQuickSale, getCaixaSessaoAtual, abrirCaixaSessao, fecharCaixaSessao, getCurrentUser, downloadFacturaPdf, openFacturaPdfInTab, getFaturacaoConfig } from '@/lib/api';
+import { getProdutos, getQuickSaleDefaults, getEstabelecimentos, emitQuickSale, getCaixaSessaoAtual, abrirCaixaSessao, fecharCaixaSessao, getCurrentUser, downloadFacturaPdf, openFacturaPdfInTab, getFaturacaoConfig, importContactToBillingCustomer } from '@/lib/api';
 import type { QuickSaleItem } from '@/lib/api';
 import type { Produto, Factura, Estabelecimento, CaixaSessao, FaturacaoConfig } from '@/lib/types';
 import { printThermalRecibo } from '@/lib/thermal-print';
-import { ClienteAutocomplete } from '@/components/faturacao/cliente-autocomplete';
-import type { ClienteFaturacao } from '@/lib/types';
+import { CommercialCustomerPicker } from '@/components/faturacao/commercial-customer-picker';
+import type { CommercialCustomerLookupItem } from '@/lib/commercial-customer-lookup';
 import { CommerceButton as Button } from '@/components/ui/button-commerce';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -99,6 +99,8 @@ export default function VendasRapidasPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerTaxID, setCustomerTaxID] = useState(DEFAULT_CUSTOMER_TAX_ID);
   const [customerName, setCustomerName] = useState(DEFAULT_CUSTOMER_NAME);
+  const [selectedCustomer, setSelectedCustomer] = useState<CommercialCustomerLookupItem | null>(null);
+  const [customerWarning, setCustomerWarning] = useState<string | null>(null);
   const [showClientePicker, setShowClientePicker] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodValue>('CASH');
   const [emitting, setEmitting] = useState(false);
@@ -345,8 +347,25 @@ export default function VendasRapidasPage() {
     }
   }, [showDropdown, searchResults, highlightedIndex, addProduct]);
 
-  const setCustomer = (c: ClienteFaturacao) => { setCustomerTaxID(c.customerTaxID); setCustomerName(c.customerName); setShowClientePicker(false); };
-  const resetCustomer = () => { setCustomerTaxID(DEFAULT_CUSTOMER_TAX_ID); setCustomerName(DEFAULT_CUSTOMER_NAME); };
+  const setCustomer = (customer: CommercialCustomerLookupItem) => {
+    setSelectedCustomer(customer);
+    setCustomerTaxID(customer.customerTaxID || '');
+    setCustomerName(customer.customerName || DEFAULT_CUSTOMER_NAME);
+    setCustomerWarning(
+      customer.source === 'crm' && customer.requiresContactFix
+        ? 'Este contacto empresa ainda não tem NIF no CRM. Atualize o contacto antes de usar a venda rápida.'
+        : customer.source === 'crm'
+        ? 'Cliente selecionado a partir do CRM. A venda será ligada automaticamente ao contacto na faturação.'
+        : null
+    );
+    setShowClientePicker(false);
+  };
+  const resetCustomer = () => {
+    setSelectedCustomer(null);
+    setCustomerWarning(null);
+    setCustomerTaxID(DEFAULT_CUSTOMER_TAX_ID);
+    setCustomerName(DEFAULT_CUSTOMER_NAME);
+  };
 
   // ── Totals ─────────────────────────────────────────────────────────────────
   const subtotal = cart.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
@@ -373,15 +392,32 @@ export default function VendasRapidasPage() {
     if (cart.length === 0) return;
     setEmitting(true); setError(null);
     try {
+      let clienteFaturacaoId: string | undefined;
+
+      if (selectedCustomer?.source === 'crm' && selectedCustomer.contactId) {
+        if (selectedCustomer.requiresContactFix) {
+          throw new Error('Este contacto empresa ainda não tem NIF no CRM. Atualize o contacto antes de emitir a venda.');
+        }
+
+        const importedCustomer = await importContactToBillingCustomer({
+          contactId: selectedCustomer.contactId,
+        });
+        clienteFaturacaoId = importedCustomer.id;
+      } else if (selectedCustomer?.source === 'faturacao') {
+        clienteFaturacaoId = selectedCustomer.id;
+      }
+
       const factura = await emitQuickSale({
         items: cart.map(({ id: _id, ...item }) => item),
         estabelecimentoId: selectedEstabelecimentoId,
-        customerTaxID, customerName, paymentMethod,
+        customerTaxID,
+        customerName,
+        clienteFaturacaoId,
+        paymentMethod,
       });
       setSuccessFactura(factura);
       setCart([]);
-      setCustomerTaxID(DEFAULT_CUSTOMER_TAX_ID);
-      setCustomerName(DEFAULT_CUSTOMER_NAME);
+      resetCustomer();
       qc.invalidateQueries({ queryKey: ['caixa-sessao-atual'] });
     } catch (err: any) {
       setError(err.message || 'Erro ao emitir fatura.');
@@ -721,25 +757,58 @@ export default function VendasRapidasPage() {
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-[#6b7e9a]/60">Cliente</p>
             {!showClientePicker ? (
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[#2c2f31]">{customerName}</p>
-                  <p className="text-xs text-slate-500">NIF: {customerTaxID}</p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[#2c2f31]">{customerName}</p>
+                    <p className="text-xs text-slate-500">NIF: {customerTaxID || 'em falta'}</p>
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    <button onClick={() => setShowClientePicker(true)} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#B84D0E] hover:bg-[#FDF2EA] transition-colors">Alterar</button>
+                    {customerTaxID !== DEFAULT_CUSTOMER_TAX_ID && (
+                      <button onClick={resetCustomer} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 transition-colors">Limpar</button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-1.5 shrink-0">
-                  <button onClick={() => setShowClientePicker(true)} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#B84D0E] hover:bg-[#FDF2EA] transition-colors">Alterar</button>
-                  {customerTaxID !== DEFAULT_CUSTOMER_TAX_ID && (
-                    <button onClick={resetCustomer} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 transition-colors">Limpar</button>
-                  )}
-                </div>
+                {customerWarning && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    {customerWarning}
+                    {selectedCustomer?.source === 'crm' && selectedCustomer.contactId ? (
+                      <>
+                        {' '}
+                        <a href={`/contacts/${selectedCustomer.contactId}`} className="font-medium underline">
+                          Abrir contacto
+                        </a>
+                      </>
+                    ) : null}
+                  </div>
+                )}
+                {selectedCustomer?.source === 'crm' && (
+                  <p className="text-xs text-slate-500">
+                    A venda rápida vai criar ou reutilizar automaticamente o cliente de faturação ligado a este contacto.
+                  </p>
+                )}
               </div>
             ) : (
               <div>
-                <ClienteAutocomplete onChange={setCustomer} value={customerName !== DEFAULT_CUSTOMER_NAME ? customerName : undefined} />
+                <CommercialCustomerPicker
+                  onChange={setCustomer}
+                  value={customerName !== DEFAULT_CUSTOMER_NAME ? customerName : undefined}
+                />
                 <button onClick={() => setShowClientePicker(false)} className="mt-2 text-xs text-slate-500 hover:text-slate-700">Cancelar</button>
               </div>
             )}
           </div>
+
+          {selectedCustomer?.source === 'crm' && selectedCustomer.requiresContactFix && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
+              Este contacto empresa ainda não tem NIF no CRM. A emissão fica bloqueada até completares o contacto.
+              {' '}
+              <a href={`/contacts/${selectedCustomer.contactId}`} className="font-medium underline">
+                Abrir contacto
+              </a>
+            </div>
+          )}
 
           {/* Método de pagamento */}
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -781,7 +850,12 @@ export default function VendasRapidasPage() {
             </div>
           )}
 
-          <Button onClick={handleEmit} disabled={!configReady || !selectedEstabelecimentoId || cart.length === 0 || emitting} className="w-full gap-2" size="lg">
+          <Button
+            onClick={handleEmit}
+            disabled={!configReady || !selectedEstabelecimentoId || cart.length === 0 || emitting || !!selectedCustomer?.requiresContactFix}
+            className="w-full gap-2"
+            size="lg"
+          >
             {emitting ? 'A emitir...' : 'Emitir Fatura'}
           </Button>
         </div>

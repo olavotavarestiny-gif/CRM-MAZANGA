@@ -4,6 +4,8 @@ const prisma = require('../lib/prisma');
 const automationRunner = require('../services/automationRunner');
 const { requirePermission, requireDeletePermission } = require('../lib/permissions');
 const { canCreateContact, getLimitState, buildLimitErrorPayload } = require('../lib/plan-limits');
+const { validateNIF } = require('../lib/fiscal/nif-validator');
+const { cleanNifValue, parseCustomFields, resolveContactNif, stripNifKeysFromCustomFields } = require('../lib/contact-nif');
 
 const VALID_STAGES = ['Novo', 'Contactado', 'Qualificado', 'Proposta Enviada', 'Fechado', 'Perdido'];
 const VALID_FIELD_TYPES = ['text', 'number', 'date', 'select', 'url'];
@@ -13,8 +15,9 @@ const SYSTEM_FIELD_DEFAULTS = [
   { key: 'name',        label: 'Nome',            required: true,  order: 0, visibleDefault: true },
   { key: 'phone',       label: 'Número',          required: true,  order: 1, visibleDefault: true },
   { key: 'email',       label: 'Email',           required: false, order: 2, visibleDefault: true },
-  { key: 'company',     label: 'Empresa',         required: false, order: 3, visibleDefault: true },
-  { key: 'clienteType', label: 'Tipo de Cliente', required: true,  order: 4, visibleDefault: true },
+  { key: 'nif',         label: 'NIF',             required: false, order: 3, visibleDefault: true },
+  { key: 'company',     label: 'Empresa',         required: false, order: 4, visibleDefault: true },
+  { key: 'clienteType', label: 'Tipo de Cliente', required: true,  order: 5, visibleDefault: true },
 ];
 
 // Slugify a label into a unique key
@@ -213,11 +216,6 @@ function isValidPhone(phone) {
   return /^[\d\s\+\-\(\)]{7,20}$/.test(phone);
 }
 
-// Helper: parse customFields JSON safely
-function parseCustomFields(raw) {
-  try { return JSON.parse(raw || '{}'); } catch { return {}; }
-}
-
 function parseDocuments(raw) {
   try {
     const parsed = JSON.parse(raw || '[]');
@@ -225,6 +223,48 @@ function parseDocuments(raw) {
   } catch {
     return [];
   }
+}
+
+function parseTags(raw) {
+  try {
+    const parsed = JSON.parse(raw || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function serialiseContact(contact) {
+  const customFields = parseCustomFields(contact.customFields);
+
+  return {
+    ...contact,
+    nif: resolveContactNif({ ...contact, customFields }),
+    tags: parseTags(contact.tags),
+    customFields,
+    documents: parseDocuments(contact.documents),
+  };
+}
+
+function normaliseClienteType(rawValue, fallback = 'particular') {
+  return ['empresa', 'particular'].includes(rawValue) ? rawValue : fallback;
+}
+
+function validateContactNif({ nif, clienteType }) {
+  if (clienteType === 'empresa' && !nif) {
+    return 'NIF obrigatório para contactos empresa.';
+  }
+
+  if (!nif) {
+    return null;
+  }
+
+  const validation = validateNIF(nif);
+  if (!validation.valid) {
+    return validation.reason ? `NIF inválido: ${validation.reason}` : 'NIF inválido.';
+  }
+
+  return null;
 }
 
 async function getWorkspaceModeForUser(userId) {
@@ -265,9 +305,11 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
 
     if (search) {
       where.OR = [
-        { name: { contains: search } },
+        { name: { contains: search, mode: 'insensitive' } },
         { phone: { contains: search } },
-        { company: { contains: search } },
+        { company: { contains: search, mode: 'insensitive' } },
+        { nif: { contains: search } },
+        { customFields: { contains: search } },
       ];
     }
 
@@ -276,12 +318,7 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json(contacts.map(c => ({
-      ...c,
-      tags: (() => { try { return JSON.parse(c.tags); } catch { return []; } })(),
-      customFields: parseCustomFields(c.customFields),
-      documents: parseDocuments(c.documents),
-    })));
+    res.json(contacts.map(serialiseContact));
   } catch (error) {
     console.error('Error fetching contacts:', error);
     res.status(500).json({ error: error.message });
@@ -291,7 +328,7 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
 // POST create new contact
 router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
-    const { name, email, phone, company, revenue, sector, stage, tags, customFields, contactType, status, clienteType } = req.body;
+    const { name, email, phone, company, revenue, sector, stage, tags, customFields, contactType, status, clienteType, nif } = req.body;
 
     if (!name || !phone) {
       return res.status(400).json({ error: 'Name and phone are required' });
@@ -309,12 +346,25 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
     const workspaceMode = await getWorkspaceModeForUser(req.user.effectiveUserId);
     const finalStage = stage && VALID_STAGES.includes(stage) ? stage : 'Novo';
     const finalInPipeline = workspaceMode === 'comercio' ? false : true;
+    const finalClienteType = normaliseClienteType(clienteType);
     const finalContactType =
       workspaceMode === 'comercio'
         ? 'cliente'
         : ['interessado', 'cliente'].includes(contactType)
         ? contactType
         : 'interessado';
+    const cleanedCustomFields =
+      customFields && typeof customFields === 'object'
+        ? stripNifKeysFromCustomFields(customFields)
+        : {};
+    const resolvedNif =
+      nif !== undefined
+        ? cleanNifValue(nif)
+        : resolveContactNif({ customFields });
+    const nifError = validateContactNif({ nif: resolvedNif, clienteType: finalClienteType });
+    if (nifError) {
+      return res.status(400).json({ error: nifError });
+    }
 
     const contact = await prisma.contact.create({
       data: {
@@ -323,15 +373,16 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
         email: email || '',
         phone,
         company: company || '',
+        nif: resolvedNif,
         revenue: revenue || null,
         sector: sector || null,
         tags: Array.isArray(tags) ? JSON.stringify(tags) : '[]',
         stage: finalStage,
         inPipeline: finalInPipeline,
-        customFields: customFields && typeof customFields === 'object' ? JSON.stringify(customFields) : '{}',
+        customFields: JSON.stringify(cleanedCustomFields),
         contactType: finalContactType,
         status: ['ativo', 'inativo'].includes(status) ? status : 'ativo',
-        clienteType: ['empresa', 'particular'].includes(clienteType) ? clienteType : 'particular',
+        clienteType: finalClienteType,
       },
     });
 
@@ -360,12 +411,7 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
       });
     }
 
-    res.status(201).json({
-      ...contact,
-      tags: (() => { try { return JSON.parse(contact.tags); } catch { return []; } })(),
-      customFields: parseCustomFields(contact.customFields),
-      documents: parseDocuments(contact.documents),
-    });
+    res.status(201).json(serialiseContact(contact));
   } catch (error) {
     if (error.code === 'P2002') {
       return res.status(400).json({ error: 'Phone number already exists' });
@@ -522,12 +568,7 @@ router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
       return res.status(404).json({ error: 'Contact not found' });
     }
 
-    res.json({
-      ...contact,
-      tags: (() => { try { return JSON.parse(contact.tags); } catch { return []; } })(),
-      customFields: parseCustomFields(contact.customFields),
-      documents: parseDocuments(contact.documents),
-    });
+    res.json(serialiseContact(contact));
   } catch (error) {
     console.error('Error fetching contact:', error);
     res.status(500).json({ error: error.message });
@@ -537,7 +578,7 @@ router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
 // PUT update contact
 router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
-    const { name, email, phone, company, revenue, sector, stage, inPipeline, tags, customFields, contactType, status, documents, clienteType } = req.body;
+    const { name, email, phone, company, revenue, sector, stage, inPipeline, tags, customFields, contactType, status, documents, clienteType, nif } = req.body;
     const updateData = {};
     const contactId = parseInt(req.params.id);
 
@@ -552,11 +593,29 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
     }
 
     const workspaceMode = await getWorkspaceModeForUser(req.user.effectiveUserId);
+    const mergedCustomFields =
+      customFields && typeof customFields === 'object'
+        ? { ...parseCustomFields(existing.customFields), ...customFields }
+        : parseCustomFields(existing.customFields);
+    const cleanedMergedCustomFields = stripNifKeysFromCustomFields(mergedCustomFields);
+    const nextClienteType = normaliseClienteType(clienteType, existing.clienteType || 'particular');
+    const resolvedNif =
+      nif !== undefined
+        ? cleanNifValue(nif)
+        : resolveContactNif({ customFields: mergedCustomFields }) || resolveContactNif(existing);
+    const nifError = validateContactNif({ nif: resolvedNif, clienteType: nextClienteType });
+
+    if (nifError) {
+      return res.status(400).json({ error: nifError });
+    }
 
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
     if (company !== undefined) updateData.company = company;
+    if (nif !== undefined || resolvedNif !== cleanNifValue(existing.nif)) {
+      updateData.nif = resolvedNif;
+    }
     if (revenue !== undefined) updateData.revenue = revenue;
     if (sector !== undefined) updateData.sector = sector;
     if (inPipeline !== undefined) updateData.inPipeline = inPipeline;
@@ -565,10 +624,9 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
       updateData.stage = stage;
     }
     if (customFields && typeof customFields === 'object') {
-      // Merge existing customFields with incoming to avoid overwriting unrelated keys
-      const existing2 = await prisma.contact.findUnique({ where: { id: contactId }, select: { customFields: true } });
-      const merged = { ...parseCustomFields(existing2?.customFields), ...customFields };
-      updateData.customFields = JSON.stringify(merged);
+      updateData.customFields = JSON.stringify(cleanedMergedCustomFields);
+    } else if (JSON.stringify(cleanedMergedCustomFields) !== JSON.stringify(parseCustomFields(existing.customFields))) {
+      updateData.customFields = JSON.stringify(cleanedMergedCustomFields);
     }
     if (workspaceMode === 'comercio') {
       updateData.contactType = 'cliente';
@@ -576,7 +634,7 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
       updateData.contactType = contactType;
     }
     if (status !== undefined && ['ativo', 'inativo'].includes(status)) updateData.status = status;
-    if (clienteType !== undefined && ['empresa', 'particular'].includes(clienteType)) updateData.clienteType = clienteType;
+    if (clienteType !== undefined && ['empresa', 'particular'].includes(clienteType)) updateData.clienteType = nextClienteType;
     if (documents !== undefined) {
       if (Array.isArray(documents)) {
         updateData.documents = JSON.stringify(documents);
@@ -612,12 +670,7 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
       });
     }
 
-    res.json({
-      ...contact,
-      tags: (() => { try { return JSON.parse(contact.tags); } catch { return []; } })(),
-      customFields: parseCustomFields(contact.customFields),
-      documents: parseDocuments(contact.documents),
-    });
+    res.json(serialiseContact(contact));
   } catch (error) {
     if (error.code === 'P2002') {
       return res.status(400).json({ error: 'Phone number already exists' });

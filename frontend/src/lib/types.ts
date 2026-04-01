@@ -39,6 +39,7 @@ export interface Contact {
   email: string;
   phone: string;
   company: string;
+  nif?: string | null;
   revenue?: string;
   sector?: string;
   stage: Stage;
@@ -74,6 +75,7 @@ export type SystemFieldKey =
   | 'name'
   | 'phone'
   | 'email'
+  | 'nif'
   | 'company'
   | 'clienteType'
   | 'revenue'
