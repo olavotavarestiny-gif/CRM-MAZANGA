@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import Script from 'next/script';
 import { getForm, submitForm } from '@/lib/api';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,52 +12,11 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
-  const pixelLoadedRef = useRef(false);
-  const gtagLoadedRef  = useRef(false);
 
   const { data: form, isLoading } = useQuery({
     queryKey: ['publicForm', params.id],
     queryFn: () => getForm(params.id),
   });
-
-  // Inject tracking scripts once the form config is loaded
-  useEffect(() => {
-    if (!form) return;
-
-    // ── Meta Pixel ────────────────────────────────────────────────
-    if (form.metaPixelEnabled && form.metaPixelId && !pixelLoadedRef.current) {
-      pixelLoadedRef.current = true;
-      const script = document.createElement('script');
-      script.innerHTML = `
-        !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-        n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
-        n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
-        t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
-        document,'script','https://connect.facebook.net/en_US/fbevents.js');
-        fbq('init', '${form.metaPixelId}');
-        fbq('track', 'PageView');
-      `;
-      document.head.appendChild(script);
-    }
-
-    // ── Google Tag ────────────────────────────────────────────────
-    if (form.googleTagEnabled && form.googleTagId && !gtagLoadedRef.current) {
-      gtagLoadedRef.current = true;
-      const scriptSrc = document.createElement('script');
-      scriptSrc.async = true;
-      scriptSrc.src = `https://www.googletagmanager.com/gtag/js?id=${form.googleTagId}`;
-      document.head.appendChild(scriptSrc);
-
-      const scriptInit = document.createElement('script');
-      scriptInit.innerHTML = `
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', '${form.googleTagId}');
-      `;
-      document.head.appendChild(scriptInit);
-    }
-  }, [form]);
 
   const submitMutation = useMutation({
     mutationFn: () => {
@@ -69,12 +29,12 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
     },
     onSuccess: () => {
       setSubmitted(true);
-      // Conversion tracking
+      // Conversion tracking events
       if (form?.trackSubmitAsLead !== false) {
-        if (form?.metaPixelEnabled && form?.metaPixelId && typeof window !== 'undefined' && (window as any).fbq) {
+        if (form?.metaPixelEnabled && form?.metaPixelId && (window as any).fbq) {
           (window as any).fbq('track', 'Lead');
         }
-        if (form?.googleTagEnabled && form?.googleTagId && typeof window !== 'undefined' && (window as any).gtag) {
+        if (form?.googleTagEnabled && form?.googleTagId && (window as any).gtag) {
           (window as any).gtag('event', 'generate_lead', {
             form_id: form?.id,
             form_name: form?.title,
@@ -169,150 +129,194 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: bgColor }}>
-      <div className="w-full max-w-lg rounded-2xl border shadow-sm overflow-hidden"
-        style={{ background: cardBg, borderColor: cardBorder }}>
+    <>
+      {/* ── Meta Pixel ─────────────────────────────────────────── */}
+      {form.metaPixelEnabled && form.metaPixelId && (
+        <Script
+          id="meta-pixel"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+              n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+              n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+              t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+              document,'script','https://connect.facebook.net/en_US/fbevents.js');
+              fbq('init', '${form.metaPixelId}');
+              fbq('track', 'PageView');
+            `,
+          }}
+        />
+      )}
 
-        {/* Header */}
-        <div className="p-6 pb-4">
-          {logoUrl && (
-            <img src={logoUrl} alt="Logo" className="max-h-12 object-contain mb-5" />
-          )}
-          <h1 className="text-xl font-bold" style={{ color: textColor }}>{form.title}</h1>
-          {form.description && (
-            <p className="text-sm mt-1" style={{ color: subColor }}>{form.description}</p>
-          )}
+      {/* ── Google Tag ─────────────────────────────────────────── */}
+      {form.googleTagEnabled && form.googleTagId && (
+        <>
+          <Script
+            id="gtag-src"
+            src={`https://www.googletagmanager.com/gtag/js?id=${form.googleTagId}`}
+            strategy="afterInteractive"
+          />
+          <Script
+            id="gtag-init"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${form.googleTagId}');
+              `,
+            }}
+          />
+        </>
+      )}
 
-          {/* Progress bar */}
-          <div className="mt-4">
-            <div className="w-full h-1.5 rounded-full overflow-hidden"
-              style={{ background: isDark ? 'rgba(255,255,255,0.15)' : '#E2E8F0' }}>
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${progress}%`, background: brandColor }}
-              />
-            </div>
-            {isStepByStep && (
-              <p className="text-xs mt-1 text-right" style={{ color: subColor }}>
-                {currentStep + 1} / {fields.length}
-              </p>
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: bgColor }}>
+        <div className="w-full max-w-lg rounded-2xl border shadow-sm overflow-hidden"
+          style={{ background: cardBg, borderColor: cardBorder }}>
+
+          {/* Header */}
+          <div className="p-6 pb-4">
+            {logoUrl && (
+              <img src={logoUrl} alt="Logo" className="max-h-12 object-contain mb-5" />
             )}
-          </div>
-        </div>
+            <h1 className="text-xl font-bold" style={{ color: textColor }}>{form.title}</h1>
+            {form.description && (
+              <p className="text-sm mt-1" style={{ color: subColor }}>{form.description}</p>
+            )}
 
-        {/* Body */}
-        <div className="px-6 pb-6">
-          {isStepByStep ? (
-            currentField && (
-              <div key={currentField.id} className="space-y-4">
-                <Label className="text-base font-medium" style={{ color: textColor }}>
-                  {currentField.label}
-                  {currentField.required && <span className="text-red-400 ml-1">*</span>}
-                </Label>
-
-                {currentField.type === 'text' ? (
-                  <input
-                    className="w-full rounded-lg border px-4 py-3 text-sm outline-none transition-all"
-                    style={{ background: inputBg, borderColor: cardBorder, color: textColor }}
-                    onFocus={(e) => { e.target.style.borderColor = brandColor; e.target.style.boxShadow = `0 0 0 3px ${brandColor}22`; }}
-                    onBlur={(e) => { e.target.style.borderColor = cardBorder; e.target.style.boxShadow = 'none'; }}
-                    placeholder="Escrever resposta..."
-                    value={answers[currentField.id] || ''}
-                    onChange={(e) => setAnswers({ ...answers, [currentField.id]: e.target.value })}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && canProceed()) {
-                        currentStep < fields.length - 1 ? setCurrentStep(currentStep + 1) : handleSubmit();
-                      }
-                    }}
-                  />
-                ) : (
-                  <Select value={answers[currentField.id] || ''} onValueChange={(v) => setAnswers({ ...answers, [currentField.id]: v })}>
-                    <SelectTrigger style={{ background: inputBg, borderColor: cardBorder, color: textColor }}>
-                      <SelectValue placeholder="Selecionar opção..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {currentField.options?.map((opt) => (
-                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                <div className="flex gap-3 justify-between pt-2">
-                  <button
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors disabled:opacity-40"
-                    style={{ borderColor: cardBorder, color: textColor, background: 'transparent' }}
-                    disabled={currentStep === 0}
-                    onClick={() => setCurrentStep(currentStep - 1)}
-                  >
-                    <ArrowLeft className="w-4 h-4" /> Anterior
-                  </button>
-                  {currentStep === fields.length - 1 ? (
-                    <button
-                      className="flex items-center gap-1.5 px-6 py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-50"
-                      style={{ background: brandColor }}
-                      disabled={submitMutation.isPending || !canProceed()}
-                      onClick={handleSubmit}
-                    >
-                      {submitMutation.isPending ? 'A enviar...' : 'Enviar'} <Check className="w-4 h-4" />
-                    </button>
-                  ) : (
-                    <button
-                      className="flex items-center gap-1.5 px-6 py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-50"
-                      style={{ background: brandColor }}
-                      disabled={!canProceed()}
-                      onClick={() => setCurrentStep(currentStep + 1)}
-                    >
-                      Próximo <ArrowRight className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
+            {/* Progress bar */}
+            <div className="mt-4">
+              <div className="w-full h-1.5 rounded-full overflow-hidden"
+                style={{ background: isDark ? 'rgba(255,255,255,0.15)' : '#E2E8F0' }}>
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${progress}%`, background: brandColor }}
+                />
               </div>
-            )
-          ) : (
-            <div className="space-y-5">
-              {fields.map((field) => (
-                <div key={field.id} className="space-y-2">
-                  <Label className="font-medium" style={{ color: textColor }}>
-                    {field.label}
-                    {field.required && <span className="text-red-400 ml-1">*</span>}
+              {isStepByStep && (
+                <p className="text-xs mt-1 text-right" style={{ color: subColor }}>
+                  {currentStep + 1} / {fields.length}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="px-6 pb-6">
+            {isStepByStep ? (
+              currentField && (
+                <div key={currentField.id} className="space-y-4">
+                  <Label className="text-base font-medium" style={{ color: textColor }}>
+                    {currentField.label}
+                    {currentField.required && <span className="text-red-400 ml-1">*</span>}
                   </Label>
-                  {field.type === 'text' ? (
+
+                  {currentField.type === 'text' ? (
                     <input
                       className="w-full rounded-lg border px-4 py-3 text-sm outline-none transition-all"
                       style={{ background: inputBg, borderColor: cardBorder, color: textColor }}
                       onFocus={(e) => { e.target.style.borderColor = brandColor; e.target.style.boxShadow = `0 0 0 3px ${brandColor}22`; }}
                       onBlur={(e) => { e.target.style.borderColor = cardBorder; e.target.style.boxShadow = 'none'; }}
                       placeholder="Escrever resposta..."
-                      value={answers[field.id] || ''}
-                      onChange={(e) => setAnswers({ ...answers, [field.id]: e.target.value })}
+                      value={answers[currentField.id] || ''}
+                      onChange={(e) => setAnswers({ ...answers, [currentField.id]: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && canProceed()) {
+                          currentStep < fields.length - 1 ? setCurrentStep(currentStep + 1) : handleSubmit();
+                        }
+                      }}
                     />
                   ) : (
-                    <Select value={answers[field.id] || ''} onValueChange={(v) => setAnswers({ ...answers, [field.id]: v })}>
+                    <Select value={answers[currentField.id] || ''} onValueChange={(v) => setAnswers({ ...answers, [currentField.id]: v })}>
                       <SelectTrigger style={{ background: inputBg, borderColor: cardBorder, color: textColor }}>
                         <SelectValue placeholder="Selecionar opção..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {field.options?.map((opt) => (
+                        {currentField.options?.map((opt) => (
                           <SelectItem key={opt} value={opt}>{opt}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   )}
+
+                  <div className="flex gap-3 justify-between pt-2">
+                    <button
+                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors disabled:opacity-40"
+                      style={{ borderColor: cardBorder, color: textColor, background: 'transparent' }}
+                      disabled={currentStep === 0}
+                      onClick={() => setCurrentStep(currentStep - 1)}
+                    >
+                      <ArrowLeft className="w-4 h-4" /> Anterior
+                    </button>
+                    {currentStep === fields.length - 1 ? (
+                      <button
+                        className="flex items-center gap-1.5 px-6 py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+                        style={{ background: brandColor }}
+                        disabled={submitMutation.isPending || !canProceed()}
+                        onClick={handleSubmit}
+                      >
+                        {submitMutation.isPending ? 'A enviar...' : 'Enviar'} <Check className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <button
+                        className="flex items-center gap-1.5 px-6 py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+                        style={{ background: brandColor }}
+                        disabled={!canProceed()}
+                        onClick={() => setCurrentStep(currentStep + 1)}
+                      >
+                        Próximo <ArrowRight className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              ))}
-              <button
-                className="w-full mt-2 py-3 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-50"
-                style={{ background: brandColor }}
-                disabled={submitMutation.isPending}
-                onClick={handleSubmit}
-              >
-                {submitMutation.isPending ? 'A enviar...' : 'Enviar'}
-              </button>
-            </div>
-          )}
+              )
+            ) : (
+              <div className="space-y-5">
+                {fields.map((field) => (
+                  <div key={field.id} className="space-y-2">
+                    <Label className="font-medium" style={{ color: textColor }}>
+                      {field.label}
+                      {field.required && <span className="text-red-400 ml-1">*</span>}
+                    </Label>
+                    {field.type === 'text' ? (
+                      <input
+                        className="w-full rounded-lg border px-4 py-3 text-sm outline-none transition-all"
+                        style={{ background: inputBg, borderColor: cardBorder, color: textColor }}
+                        onFocus={(e) => { e.target.style.borderColor = brandColor; e.target.style.boxShadow = `0 0 0 3px ${brandColor}22`; }}
+                        onBlur={(e) => { e.target.style.borderColor = cardBorder; e.target.style.boxShadow = 'none'; }}
+                        placeholder="Escrever resposta..."
+                        value={answers[field.id] || ''}
+                        onChange={(e) => setAnswers({ ...answers, [field.id]: e.target.value })}
+                      />
+                    ) : (
+                      <Select value={answers[field.id] || ''} onValueChange={(v) => setAnswers({ ...answers, [field.id]: v })}>
+                        <SelectTrigger style={{ background: inputBg, borderColor: cardBorder, color: textColor }}>
+                          <SelectValue placeholder="Selecionar opção..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {field.options?.map((opt) => (
+                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                ))}
+                <button
+                  className="w-full mt-2 py-3 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+                  style={{ background: brandColor }}
+                  disabled={submitMutation.isPending}
+                  onClick={handleSubmit}
+                >
+                  {submitMutation.isPending ? 'A enviar...' : 'Enviar'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
