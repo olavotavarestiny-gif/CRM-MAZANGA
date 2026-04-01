@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  BarChart3, CreditCard, Lock, PackageX, ShoppingCart, Store,
+  BarChart3, CreditCard, DollarSign, Lock, PackageX, ShoppingCart, Store,
   TrendingDown, TrendingUp, Trophy, Unlock,
 } from 'lucide-react';
 import { getCaixaSessaoAtual, getComercialAnalise, getComercialInsights, getComercialResumo, getCurrentUser } from '@/lib/api';
@@ -19,6 +19,7 @@ import {
   canCaixaView,
   canComercialDashboardAnalysis,
   canComercialDashboardBasic,
+  canFinanceTransactionsView,
   canStockView,
   canView,
 } from '@/lib/permissions';
@@ -152,6 +153,7 @@ function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
   const podeVerVendas = canView(currentUser, 'vendas');
   const podeVerProdutos = canStockView(currentUser);
   const podeVerContactos = canView(currentUser, 'contacts');
+  const podeVerFinancas = canFinanceTransactionsView(currentUser);
 
   const {
     data: sessao = null,
@@ -166,6 +168,7 @@ function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
   const links = [
     podeVerCaixa ? { href: '/caixa', label: 'Ir para Caixa', icon: CreditCard } : null,
     podeVerVendas ? { href: '/vendas-rapidas', label: 'Ir para Venda Rápida', icon: ShoppingCart } : null,
+    podeVerFinancas ? { href: '/finances', label: 'Abrir finanças', icon: DollarSign } : null,
     podeVerProdutos ? { href: '/produtos', label: 'Rever inventário', icon: PackageX } : null,
     podeVerContactos ? { href: '/contacts', label: 'Ver clientes', icon: Store } : null,
   ].filter(Boolean) as { href: string; label: string; icon: typeof CreditCard }[];

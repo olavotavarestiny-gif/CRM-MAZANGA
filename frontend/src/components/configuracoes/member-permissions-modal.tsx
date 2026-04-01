@@ -225,6 +225,7 @@ export default function MemberPermissionsModal({
   const comercial: NonNullable<UserPermissions['comercial']> = perms.comercial ?? {};
   const caixa: NonNullable<UserPermissions['caixa']> = perms.caixa ?? {};
   const stock: NonNullable<UserPermissions['stock']> = perms.stock ?? {};
+  const financeTransactionsLevel: SimpleLevel = finances.transactions ?? 'none';
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -328,7 +329,7 @@ export default function MemberPermissionsModal({
                         key={level}
                         onClick={() => setFinance('transactions', level)}
                         className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all border ${
-                          finances.transactions === level
+                          financeTransactionsLevel === level
                             ? level === 'none'
                               ? 'bg-red-100 text-red-700 border-red-200'
                               : level === 'view'
@@ -422,6 +423,36 @@ export default function MemberPermissionsModal({
               </label>
             </div>
           </div>
+
+          {isComercioWorkspace ? (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">Finanças</p>
+              <div className="space-y-3 p-3 bg-[#f8fafc] rounded-xl border border-[#dde3ec]">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-[#0A2540]">Transações</span>
+                  <div className="flex gap-1">
+                    {(['none', 'view', 'edit'] as SimpleLevel[]).map((level) => (
+                      <button
+                        key={level}
+                        onClick={() => setFinance('transactions', level)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all border ${
+                          financeTransactionsLevel === level
+                            ? level === 'none'
+                              ? 'bg-red-100 text-red-700 border-red-200'
+                              : level === 'view'
+                              ? 'bg-blue-100 text-blue-700 border-blue-200'
+                              : 'bg-green-100 text-green-700 border-green-200'
+                            : 'bg-white text-[#6b7e9a] border-[#dde3ec] hover:border-[#0A2540]'
+                        }`}
+                      >
+                        {LEVEL_LABELS[level]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {isComercioWorkspace ? (
             <div>

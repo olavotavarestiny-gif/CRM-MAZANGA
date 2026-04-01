@@ -9,6 +9,7 @@ import {
   markTransactionPaid,
   getClientProfitability,
   downloadTransactionsCSV,
+  getCurrentUser,
 } from '@/lib/api';
 import { Transaction, ClientProfitability } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { isComercio } from '@/lib/business-modes';
 import TransactionForm from '@/components/finances/transaction-form';
 import ClientProfitabilityModal from '@/components/finances/client-profitability-modal';
 import { TrendingUp, TrendingDown, DollarSign, Percent, RefreshCw, Plus, Download, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react';
@@ -60,6 +62,28 @@ export default function FinancesPage() {
   const [editTransaction, setEditTransaction] = useState<Transaction | undefined>();
   const [profitabilityClient, setProfitabilityClient] = useState<ClientProfitability | null>(null);
   const [activeTab, setActiveTab] = useState<'transacoes' | 'rentabilidade'>('transacoes');
+
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+    retry: false,
+  });
+
+  const isComercioWorkspace = isComercio(currentUser?.workspaceMode);
+  const title = isComercioWorkspace ? 'Finanças do Comércio' : 'Finanças';
+  const subtitle = isComercioWorkspace
+    ? 'Movimentos financeiros, despesas e rentabilidade operacional do negócio.'
+    : 'Receitas, despesas e rentabilidade por cliente.';
+  const primaryAccent = isComercioWorkspace ? '#F06A1A' : '#0A2540';
+  const tabActiveClass = isComercioWorkspace
+    ? 'bg-[#F06A1A] text-white shadow-sm'
+    : 'bg-[#0A2540] text-white shadow-sm';
+  const tabIdleClass = isComercioWorkspace
+    ? 'text-[#6b7e9a] hover:bg-[#FDF2EA] hover:text-[#F06A1A]'
+    : 'text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540]';
+  const bannerClass = isComercioWorkspace
+    ? 'rounded-2xl border border-[#F6D2BC] bg-[#FFF7F1] px-4 py-3 text-sm text-[#8A4313] shadow-sm'
+    : 'rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-[#6b7e9a] shadow-sm';
 
   const { data: dashboard } = useQuery({
     queryKey: ['finance-dashboard', dashYear, dashMonth],
@@ -146,13 +170,14 @@ export default function FinancesPage() {
     <div className="mx-auto max-w-7xl space-y-6 p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Finanças</h1>
-          <p className="mt-1 text-sm text-[#6b7e9a]">Receitas, despesas e rentabilidade por cliente.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">{title}</h1>
+          <p className="mt-1 text-sm text-[#6b7e9a]">{subtitle}</p>
         </div>
         {activeTab === 'transacoes' && (
           <Button
             onClick={() => { setEditTransaction(undefined); setFormOpen(true); }}
             className="gap-2"
+            style={{ backgroundColor: primaryAccent, borderColor: primaryAccent }}
           >
             <Plus className="w-4 h-4" />
             Nova Transação
@@ -167,8 +192,8 @@ export default function FinancesPage() {
             onClick={() => setActiveTab(tab.id)}
             className={`rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
               activeTab === tab.id
-                ? 'bg-[#0A2540] text-white shadow-sm'
-                : 'text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540]'
+                ? tabActiveClass
+                : tabIdleClass
             }`}
           >
             {tab.label}
@@ -176,9 +201,9 @@ export default function FinancesPage() {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-[#6b7e9a] shadow-sm">
-        Faturas e documentos fiscais estão centralizados em{' '}
-        <a href="/vendas" className="font-medium text-[#0A2540] underline-offset-4 hover:underline">
+      <div className={bannerClass}>
+        {isComercioWorkspace ? 'A faturação documental e os documentos fiscais estão centralizados em ' : 'Faturas e documentos fiscais estão centralizados em '}
+        <a href="/vendas" className="font-medium underline-offset-4 hover:underline" style={{ color: primaryAccent }}>
           /vendas
         </a>
         .

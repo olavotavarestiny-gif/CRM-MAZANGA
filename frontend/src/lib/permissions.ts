@@ -41,8 +41,17 @@ type CommerceRoute =
   | '/contacts'
   | '/produtos'
   | '/vendas'
+  | '/faturacao'
   | '/finances'
   | '/configuracoes';
+
+const GLOBAL_PRIVATE_ROUTE_PREFIXES = [
+  '/admin',
+  '/superadmin',
+  '/profile',
+  '/equipa',
+  '/planos',
+] as const;
 
 const SERVICOS_ROUTE_TO_MODULE: Array<{ prefix: string; module: ModuleKey }> = [
   { prefix: '/contacts', module: 'contacts' },
@@ -225,6 +234,24 @@ export function canStockEdit(user: User): boolean {
   return perms?.stock?.edit === true;
 }
 
+export function canFinanceTransactionsView(user: User): boolean {
+  if (!hasFeature(user, 'financas')) return false;
+  if (hasFullAccess(user)) return true;
+  if (!user.permissions) return true;
+  const finances = (parsePermissions(user.permissions) as UserPermissions).finances;
+  if (!finances) return true;
+  return finances.transactions === 'view' || finances.transactions === 'edit';
+}
+
+export function canFinanceTransactionsEdit(user: User): boolean {
+  if (!hasFeature(user, 'financas')) return false;
+  if (hasFullAccess(user)) return true;
+  if (!user.permissions) return true;
+  const finances = (parsePermissions(user.permissions) as UserPermissions).finances;
+  if (!finances) return true;
+  return finances.transactions === 'edit';
+}
+
 export function canAccessCommerceRoute(user: User, pathname: string): boolean {
   const path = normalizePath(pathname);
 
@@ -233,11 +260,12 @@ export function canAccessCommerceRoute(user: User, pathname: string): boolean {
   if (path.startsWith('/vendas-rapidas')) return canView(user, 'vendas');
   if (path.startsWith('/contacts')) return canView(user, 'contacts');
   if (path.startsWith('/produtos')) return canStockView(user);
-  if (path.startsWith('/finances')) return canView(user, 'finances');
-  if (path.startsWith('/vendas') || path.startsWith('/faturacao')) return canAccessBilling(user);
+  if (path.startsWith('/vendas')) return canAccessBilling(user);
+  if (path.startsWith('/faturacao')) return canAccessBilling(user);
+  if (path.startsWith('/finances')) return canFinanceTransactionsView(user);
   if (path.startsWith('/configuracoes')) return true;
 
-  return true;
+  return false;
 }
 
 export function canAccessWorkspaceRoute(
@@ -246,6 +274,10 @@ export function canAccessWorkspaceRoute(
   workspaceMode?: WorkspaceMode | null
 ): boolean {
   const path = normalizePath(pathname);
+
+  if (GLOBAL_PRIVATE_ROUTE_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix + '/'))) {
+    return true;
+  }
 
   if (workspaceMode === 'comercio') {
     return canAccessCommerceRoute(user, path);
