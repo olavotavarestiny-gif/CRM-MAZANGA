@@ -29,7 +29,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",
-      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://va.vercel-scripts.com ${API_URL} https://www.facebook.com https://connect.facebook.net https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com`,
+      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://va.vercel-scripts.com ${API_URL} https://www.facebook.com https://connect.facebook.net https://www.googletagmanager.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com https://region1.analytics.google.com`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
