@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ShoppingCart, Search, Plus, Minus, Trash2, X, CheckCircle, Printer,
   AlertCircle, Lock, Unlock, Clock, Store, TrendingUp, Hash, Download, ExternalLink,
+  Banknote, CreditCard, Smartphone,
 } from 'lucide-react';
 import { getProdutos, getQuickSaleDefaults, getEstabelecimentos, emitQuickSale, getCaixaSessaoAtual, abrirCaixaSessao, fecharCaixaSessao, getCurrentUser, downloadFacturaPdf, openFacturaPdfInTab, getFaturacaoConfig } from '@/lib/api';
 import type { QuickSaleItem } from '@/lib/api';
@@ -25,6 +26,14 @@ interface CartItem extends QuickSaleItem {
 const DEFAULT_CUSTOMER_TAX_ID = '000000000';
 const DEFAULT_CUSTOMER_NAME = 'Consumidor Final';
 const MAX_RESULTS = 10;
+
+const PAYMENT_METHODS = [
+  { value: 'CASH',       label: 'Numerário',  short: 'Num.',   icon: 'banknote'   },
+  { value: 'MULTICAIXA', label: 'Multicaixa', short: 'MC',     icon: 'smartphone' },
+  { value: 'TPA',        label: 'TPA',        short: 'TPA',    icon: 'credit'     },
+] as const;
+
+type PaymentMethodValue = typeof PAYMENT_METHODS[number]['value'];
 
 function formatKz(value: number) {
   return value.toLocaleString('pt-AO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kz';
@@ -91,6 +100,7 @@ export default function VendasRapidasPage() {
   const [customerTaxID, setCustomerTaxID] = useState(DEFAULT_CUSTOMER_TAX_ID);
   const [customerName, setCustomerName] = useState(DEFAULT_CUSTOMER_NAME);
   const [showClientePicker, setShowClientePicker] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodValue>('CASH');
   const [emitting, setEmitting] = useState(false);
   const [successFactura, setSuccessFactura] = useState<Factura | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -366,7 +376,7 @@ export default function VendasRapidasPage() {
       const factura = await emitQuickSale({
         items: cart.map(({ id: _id, ...item }) => item),
         estabelecimentoId: selectedEstabelecimentoId,
-        customerTaxID, customerName, paymentMethod: 'CASH',
+        customerTaxID, customerName, paymentMethod,
       });
       setSuccessFactura(factura);
       setCart([]);
@@ -407,6 +417,7 @@ export default function VendasRapidasPage() {
     setSuccessFactura(null);
     setPrintBlocked(false);
     setPdfLoading(false);
+    setPaymentMethod('CASH');
   };
 
   // ── Loading ────────────────────────────────────────────────────────────────
@@ -730,6 +741,33 @@ export default function VendasRapidasPage() {
             )}
           </div>
 
+          {/* Método de pagamento */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-[#6b7e9a]/60">Pagamento</p>
+            <div className="grid grid-cols-3 gap-2">
+              {PAYMENT_METHODS.map((m) => {
+                const active = paymentMethod === m.value;
+                return (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setPaymentMethod(m.value)}
+                    className={`flex flex-col items-center gap-1.5 rounded-xl border py-3 px-2 text-xs font-semibold transition-colors ${
+                      active
+                        ? 'border-[#B84D0E] bg-[#FDF2EA] text-[#B84D0E]'
+                        : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    {m.icon === 'banknote'   && <Banknote   className="h-5 w-5" />}
+                    {m.icon === 'smartphone' && <Smartphone className="h-5 w-5" />}
+                    {m.icon === 'credit'     && <CreditCard className="h-5 w-5" />}
+                    {m.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-2">
             <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#6b7e9a]/60">Resumo</p>
             <div className="flex justify-between text-sm text-slate-600"><span>Subtotal</span><span>{formatKz(subtotal)}</span></div>
@@ -766,6 +804,19 @@ export default function VendasRapidasPage() {
               {successFactura.qrCodeImage && (
                 <img src={successFactura.qrCodeImage} alt="QR Code AGT" className="mt-3 h-28 w-28 rounded-xl border border-slate-100 p-1" />
               )}
+
+              {/* Método de pagamento usado */}
+              {successFactura.paymentMethod && (() => {
+                const pm = PAYMENT_METHODS.find((m) => m.value === successFactura.paymentMethod);
+                return (
+                  <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+                    {pm?.icon === 'banknote'   && <Banknote   className="h-3.5 w-3.5" />}
+                    {pm?.icon === 'smartphone' && <Smartphone className="h-3.5 w-3.5" />}
+                    {pm?.icon === 'credit'     && <CreditCard className="h-3.5 w-3.5" />}
+                    <span>{pm?.label ?? successFactura.paymentMethod}</span>
+                  </div>
+                );
+              })()}
 
               {/* Aviso popup bloqueado */}
               {printBlocked && (
