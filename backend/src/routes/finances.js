@@ -6,11 +6,32 @@ const { requirePermission, requireDeletePermission } = require('../lib/permissio
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function startOfMonth(date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0, 0));
 }
 
 function endOfMonth(date) {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+}
+
+function parseYearMonth(year, month) {
+  const parsedYear = Number.parseInt(year, 10);
+  const parsedMonth = Number.parseInt(month, 10);
+
+  if (!Number.isInteger(parsedYear) || !Number.isInteger(parsedMonth)) return null;
+  if (parsedMonth < 1 || parsedMonth > 12) return null;
+
+  return new Date(Date.UTC(parsedYear, parsedMonth - 1, 1, 0, 0, 0, 0));
+}
+
+function parseDateBoundary(value, boundary) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+
+  const [year, month, day] = value.split('-').map((part) => Number.parseInt(part, 10));
+  if (!year || !month || !day) return null;
+
+  return boundary === 'start'
+    ? new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+    : new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
 }
 
 function formatKz(value) {
@@ -22,7 +43,7 @@ router.get('/dashboard', requirePermission('finances', 'transactions_view'), asy
   try {
     const { year, month } = req.query;
     const now = new Date();
-    const targetDate = year && month ? new Date(parseInt(year), parseInt(month) - 1, 1) : now;
+    const targetDate = parseYearMonth(year, month) || new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
     const from = startOfMonth(targetDate);
     const to = endOfMonth(targetDate);
 
@@ -86,10 +107,12 @@ router.get('/transactions', requirePermission('finances', 'transactions_view'), 
     if (status && ['pago', 'pendente', 'atrasado'].includes(status)) where.status = status;
     if (clientId) where.clientId = parseInt(clientId);
     if (category) where.category = category;
-    if (dateFrom || dateTo) {
+    const parsedDateFrom = parseDateBoundary(dateFrom, 'start');
+    const parsedDateTo = parseDateBoundary(dateTo, 'end');
+    if (parsedDateFrom || parsedDateTo) {
       where.date = {};
-      if (dateFrom) where.date.gte = new Date(dateFrom);
-      if (dateTo) where.date.lte = new Date(dateTo + 'T23:59:59.999Z');
+      if (parsedDateFrom) where.date.gte = parsedDateFrom;
+      if (parsedDateTo) where.date.lte = parsedDateTo;
     }
     if (search) {
       where.OR = [

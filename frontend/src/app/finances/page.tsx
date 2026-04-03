@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  buildMonthlyFinancePeriod,
   getFinanceDashboard,
   getTransactions,
   deleteTransaction,
@@ -44,17 +45,16 @@ const now = new Date();
 export default function FinancesPage() {
   const queryClient = useQueryClient();
 
-  // Dashboard filter
+  // Shared monthly period
   const [dashYear, setDashYear] = useState(now.getFullYear());
   const [dashMonth, setDashMonth] = useState(now.getMonth() + 1);
+  const monthPeriod = buildMonthlyFinancePeriod(dashYear, dashMonth);
 
   // Transaction filters
   const [page, setPage] = useState(1);
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const filterCategory = '';
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
   const [search, setSearch] = useState('');
 
   // Modals
@@ -89,13 +89,13 @@ export default function FinancesPage() {
     queryKey: ['finance-dashboard', dashYear, dashMonth],
     queryFn: () =>
       getFinanceDashboard({
-        dateFrom: `${dashYear}-${String(dashMonth).padStart(2, '0')}-01`,
-        dateTo: new Date(dashYear, dashMonth, 0).toISOString().slice(0, 10),
+        year: monthPeriod.year,
+        month: monthPeriod.month,
       }),
   });
 
   const { data: txData, isLoading: txLoading } = useQuery({
-    queryKey: ['transactions', page, filterType, filterStatus, filterCategory, filterDateFrom, filterDateTo, search],
+    queryKey: ['transactions', dashYear, dashMonth, page, filterType, filterStatus, filterCategory, search],
     queryFn: () =>
       getTransactions({
         page,
@@ -103,8 +103,8 @@ export default function FinancesPage() {
         type: filterType || undefined,
         status: filterStatus || undefined,
         category: filterCategory || undefined,
-        dateFrom: filterDateFrom || undefined,
-        dateTo: filterDateTo || undefined,
+        dateFrom: monthPeriod.dateFrom,
+        dateTo: monthPeriod.dateTo,
         search: search || undefined,
       }),
   });
@@ -132,6 +132,11 @@ export default function FinancesPage() {
   });
 
   const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const activeMonthLabel = `${monthNames[dashMonth - 1]} ${dashYear}`;
+
+  useEffect(() => {
+    setPage(1);
+  }, [dashYear, dashMonth]);
 
   const handlePrevMonth = () => {
     if (dashMonth === 1) { setDashMonth(12); setDashYear((y) => y - 1); }
@@ -318,7 +323,12 @@ export default function FinancesPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => downloadTransactionsCSV({ type: filterType || undefined, dateFrom: filterDateFrom || undefined, dateTo: filterDateTo || undefined })}
+            onClick={() => downloadTransactionsCSV({
+              type: filterType || undefined,
+              status: filterStatus || undefined,
+              dateFrom: monthPeriod.dateFrom,
+              dateTo: monthPeriod.dateTo,
+            })}
             className="border-gray-200 text-gray-600 hover:bg-gray-50 gap-2"
           >
             <Download className="w-4 h-4" />
@@ -327,12 +337,12 @@ export default function FinancesPage() {
         </div>
 
         {/* Filtros */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+        <div className="grid grid-cols-1 gap-3 mb-4 md:grid-cols-4">
           <Input
             placeholder="Pesquisar..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="col-span-2"
+            className="md:col-span-2"
           />
           <Select value={filterType} onValueChange={(v) => { setFilterType(v === 'all' ? '' : v); setPage(1); }}>
             <SelectTrigger>
@@ -355,16 +365,9 @@ export default function FinancesPage() {
               <SelectItem value="atrasado">Atrasado</SelectItem>
             </SelectContent>
           </Select>
-          <Input
-            type="date"
-            value={filterDateFrom}
-            onChange={(e) => { setFilterDateFrom(e.target.value); setPage(1); }}
-          />
-          <Input
-            type="date"
-            value={filterDateTo}
-            onChange={(e) => { setFilterDateTo(e.target.value); setPage(1); }}
-          />
+          <div className="flex items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 text-sm text-slate-600">
+            A mostrar movimentos de {activeMonthLabel}
+          </div>
         </div>
 
         {/* Tabela */}
@@ -391,7 +394,7 @@ export default function FinancesPage() {
                 ) : (txData?.data || []).length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-gray-400">
-                      Nenhuma transação encontrada.
+                      Sem movimentos em {activeMonthLabel}.
                     </td>
                   </tr>
                 ) : (

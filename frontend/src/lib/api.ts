@@ -515,7 +515,19 @@ export async function removeTeamMember(memberId: number) {
 }
 
 // Finances
-export async function getFinanceDashboard(params?: { dateFrom?: string; dateTo?: string }): Promise<DashboardStats> {
+export function buildMonthlyFinancePeriod(year: number, month: number) {
+  const normalizedMonth = Math.min(12, Math.max(1, month));
+  const monthLabel = String(normalizedMonth).padStart(2, '0');
+
+  return {
+    year,
+    month: normalizedMonth,
+    dateFrom: `${year}-${monthLabel}-01`,
+    dateTo: new Date(Date.UTC(year, normalizedMonth, 0)).toISOString().slice(0, 10),
+  };
+}
+
+export async function getFinanceDashboard(params?: { year?: number; month?: number }): Promise<DashboardStats> {
   const response = await api.get<DashboardStats>('/api/finances/dashboard', { params });
   return response.data;
 }
