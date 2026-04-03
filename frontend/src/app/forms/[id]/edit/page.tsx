@@ -151,6 +151,12 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState<'builder' | 'branding' | 'tracking' | 'submissions'>('builder');
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
+  const [submissionSearch, setSubmissionSearch] = useState('');
+  const [submissionResultFilter, setSubmissionResultFilter] = useState<'all' | FormSubmission['contactSyncStatus']>('all');
+  const [submissionLinkFilter, setSubmissionLinkFilter] = useState<'all' | 'linked' | 'unlinked'>('all');
+  const [submissionStageFilter, setSubmissionStageFilter] = useState('all');
+  const [submissionDateFrom, setSubmissionDateFrom] = useState('');
+  const [submissionDateTo, setSubmissionDateTo] = useState('');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [fields, setFields] = useState<FormField[]>([]);
   const [formSettings, setFormSettings] = useState<{
@@ -543,6 +549,79 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
     [fields, selectedFieldId],
   );
 
+  const submissionStageOptions = useMemo(
+    () => Array.from(new Set(submissions.map((submission) => submission.contact?.stage).filter(Boolean))).sort(),
+    [submissions],
+  );
+
+  const filteredSubmissions = useMemo(() => {
+    const search = submissionSearch.trim().toLowerCase();
+
+    return submissions.filter((submission) => {
+      const submittedAt = new Date(submission.submittedAt);
+      const name = getSubmissionAnswerValue(submission, 'name') || submission.contact?.name || '';
+      const phone = getSubmissionAnswerValue(submission, 'phone') || submission.contact?.phone || '';
+      const email = getSubmissionAnswerValue(submission, 'email') || submission.contact?.email || '';
+      const company = getSubmissionAnswerValue(submission, 'company') || submission.contact?.company || '';
+      const stage = submission.contact?.stage || '';
+      const answersText = submission.answers.map((answer) => `${answer.fieldLabel} ${answer.value}`).join(' ').toLowerCase();
+
+      if (search) {
+        const haystack = `${name} ${phone} ${email} ${company} ${stage} ${answersText}`.toLowerCase();
+        if (!haystack.includes(search)) {
+          return false;
+        }
+      }
+
+      if (submissionResultFilter !== 'all' && submission.contactSyncStatus !== submissionResultFilter) {
+        return false;
+      }
+
+      if (submissionLinkFilter === 'linked' && !submission.contact) {
+        return false;
+      }
+
+      if (submissionLinkFilter === 'unlinked' && submission.contact) {
+        return false;
+      }
+
+      if (submissionStageFilter !== 'all' && stage !== submissionStageFilter) {
+        return false;
+      }
+
+      if (submissionDateFrom) {
+        const fromDate = new Date(`${submissionDateFrom}T00:00:00`);
+        if (submittedAt < fromDate) {
+          return false;
+        }
+      }
+
+      if (submissionDateTo) {
+        const toDate = new Date(`${submissionDateTo}T23:59:59`);
+        if (submittedAt > toDate) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [
+    submissions,
+    submissionSearch,
+    submissionResultFilter,
+    submissionLinkFilter,
+    submissionStageFilter,
+    submissionDateFrom,
+    submissionDateTo,
+  ]);
+
+  const submissionSummary = useMemo(() => ({
+    total: submissions.length,
+    created: submissions.filter((submission) => submission.contactSyncStatus === 'created').length,
+    updated: submissions.filter((submission) => submission.contactSyncStatus === 'updated').length,
+    linked: submissions.filter((submission) => !!submission.contact).length,
+  }), [submissions]);
+
   const handleSaveSettings = () => {
     updateFormMutation.mutate({
       title: formSettings.title,
@@ -908,12 +987,121 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
       {activeTab === 'submissions' && (
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle>Submissões ({submissions.length})</CardTitle>
+            <CardTitle>Submissões ({filteredSubmissions.length} de {submissions.length})</CardTitle>
           </CardHeader>
           <CardContent>
             {submissions.length === 0 ? (
               <p className="text-center text-[#6b7e9a] py-8">Nenhuma submissão ainda</p>
             ) : (
+              <div className="space-y-5">
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total</div>
+                    <div className="mt-1 text-2xl font-bold text-[#0A2540]">{submissionSummary.total}</div>
+                  </div>
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Criados</div>
+                    <div className="mt-1 text-2xl font-bold text-emerald-700">{submissionSummary.created}</div>
+                  </div>
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">Atualizados</div>
+                    <div className="mt-1 text-2xl font-bold text-blue-700">{submissionSummary.updated}</div>
+                  </div>
+                  <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-violet-700">Ligados</div>
+                    <div className="mt-1 text-2xl font-bold text-violet-700">{submissionSummary.linked}</div>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                  <div className="xl:col-span-2">
+                    <Label className="text-xs uppercase tracking-wide text-slate-500">Pesquisar</Label>
+                    <Input
+                      value={submissionSearch}
+                      onChange={(e) => setSubmissionSearch(e.target.value)}
+                      placeholder="Nome, número, email, empresa..."
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-xs uppercase tracking-wide text-slate-500">Resultado</Label>
+                    <Select value={submissionResultFilter} onValueChange={(value) => setSubmissionResultFilter(value as typeof submissionResultFilter)}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="created">Criados</SelectItem>
+                        <SelectItem value="updated">Atualizados</SelectItem>
+                        <SelectItem value="skipped">Sem contacto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs uppercase tracking-wide text-slate-500">Ligação</Label>
+                    <Select value={submissionLinkFilter} onValueChange={(value) => setSubmissionLinkFilter(value as typeof submissionLinkFilter)}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="linked">Com contacto</SelectItem>
+                        <SelectItem value="unlinked">Sem contacto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs uppercase tracking-wide text-slate-500">Etapa</Label>
+                    <Select value={submissionStageFilter} onValueChange={setSubmissionStageFilter}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        {submissionStageOptions.map((stage) => (
+                          <SelectItem key={stage} value={stage!}>
+                            {stage}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs uppercase tracking-wide text-slate-500">De</Label>
+                    <Input type="date" value={submissionDateFrom} onChange={(e) => setSubmissionDateFrom(e.target.value)} className="mt-1" />
+                  </div>
+
+                  <div>
+                    <Label className="text-xs uppercase tracking-wide text-slate-500">Até</Label>
+                    <div className="mt-1 flex gap-2">
+                      <Input type="date" value={submissionDateTo} onChange={(e) => setSubmissionDateTo(e.target.value)} />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setSubmissionSearch('');
+                          setSubmissionResultFilter('all');
+                          setSubmissionLinkFilter('all');
+                          setSubmissionStageFilter('all');
+                          setSubmissionDateFrom('');
+                          setSubmissionDateTo('');
+                        }}
+                      >
+                        Limpar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {filteredSubmissions.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-[#6b7e9a]">
+                    Nenhuma submissão corresponde aos filtros atuais.
+                  </p>
+                ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -930,7 +1118,7 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {submissions.map((submission: FormSubmission) => {
+                    {filteredSubmissions.map((submission: FormSubmission) => {
                       const isExpanded = expandedSubmissionId === submission.id;
                       const submittedAt = new Date(submission.submittedAt);
                       const name = getSubmissionAnswerValue(submission, 'name') || submission.contact?.name || '—';
@@ -1001,6 +1189,8 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
                     })}
                   </tbody>
                 </table>
+              </div>
+                )}
               </div>
             )}
           </CardContent>

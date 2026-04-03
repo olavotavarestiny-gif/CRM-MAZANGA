@@ -8,6 +8,47 @@ const { requirePlanFeature, canCreateContact, getPlan, hasPlanFeature } = requir
 const { getDefaultStageName } = require('../lib/pipeline-stages');
 
 const CONTACT_FIELD_KEYS = new Set(['name', 'phone', 'email', 'company', 'sector', 'revenue']);
+const INFERRED_CONTACT_FIELD_PATTERNS = {
+  name: [/^nome$/i, /^nome completo$/i, /^contacto$/i],
+  phone: [/telefone/i, /telemovel/i, /telemóvel/i, /numero/i, /n[uú]mero/i, /celular/i, /whatsapp/i],
+  email: [/e-?mail/i, /^email$/i, /correio/i],
+  company: [/empresa/i, /companhia/i, /neg[oó]cio/i, /organiz/i],
+  sector: [/setor/i, /sector/i, /ramo/i, /ind[uú]stria/i, /area/i, /área/i],
+  revenue: [/fatura[cç][aã]o/i, /receita/i, /or[cç]amento/i, /volume/i, /revenue/i],
+};
+
+function normaliseText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function inferContactField(field, submittedValue = '') {
+  if (field?.contactField && CONTACT_FIELD_KEYS.has(field.contactField)) {
+    return field.contactField;
+  }
+
+  const normalisedLabel = normaliseText(field?.label);
+
+  for (const [contactField, patterns] of Object.entries(INFERRED_CONTACT_FIELD_PATTERNS)) {
+    if (patterns.some((pattern) => pattern.test(normalisedLabel))) {
+      return contactField;
+    }
+  }
+
+  const normalisedValue = normaliseSubmittedValue(submittedValue);
+  if (normalisedValue.includes('@')) {
+    return 'email';
+  }
+
+  if (/^[\d\s\+\-\(\)]{7,20}$/.test(normalisedValue)) {
+    return 'phone';
+  }
+
+  return null;
+}
 
 function normaliseSubmittedValue(value) {
   if (value === null || value === undefined) {
@@ -27,7 +68,7 @@ function buildAnswersSnapshot(fields, submittedAnswers) {
   return fields.map((field) => ({
     fieldId: field.id,
     fieldLabel: field.label,
-    contactField: field.contactField || null,
+    contactField: inferContactField(field, answersByFieldId.get(field.id) || ''),
     value: answersByFieldId.get(field.id) || '',
   }));
 }
@@ -45,6 +86,10 @@ function serialiseSubmissionAnswer(answer) {
   return {
     ...answer,
     fieldLabel: answer.fieldLabel || answer.field?.label || 'Campo removido',
+    contactField: answer.contactField || inferContactField({
+      label: answer.fieldLabel || answer.field?.label || '',
+      contactField: answer.contactField,
+    }, answer.value),
   };
 }
 

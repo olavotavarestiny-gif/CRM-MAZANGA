@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
-const { isValidNIF, looksLikePhone } = require('../lib/fiscal/nif-validator');
+const { isValidNIF } = require('../lib/fiscal/nif-validator');
 const { resolveContactNif } = require('../lib/contact-nif');
 
 function normaliseBillingCustomerName(contact) {
@@ -37,11 +37,8 @@ router.post('/clientes', async (req, res) => {
   try {
     const { customerTaxID, customerName, customerAddress, customerPhone, customerEmail, contactId } = req.body;
     if (!customerTaxID || !customerName) return res.status(400).json({ error: 'NIF e nome obrigatórios' });
-    if (looksLikePhone(customerTaxID)) {
-      return res.status(422).json({ error: 'O valor introduzido parece ser um número de telefone, não um NIF.' });
-    }
     if (!isValidNIF(customerTaxID)) {
-      return res.status(422).json({ error: 'NIF inválido. Verifique o número e o dígito verificador.' });
+      return res.status(422).json({ error: 'NIF inválido. Introduza um valor numérico.' });
     }
     const cliente = await prisma.clienteFaturacao.create({
       data: { userId: req.user.effectiveUserId, customerTaxID, customerName, customerAddress, customerPhone, customerEmail, contactId: contactId || null },
@@ -75,7 +72,6 @@ router.put('/clientes/:id', async (req, res) => {
 });
 
 // POST /api/faturacao/clientes/from-contact — importar contacto CRM
-// Requer NIF válido no campo customerTaxID do body; rejeita fallback para telefone.
 router.post('/clientes/from-contact', async (req, res) => {
   try {
     const { contactId, customerTaxID } = req.body;
@@ -88,19 +84,13 @@ router.post('/clientes/from-contact', async (req, res) => {
     if (!nif) {
       return res.status(422).json({
         error: 'NIF obrigatório para criar cliente de faturação.',
-        hint: 'Complete primeiro o NIF no contacto CRM. O número de telefone não pode ser usado como NIF.',
-      });
-    }
-    if (looksLikePhone(nif)) {
-      return res.status(422).json({
-        error: 'O valor introduzido parece ser um número de telefone, não um NIF.',
-        hint: 'O NIF angolano tem 10 dígitos e começa em 1 (pessoa singular) ou 5 (empresa).',
+        hint: 'Complete primeiro o NIF no contacto CRM.',
       });
     }
     if (!isValidNIF(nif)) {
       return res.status(422).json({
-        error: 'NIF inválido. Verifique o número e o dígito verificador.',
-        hint: 'O NIF angolano tem 10 dígitos e começa em 1 (pessoa singular) ou 5 (empresa).',
+        error: 'NIF inválido. Introduza um valor numérico.',
+        hint: 'O NIF deve conter pelo menos um dígito.',
       });
     }
 

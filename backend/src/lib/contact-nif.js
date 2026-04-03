@@ -1,6 +1,6 @@
 'use strict';
 
-const { validateNIF } = require('./fiscal/nif-validator');
+const { validateNIF, cleanNumericValue } = require('./fiscal/nif-validator');
 
 const NIF_CUSTOM_FIELD_KEYS = new Set([
   'nif',
@@ -40,8 +40,8 @@ function parseCustomFields(raw) {
 
 function cleanNifValue(value) {
   if (value == null) return null;
-  const trimmed = String(value).trim();
-  return trimmed || null;
+  const cleaned = cleanNumericValue(value);
+  return cleaned || null;
 }
 
 function extractNifFromCustomFields(rawCustomFields) {
