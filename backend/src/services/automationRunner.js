@@ -1,59 +1,90 @@
 const prisma = require('../lib/prisma');
 const whatsapp = require('../lib/whatsapp');
 const email = require('../lib/email');
+const { resolveStageName } = require('../lib/pipeline-stages');
 
-// Replace variables in template
 function interpolate(template, contact) {
   if (!template) return '';
   return template
     .replace(/\{\{nome\}\}/g, contact.name || '')
     .replace(/\{\{empresa\}\}/g, contact.company || '')
     .replace(/\{\{telefone\}\}/g, contact.phone || '')
-    .replace(/\{\{email\}\}/g, contact.email || '');
+    .replace(/\{\{email\}\}/g, contact.email || '')
+    .replace(/\{\{formulario\}\}/g, contact.formTitle || '');
 }
 
-async function run(trigger, contact, triggerValue = null) {
+function normaliseRunArgs(triggerValueOrContext, maybeContext) {
+  if (
+    triggerValueOrContext &&
+    typeof triggerValueOrContext === 'object' &&
+    !Array.isArray(triggerValueOrContext)
+  ) {
+    return {
+      triggerValue: null,
+      context: triggerValueOrContext,
+    };
+  }
+
+  return {
+    triggerValue: triggerValueOrContext ?? null,
+    context: maybeContext || {},
+  };
+}
+
+function matchesConditionalTrigger(trigger, automation, contact) {
+  if (trigger === 'contact_tag') {
+    try {
+      const tags = contact.tags ? JSON.parse(contact.tags) : [];
+      return tags.includes(automation.triggerValue);
+    } catch (error) {
+      console.error('Error parsing tags:', error);
+      return false;
+    }
+  }
+
+  if (trigger === 'contact_revenue') {
+    return contact.revenue === automation.triggerValue;
+  }
+
+  if (trigger === 'contact_sector') {
+    return contact.sector === automation.triggerValue;
+  }
+
+  return true;
+}
+
+function matchesAutomation(trigger, automation, contact, context) {
+  if (automation.trigger !== trigger) {
+    return false;
+  }
+
+  if (['contact_tag', 'contact_revenue', 'contact_sector'].includes(trigger)) {
+    return matchesConditionalTrigger(trigger, automation, contact);
+  }
+
+  if (trigger === 'form_submission' && automation.formId && automation.formId !== context.formId) {
+    return false;
+  }
+
+  return true;
+}
+
+async function run(trigger, contact, triggerValueOrContext = null, maybeContext = {}) {
+  const { triggerValue, context } = normaliseRunArgs(triggerValueOrContext, maybeContext);
+
   try {
     const automations = await prisma.automation.findMany({
-      where: { active: true },
+      where: {
+        active: true,
+        userId: contact.userId || context.userId || undefined,
+      },
     });
 
-    console.log(`Running automations for trigger: ${trigger}, triggerValue: ${triggerValue}`);
+    const matchingAutomations = automations.filter((automation) =>
+      matchesAutomation(trigger, automation, contact, context)
+    );
 
-    // Filter automations that match this trigger
-    const matchingAutomations = automations.filter((auto) => {
-      if (auto.trigger === trigger) {
-        // For triggers with specific values, check if it matches
-        if (['contact_tag', 'contact_revenue', 'contact_sector'].includes(trigger)) {
-          // Check if the automation's triggerValue matches the contact's value
-          if (trigger === 'contact_tag') {
-            try {
-              const tags = contact.tags ? JSON.parse(contact.tags) : [];
-              const matches = tags.includes(auto.triggerValue);
-              console.log(`Tag check: tags=${JSON.stringify(tags)}, looking for=${auto.triggerValue}, matches=${matches}`);
-              return matches;
-            } catch (e) {
-              console.error('Error parsing tags:', e);
-              return false;
-            }
-          }
-          if (trigger === 'contact_revenue') {
-            const matches = contact.revenue === auto.triggerValue;
-            console.log(`Revenue check: contact.revenue=${contact.revenue}, looking for=${auto.triggerValue}, matches=${matches}`);
-            return matches;
-          }
-          if (trigger === 'contact_sector') {
-            const matches = contact.sector === auto.triggerValue;
-            console.log(`Sector check: contact.sector=${contact.sector}, looking for=${auto.triggerValue}, matches=${matches}`);
-            return matches;
-          }
-        }
-        return true; // new_contact and form_submission always match
-      }
-      return false;
-    });
-
-    console.log(`Found ${matchingAutomations.length} matching automations`);
+    console.log(`Running automations for trigger: ${trigger}, triggerValue: ${triggerValue}, matches: ${matchingAutomations.length}`);
 
     for (const automation of matchingAutomations) {
       if (automation.action === 'send_whatsapp_template') {
@@ -94,14 +125,13 @@ async function run(trigger, contact, triggerValue = null) {
           const subject = interpolate(automation.emailSubject, contact);
           const body = interpolate(automation.emailBody, contact);
           await email.sendEmail({ to: contact.email, subject, body });
-          // Save email to message history
           await prisma.message.create({
             data: {
               contactId: contact.id,
               direction: 'outbound',
               text: body,
               channel: 'email',
-              subject: subject,
+              subject,
             },
           });
           console.log(`Automation executed: ${automation.trigger} -> ${automation.action}`);
@@ -111,12 +141,45 @@ async function run(trigger, contact, triggerValue = null) {
       }
 
       if (automation.action === 'update_stage' && automation.targetStage) {
+        if (!contact.id) {
+          continue;
+        }
+
         try {
+          const resolvedStage = await resolveStageName(contact.userId || context.userId, automation.targetStage);
           await prisma.contact.update({
             where: { id: contact.id },
-            data: { stage: automation.targetStage },
+            data: {
+              stage: resolvedStage,
+              inPipeline: true,
+            },
           });
-          console.log(`Automation executed: ${automation.trigger} -> update_stage to ${automation.targetStage}`);
+          contact.stage = resolvedStage;
+          contact.inPipeline = true;
+          console.log(`Automation executed: ${automation.trigger} -> update_stage to ${resolvedStage}`);
+        } catch (error) {
+          console.error('Error executing automation:', error.message);
+        }
+      }
+
+      if (automation.action === 'create_task' && automation.taskTitle && automation.taskAssignedToUserId) {
+        try {
+          const dueDate = automation.taskDueDays === null || automation.taskDueDays === undefined
+            ? null
+            : new Date(Date.now() + automation.taskDueDays * 24 * 60 * 60 * 1000);
+
+          await prisma.task.create({
+            data: {
+              userId: contact.userId || context.userId || null,
+              contactId: contact.id || null,
+              assignedToUserId: automation.taskAssignedToUserId,
+              title: interpolate(automation.taskTitle, contact),
+              notes: automation.taskNotes ? interpolate(automation.taskNotes, contact) : null,
+              dueDate,
+              priority: automation.taskPriority || 'Media',
+            },
+          });
+          console.log(`Automation executed: ${automation.trigger} -> create_task`);
         } catch (error) {
           console.error('Error executing automation:', error.message);
         }

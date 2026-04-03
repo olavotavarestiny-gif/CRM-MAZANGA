@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getForm,
@@ -12,7 +12,7 @@ import {
   getFormSubmissions,
   getCurrentUser,
 } from '@/lib/api';
-import { FormField, CRMForm } from '@/lib/types';
+import { FormField, CRMForm, FormSubmission } from '@/lib/types';
 import type { User } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,9 +22,9 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { X, Check, Upload, Palette, Image as ImageIcon, BarChart2 } from 'lucide-react';
+import { X, Check, Upload, Palette, Image as ImageIcon, BarChart2, ChevronDown, ChevronUp } from 'lucide-react';
 import type { DropResult } from '@hello-pangea/dnd';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { FormFieldList } from '@/components/forms/form-field-list';
 import { FormFieldEditor } from '@/components/forms/form-field-editor';
@@ -40,6 +40,17 @@ const PRESET_BG_COLORS = [
   '#F0FDF4', '#FFF1F2', '#0A2540', '#1E293B',
   '#111827', '#000000',
 ];
+
+const CONTACT_SYNC_LABELS: Record<FormSubmission['contactSyncStatus'], string> = {
+  created: 'Criado',
+  updated: 'Atualizado',
+  skipped: 'Sem contacto',
+};
+
+function getSubmissionAnswerValue(submission: FormSubmission, contactField: string) {
+  const answer = submission.answers.find((item) => item.contactField === contactField && item.value);
+  return answer?.value || '';
+}
 
 function ColorSwatch({ colors, value, onChange, label }: {
   colors: string[];
@@ -139,6 +150,7 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'builder' | 'branding' | 'tracking' | 'submissions'>('builder');
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
+  const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [fields, setFields] = useState<FormField[]>([]);
   const [formSettings, setFormSettings] = useState<{
@@ -906,26 +918,87 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
-                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Data</th>
-                      {fields.map((field) => (
-                        <th key={field.id} className="px-4 py-2 text-left text-[#0A2540] font-semibold">{field.label}</th>
-                      ))}
+                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Data / Hora</th>
+                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Nome</th>
+                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Número</th>
+                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Email</th>
+                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Empresa</th>
+                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Contacto ligado</th>
+                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Resultado</th>
+                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Etapa atual</th>
+                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Detalhes</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {submissions.map((submission: any) => (
-                      <tr key={submission.id} className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC]">
-                        <td className="px-4 py-3 text-[#6b7e9a]">
-                          {formatDistanceToNow(new Date(submission.submittedAt), { locale: ptBR, addSuffix: true })}
-                        </td>
-                        {fields.map((field) => {
-                          const answer = submission.answers?.find((a: any) => a.fieldId === field.id);
-                          return (
-                            <td key={field.id} className="px-4 py-3 text-[#0A2540]">{answer?.value || '—'}</td>
-                          );
-                        })}
-                      </tr>
-                    ))}
+                    {submissions.map((submission: FormSubmission) => {
+                      const isExpanded = expandedSubmissionId === submission.id;
+                      const submittedAt = new Date(submission.submittedAt);
+                      const name = getSubmissionAnswerValue(submission, 'name') || submission.contact?.name || '—';
+                      const phone = getSubmissionAnswerValue(submission, 'phone') || submission.contact?.phone || '—';
+                      const email = getSubmissionAnswerValue(submission, 'email') || submission.contact?.email || '—';
+                      const company = getSubmissionAnswerValue(submission, 'company') || submission.contact?.company || '—';
+
+                      return (
+                        <Fragment key={submission.id}>
+                          <tr className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC]">
+                            <td className="px-4 py-3 text-[#6b7e9a] min-w-56">
+                              <div className="font-medium text-[#0A2540]">
+                                {format(submittedAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                              </div>
+                              <div className="text-xs text-[#6b7e9a]">
+                                {formatDistanceToNow(submittedAt, { locale: ptBR, addSuffix: true })}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-[#0A2540]">{name}</td>
+                            <td className="px-4 py-3 text-[#0A2540]">{phone}</td>
+                            <td className="px-4 py-3 text-[#0A2540]">{email}</td>
+                            <td className="px-4 py-3 text-[#0A2540]">{company}</td>
+                            <td className="px-4 py-3 text-[#0A2540]">
+                              {submission.contact ? (
+                                <div>
+                                  <div className="font-medium">{submission.contact.name}</div>
+                                  <div className="text-xs text-[#6b7e9a]">#{submission.contact.id} • {submission.contact.phone}</div>
+                                </div>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge variant="outline">{CONTACT_SYNC_LABELS[submission.contactSyncStatus]}</Badge>
+                            </td>
+                            <td className="px-4 py-3 text-[#0A2540]">{submission.contact?.stage || '—'}</td>
+                            <td className="px-4 py-3">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setExpandedSubmissionId(isExpanded ? null : submission.id)}
+                              >
+                                {isExpanded ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
+                                {isExpanded ? 'Fechar' : 'Ver'}
+                              </Button>
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr className="border-b border-[#E2E8F0] bg-[#FAFCFF]">
+                              <td colSpan={9} className="px-4 py-4">
+                                <div className="grid gap-3 md:grid-cols-2">
+                                  {submission.answers.map((answer) => (
+                                    <div key={answer.id} className="rounded-lg border border-[#E2E8F0] bg-white p-3">
+                                      <div className="text-xs font-semibold uppercase tracking-wide text-[#6b7e9a]">
+                                        {answer.fieldLabel}
+                                      </div>
+                                      <div className="mt-1 text-sm text-[#0A2540] break-words">
+                                        {answer.value || '—'}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

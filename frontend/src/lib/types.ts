@@ -116,12 +116,22 @@ export interface Automation {
   id: string;
   trigger: string; // "new_contact", "form_submission", "contact_tag", "contact_revenue", "contact_sector"
   triggerValue?: string; // tag name, revenue, or sector
-  action: string; // "send_email", "send_template", "send_text", "update_stage"
+  formId?: string | null;
+  action: string; // "send_email", "send_template", "send_text", "update_stage", "create_task"
   targetStage?: Stage; // for update_stage action
   templateName?: string;
   emailSubject?: string;
   emailBody?: string;
+  taskTitle?: string;
+  taskNotes?: string;
+  taskPriority?: 'Baixa' | 'Media' | 'Alta';
+  taskDueDays?: number | null;
+  taskAssignedToUserId?: number | null;
   active: boolean;
+  form?: {
+    id: string;
+    title: string;
+  } | null;
 }
 
 export interface FormField {
@@ -153,6 +163,32 @@ export interface CRMForm {
   googleTagEnabled?: boolean;
   googleTagId?: string;
   trackSubmitAsLead?: boolean;
+}
+
+export interface FormSubmissionAnswer {
+  id: string;
+  fieldId?: string | null;
+  fieldLabel: string;
+  contactField?: string | null;
+  value: string;
+}
+
+export interface FormSubmission {
+  id: string;
+  formId: string;
+  contactId?: number | null;
+  contactSyncStatus: 'created' | 'updated' | 'skipped';
+  submittedAt: string;
+  contact?: {
+    id: number;
+    name: string;
+    phone: string;
+    email: string;
+    company: string;
+    stage: string;
+    inPipeline: boolean;
+  } | null;
+  answers: FormSubmissionAnswer[];
 }
 
 // Calendar types

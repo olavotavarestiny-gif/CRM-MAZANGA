@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getAutomations,
-  createAutomation,
   updateAutomation,
   deleteAutomation,
   getCurrentUser,
@@ -30,6 +29,14 @@ import {
 } from '@/components/ui/dialog';
 import AutomationForm from '@/components/automations/automation-form';
 import { Trash2 } from 'lucide-react';
+
+const TRIGGER_LABELS: Record<string, string> = {
+  new_contact: 'Novo Contacto',
+  form_submission: 'Submissão de Formulário',
+  contact_tag: 'Contacto com Tag',
+  contact_revenue: 'Contacto por Faturação',
+  contact_sector: 'Contacto por Setor',
+};
 
 export default function AutomationsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -117,13 +124,19 @@ export default function AutomationsPage() {
           <TableBody>
             {automations.map((automation) => (
               <TableRow key={automation.id}>
-                <TableCell className="text-sm">{automation.trigger}</TableCell>
+                <TableCell className="text-sm">
+                  {TRIGGER_LABELS[automation.trigger] || automation.trigger}
+                </TableCell>
                 <TableCell className="hidden sm:table-cell text-xs text-gray-500">
-                  {automation.triggerValue || '—'}
+                  {automation.trigger === 'form_submission'
+                    ? automation.form?.title || 'Todos os formulários'
+                    : automation.triggerValue || '—'}
                 </TableCell>
                 <TableCell className="text-sm">
                   {automation.action === 'update_stage'
                     ? `→ ${automation.targetStage}`
+                    : automation.action === 'create_task'
+                    ? 'Nova tarefa'
                     : automation.action}
                 </TableCell>
                 <TableCell className="hidden md:table-cell text-xs">
@@ -131,6 +144,8 @@ export default function AutomationsPage() {
                     ? automation.emailSubject
                     : automation.action === 'update_stage'
                     ? `Mover para ${automation.targetStage}`
+                    : automation.action === 'create_task'
+                    ? `${automation.taskTitle || 'Sem título'}${automation.taskAssignedToUserId ? ` • Resp. #${automation.taskAssignedToUserId}` : ''}`
                     : automation.templateName}
                 </TableCell>
                 <TableCell>

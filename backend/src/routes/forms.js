@@ -5,6 +5,55 @@ const automationRunner = require('../services/automationRunner');
 const requireAuth = require('../middleware/auth');
 const { requirePermission, requireDeletePermission } = require('../lib/permissions');
 const { requirePlanFeature, canCreateContact, getPlan, hasPlanFeature } = require('../lib/plan-limits');
+const { getDefaultStageName } = require('../lib/pipeline-stages');
+
+const CONTACT_FIELD_KEYS = new Set(['name', 'phone', 'email', 'company', 'sector', 'revenue']);
+
+function normaliseSubmittedValue(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  return String(value).trim();
+}
+
+function buildAnswersSnapshot(fields, submittedAnswers) {
+  const answersByFieldId = new Map(
+    Array.isArray(submittedAnswers)
+      ? submittedAnswers.map((answer) => [answer.fieldId, normaliseSubmittedValue(answer.value)])
+      : []
+  );
+
+  return fields.map((field) => ({
+    fieldId: field.id,
+    fieldLabel: field.label,
+    contactField: field.contactField || null,
+    value: answersByFieldId.get(field.id) || '',
+  }));
+}
+
+function buildContactDataFromAnswers(answerSnapshots) {
+  return answerSnapshots.reduce((acc, answer) => {
+    if (answer.contactField && CONTACT_FIELD_KEYS.has(answer.contactField) && answer.value) {
+      acc[answer.contactField] = answer.value;
+    }
+    return acc;
+  }, {});
+}
+
+function serialiseSubmissionAnswer(answer) {
+  return {
+    ...answer,
+    fieldLabel: answer.fieldLabel || answer.field?.label || 'Campo removido',
+  };
+}
+
+function serialiseSubmission(submission) {
+  return {
+    ...submission,
+    answers: (submission.answers || []).map(serialiseSubmissionAnswer),
+  };
+}
 
 // GET /api/forms - lista todos os formulários com contagem de submissões
 router.get('/', requireAuth, requirePlanFeature('formularios'), requirePermission('forms', 'view'), async (req, res) => {
@@ -274,7 +323,14 @@ router.post('/:id/submit', async (req, res) => {
   try {
     const form = await prisma.form.findUnique({
       where: { id: req.params.id },
-      select: { userId: true },
+      select: {
+        id: true,
+        title: true,
+        userId: true,
+        fields: {
+          orderBy: { order: 'asc' },
+        },
+      },
     });
     if (!form) {
       return res.status(404).json({ error: 'Form not found' });
@@ -288,73 +344,166 @@ router.post('/:id/submit', async (req, res) => {
     }
 
     const { answers } = req.body; // [{fieldId, value}, ...]
-    const submission = await prisma.formSubmission.create({
-      data: {
-        formId: req.params.id,
-        answers: {
-          create: answers,
-        },
-      },
-      include: { answers: true },
+    if (!Array.isArray(answers)) {
+      return res.status(400).json({ error: 'answers must be an array' });
+    }
+
+    const answerSnapshots = buildAnswersSnapshot(form.fields, answers);
+    const missingRequiredField = form.fields.find((field) => {
+      if (!field.required) {
+        return false;
+      }
+
+      const answer = answerSnapshots.find((item) => item.fieldId === field.id);
+      return !answer?.value;
     });
 
-    // Auto-criar contacto se campos mapeados
+    if (missingRequiredField) {
+      return res.status(400).json({ error: `O campo "${missingRequiredField.label}" é obrigatório.` });
+    }
+
+    let linkedContactId = null;
+    let contactSyncStatus = 'skipped';
+    let syncedContact = null;
+    let automationContact = {
+      userId: form.userId,
+      id: null,
+      name: '',
+      phone: '',
+      email: '',
+      company: '',
+      revenue: null,
+      sector: null,
+      stage: null,
+      inPipeline: false,
+      formTitle: '',
+    };
+
     try {
-      const formWithFields = await prisma.form.findUnique({
-        where: { id: req.params.id },
-        select: { fields: true, userId: true },
-      });
+      const contactData = buildContactDataFromAnswers(answerSnapshots);
+      automationContact = {
+        ...automationContact,
+        name: contactData.name || '',
+        phone: contactData.phone || '',
+        email: contactData.email || '',
+        company: contactData.company || '',
+        revenue: contactData.revenue || null,
+        sector: contactData.sector || null,
+      };
 
-      if (!formWithFields) {
-        return;
-      }
-      if (!formWithFields.userId) {
-        return;
-      }
-
-      const contactData = {};
-      for (const answer of answers) {
-        const field = formWithFields.fields.find((f) => f.id === answer.fieldId);
-        if (field?.contactField && answer.value?.trim()) {
-          contactData[field.contactField] = answer.value.trim();
-        }
-      }
-
-      // Só criar se tiver phone (campo único obrigatório)
       if (contactData.phone) {
-        try {
-          const contactLimit = await canCreateContact(formWithFields.userId);
-          if (!contactLimit.allowed) {
-            return;
-          }
+        const defaultStage = await getDefaultStageName(form.userId);
+        const existingContact = await prisma.contact.findFirst({
+          where: {
+            userId: form.userId,
+            phone: contactData.phone,
+          },
+        });
 
-          const newContact = await prisma.contact.create({
-            data: {
-              userId: formWithFields.userId,
-              name: contactData.name || 'Sem nome',
-              phone: contactData.phone,
-              email: contactData.email || '',
-              company: contactData.company || '',
-              revenue: contactData.revenue || null,
-              sector: contactData.sector || null,
-              stage: 'Novo',
-            },
+        if (existingContact) {
+          const updateData = {
+            inPipeline: true,
+          };
+
+          if (contactData.name) updateData.name = contactData.name;
+          if (contactData.email) updateData.email = contactData.email;
+          if (contactData.company) updateData.company = contactData.company;
+          if (contactData.sector) updateData.sector = contactData.sector;
+          if (contactData.revenue) updateData.revenue = contactData.revenue;
+
+          syncedContact = await prisma.contact.update({
+            where: { id: existingContact.id },
+            data: updateData,
           });
-          // Trigger form_submission automation
-          await automationRunner.run('form_submission', newContact);
-        } catch (e) {
-          // Ignorar P2002 (telefone duplicado) — contacto já existe
-          if (e.code !== 'P2002') {
-            console.error('Error creating contact from form:', e);
+          automationContact = {
+            ...automationContact,
+            ...syncedContact,
+            formTitle: form.title,
+          };
+          linkedContactId = syncedContact.id;
+          contactSyncStatus = 'updated';
+        } else {
+          const contactLimit = await canCreateContact(form.userId);
+          if (contactLimit.allowed) {
+            syncedContact = await prisma.contact.create({
+              data: {
+                userId: form.userId,
+                name: contactData.name || 'Sem nome',
+                phone: contactData.phone,
+                email: contactData.email || '',
+                company: contactData.company || '',
+                revenue: contactData.revenue || null,
+                sector: contactData.sector || null,
+                stage: defaultStage,
+                inPipeline: true,
+                contactType: 'interessado',
+                status: 'ativo',
+              },
+            });
+            automationContact = {
+              ...automationContact,
+              ...syncedContact,
+              formTitle: form.title,
+            };
+            linkedContactId = syncedContact.id;
+            contactSyncStatus = 'created';
           }
         }
       }
     } catch (error) {
-      // Não bloquear a resposta se falhar ao criar contacto
       console.error('Error in auto-create contact logic:', error);
     }
 
-    res.status(201).json(submission);
+    const submission = await prisma.formSubmission.create({
+      data: {
+        formId: req.params.id,
+        contactId: linkedContactId,
+        contactSyncStatus,
+        answers: {
+          create: answerSnapshots,
+        },
+      },
+      include: {
+        answers: {
+          include: {
+            field: {
+              select: { label: true },
+            },
+          },
+        },
+        contact: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+            company: true,
+            stage: true,
+            inPipeline: true,
+          },
+        },
+      },
+    });
+
+    automationContact.formTitle = form.title;
+
+    if (automationContact) {
+      await automationRunner.run('form_submission', syncedContact || automationContact, { formId: req.params.id, userId: form.userId });
+    }
+
+    if (syncedContact) {
+      submission.contact = submission.contact || {
+        id: syncedContact.id,
+        name: syncedContact.name,
+        phone: syncedContact.phone,
+        email: syncedContact.email,
+        company: syncedContact.company,
+        stage: syncedContact.stage,
+        inPipeline: syncedContact.inPipeline,
+      };
+    }
+
+    res.status(201).json(serialiseSubmission(submission));
   } catch (error) {
     console.error('Error submitting form:', error);
     res.status(500).json({ error: error.message });
@@ -375,10 +524,30 @@ router.get('/:id/submissions', requireAuth, requirePlanFeature('formularios'), a
 
     const submissions = await prisma.formSubmission.findMany({
       where: { formId: req.params.id },
-      include: { answers: true },
+      include: {
+        answers: {
+          include: {
+            field: {
+              select: { label: true },
+            },
+          },
+          orderBy: { fieldLabel: 'asc' },
+        },
+        contact: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+            company: true,
+            stage: true,
+            inPipeline: true,
+          },
+        },
+      },
       orderBy: { submittedAt: 'desc' },
     });
-    res.json(submissions);
+    res.json(submissions.map(serialiseSubmission));
   } catch (error) {
     console.error('Error fetching submissions:', error);
     res.status(500).json({ error: error.message });

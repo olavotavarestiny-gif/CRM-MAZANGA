@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, Task, CRMForm, FormField, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, ProdutoCategoria, ComercialResumo, ComercialAnalise, StockMovement, CaixaSessao, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount } from './types';
+import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, Task, CRMForm, FormField, FormSubmission, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, ProdutoCategoria, ComercialResumo, ComercialAnalise, StockMovement, CaixaSessao, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount } from './types';
 import { createClient } from './supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -291,7 +291,7 @@ export async function submitForm(formId: string, answers: { fieldId: string; val
 }
 
 export async function getFormSubmissions(formId: string) {
-  const response = await api.get(`/api/forms/${formId}/submissions`);
+  const response = await api.get<FormSubmission[]>(`/api/forms/${formId}/submissions`);
   return response.data;
 }
 

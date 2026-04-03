@@ -1,26 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
-
-const DEFAULT_STAGES = [
-  { name: 'Novo',             color: '#3B82F6', order: 0 },
-  { name: 'Contactado',       color: '#F59E0B', order: 1 },
-  { name: 'Qualificado',      color: '#8B5CF6', order: 2 },
-  { name: 'Proposta Enviada', color: '#F97316', order: 3 },
-  { name: 'Fechado',          color: '#10B981', order: 4 },
-  { name: 'Perdido',          color: '#6B7280', order: 5 },
-];
-
-// Seed default stages if user has none
-async function ensureDefaultStages(userId) {
-  const count = await prisma.pipelineStage.count({ where: { userId } });
-  if (count === 0) {
-    await prisma.pipelineStage.createMany({
-      data: DEFAULT_STAGES.map(s => ({ ...s, userId })),
-      skipDuplicates: true,
-    });
-  }
-}
+const { ensureDefaultStages } = require('../lib/pipeline-stages');
 
 // GET /api/pipeline-stages
 router.get('/', async (req, res) => {

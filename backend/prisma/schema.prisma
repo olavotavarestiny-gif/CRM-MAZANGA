@@ -91,6 +91,7 @@ model Contact {
   clienteType   String        @default("particular") // "empresa" | "particular"
   documents     String        @default("[]")
   notes         ContactNote[]
+  formSubmissions FormSubmission[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   user          User?         @relation("ContactUser", fields: [userId], references: [id], onDelete: SetNull)
@@ -188,15 +189,22 @@ model Task {
 model Automation {
   id           String  @id @default(cuid())
   userId       Int?
+  formId       String?
   trigger      String  // "new_contact", "form_submission", "contact_tag", "contact_revenue", "contact_sector"
   triggerValue String? // tag name, revenue range, or sector (for matching conditions)
-  action       String  // "send_email", "send_template", "send_text", "update_stage"
+  action       String  // "send_email", "send_template", "send_text", "update_stage", "create_task"
   targetStage  String? // "Novo", "Contactado", etc. (for update_stage action)
   templateName String?
   emailSubject String?
   emailBody    String?
+  taskTitle    String?
+  taskNotes    String?
+  taskPriority String?
+  taskDueDays  Int?
+  taskAssignedToUserId Int?
   active       Boolean @default(true)
   user         User?   @relation("AutomationUser", fields: [userId], references: [id], onDelete: SetNull)
+  form         Form?   @relation(fields: [formId], references: [id], onDelete: SetNull)
 }
 
 model Form {
@@ -219,6 +227,7 @@ model Form {
   user        User?    @relation("FormUser", fields: [userId], references: [id], onDelete: SetNull)
   fields      FormField[]
   submissions FormSubmission[]
+  automations Automation[]
 }
 
 model FormField {
@@ -237,18 +246,23 @@ model FormField {
 model FormSubmission {
   id          String   @id @default(cuid())
   formId      String
+  contactId   Int?
+  contactSyncStatus String @default("skipped")
   submittedAt DateTime @default(now())
   form        Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
   answers     FormAnswer[]
 }
 
 model FormAnswer {
   id           String         @id @default(cuid())
   submissionId String
-  fieldId      String
+  fieldId      String?
+  fieldLabel   String?
+  contactField String?
   value        String
   submission   FormSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  field        FormField      @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  field        FormField?     @relation(fields: [fieldId], references: [id], onDelete: SetNull)
 }
 
 model Transaction {

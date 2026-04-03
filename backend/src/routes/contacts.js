@@ -6,8 +6,7 @@ const { requirePermission, requireDeletePermission } = require('../lib/permissio
 const { canCreateContact, getLimitState, buildLimitErrorPayload } = require('../lib/plan-limits');
 const { validateNIF } = require('../lib/fiscal/nif-validator');
 const { cleanNifValue, parseCustomFields, resolveContactNif, stripNifKeysFromCustomFields } = require('../lib/contact-nif');
-
-const VALID_STAGES = ['Novo', 'Contactado', 'Qualificado', 'Proposta Enviada', 'Fechado', 'Perdido'];
+const { getDefaultStageName, isValidStageName } = require('../lib/pipeline-stages');
 const VALID_FIELD_TYPES = ['text', 'number', 'date', 'select', 'url'];
 
 // Built-in system field defaults exposed in contact field customization.
@@ -276,14 +275,23 @@ async function getWorkspaceModeForUser(userId) {
   return ownerAccount?.workspaceMode === 'comercio' ? 'comercio' : 'servicos';
 }
 
+async function getValidatedStageName(userId, requestedStage) {
+  if (requestedStage && await isValidStageName(userId, requestedStage)) {
+    return requestedStage;
+  }
+
+  return getDefaultStageName(userId);
+}
+
 // GET all contacts with optional filters
 router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
   try {
     const { stage, search, inPipeline, revenue, contactType } = req.query;
-    const where = { userId: req.user.effectiveUserId };
-    const workspaceMode = await getWorkspaceModeForUser(req.user.effectiveUserId);
+    const userId = req.user.effectiveUserId;
+    const where = { userId };
+    const workspaceMode = await getWorkspaceModeForUser(userId);
 
-    if (stage && VALID_STAGES.includes(stage)) {
+    if (stage && await isValidStageName(userId, stage)) {
       where.stage = stage;
     }
 
@@ -329,6 +337,7 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
 router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const { name, email, phone, company, revenue, sector, stage, tags, customFields, contactType, status, clienteType, nif } = req.body;
+    const userId = req.user.effectiveUserId;
 
     if (!name || !phone) {
       return res.status(400).json({ error: 'Name and phone are required' });
@@ -338,13 +347,13 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
       return res.status(400).json({ error: 'Phone format is invalid. Use only digits, spaces, +, -, (, )' });
     }
 
-    const limitState = await canCreateContact(req.user.effectiveUserId);
+    const limitState = await canCreateContact(userId);
     if (!limitState.allowed) {
       return res.status(403).json(buildLimitErrorPayload(limitState));
     }
 
-    const workspaceMode = await getWorkspaceModeForUser(req.user.effectiveUserId);
-    const finalStage = stage && VALID_STAGES.includes(stage) ? stage : 'Novo';
+    const workspaceMode = await getWorkspaceModeForUser(userId);
+    const finalStage = await getValidatedStageName(userId, stage);
     const finalInPipeline = workspaceMode === 'comercio' ? false : true;
     const finalClienteType = normaliseClienteType(clienteType);
     const finalContactType =
@@ -368,7 +377,7 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
 
     const contact = await prisma.contact.create({
       data: {
-        userId: req.user.effectiveUserId,
+        userId,
         name,
         email: email || '',
         phone,
@@ -425,32 +434,39 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
 router.post('/import', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const { contacts } = req.body;
+    const userId = req.user.effectiveUserId;
 
     if (!Array.isArray(contacts) || contacts.length === 0) {
       return res.status(400).json({ error: 'Invalid contacts array' });
     }
 
+    const defaultStage = await getDefaultStageName(userId);
+    const workspaceMode = await getWorkspaceModeForUser(userId);
+
     // Prepare contacts for insertion
     const preparedContacts = contacts
       .filter((c) => c.phone) // Required field
       .map((c) => ({
-        userId: req.user.effectiveUserId,
+        userId,
         name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.phone,
         email: c.email || '',
         phone: c.phone,
         company: c.companyName || '',
         revenue: c.revenue || null,
         sector: c.sector || null,
-        stage: 'Novo',
+        stage: defaultStage,
+        inPipeline: workspaceMode === 'comercio' ? false : true,
+        contactType: workspaceMode === 'comercio' ? 'cliente' : 'interessado',
+        status: 'ativo',
       }));
 
-    const limitState = await getLimitState(req.user.effectiveUserId, 'contacts');
+    const limitState = await getLimitState(userId, 'contacts');
     if (limitState.rawLimit !== Infinity) {
       const uniquePhones = [...new Set(preparedContacts.map((contact) => contact.phone))];
       const existingContacts = uniquePhones.length
         ? await prisma.contact.findMany({
             where: {
-              userId: req.user.effectiveUserId,
+              userId,
               phone: { in: uniquePhones },
             },
             select: { phone: true },
@@ -581,10 +597,11 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
     const { name, email, phone, company, revenue, sector, stage, inPipeline, tags, customFields, contactType, status, documents, clienteType, nif } = req.body;
     const updateData = {};
     const contactId = parseInt(req.params.id);
+    const userId = req.user.effectiveUserId;
 
     // Verify ownership
     const existing = await prisma.contact.findUnique({ where: { id: contactId } });
-    if (!existing || existing.userId !== req.user.effectiveUserId) {
+    if (!existing || existing.userId !== userId) {
       return res.status(404).json({ error: 'Contact not found' });
     }
 
@@ -592,7 +609,7 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
       return res.status(400).json({ error: 'Phone format is invalid. Use only digits, spaces, +, -, (, )' });
     }
 
-    const workspaceMode = await getWorkspaceModeForUser(req.user.effectiveUserId);
+    const workspaceMode = await getWorkspaceModeForUser(userId);
     const mergedCustomFields =
       customFields && typeof customFields === 'object'
         ? { ...parseCustomFields(existing.customFields), ...customFields }
@@ -620,7 +637,7 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
     if (sector !== undefined) updateData.sector = sector;
     if (inPipeline !== undefined) updateData.inPipeline = inPipeline;
     if (Array.isArray(tags)) updateData.tags = JSON.stringify(tags);
-    if (stage && VALID_STAGES.includes(stage)) {
+    if (stage && await isValidStageName(userId, stage)) {
       updateData.stage = stage;
     }
     if (customFields && typeof customFields === 'object') {
