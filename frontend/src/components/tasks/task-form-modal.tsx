@@ -108,13 +108,20 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
         notes: notes || undefined,
         dueDate: dueDate || undefined,
         priority,
-        contactId: selectedContact?.id ?? null,
+        contactId: selectedContact?.id ?? defaultContactId ?? null,
         assignedToUserId: assignedToUserId ? Number(assignedToUserId) : null,
       };
       return isEdit ? updateTask(task!.id, data) : createTask(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      if (selectedContact?.id != null) {
+        queryClient.invalidateQueries({ queryKey: ['contact', String(selectedContact.id)] });
+      } else if (task?.contact?.id != null) {
+        queryClient.invalidateQueries({ queryKey: ['contact', String(task.contact.id)] });
+      } else if (defaultContactId != null) {
+        queryClient.invalidateQueries({ queryKey: ['contact', String(defaultContactId)] });
+      }
       toast({
         variant: 'success',
         title: isEdit ? 'Tarefa atualizada' : 'Tarefa criada',

@@ -3,21 +3,20 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  getContact, createTask, updateTask, deleteTask, updateContact,
+  getContact, updateTask, deleteTask, updateContact,
   getContactFieldConfigs, getContactFieldDefs, getPipelineStages,
   getContactNotes, createContactNote, updateContactNote, deleteContactNote,
   getContactSummary,
 } from '@/lib/api';
-import { ContactFieldConfig, ContactFieldDef, ContactNote } from '@/lib/types';
+import { ContactFieldConfig, ContactFieldDef, ContactNote, Task } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import TaskItem from '@/components/tasks/task-item';
+import TaskFormModal from '@/components/tasks/task-form-modal';
 import { Badge } from '@/components/ui/badge';
 import {
   Pencil, Check, X, ExternalLink, Phone, Download, Trash2,
@@ -419,7 +418,7 @@ function NoteItem({
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function ContactDetailPage({ params }: { params: { id: string } }) {
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
-  const [newTask, setNewTask] = useState({ title: '', dueDate: '', priority: 'Media', notes: '' });
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [noteInput, setNoteInput] = useState('');
   const [notesSkip, setNotesSkip] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -483,16 +482,6 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const deleteNoteMutation = useMutation({
     mutationFn: (id: number) => deleteContactNote(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contact-notes', params.id] }),
-  });
-
-  const createTaskMutation = useMutation({
-    mutationFn: (data: { title: string; dueDate?: string; priority: string; notes?: string }) =>
-      createTask({ contactId: parseInt(params.id), ...data }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contact', params.id] });
-      setNewTask({ title: '', dueDate: '', priority: 'Media', notes: '' });
-      setIsAddTaskOpen(false);
-    },
   });
 
   const updateTaskMutation = useMutation({
@@ -902,7 +891,7 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
           <Card>
             <CardHeader className="flex justify-between items-center">
               <CardTitle>Tarefas</CardTitle>
-              <Button size="sm" onClick={() => setIsAddTaskOpen(true)}>+ Nova Tarefa</Button>
+              <Button size="sm" onClick={() => { setEditingTask(null); setIsAddTaskOpen(true); }}>+ Nova Tarefa</Button>
             </CardHeader>
             <CardContent>
               {contact.tasks && contact.tasks.length > 0 ? (
@@ -912,7 +901,10 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
                       key={task.id}
                       task={task}
                       onToggleDone={(id, done) => updateTaskMutation.mutate({ id, done })}
-                      onEdit={() => {}}
+                      onEdit={(task) => {
+                        setEditingTask(task);
+                        setIsAddTaskOpen(true);
+                      }}
                       onDelete={(id) => deleteTaskMutation.mutate(id)}
                       isLoading={false}
                     />
@@ -927,47 +919,15 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
         </div>
       </div>
 
-      {/* Nova Tarefa Modal */}
-      <Dialog open={isAddTaskOpen} onOpenChange={setIsAddTaskOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Nova Tarefa</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Título *</Label>
-              <Input placeholder="Ex: Ligar ao cliente" value={newTask.title}
-                onChange={e => setNewTask({ ...newTask, title: e.target.value })} />
-            </div>
-            <div>
-              <Label>Data Limite</Label>
-              <Input type="date" value={newTask.dueDate}
-                onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })} />
-            </div>
-            <div>
-              <Label>Prioridade</Label>
-              <Select value={newTask.priority} onValueChange={v => setNewTask({ ...newTask, priority: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Alta">Alta</SelectItem>
-                  <SelectItem value="Media">Média</SelectItem>
-                  <SelectItem value="Baixa">Baixa</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Notas</Label>
-              <Input placeholder="Notas adicionais..." value={newTask.notes}
-                onChange={e => setNewTask({ ...newTask, notes: e.target.value })} />
-            </div>
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" onClick={() => setIsAddTaskOpen(false)} className="flex-1">Cancelar</Button>
-              <Button onClick={() => { if (newTask.title.trim()) createTaskMutation.mutate(newTask); }}
-                disabled={!newTask.title.trim() || createTaskMutation.isPending} className="flex-1">
-                {createTaskMutation.isPending ? 'A criar...' : 'Criar Tarefa'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <TaskFormModal
+        open={isAddTaskOpen}
+        onClose={() => {
+          setIsAddTaskOpen(false);
+          setEditingTask(null);
+        }}
+        task={editingTask}
+        defaultContactId={parseInt(params.id, 10)}
+      />
     </div>
   );
 }
