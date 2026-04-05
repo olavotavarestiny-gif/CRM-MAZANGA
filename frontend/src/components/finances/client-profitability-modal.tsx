@@ -2,12 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getClientProfitabilityDetail, markTransactionPaid } from '@/lib/api';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { ClientProfitability } from '@/lib/types';
 
@@ -49,19 +44,27 @@ export default function ClientProfitabilityModal({
     'text-red-600';
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white border-[#E2E8F0]">
-        <DialogHeader>
-          <DialogTitle className="text-[#0A2540]">
-            {data?.contact?.name || client?.clientName || '—'}
-            {data?.contact?.company && (
-              <span className="text-[#64748B] font-normal text-sm ml-2">
-                — {data.contact.company}
-              </span>
-            )}
-          </DialogTitle>
-        </DialogHeader>
-
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="lg"
+      scrollable
+      title={
+        <>
+          {data?.contact?.name || client?.clientName || '—'}
+          {data?.contact?.company && (
+            <span className="text-[#64748B] font-normal text-sm ml-2">
+              — {data.contact.company}
+            </span>
+          )}
+        </>
+      }
+      footer={
+        <Button variant="outline" onClick={onClose}>
+          Fechar
+        </Button>
+      }
+    >
         {isLoading ? (
           <div className="py-12 text-center text-[#64748B]">A carregar...</div>
         ) : data ? (
@@ -172,7 +175,6 @@ export default function ClientProfitabilityModal({
         ) : (
           <div className="py-12 text-center text-[#64748B]">Sem dados disponíveis.</div>
         )}
-      </DialogContent>
-    </Dialog>
+    </Modal>
   );
 }

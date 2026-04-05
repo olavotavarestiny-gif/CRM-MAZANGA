@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { EmptyState } from '@/components/ui/empty-state';
+import { FilterBar } from '@/components/ui/filter-bar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, FileText, TrendingUp, Clock, Search } from 'lucide-react';
+import { Plus, FileText, TrendingUp, Clock } from 'lucide-react';
 import { getFacturas, getFaturacaoDashboard } from '@/lib/api';
 
 function fmtKz(n: number) {
@@ -99,17 +100,15 @@ export function TabFacturas() {
       )}
 
       {/* Filters */}
-      <div className="flex gap-3">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Pesquisar por número, cliente ou NIF..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
-            className="pl-9"
-          />
-        </div>
-        <Select value={docType} onValueChange={v => { setDocType(v === 'all' ? '' : v); setPage(1); }}>
+      <FilterBar
+        search={search}
+        onSearchChange={(v) => { setSearch(v); setPage(1); }}
+        placeholder="Pesquisar por número, cliente ou NIF..."
+        isLoading={isLoading}
+        hasActiveFilters={!!search || !!docType || !!docStatus}
+        onClearFilters={() => { setSearch(''); setDocType(''); setDocStatus(''); setPage(1); }}
+      >
+        <Select value={docType || 'all'} onValueChange={v => { setDocType(v === 'all' ? '' : v); setPage(1); }}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Tipo" />
           </SelectTrigger>
@@ -123,7 +122,7 @@ export function TabFacturas() {
             <SelectItem value="PF">PF — Proforma</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={docStatus} onValueChange={v => { setDocStatus(v === 'all' ? '' : v); setPage(1); }}>
+        <Select value={docStatus || 'all'} onValueChange={v => { setDocStatus(v === 'all' ? '' : v); setPage(1); }}>
           <SelectTrigger className="w-36">
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
@@ -133,7 +132,7 @@ export function TabFacturas() {
             <SelectItem value="A">Anulada</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       {/* Table */}
       <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
@@ -146,16 +145,21 @@ export function TabFacturas() {
           <span className="col-span-2 text-right">Estado AGT</span>
         </div>
         {isLoading && (
-          <div className="py-12 text-center text-gray-400">A carregar...</div>
+          <div className="space-y-0">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-12 animate-pulse border-b border-gray-100 bg-gray-50 last:border-0" />
+            ))}
+          </div>
         )}
         {!isLoading && facturas.length === 0 && (
-          <div className="py-12 text-center text-gray-400">
-            <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p>Nenhuma factura encontrada</p>
-            <Link href="/faturacao/nova" className="mt-1 inline-block text-sm text-[#0A2540] underline-offset-4 hover:underline">
-              Criar primeira factura →
-            </Link>
-          </div>
+          <EmptyState
+            variant={search || docType || docStatus ? 'no-results' : 'empty'}
+            icon={FileText}
+            title={search || docType || docStatus ? 'Nenhuma factura encontrada' : 'Ainda não há facturas emitidas'}
+            description={search || docType || docStatus ? 'Tenta ajustar ou limpar os filtros.' : 'Cria a primeira factura para começar a faturar.'}
+            action={!search && !docType && !docStatus ? { label: 'Nova Factura', href: '/faturacao/nova' } : undefined}
+            compact
+          />
         )}
         {facturas.map(f => (
           <Link key={f.id} href={`/faturacao/${f.id}`}

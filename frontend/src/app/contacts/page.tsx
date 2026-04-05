@@ -34,14 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
+import { Modal } from '@/components/ui/modal';
 import ContactForm from '@/components/contacts/contact-form';
 import ImportCSVModal from '@/components/contacts/import-csv-modal';
 import ContactFieldsManager from '@/components/contacts/contact-fields-manager';
@@ -161,22 +154,17 @@ export default function ContactsPage() {
             <Upload className="w-4 h-4 mr-2" />
             Import CSV
           </Button>
-          <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-            <DialogTrigger asChild>
-              <Button data-tour="contacts-new" className="w-full sm:w-auto">Novo Contacto</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Novo Contacto</DialogTitle>
-              </DialogHeader>
-              <ContactForm
-                onSuccess={() => {
-                  setIsFormOpen(false);
-                  queryClient.invalidateQueries({ queryKey: ['contacts'] });
-                }}
-              />
-            </DialogContent>
-          </Dialog>
+          <Button data-tour="contacts-new" className="w-full sm:w-auto" onClick={() => setIsFormOpen(true)}>
+            Novo Contacto
+          </Button>
+          <Modal open={isFormOpen} onClose={() => setIsFormOpen(false)} title="Novo Contacto">
+            <ContactForm
+              onSuccess={() => {
+                setIsFormOpen(false);
+                queryClient.invalidateQueries({ queryKey: ['contacts'] });
+              }}
+            />
+          </Modal>
         </div>
       </div>
 

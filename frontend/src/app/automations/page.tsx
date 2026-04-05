@@ -13,13 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
 import { Switch } from '@/components/ui/switch';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Modal } from '@/components/ui/modal';
 import AutomationForm from '@/components/automations/automation-form';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Trash2, Zap } from 'lucide-react';
@@ -70,22 +64,15 @@ export default function AutomationsPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Automações</h1>
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          <DialogTrigger asChild>
-            <Button>Nova Automação</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Nova Automação</DialogTitle>
-            </DialogHeader>
-            <AutomationForm
-              onSuccess={() => {
-                setIsFormOpen(false);
-                queryClient.invalidateQueries({ queryKey: ['automations'] });
-              }}
-            />
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setIsFormOpen(true)}>Nova Automação</Button>
+        <Modal open={isFormOpen} onClose={() => setIsFormOpen(false)} title="Nova Automação">
+          <AutomationForm
+            onSuccess={() => {
+              setIsFormOpen(false);
+              queryClient.invalidateQueries({ queryKey: ['automations'] });
+            }}
+          />
+        </Modal>
       </div>
 
       <Card className="overflow-hidden">

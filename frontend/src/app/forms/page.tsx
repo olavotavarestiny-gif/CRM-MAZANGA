@@ -8,7 +8,9 @@ import type { User } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Edit, Copy, Plus } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { Trash2, Edit, Copy, Plus, FileText } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -69,23 +71,35 @@ export default function FormsPage() {
       </div>
 
       {isLoading ? (
-        <Card>
-          <CardContent className="pt-8 text-center text-gray-500">
-            <p>A carregar formulários...</p>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="pt-6 space-y-3">
+                <div className="h-5 w-3/4 animate-pulse rounded bg-slate-100" />
+                <div className="h-3 w-full animate-pulse rounded bg-slate-100" />
+                <div className="h-3 w-1/2 animate-pulse rounded bg-slate-100" />
+                <div className="mt-4 flex gap-2">
+                  <div className="h-8 flex-1 animate-pulse rounded bg-slate-100" />
+                  <div className="h-8 flex-1 animate-pulse rounded bg-slate-100" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : isError ? (
-        <Card>
-          <CardContent className="pt-8 text-center text-red-600">
-            <p>Não foi possível carregar os formulários. Recarrega a página para tentar novamente.</p>
-          </CardContent>
-        </Card>
+        <ErrorState
+          title="Não foi possível carregar os formulários"
+          message="Recarrega a página para tentar novamente."
+          onRetry={() => window.location.reload()}
+        />
       ) : forms.length === 0 ? (
-        <Card>
-          <CardContent className="pt-8 text-center text-gray-500">
-            <p>Nenhum formulário criado ainda</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          variant="empty"
+          icon={FileText}
+          title="Nenhum formulário criado ainda"
+          description="Cria o primeiro formulário para capturar leads directamente no teu site."
+          action={{ label: 'Criar primeiro formulário', onClick: () => createMutation.mutate() }}
+        />
       ) : (
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {forms.map((form) => (
