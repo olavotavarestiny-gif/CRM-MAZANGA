@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { isPast, isSameDay, parseISO } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -12,7 +12,7 @@ import {
   Settings2,
   Workflow,
 } from 'lucide-react';
-import { getContacts, getCurrentUser, getFinanceDashboard, getTasks } from '@/lib/api';
+import { getContacts, getCurrentUser, getDailySuggestion, getFinanceDashboard, getTasks } from '@/lib/api';
 import { isComercio } from '@/lib/business-modes';
 import type { Contact, DashboardStats, Task } from '@/lib/types';
 import PainelComercialPage from '@/components/comercial/painel-comercial';
@@ -23,8 +23,10 @@ import StatWidget from '@/components/dashboard/stat-widget';
 import TasksWidget from '@/components/dashboard/tasks-widget';
 import { SOURCE_UNITS, type DashboardWidget, type WidgetSource } from '@/components/dashboard/types';
 import { useDashboardConfig } from '@/components/dashboard/use-dashboard-config';
-import WeeklyInsightCard from '@/components/dashboard/weekly-insight-card';
+import SuggestionCard from '@/components/dashboard/suggestion-card';
 import WidgetWrapper from '@/components/dashboard/widget-wrapper';
+import OnboardingChecklist from '@/components/onboarding/onboarding-checklist';
+import { useToast } from '@/components/ui/toast-provider';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
@@ -191,6 +193,24 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
   const [customizerOpen, setCustomizerOpen] = useState(false);
   const dashboardScope = currentUser?.id ?? 'demo-user';
   const { widgets, loaded } = useDashboardConfig(dashboardScope);
+  const { toast } = useToast();
+  const toastShownRef = useRef(false);
+
+  const { data: dailySuggestion } = useQuery({
+    queryKey: ['daily-suggestion'],
+    queryFn: getDailySuggestion,
+    staleTime: 1000 * 60 * 60 * 8,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (toastShownRef.current) return;
+    const s = dailySuggestion?.suggestion;
+    if (s && s.type === 'action' && s.priority >= 9) {
+      toastShownRef.current = true;
+      toast({ title: s.title, description: s.message, variant: 'info' });
+    }
+  }, [dailySuggestion, toast]);
 
   const {
     data: contacts = [],
@@ -251,8 +271,6 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
   const visible = widgets.filter((widget) => widget.visible);
   const statGoalWidgets = visible.filter((widget) => widget.type === 'stat' || widget.type === 'goal');
   const otherWidgets = visible.filter((widget) => widget.type === 'tasks' || widget.type === 'pipeline');
-  const pipelineCount = sourceValues.pipeline_count;
-  const pendingTasks = sourceValues.tasks_pending;
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -268,6 +286,8 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
           Personalizar
         </Button>
       </div>
+
+      <OnboardingChecklist currentUser={currentUser} />
 
       {(contactsError || tasksError) && (
         <div className="mb-6">
@@ -337,9 +357,11 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
         </div>
       )}
 
-      <div className="mb-6 max-w-2xl">
-        <WeeklyInsightCard pendingTasks={pendingTasks} pipelineCount={pipelineCount} />
-      </div>
+      {dailySuggestion?.show && (
+        <div className="mb-6 max-w-2xl">
+          <SuggestionCard suggestion={dailySuggestion.suggestion} />
+        </div>
+      )}
 
       {otherWidgets.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

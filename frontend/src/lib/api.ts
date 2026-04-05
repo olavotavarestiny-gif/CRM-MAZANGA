@@ -1275,4 +1275,47 @@ export async function emitQuickSale(payload: {
   return res.data;
 }
 
+export interface OnboardingStep {
+  id: string;
+  label: string;
+  href: string;
+  completed: boolean;
+}
+
+export interface OnboardingData {
+  show: boolean;
+  dismissed: boolean;
+  completedCount: number;
+  totalCount: number;
+  allDone?: boolean;
+  steps?: OnboardingStep[];
+}
+
+export async function getOnboarding(): Promise<OnboardingData> {
+  const res = await api.get<OnboardingData>('/api/onboarding');
+  return res.data;
+}
+
+export async function dismissOnboarding(): Promise<void> {
+  await api.post('/api/onboarding/dismiss');
+}
+
+export interface DailySuggestion {
+  show: boolean;
+  suggestion?: {
+    id: string;
+    type: 'insight' | 'action' | 'automation';
+    title: string;
+    message: string;
+    ctaLabel?: string;
+    ctaAction?: string;
+    priority: number;
+  };
+}
+
+export async function getDailySuggestion(): Promise<DailySuggestion> {
+  const res = await api.post<DailySuggestion>('/api/daily-tip/deliver');
+  return res.data;
+}
+
 export default api;

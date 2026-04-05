@@ -35,6 +35,8 @@ const notesRouter = require('./routes/notes');
 const quickSalesRouter = require('./routes/quick-sales');
 const caixaSessoesRouter = require('./routes/caixa-sessoes');
 const activityRouter = require('./routes/activity');
+const dailyTipRouter = require('./routes/daily-tip');
+const onboardingRouter = require('./routes/onboarding');
 const requireAuth = require('./middleware/auth');
 const { requireSuperAdmin } = require('./middleware/auth');
 const { requirePlanFeature } = require('./lib/plan-limits');
@@ -135,6 +137,8 @@ app.use('/api/chat', requireAuth, requirePlanFeature('conversas'), chatRouter);
 app.use('/api/quick-sales', requireAuth, requirePlanFeature('vendas'), quickSalesRouter);
 app.use('/api/caixa', requireAuth, requirePlanFeature('vendas'), caixaSessoesRouter);
 app.use('/api/activity', requireAuth, activityRouter);
+app.use('/api/daily-tip', requireAuth, dailyTipRouter);
+app.use('/api/onboarding', requireAuth, onboardingRouter);
 app.use('/api', requireAuth, notesRouter);
 
 // Scheduler: process recurring invoices daily at 00:05

@@ -60,6 +60,7 @@ model User {
   chatChannelMemberships    ChatChannelMember[]    @relation("ChatMemberUser")
   chatMessagesSent          ChatMessage[]          @relation("ChatSenderUser")
   contactNotes              ContactNote[]          @relation("NoteAuthor")
+  suggestionDeliveries      SuggestionDelivery[]
 
   @@index([assignedEstabelecimentoId])
 }
@@ -689,4 +690,28 @@ model ChatMessage {
   sender      User        @relation("ChatSenderUser", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([channelId, createdAt])
+}
+
+model OnboardingProgress {
+  id              String    @id @default(cuid())
+  organization_id String    @unique // effectiveUserId as String
+  workspace_mode  String    // locked at creation: "servicos" | "comercio"
+  completed_steps String[]  @default([])
+  dismissed       Boolean   @default(false)
+  dismissed_at    DateTime?
+  completed_at    DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+}
+
+model SuggestionDelivery {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  date         String   // "YYYY-MM-DD" — one row per user per day
+  suggestionId String
+  payload      String?  // JSON — stored suggestion payload for consistent re-delivery
+  shownAt      DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
 }

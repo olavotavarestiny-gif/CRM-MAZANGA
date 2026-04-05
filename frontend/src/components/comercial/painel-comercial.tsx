@@ -16,8 +16,10 @@ import {
   Trophy,
   Unlock,
 } from 'lucide-react';
-import { getCaixaSessaoAtual, getComercialAnalise, getComercialInsights, getComercialResumo, getCurrentUser } from '@/lib/api';
+import { getCaixaSessaoAtual, getComercialAnalise, getComercialResumo, getCurrentUser, getDailySuggestion } from '@/lib/api';
 import type { User } from '@/lib/api';
+import SuggestionCard from '@/components/dashboard/suggestion-card';
+import OnboardingChecklist from '@/components/onboarding/onboarding-checklist';
 import WidgetWrapper from '@/components/dashboard/widget-wrapper';
 import { CommerceButton as Button } from '@/components/ui/button-commerce';
 import { Badge } from '@/components/ui/badge';
@@ -429,16 +431,12 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
     enabled: !!currentUser && podeResumo,
   });
 
-  const {
-    data: insights = [],
-    isLoading: insightsLoading,
-    isError: insightsError,
-    refetch: refetchInsights,
-  } = useQuery({
-    queryKey: ['comercial-insights'],
-    queryFn: getComercialInsights,
-    refetchInterval: 60_000,
-    enabled: !!currentUser && podeResumo,
+  const { data: dailySuggestion } = useQuery({
+    queryKey: ['daily-suggestion'],
+    queryFn: getDailySuggestion,
+    staleTime: 1000 * 60 * 60 * 8,
+    retry: false,
+    enabled: !!currentUser,
   });
 
   const {
@@ -511,6 +509,8 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
         ) : null}
       </div>
 
+      <OnboardingChecklist currentUser={currentUser} />
+
       {modo === 'analise' && podeAnalise ? (
         <PainelAnalise />
       ) : (
@@ -562,30 +562,9 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            <Card className="border-slate-200 p-5 shadow-sm">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-[#B84D0E]" />
-                <p className="text-sm font-semibold text-[#2c2f31]">Insights do Dia</p>
-              </div>
-              <div className="mt-4">
-                <WidgetWrapper
-                  title="insights do dia"
-                  isLoading={insightsLoading}
-                  error={insightsError}
-                  isEmpty={!insightsLoading && !insightsError && insights.length === 0}
-                  onRetry={() => refetchInsights()}
-                  className="border-0 bg-transparent p-0"
-                >
-                  <div className="space-y-3">
-                    {insights.map((insight) => (
-                      <div key={insight} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                        {insight}
-                      </div>
-                    ))}
-                  </div>
-                </WidgetWrapper>
-              </div>
-            </Card>
+            {dailySuggestion?.show && (
+              <SuggestionCard suggestion={dailySuggestion.suggestion} />
+            )}
 
             <Card className="border-slate-200 p-5 shadow-sm">
               <p className="text-sm font-semibold text-[#2c2f31]">Ações rápidas</p>

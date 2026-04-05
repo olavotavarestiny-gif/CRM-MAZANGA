@@ -14,7 +14,7 @@ import { isComercio } from '@/lib/business-modes';
 import KukuGestLogo from '@/components/KukuGestLogo';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
-import { getChatUnreadCount } from '@/lib/api';
+import { getChatUnreadCount, getOnboarding } from '@/lib/api';
 import { canAccessCommerceRoute, canView } from '@/lib/permissions';
 import type { ModuleKey } from '@/lib/permissions';
 import { ONBOARDING_OPEN, ONBOARDING_DISMISSED } from '@/lib/onboarding-tasks';
@@ -58,6 +58,23 @@ export default function Sidebar({
     refetchInterval: 15_000,
     enabled: !!currentUser && canView(currentUser, 'chat'),
   });
+
+  const isOnboardingEligible = !!(
+    currentUser && (currentUser.isSuperAdmin || currentUser.role === 'admin' || !currentUser.accountOwnerId)
+  );
+  const { data: onboarding } = useQuery({
+    queryKey: ['onboarding'],
+    queryFn: getOnboarding,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    enabled: isOnboardingEligible,
+  });
+  const showOnboardingBadge =
+    isOnboardingEligible &&
+    onboarding &&
+    !onboarding.dismissed &&
+    !onboarding.allDone &&
+    onboarding.totalCount > 0;
 
   const navItemClass = (active: boolean) => cn(
     'flex items-center gap-3 px-3 py-2 transition-all text-sm font-medium rounded-xl',
@@ -292,6 +309,28 @@ export default function Sidebar({
               {currentUser.plan.toUpperCase()}
             </div>
           </div>
+        )}
+        {showOnboardingBadge && (
+          <Link
+            href="/"
+            onClick={onClose}
+            className="mb-1 flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 hover:bg-slate-100 transition-colors"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-[#2c2f31]">Configuração inicial</p>
+              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className="h-full rounded-full bg-[#1A6FD4] transition-all"
+                  style={{
+                    width: `${Math.round(((onboarding?.completedCount ?? 0) / (onboarding?.totalCount ?? 1)) * 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+            <span className="flex-shrink-0 text-xs font-bold text-[#1A6FD4]">
+              {onboarding?.completedCount}/{onboarding?.totalCount}
+            </span>
+          </Link>
         )}
         {!comercio && (
           <Link href="/configuracoes" className={navItemClass(isActive('/configuracoes'))} onClick={onClose}>
