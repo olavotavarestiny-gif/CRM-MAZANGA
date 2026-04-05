@@ -18,6 +18,7 @@ const setupRouter = require('./routes/setup');
 const financesRouter = require('./routes/finances');
 const accountRouter = require('./routes/account');
 const pipelineStagesRouter = require('./routes/pipeline-stages');
+const pipelineAnalyticsRouter = require('./routes/pipeline-analytics');
 const calendarRouter = require('./routes/calendar');
 const faturacaoConfigRouter = require('./routes/faturacao-config');
 const faturacaoSeriesRouter = require('./routes/faturacao-series');
@@ -116,6 +117,7 @@ app.use('/api/superadmin', requireAuth, requireSuperAdmin, superadminRouter);
 app.use('/api/finances', requireAuth, requirePlanFeature('financas'), financesRouter);
 app.use('/api/account', requireAuth, accountRouter);
 app.use('/api/pipeline-stages', requireAuth, pipelineStagesRouter);
+app.use('/api/pipeline/analytics', requireAuth, requirePlanFeature('processos'), pipelineAnalyticsRouter);
 app.use('/api/calendar', calendarRouter);
 // Faturação AGT
 app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoConfigRouter);

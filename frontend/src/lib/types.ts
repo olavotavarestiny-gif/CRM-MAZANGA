@@ -8,6 +8,84 @@ export interface PipelineStage {
   order: number;
   createdAt: string;
 }
+
+export interface PipelineAnalyticsConversionStage {
+  stage: string;
+  color: string;
+  currentCount: number;
+  reachedCount: number;
+  advancementRate: number | null;
+  stageConversionRate: number | null;
+}
+
+export interface PipelineAnalyticsConversionResponse {
+  range: {
+    period: '7d' | '30d' | '90d';
+    start: string;
+    end: string;
+    previousStart: string;
+    previousEnd: string;
+  };
+  totalContacts: number;
+  closedContacts: number;
+  totalConversionRate: number | null;
+  byStage: PipelineAnalyticsConversionStage[];
+}
+
+export interface PipelineAnalyticsVelocityStage {
+  stage: string;
+  color: string;
+  contactCount: number;
+  currentDays: number | null;
+  previousDays: number | null;
+  deltaDays: number | null;
+}
+
+export interface PipelineAnalyticsVelocityResponse {
+  range: {
+    period: '7d' | '30d' | '90d';
+    start: string;
+    end: string;
+    previousStart: string;
+    previousEnd: string;
+  };
+  averageCurrentDays: number | null;
+  averagePreviousDays: number | null;
+  byStage: PipelineAnalyticsVelocityStage[];
+}
+
+export interface PipelineAnalyticsForecastStage {
+  stage: string;
+  color: string;
+  contacts: number;
+  currentValue: number;
+  historicalConversionRate: number;
+  weightedForecastValue: number;
+}
+
+export interface PipelineAnalyticsForecastResponse {
+  currentValue: number;
+  forecastValue: number;
+  totalClosedContacts: number;
+  low_confidence: boolean;
+  stageForecasts: PipelineAnalyticsForecastStage[];
+}
+
+export interface PipelineAnalyticsTeamMember {
+  userId: number;
+  name: string;
+  email: string;
+  role: string;
+  activeContacts: number;
+  closedContacts: number;
+  totalContacts: number;
+  showConversionRate: boolean;
+  conversionRate: number | null;
+}
+
+export interface PipelineAnalyticsTeamResponse {
+  members: PipelineAnalyticsTeamMember[];
+}
 export type Priority = 'Alta' | 'Media' | 'Baixa';
 
 export interface Task {

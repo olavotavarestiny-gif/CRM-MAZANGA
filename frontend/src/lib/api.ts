@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, AutomationLogsResponse, AutomationStatsResponse, Task, CRMForm, FormField, FormSubmission, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, ProdutoCategoria, ComercialResumo, ComercialAnalise, StockMovement, CaixaSessao, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount } from './types';
+import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, AutomationLogsResponse, AutomationStatsResponse, Task, CRMForm, FormField, FormSubmission, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, PipelineAnalyticsConversionResponse, PipelineAnalyticsVelocityResponse, PipelineAnalyticsForecastResponse, PipelineAnalyticsTeamResponse, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, ProdutoCategoria, ComercialResumo, ComercialAnalise, StockMovement, CaixaSessao, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount } from './types';
 import { createClient } from './supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -175,6 +175,38 @@ export async function deletePipelineStage(id: string) {
 
 export async function reorderPipelineStages(order: { id: string; order: number }[]) {
   const response = await api.put<PipelineStage[]>('/api/pipeline-stages/reorder', { order });
+  return response.data;
+}
+
+export async function getPipelineAnalyticsConversion(params: {
+  organization_id: number;
+  period?: '7d' | '30d' | '90d';
+}) {
+  const response = await api.get<PipelineAnalyticsConversionResponse>('/api/pipeline/analytics/conversion', { params });
+  return response.data;
+}
+
+export async function getPipelineAnalyticsVelocity(params: {
+  organization_id: number;
+  period?: '7d' | '30d' | '90d';
+}) {
+  const response = await api.get<PipelineAnalyticsVelocityResponse>('/api/pipeline/analytics/velocity', { params });
+  return response.data;
+}
+
+export async function getPipelineAnalyticsForecast(params: {
+  organization_id: number;
+  period?: '7d' | '30d' | '90d';
+}) {
+  const response = await api.get<PipelineAnalyticsForecastResponse>('/api/pipeline/analytics/forecast', { params });
+  return response.data;
+}
+
+export async function getPipelineAnalyticsTeam(params: {
+  organization_id: number;
+  period?: '7d' | '30d' | '90d';
+}) {
+  const response = await api.get<PipelineAnalyticsTeamResponse>('/api/pipeline/analytics/team', { params });
   return response.data;
 }
 
