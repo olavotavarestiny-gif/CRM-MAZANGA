@@ -5,6 +5,7 @@ const { createFactura } = require('../lib/faturacao/create-factura');
 const { isMock } = require('../lib/faturacao/agt-api');
 const { generateFacturaPDF } = require('../lib/faturacao/pdf');
 const { logEvent } = require('../lib/faturacao/audit');
+const { logInvoiceStatusChangeActivity } = require('../lib/activity-log');
 const {
   isInvoicePaid,
   reconcileInvoicePayment,
@@ -131,6 +132,18 @@ router.post('/facturas/:id/anular', async (req, res) => {
     });
 
     await logEvent('CANCEL_FACTURA', 'FACTURA', req.params.id, userId, req, { documentNo: factura.documentNo, motivo });
+    await logInvoiceStatusChangeActivity({
+      facturaId: req.params.id,
+      organizationId: userId,
+      actor: req,
+      entityLabel: factura.documentNo,
+      oldStatus: 'Normal',
+      newStatus: 'Anulada',
+      metadata: {
+        document_no: factura.documentNo,
+        motivo,
+      },
+    });
 
     res.json(updated);
   } catch (err) {

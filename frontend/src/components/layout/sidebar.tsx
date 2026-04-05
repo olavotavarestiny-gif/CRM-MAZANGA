@@ -8,7 +8,7 @@ import {
   BarChart3, Users, MessageSquare, Zap, Kanban,
   CheckSquare, FileText, LogOut, X, DollarSign, CalendarDays,
   Package, Settings, HelpCircle, ShieldAlert, ShoppingBag, ShoppingCart,
-  ChevronDown, CreditCard,
+  ChevronDown, CreditCard, Clock3,
 } from 'lucide-react';
 import { isComercio } from '@/lib/business-modes';
 import KukuGestLogo from '@/components/KukuGestLogo';
@@ -83,6 +83,7 @@ export default function Sidebar({
 
   const isVisible = (href: string) => {
     if (!currentUser) return false;
+    if (href === '/activity') return canSeeActivity;
     if (comercio) return canAccessCommerceRoute(currentUser, href);
     const module = hrefToModule[href];
     if (module === null) return true; // always visible (painel)
@@ -93,6 +94,10 @@ export default function Sidebar({
     currentUser &&
     !comercio &&
     isVisible('/pipeline') &&
+    (currentUser.isSuperAdmin || currentUser.role === 'admin' || !currentUser.accountOwnerId)
+  );
+  const canSeeActivity = !!(
+    currentUser &&
     (currentUser.isSuperAdmin || currentUser.role === 'admin' || !currentUser.accountOwnerId)
   );
 
@@ -122,11 +127,13 @@ export default function Sidebar({
   const comercioGestaoInternaLinks = comercio ? [
     { href: '/vendas', label: 'Faturação', icon: ShoppingBag, module: 'vendas' as const },
     { href: '/finances', label: 'Finanças', icon: DollarSign, module: 'finances' as const },
+    ...(canSeeActivity ? [{ href: '/activity', label: 'Atividade', icon: Clock3 }] : []),
     { href: '/configuracoes', label: 'Configurações', icon: Settings },
   ].filter(l => isVisible(l.href)) : [];
 
   const allGestaoLinks = [
     { href: '/finances', label: 'Finanças', icon: DollarSign },
+    ...(canSeeActivity ? [{ href: '/activity', label: 'Atividade', icon: Clock3 }] : []),
   ];
 
   const mainLinks = allMainLinks.filter((link) => isVisible(link.href));

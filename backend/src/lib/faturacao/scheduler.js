@@ -5,6 +5,7 @@ const { getNextDocumentNumber } = require('./numeracao');
 const { generateQRCode } = require('./qrcode');
 const { registarFatura } = require('./agt-api');
 const { registerFacturaFinanceEntry } = require('./register-finance-entry');
+const { logInvoiceCreatedActivity, buildActivityActor } = require('../activity-log');
 
 const prisma = new PrismaClient();
 
@@ -29,7 +30,7 @@ function calcNextRunDate(current, frequency) {
  * Processes a single recurring invoice template and creates a real Factura.
  * @param {object} rec - FacturaRecorrente record with serie and estabelecimento included
  */
-async function processOne(rec) {
+async function processOne(rec, actor = null) {
   const lines = JSON.parse(rec.lines);
 
   // Calculate totals from line template
@@ -117,6 +118,12 @@ async function processOne(rec) {
     return createdFactura;
   });
 
+  await logInvoiceCreatedActivity(factura, actor || {
+    organization_id: rec.userId,
+    user_id: rec.userId,
+    user_name: 'Sistema',
+  });
+
   return factura;
 }
 
@@ -125,7 +132,7 @@ async function processOne(rec) {
  * Can be called by cron or manually for a specific ID.
  * @param {string|null} specificId - If set, only process this record (ignore nextRunDate)
  */
-async function processRecorrentes(specificId = null) {
+async function processRecorrentes(specificId = null, actor = null) {
   const now = new Date();
 
   const where = specificId
@@ -139,7 +146,7 @@ async function processRecorrentes(specificId = null) {
 
   for (const rec of due) {
     try {
-      const factura = await processOne(rec);
+      const factura = await processOne(rec, buildActivityActor(actor, rec.userId));
       const newTotal = rec.totalGenerated + 1;
       const shouldDeactivate = rec.maxOccurrences != null && newTotal >= rec.maxOccurrences;
 

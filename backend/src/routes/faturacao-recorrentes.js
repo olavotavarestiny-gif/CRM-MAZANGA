@@ -146,7 +146,7 @@ router.post('/recorrentes/:id/trigger', async (req, res) => {
     const existing = await prisma.facturaRecorrente.findFirst({ where: { id: req.params.id, userId } });
     if (!existing) return res.status(404).json({ error: 'Não encontrado' });
 
-    const count = await processRecorrentes(req.params.id);
+    const count = await processRecorrentes(req.params.id, req);
     if (count === 0) {
       return res.status(400).json({ error: 'Fatura recorrente não encontrada ou inativa' });
     }

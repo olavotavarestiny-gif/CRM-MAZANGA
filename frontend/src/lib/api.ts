@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, AutomationLogsResponse, AutomationStatsResponse, Task, CRMForm, FormField, FormSubmission, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, PipelineAnalyticsConversionResponse, PipelineAnalyticsVelocityResponse, PipelineAnalyticsForecastResponse, PipelineAnalyticsTeamResponse, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, ProdutoCategoria, ComercialResumo, ComercialAnalise, StockMovement, CaixaSessao, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount } from './types';
+import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, AutomationLogsResponse, AutomationStatsResponse, Task, CRMForm, FormField, FormSubmission, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, PipelineAnalyticsConversionResponse, PipelineAnalyticsVelocityResponse, PipelineAnalyticsForecastResponse, PipelineAnalyticsTeamResponse, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, ProdutoCategoria, ComercialResumo, ComercialAnalise, StockMovement, CaixaSessao, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount, ActivityEntityHistoryResponse, ActivityFeedResponse } from './types';
 import { createClient } from './supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -101,6 +101,28 @@ export async function getContactSummary(contactId: number) {
     transacoes: any[];
     faturas: any[];
   };
+}
+
+export async function getEntityHistory(
+  entityType: string,
+  entityId: string | number,
+  params?: { page?: number; pageSize?: number }
+) {
+  const response = await api.get<ActivityEntityHistoryResponse>(`/api/activity/entity/${entityType}/${entityId}`, { params });
+  return response.data;
+}
+
+export async function getActivityFeed(params?: {
+  page?: number;
+  pageSize?: number;
+  userId?: number;
+  entityType?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  const response = await api.get<ActivityFeedResponse>('/api/activity', { params });
+  return response.data;
 }
 
 export interface ImportContactData {
@@ -657,6 +679,24 @@ export async function downloadTransactionsCSV(params?: { dateFrom?: string; date
   const link = document.createElement('a');
   link.href = url;
   link.setAttribute('download', `transacoes-${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+export async function downloadActivityCsv(params?: {
+  userId?: number;
+  entityType?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}): Promise<void> {
+  const response = await api.get('/api/activity/export-csv', { params, responseType: 'blob' });
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `atividade-${new Date().toISOString().slice(0, 10)}.csv`);
   document.body.appendChild(link);
   link.click();
   link.remove();

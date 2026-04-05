@@ -234,6 +234,26 @@ model AutomationLog {
   @@map("automation_log")
 }
 
+model ActivityLog {
+  id              String   @id @default(cuid())
+  organization_id Int
+  entity_type     String
+  entity_id       String
+  entity_label    String
+  action          String
+  field_changed   String?
+  old_value       String?
+  new_value       String?
+  user_id         Int
+  user_name       String
+  metadata        Json?
+  created_at      DateTime @default(now())
+
+  @@index([organization_id, created_at])
+  @@index([entity_type, entity_id])
+  @@map("activity_log")
+}
+
 model Form {
   id                String           @id @default(cuid())
   userId            Int?

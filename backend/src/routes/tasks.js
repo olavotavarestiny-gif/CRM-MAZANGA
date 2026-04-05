@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requirePermission, requireDeletePermission, canPerform } = require('../lib/permissions');
+const { log: logActivity } = require('../services/activity-log.service.js');
 const { canCreateTask, buildLimitErrorPayload } = require('../lib/plan-limits');
 
 const router = express.Router();
@@ -129,6 +130,15 @@ async function notifyTaskAssignment({ req, assignedToUserId, taskTitle, taskId, 
   });
 }
 
+async function logTaskActivity(req, data) {
+  await logActivity({
+    organization_id: req.user.effectiveUserId,
+    user_id: req.user.id,
+    user_name: req.user.name,
+    ...data,
+  });
+}
+
 // GET all tasks
 router.get('/', requirePermission('tasks', 'view'), async (req, res) => {
   try {
@@ -208,6 +218,17 @@ router.post('/', requirePermission('tasks', 'edit'), async (req, res) => {
       previousAssignedToUserId: null,
     });
 
+    await logTaskActivity(req, {
+      entity_type: 'task',
+      entity_id: task.id,
+      entity_label: task.title,
+      action: 'created',
+      metadata: {
+        task_id: task.id,
+        assigned_to_name: task.assignedTo?.name || null,
+      },
+    });
+
     res.status(201).json(task);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create task' });
@@ -226,7 +247,7 @@ router.put('/:id', requirePermission('tasks', 'edit'), async (req, res) => {
 
     const task = await prisma.task.findFirst({
       where: { id: parseInt(id), userId: req.user.effectiveUserId },
-      select: { userId: true, assignedToUserId: true, title: true },
+      select: { userId: true, assignedToUserId: true, title: true, done: true },
     });
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
@@ -274,6 +295,42 @@ router.put('/:id', requirePermission('tasks', 'edit'), async (req, res) => {
       previousAssignedToUserId: task.assignedToUserId,
     });
 
+    if (task.done !== updatedTask.done) {
+      await logTaskActivity(req, {
+        entity_type: 'task',
+        entity_id: updatedTask.id,
+        entity_label: updatedTask.title,
+        action: 'status_changed',
+        field_changed: 'done',
+        old_value: task.done ? 'Concluída' : 'Por fazer',
+        new_value: updatedTask.done ? 'Concluída' : 'Por fazer',
+        metadata: {
+          task_id: updatedTask.id,
+        },
+      });
+    }
+
+    if (task.assignedToUserId !== updatedTask.assignedToUserId) {
+      const previousAssignee = task.assignedToUserId
+        ? await getOrgMember(req.user.effectiveUserId, task.assignedToUserId)
+        : null;
+
+      await logTaskActivity(req, {
+        entity_type: 'task',
+        entity_id: updatedTask.id,
+        entity_label: updatedTask.title,
+        action: 'updated',
+        field_changed: 'assigned_to',
+        old_value: previousAssignee?.name || 'Sem responsável',
+        new_value: updatedTask.assignedTo?.name || 'Sem responsável',
+        metadata: {
+          task_id: updatedTask.id,
+          previous_assigned_to_name: previousAssignee?.name || null,
+          new_assigned_to_name: updatedTask.assignedTo?.name || null,
+        },
+      });
+    }
+
     res.json(updatedTask);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update task' });
@@ -287,13 +344,22 @@ router.delete('/:id', requireDeletePermission, async (req, res) => {
 
     const task = await prisma.task.findFirst({
       where: { id: parseInt(id), userId: req.user.effectiveUserId },
-      select: { userId: true },
+      select: { id: true, userId: true, title: true },
     });
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
 
     await prisma.task.delete({ where: { id: parseInt(id) } });
+    await logTaskActivity(req, {
+      entity_type: 'task',
+      entity_id: task.id,
+      entity_label: task.title,
+      action: 'deleted',
+      metadata: {
+        task_id: task.id,
+      },
+    });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete task' });

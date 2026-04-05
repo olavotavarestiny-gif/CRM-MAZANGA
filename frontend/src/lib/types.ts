@@ -266,6 +266,51 @@ export interface AutomationLogsResponse {
   };
 }
 
+export interface ActivityLogEntry {
+  id: string;
+  organization_id: number;
+  entity_type: 'contact' | 'invoice' | 'task' | 'pipeline_stage' | string;
+  entity_id: string;
+  entity_label: string;
+  action: 'created' | 'updated' | 'deleted' | 'stage_changed' | 'status_changed' | string;
+  field_changed?: string | null;
+  old_value?: string | null;
+  new_value?: string | null;
+  user_id: number;
+  user_name: string;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface ActivityPagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface ActivityEntityHistoryResponse {
+  data: ActivityLogEntry[];
+  pagination: ActivityPagination;
+}
+
+export interface ActivityFeedResponse {
+  data: ActivityLogEntry[];
+  pagination: ActivityPagination;
+  users: Array<{
+    id: number;
+    name: string;
+    email: string;
+  }>;
+  filters: {
+    userId: number | null;
+    entityType: string | null;
+    search: string;
+    dateFrom: string | null;
+    dateTo: string | null;
+  };
+}
+
 export interface AutomationStatsEntry {
   automation_id: string;
   automation: Automation;

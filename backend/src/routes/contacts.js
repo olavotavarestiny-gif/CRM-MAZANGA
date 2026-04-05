@@ -3,11 +3,36 @@ const router = express.Router();
 const prisma = require('../lib/prisma');
 const automationRunner = require('../services/automationRunner');
 const { requirePermission, requireDeletePermission } = require('../lib/permissions');
+const { log: logActivity } = require('../services/activity-log.service.js');
 const { canCreateContact, getLimitState, buildLimitErrorPayload } = require('../lib/plan-limits');
 const { validateNIF } = require('../lib/fiscal/nif-validator');
 const { cleanNifValue, parseCustomFields, resolveContactNif, stripNifKeysFromCustomFields } = require('../lib/contact-nif');
 const { getDefaultStageName, isValidStageName } = require('../lib/pipeline-stages');
 const VALID_FIELD_TYPES = ['text', 'number', 'date', 'select', 'url'];
+
+function parseTags(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value !== 'string') return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function formatTagsValue(tags) {
+  return tags.length > 0 ? tags.join(', ') : 'Sem tags';
+}
+
+async function logContactActivity(req, data) {
+  await logActivity({
+    organization_id: req.user.effectiveUserId,
+    user_id: req.user.id,
+    user_name: req.user.name,
+    ...data,
+  });
+}
 
 // Built-in system field defaults exposed in contact field customization.
 const SYSTEM_FIELD_DEFAULTS = [
@@ -395,6 +420,16 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
       },
     });
 
+    await logContactActivity(req, {
+      entity_type: 'contact',
+      entity_id: contact.id,
+      entity_label: contact.name,
+      action: 'created',
+      metadata: {
+        source: 'manual',
+      },
+    });
+
     // Run automations for new_contact trigger (don't wait, just fire and forget)
     console.log(`[AUTOMATION] New contact created: ${contact.name} (ID: ${contact.id})`);
     automationRunner.run('new_contact', contact).catch((err) => {
@@ -487,6 +522,15 @@ router.post('/import', requirePermission('contacts', 'edit'), async (req, res) =
         prisma.contact
           .create({ data: contact })
           .then(async (newContact) => {
+            await logContactActivity(req, {
+              entity_type: 'contact',
+              entity_id: newContact.id,
+              entity_label: newContact.name,
+              action: 'created',
+              metadata: {
+                source: 'csv_import',
+              },
+            });
             // Run automations for each new contact
             await automationRunner.run('new_contact', newContact);
             return newContact;
@@ -668,6 +712,72 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
       data: updateData,
     });
 
+    if (existing.name !== contact.name) {
+      await logContactActivity(req, {
+        entity_type: 'contact',
+        entity_id: contact.id,
+        entity_label: contact.name,
+        action: 'updated',
+        field_changed: 'name',
+        old_value: existing.name,
+        new_value: contact.name,
+      });
+    }
+
+    if (existing.email !== contact.email) {
+      await logContactActivity(req, {
+        entity_type: 'contact',
+        entity_id: contact.id,
+        entity_label: contact.name,
+        action: 'updated',
+        field_changed: 'email',
+        old_value: existing.email || 'Sem email',
+        new_value: contact.email || 'Sem email',
+      });
+    }
+
+    if (existing.phone !== contact.phone) {
+      await logContactActivity(req, {
+        entity_type: 'contact',
+        entity_id: contact.id,
+        entity_label: contact.name,
+        action: 'updated',
+        field_changed: 'phone',
+        old_value: existing.phone || 'Sem telefone',
+        new_value: contact.phone || 'Sem telefone',
+      });
+    }
+
+    const oldTags = parseTags(existing.tags);
+    const newTags = parseTags(contact.tags);
+    if (JSON.stringify(oldTags) !== JSON.stringify(newTags)) {
+      await logContactActivity(req, {
+        entity_type: 'contact',
+        entity_id: contact.id,
+        entity_label: contact.name,
+        action: 'updated',
+        field_changed: 'tags',
+        old_value: formatTagsValue(oldTags),
+        new_value: formatTagsValue(newTags),
+      });
+    }
+
+    if (existing.stage !== contact.stage) {
+      await logContactActivity(req, {
+        entity_type: 'contact',
+        entity_id: contact.id,
+        entity_label: contact.name,
+        action: 'stage_changed',
+        field_changed: 'stage',
+        old_value: existing.stage,
+        new_value: contact.stage,
+        metadata: {
+          old_stage_name: existing.stage,
+          new_stage_name: contact.stage,
+        },
+      });
+    }
+
     // Trigger automations for tags, revenue, sector changes
     if (tags && Array.isArray(tags)) {
       for (const tag of tags) {
@@ -718,6 +828,13 @@ router.delete('/:id', requireDeletePermission, async (req, res) => {
 
     await prisma.contact.delete({
       where: { id: contactId },
+    });
+
+    await logContactActivity(req, {
+      entity_type: 'contact',
+      entity_id: existing.id,
+      entity_label: existing.name,
+      action: 'deleted',
     });
 
     res.json({ message: 'Contact deleted' });

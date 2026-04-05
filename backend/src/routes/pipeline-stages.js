@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { log: logActivity } = require('../services/activity-log.service.js');
 const { ensureDefaultStages } = require('../lib/pipeline-stages');
 
 // GET /api/pipeline-stages
@@ -97,10 +98,37 @@ router.delete('/:id', async (req, res) => {
       orderBy: { order: 'asc' },
     });
     if (firstOther) {
+      const contactsToMove = await prisma.contact.findMany({
+        where: { userId, stage: existing.name },
+        select: { id: true, name: true },
+      });
+
       await prisma.contact.updateMany({
         where: { userId, stage: existing.name },
         data: { stage: firstOther.name },
       });
+
+      await Promise.all(
+        contactsToMove.map((contact) =>
+          logActivity({
+            organization_id: userId,
+            entity_type: 'contact',
+            entity_id: contact.id,
+            entity_label: contact.name,
+            action: 'stage_changed',
+            field_changed: 'stage',
+            old_value: existing.name,
+            new_value: firstOther.name,
+            user_id: req.user.id,
+            user_name: req.user.name,
+            metadata: {
+              old_stage_name: existing.name,
+              new_stage_name: firstOther.name,
+              trigger: 'stage_deleted',
+            },
+          })
+        )
+      );
     }
 
     await prisma.pipelineStage.delete({ where: { id: req.params.id } });

@@ -11,6 +11,7 @@ const { logEvent } = require('./audit');
 const { isValidRate, getTaxCode } = require('../fiscal/iva-rates');
 const { computeDocumentHash } = require('../fiscal/hash-chain');
 const { registerFacturaFinanceEntry } = require('./register-finance-entry');
+const { logInvoiceCreatedActivity } = require('../activity-log');
 
 /**
  * @param {number} userId  - effectiveUserId (accountOwnerId or id)
@@ -185,6 +186,7 @@ async function createFactura(userId, body, req = null) {
   });
 
   await logEvent('CREATE_FACTURA', 'FACTURA', factura.id, userId, req, { documentNo, grossTotal });
+  await logInvoiceCreatedActivity(factura, req);
 
   return { ...factura, lines: processedLines };
 }

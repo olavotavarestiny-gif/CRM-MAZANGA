@@ -18,6 +18,7 @@ import {
 import TaskItem from '@/components/tasks/task-item';
 import TaskFormModal from '@/components/tasks/task-form-modal';
 import { Badge } from '@/components/ui/badge';
+import { ContactHistoryTimeline } from '@/components/contacts/contact-history-timeline';
 import {
   Pencil, Check, X, ExternalLink, Phone, Download, Trash2,
   Upload, Loader2, Send, FileText, TrendingUp, Clock,
@@ -707,12 +708,12 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
             </CardContent>
           </Card>
 
-          {/* History card */}
+          {/* Commercial summary card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-[#6b7e9a]" />
-                Histórico
+                Resumo comercial
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -754,6 +755,8 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
               )}
             </CardContent>
           </Card>
+
+          <ContactHistoryTimeline contactId={contact.id} />
 
         </div>
 
