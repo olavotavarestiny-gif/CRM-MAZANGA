@@ -90,12 +90,6 @@ export default function Sidebar({
     if (!module) return true;
     return canView(currentUser, module);
   };
-  const canSeePipelineAnalytics = !!(
-    currentUser &&
-    !comercio &&
-    isVisible('/pipeline') &&
-    (currentUser.isSuperAdmin || currentUser.role === 'admin' || !currentUser.accountOwnerId)
-  );
   const canSeeActivity = !!(
     currentUser &&
     (currentUser.isSuperAdmin || currentUser.role === 'admin' || !currentUser.accountOwnerId)
@@ -239,38 +233,21 @@ export default function Sidebar({
           <>
             {/* SERVICOS: nav padrão inalterado */}
             {mainLinks.map(({ href, label, icon: Icon }) => (
-              <div key={href} className="space-y-1">
-                <Link
-                  href={href}
-                  data-tour={TOUR_ATTR[href]}
-                  className={navItemClass(isActive(href))}
-                  onClick={onClose}
-                >
-                  <Icon className="w-[18px] h-[18px] flex-shrink-0" />
-                  <span className="flex-1">{label}</span>
-                  {href === '/chat' && chatUnread > 0 && (
-                    <span className="ml-auto bg-[#b31b25] text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">
-                      {chatUnread > 99 ? '99+' : chatUnread}
-                    </span>
-                  )}
-                </Link>
-
-                {href === '/pipeline' && canSeePipelineAnalytics ? (
-                  <Link
-                    href="/pipeline/analytics"
-                    className={cn(
-                      'ml-9 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors',
-                      isActive('/pipeline/analytics')
-                        ? 'bg-[#EEF5FC] text-[#1A6FD4]'
-                        : 'text-[#6b7e9a] hover:bg-[#EEF5FC] hover:text-[#1A6FD4]'
-                    )}
-                    onClick={onClose}
-                  >
-                    <BarChart3 className="h-3.5 w-3.5" />
-                    <span>Analytics</span>
-                  </Link>
-                ) : null}
-              </div>
+              <Link
+                key={href}
+                href={href}
+                data-tour={TOUR_ATTR[href]}
+                className={navItemClass(isActive(href))}
+                onClick={onClose}
+              >
+                <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+                <span className="flex-1">{label}</span>
+                {href === '/chat' && chatUnread > 0 && (
+                  <span className="ml-auto bg-[#b31b25] text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">
+                    {chatUnread > 99 ? '99+' : chatUnread}
+                  </span>
+                )}
+              </Link>
             ))}
 
             {gestaoLinks.length > 0 && (
