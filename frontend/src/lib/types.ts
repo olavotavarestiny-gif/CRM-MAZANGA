@@ -66,6 +66,10 @@ export interface PipelineAnalyticsForecastStage {
 export interface PipelineAnalyticsForecastResponse {
   currentValue: number;
   forecastValue: number;
+  averageTicketValue: number;
+  contactsWithCustomValue: number;
+  contactsUsingAverageTicket: number;
+  contactsUsingLegacyEstimate: number;
   totalClosedContacts: number;
   low_confidence: boolean;
   stageForecasts: PipelineAnalyticsForecastStage[];
@@ -118,6 +122,7 @@ export interface Contact {
   phone: string;
   company: string;
   nif?: string | null;
+  dealValueKz?: number | null;
   revenue?: string;
   sector?: string;
   stage: Stage;

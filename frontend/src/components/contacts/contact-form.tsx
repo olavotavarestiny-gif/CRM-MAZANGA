@@ -127,6 +127,9 @@ export default function ContactForm({
   // Core values (always present)
   const [name, setName] = useState(contact?.name ?? '');
   const [stage, setStage] = useState(contact?.stage ?? 'Novo');
+  const [dealValueKz, setDealValueKz] = useState(
+    contact?.dealValueKz !== null && contact?.dealValueKz !== undefined ? String(contact.dealValueKz) : ''
+  );
   const [tipoCliente, setTipoCliente] = useState<'empresa' | 'particular'>(
     contact?.clienteType || 'particular'
   );
@@ -150,6 +153,9 @@ export default function ContactForm({
     if (contact) {
       setName(contact.name);
       setStage(contact.stage);
+      setDealValueKz(
+        contact.dealValueKz !== null && contact.dealValueKz !== undefined ? String(contact.dealValueKz) : ''
+      );
       setTipoCliente(contact.clienteType || 'particular');
       setValues({
         email: contact.email ?? '',
@@ -224,6 +230,7 @@ export default function ContactForm({
         phone: (values.phone as string) || '',
         nif: (values.nif as string) || '',
         company: tipoCliente === 'empresa' ? (values.company as string) || '' : '',
+        dealValueKz: dealValueKz.trim() ? Number(dealValueKz) : null,
         revenue: (values.revenue as string) || null,
         sector: tipoCliente === 'empresa' ? (values.sector as string) || null : null,
         tags: Array.isArray(values.tags) ? values.tags : [],
@@ -242,6 +249,7 @@ export default function ContactForm({
       if (!isEditMode) {
         setName('');
         setStage('Novo');
+        setDealValueKz('');
         setValues({ email: '', phone: '', nif: '', company: '', revenue: '', sector: '', tags: [] });
       }
       toast({
@@ -383,6 +391,22 @@ export default function ContactForm({
           No modo Comércio, cada contacto é criado automaticamente como cliente e fica fora de Processos. Usa Processos apenas quando a compra precisar de acompanhamento e negociação.
         </div>
       )}
+
+      <div>
+        <Label>Valor da Negociação (Kz)</Label>
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          value={dealValueKz}
+          onChange={(e) => setDealValueKz(e.target.value)}
+          placeholder="Opcional. Se vazio, o analytics usa ticket médio."
+          className="mt-1"
+        />
+        <p className="mt-1 text-xs text-[#6b7e9a]">
+          Este valor é usado em Processos e no forecast do pipeline.
+        </p>
+      </div>
 
       {/* Custom fields */}
       {customFieldDefs.length > 0 && (

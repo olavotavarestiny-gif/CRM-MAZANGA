@@ -291,6 +291,28 @@ function validateContactNif({ nif, clienteType }) {
   return null;
 }
 
+function parseDealValueInput(rawValue) {
+  if (rawValue === undefined) {
+    return { provided: false, value: undefined };
+  }
+
+  if (rawValue === null || rawValue === '') {
+    return { provided: true, value: null };
+  }
+
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    const error = new Error('Valor da negociação inválido');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    provided: true,
+    value: Number(parsed.toFixed(2)),
+  };
+}
+
 async function getWorkspaceModeForUser(userId) {
   const ownerAccount = await prisma.user.findUnique({
     where: { id: userId },
@@ -361,7 +383,7 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
 // POST create new contact
 router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
-    const { name, email, phone, company, revenue, sector, stage, tags, customFields, contactType, status, clienteType, nif } = req.body;
+    const { name, email, phone, company, dealValueKz, revenue, sector, stage, tags, customFields, contactType, status, clienteType, nif } = req.body;
     const userId = req.user.effectiveUserId;
 
     if (!name || !phone) {
@@ -395,6 +417,7 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
       nif !== undefined
         ? cleanNifValue(nif)
         : resolveContactNif({ customFields });
+    const parsedDealValue = parseDealValueInput(dealValueKz);
     const nifError = validateContactNif({ nif: resolvedNif, clienteType: finalClienteType });
     if (nifError) {
       return res.status(400).json({ error: nifError });
@@ -408,6 +431,7 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
         phone,
         company: company || '',
         nif: resolvedNif,
+        dealValueKz: parsedDealValue.provided ? parsedDealValue.value : null,
         revenue: revenue || null,
         sector: sector || null,
         tags: Array.isArray(tags) ? JSON.stringify(tags) : '[]',
@@ -459,6 +483,9 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
   } catch (error) {
     if (error.code === 'P2002') {
       return res.status(400).json({ error: 'Phone number already exists' });
+    }
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
     }
     console.error('Error creating contact:', error);
     res.status(500).json({ error: error.message });
@@ -638,7 +665,7 @@ router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
 // PUT update contact
 router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
-    const { name, email, phone, company, revenue, sector, stage, inPipeline, tags, customFields, contactType, status, documents, clienteType, nif } = req.body;
+    const { name, email, phone, company, dealValueKz, revenue, sector, stage, inPipeline, tags, customFields, contactType, status, documents, clienteType, nif } = req.body;
     const updateData = {};
     const contactId = parseInt(req.params.id);
     const userId = req.user.effectiveUserId;
@@ -664,6 +691,7 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
       nif !== undefined
         ? cleanNifValue(nif)
         : resolveContactNif({ customFields: mergedCustomFields }) || resolveContactNif(existing);
+    const parsedDealValue = parseDealValueInput(dealValueKz);
     const nifError = validateContactNif({ nif: resolvedNif, clienteType: nextClienteType });
 
     if (nifError) {
@@ -677,6 +705,7 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
     if (nif !== undefined || resolvedNif !== cleanNifValue(existing.nif)) {
       updateData.nif = resolvedNif;
     }
+    if (parsedDealValue.provided) updateData.dealValueKz = parsedDealValue.value;
     if (revenue !== undefined) updateData.revenue = revenue;
     if (sector !== undefined) updateData.sector = sector;
     if (inPipeline !== undefined) updateData.inPipeline = inPipeline;
@@ -804,6 +833,9 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
     }
     if (error.code === 'P2025') {
       return res.status(404).json({ error: 'Contact not found' });
+    }
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
     }
     console.error('Error updating contact:', error);
     res.status(500).json({ error: error.message });

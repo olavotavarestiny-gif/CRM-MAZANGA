@@ -95,6 +95,25 @@ function estimateContactValue(revenue) {
   return 0;
 }
 
+async function loadAverageTicketValue(organizationId) {
+  const result = await prisma.transaction.aggregate({
+    where: {
+      userId: organizationId,
+      type: 'entrada',
+      status: 'pago',
+      deleted: false,
+      amountKz: { gt: 0 },
+    },
+    _avg: { amountKz: true },
+    _count: { amountKz: true },
+  });
+
+  return {
+    averageTicketValue: result._avg.amountKz ? Number(result._avg.amountKz.toFixed(2)) : 0,
+    paidIncomeCount: result._count.amountKz || 0,
+  };
+}
+
 function getContactStageIndex(contact, stageIndexMap) {
   if (contact.stage === LOST_STAGE) {
     return stageIndexMap[LOST_STAGE] ?? Number.MAX_SAFE_INTEGER;
@@ -165,6 +184,7 @@ async function loadContactsForAnalytics(organizationId) {
     select: {
       id: true,
       name: true,
+      dealValueKz: true,
       stage: true,
       inPipeline: true,
       revenue: true,
@@ -267,16 +287,39 @@ function buildHistoricalWinRates(contacts, stages, stageIndexMap) {
   };
 }
 
-function buildForecastResponse(contacts, funnelStages, historicalWinRates) {
+function resolveContactPipelineValue(contact, averageTicketValue) {
+  if (typeof contact.dealValueKz === 'number' && contact.dealValueKz > 0) {
+    return { value: contact.dealValueKz, source: 'custom' };
+  }
+
+  if (averageTicketValue > 0) {
+    return { value: averageTicketValue, source: 'ticket_medio' };
+  }
+
+  const legacyEstimate = estimateContactValue(contact.revenue);
+  return { value: legacyEstimate, source: legacyEstimate > 0 ? 'legacy_bucket' : 'none' };
+}
+
+function buildForecastResponse(contacts, funnelStages, historicalWinRates, averageTicketValue) {
   const openContacts = contacts.filter(
     (contact) => contact.inPipeline && ![WON_STAGE, LOST_STAGE].includes(contact.stage)
   );
+
+  let contactsWithCustomValue = 0;
+  let contactsUsingAverageTicket = 0;
+  let contactsUsingLegacyEstimate = 0;
 
   const stageForecasts = funnelStages
     .filter((stage) => ![WON_STAGE, LOST_STAGE].includes(stage.name))
     .map((stage) => {
       const stageContacts = openContacts.filter((contact) => contact.stage === stage.name);
-      const currentValue = stageContacts.reduce((sum, contact) => sum + estimateContactValue(contact.revenue), 0);
+      const currentValue = stageContacts.reduce((sum, contact) => {
+        const resolved = resolveContactPipelineValue(contact, averageTicketValue);
+        if (resolved.source === 'custom') contactsWithCustomValue += 1;
+        if (resolved.source === 'ticket_medio') contactsUsingAverageTicket += 1;
+        if (resolved.source === 'legacy_bucket') contactsUsingLegacyEstimate += 1;
+        return sum + resolved.value;
+      }, 0);
       const conversionRate = historicalWinRates.byStage[stage.name] || 0;
       const weightedValue = currentValue * (conversionRate / 100);
 
@@ -296,6 +339,10 @@ function buildForecastResponse(contacts, funnelStages, historicalWinRates) {
   return {
     currentValue,
     forecastValue: Number(forecastValue.toFixed(2)),
+    averageTicketValue,
+    contactsWithCustomValue,
+    contactsUsingAverageTicket,
+    contactsUsingLegacyEstimate,
     totalClosedContacts: historicalWinRates.totalClosedContacts,
     low_confidence: historicalWinRates.totalClosedContacts < 10,
     stageForecasts,
@@ -448,13 +495,14 @@ router.get('/velocity', requirePermission('pipeline', 'view'), async (req, res) 
 router.get('/forecast', requirePermission('pipeline', 'view'), async (req, res) => {
   try {
     const { organizationId } = await loadAnalyticsContext(req);
-    const [{ funnelStages, stages, stageIndexMap }, contacts] = await Promise.all([
+    const [{ funnelStages, stages, stageIndexMap }, contacts, ticketStats] = await Promise.all([
       loadStageContext(organizationId),
       loadContactsForAnalytics(organizationId),
+      loadAverageTicketValue(organizationId),
     ]);
 
     const historicalWinRates = buildHistoricalWinRates(contacts, stages, stageIndexMap);
-    res.json(buildForecastResponse(contacts, funnelStages, historicalWinRates));
+    res.json(buildForecastResponse(contacts, funnelStages, historicalWinRates, ticketStats.averageTicketValue));
   } catch (error) {
     const statusCode = error.statusCode || (error.message?.includes('organization_id') ? 400 : 500);
     if (statusCode >= 500) {

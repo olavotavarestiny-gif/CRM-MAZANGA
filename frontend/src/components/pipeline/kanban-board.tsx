@@ -14,6 +14,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -21,7 +22,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { X, GripVertical } from 'lucide-react';
+import { Check, GripVertical, Pencil, X } from 'lucide-react';
+
+function formatKz(value?: number | null) {
+  if (value === null || value === undefined || value <= 0) {
+    return 'Sem valor';
+  }
+
+  return `${new Intl.NumberFormat('pt-PT').format(Math.round(value))} Kz`;
+}
 
 export default function KanbanBoard({
   contacts,
@@ -33,6 +42,8 @@ export default function KanbanBoard({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [selectedStage, setSelectedStage] = useState<string>(stages[0]?.name ?? '');
+  const [editingValueContactId, setEditingValueContactId] = useState<number | null>(null);
+  const [dealValueDraft, setDealValueDraft] = useState('');
 
   const updateMutation = useMutation({
     mutationFn: (params: { id: number; stage: string }) =>
@@ -71,6 +82,44 @@ export default function KanbanBoard({
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
     },
   });
+
+  const valueMutation = useMutation({
+    mutationFn: ({ id, dealValueKz }: { id: number; dealValueKz: number | null }) =>
+      updateContact(id.toString(), { dealValueKz }),
+    onMutate: async ({ id, dealValueKz }) => {
+      await queryClient.cancelQueries({ queryKey: ['contacts', 'pipeline'] });
+      const previous = queryClient.getQueryData<Contact[]>(['contacts', 'pipeline']);
+      queryClient.setQueryData<Contact[]>(['contacts', 'pipeline'], (old = []) =>
+        old.map((contact) => (
+          contact.id === id ? { ...contact, dealValueKz } : contact
+        ))
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(['contacts', 'pipeline'], context.previous);
+    },
+    onSettled: () => {
+      setEditingValueContactId(null);
+      setDealValueDraft('');
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    },
+  });
+
+  const startValueEdit = (contact: Contact) => {
+    setEditingValueContactId(contact.id);
+    setDealValueDraft(
+      contact.dealValueKz !== null && contact.dealValueKz !== undefined ? String(contact.dealValueKz) : ''
+    );
+  };
+
+  const submitValueEdit = (contactId: number) => {
+    const trimmed = dealValueDraft.trim();
+    valueMutation.mutate({
+      id: contactId,
+      dealValueKz: trimmed ? Number(trimmed) : null,
+    });
+  };
 
   const handleDragEnd = (result: DropResult) => {
     const { source, destination, draggableId } = result;
@@ -118,6 +167,59 @@ export default function KanbanBoard({
                 <p className="font-medium text-sm text-[#0A2540]">{contact.name}</p>
                 <p className="text-xs text-[#6b7e9a]">{contact.company}</p>
                 <p className="text-xs text-[#6b7e9a]">{contact.phone}</p>
+                <div className="mt-2 flex items-center gap-2">
+                  {editingValueContactId === contact.id ? (
+                    <>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={dealValueDraft}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) => setDealValueDraft(event.target.value)}
+                        className="h-7 text-xs"
+                        placeholder="Valor em Kz"
+                      />
+                      <button
+                        type="button"
+                        className="text-green-600"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          submitValueEdit(contact.id);
+                        }}
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        className="text-slate-500"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setEditingValueContactId(null);
+                          setDealValueDraft('');
+                        }}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xs font-medium text-[#0A2540]">
+                        {formatKz(contact.dealValueKz)}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-slate-400"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          startValueEdit(contact);
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
                 {contact.sector && (
                   <Badge variant="outline" className="text-xs mt-2">
                     {contact.sector}
@@ -194,6 +296,59 @@ export default function KanbanBoard({
                                     </p>
                                     <p className="text-xs text-[#6b7e9a] truncate">{contact.company}</p>
                                     <p className="text-xs text-[#6b7e9a] truncate">{contact.phone}</p>
+                                    <div className="mt-1.5 flex items-center gap-2">
+                                      {editingValueContactId === contact.id ? (
+                                        <>
+                                          <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={dealValueDraft}
+                                            onClick={(event) => event.stopPropagation()}
+                                            onChange={(event) => setDealValueDraft(event.target.value)}
+                                            className="h-7 text-xs"
+                                            placeholder="Valor em Kz"
+                                          />
+                                          <button
+                                            type="button"
+                                            className="text-green-600"
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              submitValueEdit(contact.id);
+                                            }}
+                                          >
+                                            <Check className="h-3.5 w-3.5" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="text-slate-500"
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              setEditingValueContactId(null);
+                                              setDealValueDraft('');
+                                            }}
+                                          >
+                                            <X className="h-3.5 w-3.5" />
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span className="text-xs font-medium text-[#0A2540]">
+                                            {formatKz(contact.dealValueKz)}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            className="text-slate-400"
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              startValueEdit(contact);
+                                            }}
+                                          >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
                                     {contact.sector && (
                                       <Badge variant="outline" className="text-xs mt-1.5">
                                         {contact.sector}

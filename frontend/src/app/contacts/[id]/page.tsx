@@ -697,6 +697,14 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
                 </Select>
               </div>
 
+              <InlineField
+                label="Valor da negociação (Kz)"
+                value={contact.dealValueKz !== null && contact.dealValueKz !== undefined ? String(contact.dealValueKz) : ''}
+                onSave={v => save('dealValueKz', v)}
+                type="number"
+                placeholder="Sem valor definido"
+              />
+
               {customFieldDefs.length > 0 && (
                 <div className="border-t border-[#dde3ec] pt-3">
                   <p className="text-xs font-semibold text-[#6b7e9a] uppercase tracking-wide mb-3">Campos personalizados</p>

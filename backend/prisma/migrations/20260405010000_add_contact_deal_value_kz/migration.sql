@@ -1,0 +1,2 @@
+ALTER TABLE "Contact"
+ADD COLUMN "dealValueKz" DOUBLE PRECISION;

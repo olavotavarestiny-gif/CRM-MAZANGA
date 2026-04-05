@@ -251,9 +251,13 @@ export default function PipelineAnalyticsView() {
             <ErrorState compact title="Falha ao carregar valor do pipeline" message="Não foi possível calcular o valor actual do pipeline." />
           ) : (
             <MetricCard
-              title="Pipeline Value Actual"
+              title="Valor Actual do Pipeline"
               value={formatKz(forecastQuery.data?.currentValue)}
-              description="Estimativa actual baseada no bucket de faturação dos negócios em aberto."
+              description={
+                forecastQuery.data?.contactsUsingAverageTicket
+                  ? `Negócios sem valor definido usam o ticket médio (${formatKz(forecastQuery.data.averageTicketValue)}).`
+                  : 'Soma das negociações activas com valor definido.'
+              }
               icon={Wallet}
               accentClass="bg-[#EEF5FC] text-[#1A6FD4]"
             />
@@ -298,9 +302,13 @@ export default function PipelineAnalyticsView() {
               <ErrorState compact title="Falha ao carregar pipeline value" message="Não foi possível calcular o valor actual do pipeline." />
             ) : (
               <MetricCard
-                title="Pipeline Value"
+                title="Valor do Pipeline"
                 value={formatKz(forecastQuery.data?.currentValue)}
-                description="Soma estimada dos negócios activos em aberto."
+                description={
+                  forecastQuery.data?.contactsUsingAverageTicket
+                    ? `${forecastQuery.data.contactsWithCustomValue} com valor próprio, ${forecastQuery.data.contactsUsingAverageTicket} com ticket médio.`
+                    : 'Soma dos negócios activos com valor definido.'
+                }
                 icon={Wallet}
                 accentClass="bg-[#EEF5FC] text-[#1A6FD4]"
               />
@@ -327,6 +335,16 @@ export default function PipelineAnalyticsView() {
                   <p className="text-sm text-[#6b7e9a]">
                     Projecção ponderada pela conversão histórica estimada de cada etapa.
                   </p>
+                  {(forecastQuery.data?.averageTicketValue ?? 0) > 0 ? (
+                    <p className="text-xs text-[#6b7e9a]">
+                      Ticket médio actual usado como fallback: {formatKz(forecastQuery.data?.averageTicketValue)}
+                    </p>
+                  ) : null}
+                  {forecastQuery.data?.contactsUsingLegacyEstimate ? (
+                    <p className="text-xs text-amber-700">
+                      {forecastQuery.data.contactsUsingLegacyEstimate} negócios ainda usam a estimativa antiga por bucket, porque não têm valor definido nem histórico suficiente para ticket médio.
+                    </p>
+                  ) : null}
                   {forecastQuery.data?.low_confidence ? (
                     <Badge variant="secondary">Confiança baixa: menos de 10 fechados</Badge>
                   ) : null}

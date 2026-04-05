@@ -81,6 +81,7 @@ model Contact {
   phone           String
   company         String
   nif             String?
+  dealValueKz     Float?
   revenue         String?
   sector          String?
   stage           String           @default("Novo")
