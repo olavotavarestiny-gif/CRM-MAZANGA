@@ -10,55 +10,56 @@ datasource db {
 }
 
 model User {
-  id                   Int        @id @default(autoincrement())
-  name                 String
-  email                String     @unique
-  jobTitle             String?
-  supabaseUid          String?    @unique  // UUID from Supabase auth.users
-  passwordHash         String     @default("SUPABASE_AUTH")  // legacy; not used after Supabase auth
-  resetToken           String?
-  resetExpiry          DateTime?
-  role                 String     @default("user")   // "admin" | "user"
-  active               Boolean    @default(true)
-  plan                 String     @default("essencial") // "essencial" | "profissional"
-  isSuperAdmin         Boolean    @default(false)
-  permissions          String?    // JSON: null = full access; see permissions structure in lib/permissions.js
-  mustChangePassword   Boolean    @default(false)
-  accountOwnerId       Int?       // null = owner of their own account; Int = member of another account
+  id                        Int                    @id @default(autoincrement())
+  name                      String
+  email                     String                 @unique
+  jobTitle                  String?
+  supabaseUid               String?                @unique // UUID from Supabase auth.users
+  passwordHash              String                 @default("SUPABASE_AUTH") // legacy; not used after Supabase auth
+  resetToken                String?
+  resetExpiry               DateTime?
+  role                      String                 @default("user") // "admin" | "user"
+  active                    Boolean                @default(true)
+  plan                      String                 @default("essencial") // "essencial" | "profissional"
+  isSuperAdmin              Boolean                @default(false)
+  permissions               String? // JSON: null = full access; see permissions structure in lib/permissions.js
+  mustChangePassword        Boolean                @default(false)
+  accountOwnerId            Int? // null = owner of their own account; Int = member of another account
   assignedEstabelecimentoId String?
-  workspaceMode        String     @default("servicos") // "servicos" | "comercio"
-  createdAt            DateTime   @default(now())
-  loginLogs            LoginLog[]
-  contacts             Contact[]  @relation("ContactUser")
-  contactFieldDefs     ContactFieldDef[] @relation("ContactFieldDefUser")
-  contactFieldConfigs  ContactFieldConfig[] @relation("ContactFieldConfigUser")
-  pipelineStages       PipelineStage[]     @relation("PipelineStageUser")
-  tasks                Task[]     @relation("TaskUser")
-  assignedTasks        Task[]     @relation("TaskAssignee")
-  transactions         Transaction[] @relation("TransactionUser")
-  automations          Automation[] @relation("AutomationUser")
-  forms                Form[]     @relation("FormUser")
-  googleCalendarToken  GoogleCalendarToken?
-  estabelecimentos     Estabelecimento[]     @relation("EstabelecimentoUser")
-  series               Serie[]               @relation("SerieUser")
-  clientesFaturacao    ClienteFaturacao[]    @relation("ClienteFaturacaoUser")
-  produtoCategorias    ProdutoCategoria[]    @relation("ProdutoCategoriaUser")
-  produtos             Produto[]             @relation("ProdutoUser")
-  stockMovements       StockMovement[]       @relation("StockMovementUser")
-  stockMovementsCreated StockMovement[]      @relation("StockMovementCreatedBy")
-  caixaSessoes         CaixaSessao[]         @relation("CaixaSessaoUser")
-  caixaSessoesAbertas  CaixaSessao[]         @relation("CaixaSessaoOpenedBy")
-  caixaSessoesFechadas CaixaSessao[]         @relation("CaixaSessaoClosedBy")
-  facturas             Factura[]             @relation("FacturaUser")
-  facturaRecorrentes   FacturaRecorrente[]   @relation("FacturaRecorrenteUser")
-  saftPeriodos         SaftPeriodo[]         @relation("SaftPeriodoUser")
-  configuracaoFaturacao ConfiguracaoFaturacao? @relation("ConfigFaturacaoUser")
-  accountOwner         User?      @relation("AccountMembers", fields: [accountOwnerId], references: [id], onDelete: SetNull)
-  accountMembers       User[]     @relation("AccountMembers")
-  assignedEstabelecimento Estabelecimento? @relation("AssignedEstabelecimento", fields: [assignedEstabelecimentoId], references: [id], onDelete: SetNull)
-  chatChannelMemberships ChatChannelMember[] @relation("ChatMemberUser")
-  chatMessagesSent       ChatMessage[]       @relation("ChatSenderUser")
-  contactNotes           ContactNote[]       @relation("NoteAuthor")
+  workspaceMode             String                 @default("servicos") // "servicos" | "comercio"
+  createdAt                 DateTime               @default(now())
+  loginLogs                 LoginLog[]
+  contacts                  Contact[]              @relation("ContactUser")
+  contactFieldDefs          ContactFieldDef[]      @relation("ContactFieldDefUser")
+  contactFieldConfigs       ContactFieldConfig[]   @relation("ContactFieldConfigUser")
+  pipelineStages            PipelineStage[]        @relation("PipelineStageUser")
+  tasks                     Task[]                 @relation("TaskUser")
+  assignedTasks             Task[]                 @relation("TaskAssignee")
+  transactions              Transaction[]          @relation("TransactionUser")
+  automations               Automation[]           @relation("AutomationUser")
+  automationLogs            AutomationLog[]
+  forms                     Form[]                 @relation("FormUser")
+  googleCalendarToken       GoogleCalendarToken?
+  estabelecimentos          Estabelecimento[]      @relation("EstabelecimentoUser")
+  series                    Serie[]                @relation("SerieUser")
+  clientesFaturacao         ClienteFaturacao[]     @relation("ClienteFaturacaoUser")
+  produtoCategorias         ProdutoCategoria[]     @relation("ProdutoCategoriaUser")
+  produtos                  Produto[]              @relation("ProdutoUser")
+  stockMovements            StockMovement[]        @relation("StockMovementUser")
+  stockMovementsCreated     StockMovement[]        @relation("StockMovementCreatedBy")
+  caixaSessoes              CaixaSessao[]          @relation("CaixaSessaoUser")
+  caixaSessoesAbertas       CaixaSessao[]          @relation("CaixaSessaoOpenedBy")
+  caixaSessoesFechadas      CaixaSessao[]          @relation("CaixaSessaoClosedBy")
+  facturas                  Factura[]              @relation("FacturaUser")
+  facturaRecorrentes        FacturaRecorrente[]    @relation("FacturaRecorrenteUser")
+  saftPeriodos              SaftPeriodo[]          @relation("SaftPeriodoUser")
+  configuracaoFaturacao     ConfiguracaoFaturacao? @relation("ConfigFaturacaoUser")
+  accountOwner              User?                  @relation("AccountMembers", fields: [accountOwnerId], references: [id], onDelete: SetNull)
+  accountMembers            User[]                 @relation("AccountMembers")
+  assignedEstabelecimento   Estabelecimento?       @relation("AssignedEstabelecimento", fields: [assignedEstabelecimentoId], references: [id], onDelete: SetNull)
+  chatChannelMemberships    ChatChannelMember[]    @relation("ChatMemberUser")
+  chatMessagesSent          ChatMessage[]          @relation("ChatSenderUser")
+  contactNotes              ContactNote[]          @relation("NoteAuthor")
 
   @@index([assignedEstabelecimentoId])
 }
@@ -73,31 +74,32 @@ model LoginLog {
 }
 
 model Contact {
-  id            Int           @id @default(autoincrement())
-  userId        Int?
-  name          String
-  email         String
-  phone         String
-  company       String
-  nif           String?
-  revenue       String?
-  sector        String?
-  stage         String        @default("Novo")
-  inPipeline    Boolean       @default(false)
-  tags          String        @default("[]") // JSON array stored as string: ["tag1", "tag2"]
-  customFields  String        @default("{}") // JSON object: { "fieldKey": "value" }
-  contactType   String        @default("interessado")
-  status        String        @default("ativo")
-  clienteType   String        @default("particular") // "empresa" | "particular"
-  documents     String        @default("[]")
-  notes         ContactNote[]
+  id              Int              @id @default(autoincrement())
+  userId          Int?
+  name            String
+  email           String
+  phone           String
+  company         String
+  nif             String?
+  revenue         String?
+  sector          String?
+  stage           String           @default("Novo")
+  inPipeline      Boolean          @default(false)
+  tags            String           @default("[]") // JSON array stored as string: ["tag1", "tag2"]
+  customFields    String           @default("{}") // JSON object: { "fieldKey": "value" }
+  contactType     String           @default("interessado")
+  status          String           @default("ativo")
+  clienteType     String           @default("particular") // "empresa" | "particular"
+  documents       String           @default("[]")
+  notes           ContactNote[]
   formSubmissions FormSubmission[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  user          User?         @relation("ContactUser", fields: [userId], references: [id], onDelete: SetNull)
-  messages      Message[]
-  tasks         Task[]
-  transactions  Transaction[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  user            User?            @relation("ContactUser", fields: [userId], references: [id], onDelete: SetNull)
+  messages        Message[]
+  tasks           Task[]
+  transactions    Transaction[]
+  automationLogs  AutomationLog[]
 
   @@unique([userId, phone], name: "user_phone_unique")
 }
@@ -117,9 +119,9 @@ model ContactFieldDef {
   id        String   @id @default(cuid())
   userId    Int
   label     String
-  key       String   // slug used as key in customFields JSON
+  key       String // slug used as key in customFields JSON
   type      String   @default("text") // "text" | "number" | "date" | "select" | "url"
-  options   String?  // JSON array for select type: '["Option A","Option B"]'
+  options   String? // JSON array for select type: '["Option A","Option B"]'
   required  Boolean  @default(false)
   order     Int      @default(0)
   active    Boolean  @default(true)
@@ -146,8 +148,8 @@ model PipelineStage {
 model ContactFieldConfig {
   id       String  @id @default(cuid())
   userId   Int
-  fieldKey String  // "email" | "phone" | "company" | "revenue" | "sector" | "tags"
-  label    String  // user-defined label (defaults to the built-in label)
+  fieldKey String // "email" | "phone" | "company" | "revenue" | "sector" | "tags"
+  label    String // user-defined label (defaults to the built-in label)
   visible  Boolean @default(true)
   required Boolean @default(false)
   order    Int     @default(0)
@@ -168,90 +170,115 @@ model Message {
 }
 
 model Task {
-  id        Int       @id @default(autoincrement())
-  userId    Int?
+  id               Int       @id @default(autoincrement())
+  userId           Int?
   assignedToUserId Int?
-  contactId Int?
-  title     String
-  notes     String?
-  dueDate   DateTime?
-  priority  String    @default("Media")
-  done      Boolean   @default(false)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  user      User?     @relation("TaskUser", fields: [userId], references: [id], onDelete: SetNull)
-  assignedTo User?    @relation("TaskAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
-  contact   Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactId        Int?
+  title            String
+  notes            String?
+  dueDate          DateTime?
+  priority         String    @default("Media")
+  done             Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User?     @relation("TaskUser", fields: [userId], references: [id], onDelete: SetNull)
+  assignedTo       User?     @relation("TaskAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  contact          Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
   @@index([assignedToUserId])
 }
 
 model Automation {
-  id           String  @id @default(cuid())
-  userId       Int?
-  formId       String?
-  trigger      String  // "new_contact", "form_submission", "contact_tag", "contact_revenue", "contact_sector"
-  triggerValue String? // tag name, revenue range, or sector (for matching conditions)
-  action       String  // "send_email", "send_template", "send_text", "update_stage", "create_task"
-  targetStage  String? // "Novo", "Contactado", etc. (for update_stage action)
-  templateName String?
-  emailSubject String?
-  emailBody    String?
-  taskTitle    String?
-  taskNotes    String?
-  taskPriority String?
-  taskDueDays  Int?
+  id                   String          @id @default(cuid())
+  userId               Int?
+  formId               String?
+  trigger              String // "new_contact", "form_submission", "contact_tag", "contact_revenue", "contact_sector"
+  triggerValue         String? // tag name, revenue range, or sector (for matching conditions)
+  action               String // "send_email", "send_template", "send_text", "update_stage", "create_task"
+  targetStage          String? // "Novo", "Contactado", etc. (for update_stage action)
+  templateName         String?
+  emailSubject         String?
+  emailBody            String?
+  taskTitle            String?
+  taskNotes            String?
+  taskPriority         String?
+  taskDueDays          Int?
   taskAssignedToUserId Int?
-  active       Boolean @default(true)
-  user         User?   @relation("AutomationUser", fields: [userId], references: [id], onDelete: SetNull)
-  form         Form?   @relation(fields: [formId], references: [id], onDelete: SetNull)
+  active               Boolean         @default(true)
+  logs                 AutomationLog[]
+  user                 User?           @relation("AutomationUser", fields: [userId], references: [id], onDelete: SetNull)
+  form                 Form?           @relation(fields: [formId], references: [id], onDelete: SetNull)
+}
+
+model AutomationLog {
+  id              String     @id @default(cuid())
+  automation_id   String
+  organization_id Int
+  trigger_type    String
+  trigger_data    Json
+  action_type     String
+  action_data     Json
+  success         Boolean
+  error_message   String?
+  contact_id      Int?
+  duration_ms     Int?
+  created_at      DateTime   @default(now())
+  automation      Automation @relation(fields: [automation_id], references: [id], onDelete: Cascade)
+  organization    User       @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  contact         Contact?   @relation(fields: [contact_id], references: [id], onDelete: SetNull)
+
+  @@index([automation_id, created_at])
+  @@index([organization_id, created_at])
+  @@index([organization_id, success])
+  @@index([contact_id])
+  @@map("automation_log")
 }
 
 model Form {
-  id          String   @id @default(cuid())
-  userId      Int?
-  title       String
-  description String?
-  mode        String   @default("step")
-  thankYouUrl String?
-  brandColor  String?  // hex — cor principal (botões, barra de progresso)
-  bgColor     String?  // hex — cor de fundo
-  logoUrl            String?  // base64 data URL do logotipo
-  metaPixelEnabled   Boolean  @default(false)
-  metaPixelId        String?
-  googleTagEnabled   Boolean  @default(false)
-  googleTagId        String?
-  trackSubmitAsLead  Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User?    @relation("FormUser", fields: [userId], references: [id], onDelete: SetNull)
-  fields      FormField[]
-  submissions FormSubmission[]
-  automations Automation[]
+  id                String           @id @default(cuid())
+  userId            Int?
+  title             String
+  description       String?
+  mode              String           @default("step")
+  thankYouUrl       String?
+  brandColor        String? // hex — cor principal (botões, barra de progresso)
+  bgColor           String? // hex — cor de fundo
+  logoUrl           String? // base64 data URL do logotipo
+  metaPixelEnabled  Boolean          @default(false)
+  metaPixelId       String?
+  googleTagEnabled  Boolean          @default(false)
+  googleTagId       String?
+  trackSubmitAsLead Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  user              User?            @relation("FormUser", fields: [userId], references: [id], onDelete: SetNull)
+  fields            FormField[]
+  submissions       FormSubmission[]
+  automations       Automation[]
 }
 
 model FormField {
-  id           String  @id @default(cuid())
+  id           String       @id @default(cuid())
   formId       String
   type         String
   label        String
-  required     Boolean @default(false)
+  required     Boolean      @default(false)
   order        Int
   options      String?
   contactField String?
-  form         Form    @relation(fields: [formId], references: [id], onDelete: Cascade)
+  form         Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
   answers      FormAnswer[]
 }
 
 model FormSubmission {
-  id          String   @id @default(cuid())
-  formId      String
-  contactId   Int?
-  contactSyncStatus String @default("skipped")
-  submittedAt DateTime @default(now())
-  form        Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
-  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  answers     FormAnswer[]
+  id                String       @id @default(cuid())
+  formId            String
+  contactId         Int?
+  contactSyncStatus String       @default("skipped")
+  submittedAt       DateTime     @default(now())
+  form              Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
+  contact           Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  answers           FormAnswer[]
 }
 
 model FormAnswer {
@@ -266,35 +293,35 @@ model FormAnswer {
 }
 
 model Transaction {
-  id                     String    @id @default(cuid())
+  id                     String       @id @default(cuid())
   userId                 Int?
   date                   DateTime
   clientId               Int?
   clientName             String?
-  invoiceId              String?   @map("invoice_id")
-  cashSessionId          String?   @map("cash_session_id")
-  type                   String    // "entrada" | "saida"
-  revenueType            String?   // "recorrente" | "one-off"
+  invoiceId              String?      @map("invoice_id")
+  cashSessionId          String?      @map("cash_session_id")
+  type                   String // "entrada" | "saida"
+  revenueType            String? // "recorrente" | "one-off"
   contractDurationMonths Int?
   nextPaymentDate        DateTime?
   category               String
   subcategory            String?
   description            String?
   amountKz               Float
-  currencyOrigin         String    @default("KZ") // KZ | CHF | EUR | USD
-  exchangeRate           Float     @default(1.0)
+  currencyOrigin         String       @default("KZ") // KZ | CHF | EUR | USD
+  exchangeRate           Float        @default(1.0)
   paymentMethod          String?
-  status                 String    @default("pago") // "pago" | "pendente" | "atrasado"
+  status                 String       @default("pago") // "pago" | "pendente" | "atrasado"
   receiptNumber          String?
   notes                  String?
-  deleted                Boolean   @default(false)
-  reconciled             Boolean   @default(false)
-  reconciledAt           DateTime? @map("reconciled_at")
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
-  user                   User?     @relation("TransactionUser", fields: [userId], references: [id], onDelete: SetNull)
-  contact                Contact?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  invoice                Factura?  @relation("TransactionInvoice", fields: [invoiceId], references: [id], onDelete: SetNull)
+  deleted                Boolean      @default(false)
+  reconciled             Boolean      @default(false)
+  reconciledAt           DateTime?    @map("reconciled_at")
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  user                   User?        @relation("TransactionUser", fields: [userId], references: [id], onDelete: SetNull)
+  contact                Contact?     @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  invoice                Factura?     @relation("TransactionInvoice", fields: [invoiceId], references: [id], onDelete: SetNull)
   cashSession            CaixaSessao? @relation("TransactionCashSession", fields: [cashSessionId], references: [id], onDelete: SetNull)
 
   @@index([invoiceId])
@@ -305,7 +332,7 @@ model Transaction {
 
 model FinancialCategory {
   id            String  @id @default(cuid())
-  type          String  // "entrada" | "saida"
+  type          String // "entrada" | "saida"
   category      String
   subcategories String? // JSON array as string: ["sub1","sub2"]
   color         String?
@@ -333,59 +360,59 @@ model GoogleCalendarToken {
 // ============================================
 
 model Estabelecimento {
-  id          String    @id @default(cuid())
-  userId      Int
-  nome        String
-  nif         String
-  defaultSerieId String?
-  morada      String?
-  telefone    String?
-  email       String?
-  isPrincipal Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  user        User      @relation("EstabelecimentoUser", fields: [userId], references: [id], onDelete: Cascade)
-  series               Serie[] @relation("EstabelecimentoSeries")
-  defaultSerie         Serie? @relation("EstabelecimentoDefaultSerie", fields: [defaultSerieId], references: [id], onDelete: SetNull)
-  facturas             Factura[]
-  facturaRecorrentes   FacturaRecorrente[]
-  caixaSessoes         CaixaSessao[]
-  assignedUsers        User[]    @relation("AssignedEstabelecimento")
+  id                 String              @id @default(cuid())
+  userId             Int
+  nome               String
+  nif                String
+  defaultSerieId     String?
+  morada             String?
+  telefone           String?
+  email              String?
+  isPrincipal        Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  user               User                @relation("EstabelecimentoUser", fields: [userId], references: [id], onDelete: Cascade)
+  series             Serie[]             @relation("EstabelecimentoSeries")
+  defaultSerie       Serie?              @relation("EstabelecimentoDefaultSerie", fields: [defaultSerieId], references: [id], onDelete: SetNull)
+  facturas           Factura[]
+  facturaRecorrentes FacturaRecorrente[]
+  caixaSessoes       CaixaSessao[]
+  assignedUsers      User[]              @relation("AssignedEstabelecimento")
 }
 
 model Serie {
-  id                  String          @id @default(cuid())
-  userId              Int
-  estabelecimentoId   String
-  seriesCode          String
-  seriesYear          Int
-  documentType        String          // FT, FR, ND, NC, FA
-  firstDocumentNumber Int             @default(1)
-  lastDocumentNumber  Int?
-  seriesStatus        String          @default("A") // A=Ativa, U=Em uso, F=Fechada
-  createdAt           DateTime        @default(now())
-  user                User            @relation("SerieUser", fields: [userId], references: [id], onDelete: Cascade)
-  estabelecimento     Estabelecimento @relation("EstabelecimentoSeries", fields: [estabelecimentoId], references: [id], onDelete: Cascade)
-  defaultForEstabelecimentos Estabelecimento[] @relation("EstabelecimentoDefaultSerie")
-  facturas             Factura[]
-  facturaRecorrentes   FacturaRecorrente[]
+  id                         String              @id @default(cuid())
+  userId                     Int
+  estabelecimentoId          String
+  seriesCode                 String
+  seriesYear                 Int
+  documentType               String // FT, FR, ND, NC, FA
+  firstDocumentNumber        Int                 @default(1)
+  lastDocumentNumber         Int?
+  seriesStatus               String              @default("A") // A=Ativa, U=Em uso, F=Fechada
+  createdAt                  DateTime            @default(now())
+  user                       User                @relation("SerieUser", fields: [userId], references: [id], onDelete: Cascade)
+  estabelecimento            Estabelecimento     @relation("EstabelecimentoSeries", fields: [estabelecimentoId], references: [id], onDelete: Cascade)
+  defaultForEstabelecimentos Estabelecimento[]   @relation("EstabelecimentoDefaultSerie")
+  facturas                   Factura[]
+  facturaRecorrentes         FacturaRecorrente[]
 
   @@unique([userId, seriesCode, seriesYear, documentType])
 }
 
 model ClienteFaturacao {
-  id              String    @id @default(cuid())
-  userId          Int
-  customerTaxID   String
-  customerName    String
-  customerAddress String?
-  customerPhone   String?
-  customerEmail   String?
-  contactId       Int?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  user                User      @relation("ClienteFaturacaoUser", fields: [userId], references: [id], onDelete: Cascade)
-  facturas            Factura[]
-  facturaRecorrentes  FacturaRecorrente[]
+  id                 String              @id @default(cuid())
+  userId             Int
+  customerTaxID      String
+  customerName       String
+  customerAddress    String?
+  customerPhone      String?
+  customerEmail      String?
+  contactId          Int?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  user               User                @relation("ClienteFaturacaoUser", fields: [userId], references: [id], onDelete: Cascade)
+  facturas           Factura[]
+  facturaRecorrentes FacturaRecorrente[]
 
   @@unique([userId, customerTaxID])
 }
@@ -404,24 +431,24 @@ model ProdutoCategoria {
 }
 
 model Produto {
-  id                 String   @id @default(cuid())
+  id                 String            @id @default(cuid())
   userId             Int
   productCode        String
   productDescription String
-  unitPrice          Float    @default(0)   // preço de venda (salePrice)
-  cost               Float?                 // preço de custo
-  productType        String   @default("S") // S=serviço, P=produto, O=outro (AGT)
-  sku                String?                // referência interna
-  barcode            String?                // código de barras EAN/QR (para leitura por scanner)
-  unitOfMeasure      String   @default("UN")
-  taxPercentage      Float    @default(14)
-  taxCode            String   @default("NOR")
-  active             Boolean  @default(true)
-  stock              Int?     @default(0) // stock atual (null = produto sem controlo de stock)
-  stockMinimo        Int?     @default(0)
+  unitPrice          Float             @default(0) // preço de venda (salePrice)
+  cost               Float? // preço de custo
+  productType        String            @default("S") // S=serviço, P=produto, O=outro (AGT)
+  sku                String? // referência interna
+  barcode            String? // código de barras EAN/QR (para leitura por scanner)
+  unitOfMeasure      String            @default("UN")
+  taxPercentage      Float             @default(14)
+  taxCode            String            @default("NOR")
+  active             Boolean           @default(true)
+  stock              Int?              @default(0) // stock atual (null = produto sem controlo de stock)
+  stockMinimo        Int?              @default(0)
   categoriaId        String?
-  createdAt          DateTime @default(now())
-  user               User     @relation("ProdutoUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt          DateTime          @default(now())
+  user               User              @relation("ProdutoUser", fields: [userId], references: [id], onDelete: Cascade)
   categoria          ProdutoCategoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   stockMovements     StockMovement[]
 
@@ -431,15 +458,15 @@ model Produto {
 model StockMovement {
   id              String   @id @default(cuid())
   productId       String
-  userId          Int                          // effectiveUserId (scoping por conta)
-  type            String                       // "entry" | "exit" | "adjustment"
+  userId          Int // effectiveUserId (scoping por conta)
+  type            String // "entry" | "exit" | "adjustment"
   quantity        Int
   previousStock   Int
   newStock        Int
   reason          String?
   notes           String?
   createdByUserId Int
-  referenceType   String?                      // "manual" | "quick_sale"
+  referenceType   String? // "manual" | "quick_sale"
   referenceId     String?
   createdAt       DateTime @default(now())
   product         Produto  @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -448,43 +475,43 @@ model StockMovement {
 }
 
 model Factura {
-  id                   String           @id @default(cuid())
+  id                   String            @id @default(cuid())
   userId               Int
   documentNo           String
   documentType         String
   serieId              String
   estabelecimentoId    String
-  documentDate         DateTime         @default(now())
-  documentStatus       String           @default("N") // N=Normal, A=Anulada
+  documentDate         DateTime          @default(now())
+  documentStatus       String            @default("N") // N=Normal, A=Anulada
   documentCancelReason String?
   customerTaxID        String
   customerName         String
   customerAddress      String?
   clienteFaturacaoId   String?
-  lines                String           // JSON
+  lines                String // JSON
   netTotal             Float
   taxPayable           Float
   grossTotal           Float
   qrCodeUrl            String?
   qrCodeImage          String?
-  hashCode             String?          // Cadeia de hash AGT (SHA256 → RSA-2048 quando certificado disponível)
-  hashControl          String?          // "1" = primeiro doc da série; "0" = encadeado
-  jwsSignature         String           @default("PLACEHOLDER")
+  hashCode             String? // Cadeia de hash AGT (SHA256 → RSA-2048 quando certificado disponível)
+  hashControl          String? // "1" = primeiro doc da série; "0" = encadeado
+  jwsSignature         String            @default("PLACEHOLDER")
   agtRequestId         String?
-  agtValidationStatus  String           @default("P") // P=Pendente, V=Válida, I=Inválida, A=Anulada
+  agtValidationStatus  String            @default("P") // P=Pendente, V=Válida, I=Inválida, A=Anulada
   agtSubmittedAt       DateTime?
-  currencyCode         String           @default("AOA")
+  currencyCode         String            @default("AOA")
   currencyAmount       Float?
   exchangeRate         Float?
-  paymentMethod        String           @default("Transferência Bancária")
-  isOffline            Boolean          @default(false)
+  paymentMethod        String            @default("Transferência Bancária")
+  isOffline            Boolean           @default(false)
   offlineEmittedAt     DateTime?
   offlineSubmittedAt   DateTime?
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
-  user                 User             @relation("FacturaUser", fields: [userId], references: [id], onDelete: SetNull)
-  serie                Serie            @relation(fields: [serieId], references: [id])
-  estabelecimento      Estabelecimento  @relation(fields: [estabelecimentoId], references: [id])
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  user                 User              @relation("FacturaUser", fields: [userId], references: [id], onDelete: SetNull)
+  serie                Serie             @relation(fields: [serieId], references: [id])
+  estabelecimento      Estabelecimento   @relation(fields: [estabelecimentoId], references: [id])
   clienteFaturacao     ClienteFaturacao? @relation(fields: [clienteFaturacaoId], references: [id])
   caixaSessaoId        String?
   caixaSessao          CaixaSessao?      @relation(fields: [caixaSessaoId], references: [id], onDelete: SetNull)
@@ -495,7 +522,7 @@ model Factura {
 
 model CaixaSessao {
   id                    String          @id @default(cuid())
-  userId                Int                               // effectiveUserId (scoping)
+  userId                Int // effectiveUserId (scoping)
   estabelecimentoId     String
   openedByUserId        Int
   closedByUserId        Int?
@@ -511,7 +538,7 @@ model CaixaSessao {
   totalMulticaixa       Float           @default(0)
   totalTpa              Float           @default(0)
   totalTransferencia    Float           @default(0)
-  status                String          @default("open")  // "open" | "closed"
+  status                String          @default("open") // "open" | "closed"
   notes                 String?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
@@ -526,7 +553,7 @@ model CaixaSessao {
 model SaftPeriodo {
   id            String   @id @default(cuid())
   userId        Int
-  periodo       String   // "2026-01"
+  periodo       String // "2026-01"
   startDate     DateTime
   endDate       DateTime
   status        String   @default("GENERATED")
@@ -550,34 +577,34 @@ model AuditoriaEvento {
 }
 
 model FacturaRecorrente {
-  id                  String    @id @default(cuid())
-  userId              Int
-  serieId             String
-  estabelecimentoId   String
-  clienteFaturacaoId  String?
-  customerTaxID       String
-  customerName        String
-  customerAddress     String?
-  documentType        String    @default("FT")
-  lines               String    // JSON array (template das linhas)
-  currencyCode        String    @default("AOA")
-  exchangeRate        Float?
-  paymentMethod       String    @default("Transferência Bancária")
-  frequency           String    // WEEKLY | MONTHLY | QUARTERLY | ANNUAL
-  startDate           DateTime
-  nextRunDate         DateTime
-  lastRunDate         DateTime?
-  lastFacturaId       String?
-  isActive            Boolean   @default(true)
-  totalGenerated      Int       @default(0)
-  maxOccurrences      Int?
-  notes               String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  user                User      @relation("FacturaRecorrenteUser", fields: [userId], references: [id], onDelete: Cascade)
-  serie               Serie     @relation(fields: [serieId], references: [id])
-  estabelecimento     Estabelecimento @relation(fields: [estabelecimentoId], references: [id])
-  clienteFaturacao    ClienteFaturacao? @relation(fields: [clienteFaturacaoId], references: [id])
+  id                 String            @id @default(cuid())
+  userId             Int
+  serieId            String
+  estabelecimentoId  String
+  clienteFaturacaoId String?
+  customerTaxID      String
+  customerName       String
+  customerAddress    String?
+  documentType       String            @default("FT")
+  lines              String // JSON array (template das linhas)
+  currencyCode       String            @default("AOA")
+  exchangeRate       Float?
+  paymentMethod      String            @default("Transferência Bancária")
+  frequency          String // WEEKLY | MONTHLY | QUARTERLY | ANNUAL
+  startDate          DateTime
+  nextRunDate        DateTime
+  lastRunDate        DateTime?
+  lastFacturaId      String?
+  isActive           Boolean           @default(true)
+  totalGenerated     Int               @default(0)
+  maxOccurrences     Int?
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  user               User              @relation("FacturaRecorrenteUser", fields: [userId], references: [id], onDelete: Cascade)
+  serie              Serie             @relation(fields: [serieId], references: [id])
+  estabelecimento    Estabelecimento   @relation(fields: [estabelecimentoId], references: [id])
+  clienteFaturacao   ClienteFaturacao? @relation(fields: [clienteFaturacaoId], references: [id])
 }
 
 model ConfiguracaoFaturacao {
@@ -604,13 +631,13 @@ model ConfiguracaoFaturacao {
 // ============================================
 
 model ChatChannel {
-  id          String   @id @default(cuid())
-  orgId       Int      // effectiveUserId do criador (= account owner ID)
+  id          String              @id @default(cuid())
+  orgId       Int // effectiveUserId do criador (= account owner ID)
   name        String
   description String?
-  type        String   @default("channel") // "channel" | "dm"
+  type        String              @default("channel") // "channel" | "dm"
   createdById Int
-  createdAt   DateTime @default(now())
+  createdAt   DateTime            @default(now())
   members     ChatChannelMember[]
   messages    ChatMessage[]
 

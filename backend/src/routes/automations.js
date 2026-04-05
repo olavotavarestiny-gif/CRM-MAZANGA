@@ -4,6 +4,11 @@ const prisma = require('../lib/prisma');
 const { requirePermission, requireDeletePermission } = require('../lib/permissions');
 const { canCreateAutomation, buildLimitErrorPayload } = require('../lib/plan-limits');
 const { isValidStageName } = require('../lib/pipeline-stages');
+const {
+  getAutomationExecutionSummary,
+  getAutomationLogs,
+  getAutomationStats,
+} = require('../services/automation-logger.service');
 
 const VALID_TRIGGERS = ['new_contact', 'form_submission', 'contact_tag', 'contact_revenue', 'contact_sector'];
 const VALID_ACTIONS = ['send_email', 'send_whatsapp_template', 'send_whatsapp_text', 'update_stage', 'create_task'];
@@ -140,9 +145,76 @@ router.get('/', requirePermission('automations', 'view'), async (req, res) => {
         },
       },
     });
-    res.json(automations);
+
+    const executionSummary = await getAutomationExecutionSummary(req.user.effectiveUserId, {
+      automationIds: automations.map((automation) => automation.id),
+      successWindowDays: 30,
+    });
+
+    res.json(
+      automations.map((automation) => ({
+        ...automation,
+        executionSummary: executionSummary.get(automation.id) || {
+          automationId: automation.id,
+          totalExecutions: 0,
+          executionsLast30Days: 0,
+          successfulExecutionsLast30Days: 0,
+          failedExecutionsLast30Days: 0,
+          successRateLast30Days: null,
+          lastExecution: null,
+        },
+      }))
+    );
   } catch (error) {
     console.error('Error fetching automations:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET automation statistics
+router.get('/stats', requirePermission('automations', 'view'), async (req, res) => {
+  try {
+    const stats = await getAutomationStats(req.user.effectiveUserId, {
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+    });
+
+    res.json(stats);
+  } catch (error) {
+    if (error.message?.includes('Data inválida')) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error fetching automation stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET execution logs for a specific automation
+router.get('/:id/logs', requirePermission('automations', 'view'), async (req, res) => {
+  try {
+    const automation = await prisma.automation.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, userId: true },
+    });
+
+    if (!automation || automation.userId !== req.user.effectiveUserId) {
+      return res.status(404).json({ error: 'Automação não encontrada' });
+    }
+
+    const logs = await getAutomationLogs(req.params.id, req.user.effectiveUserId, {
+      page: req.query.page,
+      pageSize: req.query.pageSize,
+      status: req.query.status,
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+    });
+
+    res.json(logs);
+  } catch (error) {
+    if (error.message?.includes('Data inválida')) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error fetching automation logs:', error);
     res.status(500).json({ error: error.message });
   }
 });

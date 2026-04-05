@@ -132,6 +132,92 @@ export interface Automation {
     id: string;
     title: string;
   } | null;
+  executionSummary?: AutomationExecutionSummary;
+}
+
+export interface AutomationExecutionSummary {
+  automationId: string;
+  totalExecutions: number;
+  executionsLast30Days: number;
+  successfulExecutionsLast30Days: number;
+  failedExecutionsLast30Days: number;
+  successRateLast30Days: number | null;
+  lastExecution: {
+    success: boolean;
+    error_message?: string | null;
+    duration_ms?: number | null;
+    created_at: string;
+  } | null;
+}
+
+export interface AutomationLogEntry {
+  id: string;
+  automation_id: string;
+  organization_id: number;
+  trigger_type: string;
+  trigger_data: Record<string, unknown>;
+  action_type: string;
+  action_data: Record<string, unknown>;
+  success: boolean;
+  error_message?: string | null;
+  contact_id?: number | null;
+  duration_ms?: number | null;
+  created_at: string;
+  automation: Automation;
+  contact?: {
+    id: number;
+    name: string;
+    email: string;
+    phone: string;
+    company: string;
+  } | null;
+}
+
+export interface AutomationLogsResponse {
+  data: AutomationLogEntry[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+  filters: {
+    status: 'all' | 'success' | 'failed';
+    dateFrom?: string | null;
+    dateTo?: string | null;
+  };
+}
+
+export interface AutomationStatsEntry {
+  automation_id: string;
+  automation: Automation;
+  totalExecutions: number;
+  successfulExecutions: number;
+  failedExecutions: number;
+  successRate: number | null;
+  lastExecution: {
+    id: string;
+    success: boolean;
+    error_message?: string | null;
+    duration_ms?: number | null;
+    created_at: string;
+  } | null;
+}
+
+export interface AutomationStatsResponse {
+  dateRange: {
+    from?: string | null;
+    to?: string | null;
+  };
+  totalAutomations: number;
+  totalExecutions: number;
+  successfulExecutions: number;
+  failedExecutions: number;
+  successRate: number | null;
+  neverExecutedCount: number;
+  perAutomation: AutomationStatsEntry[];
+  mostFailingAutomations: AutomationStatsEntry[];
+  recentExecutions: AutomationLogEntry[];
 }
 
 export interface FormField {

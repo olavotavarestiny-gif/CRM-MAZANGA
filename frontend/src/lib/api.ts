@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, Task, CRMForm, FormField, FormSubmission, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, ProdutoCategoria, ComercialResumo, ComercialAnalise, StockMovement, CaixaSessao, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount } from './types';
+import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, AutomationLogsResponse, AutomationStatsResponse, Task, CRMForm, FormField, FormSubmission, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, ProdutoCategoria, ComercialResumo, ComercialAnalise, StockMovement, CaixaSessao, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount } from './types';
 import { createClient } from './supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -210,6 +210,25 @@ export async function updateAutomation(id: string, data: Partial<Automation>) {
 
 export async function deleteAutomation(id: string) {
   await api.delete(`/api/automations/${id}`);
+}
+
+export async function getAutomationLogs(
+  id: string,
+  params?: {
+    page?: number;
+    pageSize?: number;
+    status?: 'all' | 'success' | 'failed';
+    dateFrom?: string;
+    dateTo?: string;
+  }
+) {
+  const response = await api.get<AutomationLogsResponse>(`/api/automations/${id}/logs`, { params });
+  return response.data;
+}
+
+export async function getAutomationStats(params?: { dateFrom?: string; dateTo?: string }) {
+  const response = await api.get<AutomationStatsResponse>('/api/automations/stats', { params });
+  return response.data;
 }
 
 // Tasks
