@@ -7,13 +7,19 @@ import { Task } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskItem from '@/components/tasks/task-item';
 import TaskFormModal from '@/components/tasks/task-form-modal';
+import WidgetWrapper from './widget-wrapper';
 
 export default function TasksWidget() {
   const queryClient = useQueryClient();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const { data: tasks = [] } = useQuery({
+  const {
+    data: tasks = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ['tasks', 'pending'],
     queryFn: () => getTasks({ done: false }),
   });
@@ -50,7 +56,14 @@ export default function TasksWidget() {
           <Link href="/tasks" className="text-xs text-[#0049e6] font-semibold hover:text-[#0049e6]/80 transition-colors">Ver todas</Link>
         </CardHeader>
         <CardContent className="divide-y divide-slate-100">
-          {tasks.length > 0 ? (
+          <WidgetWrapper
+            title="tarefas pendentes"
+            isLoading={isLoading}
+            error={isError}
+            isEmpty={!isLoading && !isError && tasks.length === 0}
+            onRetry={() => refetch()}
+            className="border-0 bg-transparent p-0"
+          >
             <div className="space-y-0">
               {tasks.slice(0, 8).map((task) => (
                 <TaskItem
@@ -68,9 +81,7 @@ export default function TasksWidget() {
                 </Link>
               )}
             </div>
-          ) : (
-            <p className="text-center text-[#595c5e] py-6">Nenhuma tarefa pendente 🎉</p>
-          )}
+          </WidgetWrapper>
         </CardContent>
       </Card>
 

@@ -4,11 +4,21 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  BarChart3, CreditCard, DollarSign, Lock, PackageX, ShoppingCart, Store,
-  TrendingDown, TrendingUp, Trophy, Unlock,
+  BarChart3,
+  CreditCard,
+  DollarSign,
+  Lock,
+  PackageX,
+  ShoppingCart,
+  Store,
+  TrendingDown,
+  TrendingUp,
+  Trophy,
+  Unlock,
 } from 'lucide-react';
 import { getCaixaSessaoAtual, getComercialAnalise, getComercialInsights, getComercialResumo, getCurrentUser } from '@/lib/api';
 import type { User } from '@/lib/api';
+import WidgetWrapper from '@/components/dashboard/widget-wrapper';
 import { CommerceButton as Button } from '@/components/ui/button-commerce';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -25,7 +35,16 @@ import {
 } from '@/lib/permissions';
 
 function formatKz(value: number) {
-  return `${value.toLocaleString('pt-AO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Kz`;
+  return `${new Intl.NumberFormat('pt-PT').format(Math.round(value || 0))} Kz`;
+}
+
+function formatShortTime(value?: string | null) {
+  if (!value) return '--:--';
+
+  return new Date(value).toLocaleTimeString('pt-PT', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function CommercialSummaryCard({
@@ -54,6 +73,124 @@ function CommercialSummaryCard({
             <Icon className="h-5 w-5" />
           </div>
         </div>
+      </div>
+    </Card>
+  );
+}
+
+function SummaryCardSkeleton() {
+  return (
+    <Card className="overflow-hidden border-slate-200 shadow-sm">
+      <div className="animate-pulse p-5 space-y-3">
+        <div className="h-3 w-28 rounded-full bg-slate-200" />
+        <div className="h-9 w-36 rounded-full bg-slate-200" />
+        <div className="h-4 w-40 rounded-full bg-slate-200" />
+      </div>
+    </Card>
+  );
+}
+
+function TopProdutosMesCard({
+  items,
+  isLoading,
+  isError,
+  onRetry,
+}: {
+  items: { productCode: string; productDescription: string; quantidadeTotal: number }[];
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+}) {
+  return (
+    <Card className="border-slate-200 p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <Trophy className="h-4 w-4 text-[#B84D0E]" />
+        <p className="text-sm font-semibold text-[#2c2f31]">Top 3 do Mês</p>
+      </div>
+      <div className="mt-4">
+        <WidgetWrapper
+          title="top 3 do mês"
+          isLoading={isLoading}
+          error={isError}
+          isEmpty={!isLoading && !isError && items.length === 0}
+          onRetry={onRetry}
+          className="border-0 bg-transparent p-0"
+        >
+          <div className="space-y-3">
+            {items.map((item, index) => (
+              <div key={item.productCode} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-[#2c2f31]">{index + 1}. {item.productDescription}</p>
+                  <p className="text-xs text-slate-500">{item.productCode}</p>
+                </div>
+                <strong>{item.quantidadeTotal}</strong>
+              </div>
+            ))}
+          </div>
+        </WidgetWrapper>
+      </div>
+    </Card>
+  );
+}
+
+function CaixaSessaoCard({
+  canViewCaixa,
+  sessao,
+  isLoading,
+  isError,
+  onRetry,
+}: {
+  canViewCaixa: boolean;
+  sessao: Awaited<ReturnType<typeof getCaixaSessaoAtual>>;
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+}) {
+  if (!canViewCaixa) return null;
+
+  return (
+    <Card className="border-slate-200 p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <CreditCard className="h-4 w-4 text-[#B84D0E]" />
+        <p className="text-sm font-semibold text-[#2c2f31]">Sessão Caixa</p>
+      </div>
+      <div className="mt-4">
+        <WidgetWrapper
+          title="sessão de caixa"
+          isLoading={isLoading}
+          error={isError}
+          onRetry={onRetry}
+          className="border-0 bg-transparent p-0"
+        >
+          {sessao?.status === 'open' ? (
+            <div className="space-y-3 rounded-2xl border border-green-200 bg-green-50 p-4">
+              <Badge variant="success">Aberta</Badge>
+              <div>
+                <p className="text-sm font-medium text-[#2c2f31]">{sessao.estabelecimento?.nome || 'Sem estabelecimento'}</p>
+                <p className="text-sm text-slate-600">
+                  Aberta desde {formatShortTime(sessao.openedAt)} · {sessao.salesCount} vendas · {formatKz(sessao.totalSalesAmount)}
+                </p>
+              </div>
+              <Button asChild variant="outline" className="justify-start gap-2">
+                <Link href="/caixa">
+                  <CreditCard className="h-4 w-4" />
+                  Ir para Caixa
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <Badge variant="secondary">Fechada</Badge>
+              <p className="text-sm text-slate-600">Sem sessão aberta neste momento.</p>
+              <Button asChild variant="outline" className="justify-start gap-2">
+                <Link href="/caixa">
+                  <CreditCard className="h-4 w-4" />
+                  Abrir área de Caixa
+                </Link>
+              </Button>
+            </div>
+          )}
+        </WidgetWrapper>
       </div>
     </Card>
   );
@@ -278,6 +415,7 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
   const podeVerVendas = currentUser ? canView(currentUser, 'vendas') : false;
   const podeVerProdutos = currentUser ? canStockView(currentUser) : false;
   const podeVerFaturacao = currentUser ? canAccessBilling(currentUser) : false;
+  const podeVerCaixa = currentUser ? canCaixaView(currentUser) : false;
 
   const {
     data: resumo,
@@ -303,6 +441,18 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
     enabled: !!currentUser && podeResumo,
   });
 
+  const {
+    data: sessao = null,
+    isLoading: sessaoLoading,
+    isError: sessaoError,
+    refetch: refetchSessao,
+  } = useQuery({
+    queryKey: ['caixa-sessao-atual', 'dashboard'],
+    queryFn: () => getCaixaSessaoAtual(),
+    enabled: !!currentUser && podeResumo && podeVerCaixa,
+    refetchInterval: 30_000,
+  });
+
   if (loadingUser) {
     return (
       <div className="mx-auto max-w-6xl p-4 md:p-6">
@@ -322,40 +472,14 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
     return <PainelOperacionalReduzido currentUser={currentUser} />;
   }
 
-  if (resumoLoading || insightsLoading) {
-    return (
-      <div className="mx-auto max-w-6xl p-4 md:p-6">
-        <div className="space-y-4">
-          <div className="h-8 w-64 animate-pulse rounded-full bg-slate-200" />
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-36 animate-pulse rounded-2xl bg-slate-200" />
-            ))}
-          </div>
-          <div className="h-36 animate-pulse rounded-2xl bg-slate-200" />
-        </div>
-      </div>
-    );
-  }
-
-  if (resumoError || insightsError || !resumo) {
-    return (
-      <div className="mx-auto max-w-6xl p-4 md:p-6">
-        <ErrorState
-          title="Não foi possível carregar o painel comercial"
-          message="Os dados de vendas não responderam como esperado."
-          onRetry={() => {
-            refetchResumo();
-            refetchInsights();
-          }}
-        />
-      </div>
-    );
-  }
-
-  const variacaoLabel = resumo.variacao > 0
-    ? `+${resumo.variacao}% vs ontem`
-    : `${resumo.variacao}% vs ontem`;
+  const variacaoHoje = resumo?.variacao ?? 0;
+  const variacaoLabel = variacaoHoje > 0
+    ? `+${variacaoHoje}% vs ontem`
+    : `${variacaoHoje}% vs ontem`;
+  const variacaoSemana = resumo?.variacaoSemana ?? 0;
+  const variacaoSemanaLabel = variacaoSemana > 0
+    ? `+${variacaoSemana}% vs semana anterior`
+    : `${variacaoSemana}% vs semana anterior`;
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-6">
@@ -363,7 +487,7 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Painel Comercial</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Acompanha vendas, rotação de produtos e sinais rápidos do dia.
+            Acompanha vendas, operação de caixa e sinais rápidos do mês.
           </p>
         </div>
 
@@ -392,34 +516,49 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <CommercialSummaryCard
-              title="Total Hoje"
-              value={formatKz(resumo.totalHoje)}
-              hint={variacaoLabel}
-              icon={resumo.variacao >= 0 ? TrendingUp : TrendingDown}
-              accentClass={resumo.variacao >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}
-            />
-            <CommercialSummaryCard
-              title="Vendas Hoje"
-              value={String(resumo.vendasHoje)}
-              hint={resumo.estabelecimentoDestaque ? `Destaque: ${resumo.estabelecimentoDestaque.nome}` : 'Sem destaque ainda'}
-              icon={ShoppingCart}
-              accentClass="bg-blue-100 text-blue-700"
-            />
-            <CommercialSummaryCard
-              title="Top Produto"
-              value={resumo.topProduto?.productDescription || 'Sem vendas'}
-              hint={resumo.topProduto ? `${resumo.topProduto.quantidadeVendida} unidades` : 'Ainda sem rotação hoje'}
-              icon={Trophy}
-              accentClass="bg-amber-100 text-amber-700"
-            />
-            <CommercialSummaryCard
-              title="Stock Baixo"
-              value={String(resumo.stockAlertaCount)}
-              hint={resumo.stockAlertaCount > 0 ? 'Ver produtos com alerta' : 'Inventário sem alertas'}
-              icon={PackageX}
-              accentClass="bg-rose-100 text-rose-700"
-            />
+            {resumoLoading ? (
+              Array.from({ length: 4 }).map((_, index) => <SummaryCardSkeleton key={index} />)
+            ) : resumoError || !resumo ? (
+              <div className="md:col-span-2 xl:col-span-4">
+                <ErrorState
+                  compact
+                  title="Não foi possível carregar o resumo comercial"
+                  message="Tenta novamente para ver os indicadores principais."
+                  onRetry={() => refetchResumo()}
+                />
+              </div>
+            ) : (
+              <>
+                <CommercialSummaryCard
+                  title="Total Hoje"
+                  value={formatKz(resumo.totalHoje)}
+                  hint={variacaoLabel}
+                  icon={variacaoHoje >= 0 ? TrendingUp : TrendingDown}
+                  accentClass={variacaoHoje >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}
+                />
+                <CommercialSummaryCard
+                  title="Vendas Hoje"
+                  value={String(resumo.vendasHoje)}
+                  hint={resumo.estabelecimentoDestaque ? `Destaque: ${resumo.estabelecimentoDestaque.nome}` : 'Sem destaque ainda'}
+                  icon={ShoppingCart}
+                  accentClass="bg-blue-100 text-blue-700"
+                />
+                <CommercialSummaryCard
+                  title="Receita Semana"
+                  value={formatKz(resumo.totalSemanaActual)}
+                  hint={variacaoSemanaLabel}
+                  icon={variacaoSemana >= 0 ? TrendingUp : TrendingDown}
+                  accentClass={variacaoSemana >= 0 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}
+                />
+                <CommercialSummaryCard
+                  title="Stock Baixo"
+                  value={String(resumo.stockAlertaCount)}
+                  hint={resumo.stockAlertaCount > 0 ? 'Ver produtos com alerta' : 'Inventário sem alertas'}
+                  icon={PackageX}
+                  accentClass="bg-slate-100 text-slate-700"
+                />
+              </>
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
@@ -428,17 +567,23 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
                 <BarChart3 className="h-4 w-4 text-[#B84D0E]" />
                 <p className="text-sm font-semibold text-[#2c2f31]">Insights do Dia</p>
               </div>
-              <div className="mt-4 space-y-3">
-                {insights.map((insight) => (
-                  <div key={insight} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                    {insight}
+              <div className="mt-4">
+                <WidgetWrapper
+                  title="insights do dia"
+                  isLoading={insightsLoading}
+                  error={insightsError}
+                  isEmpty={!insightsLoading && !insightsError && insights.length === 0}
+                  onRetry={() => refetchInsights()}
+                  className="border-0 bg-transparent p-0"
+                >
+                  <div className="space-y-3">
+                    {insights.map((insight) => (
+                      <div key={insight} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        {insight}
+                      </div>
+                    ))}
                   </div>
-                ))}
-                {insights.length === 0 ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                    Ainda não há insights suficientes para hoje.
-                  </div>
-                ) : null}
+                </WidgetWrapper>
               </div>
             </Card>
 
@@ -476,6 +621,23 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
                 ) : null}
               </div>
             </Card>
+          </div>
+
+          <div className={`grid grid-cols-1 gap-4 ${podeVerCaixa ? 'xl:grid-cols-2' : ''}`}>
+            <CaixaSessaoCard
+              canViewCaixa={podeVerCaixa}
+              sessao={sessao}
+              isLoading={sessaoLoading}
+              isError={sessaoError}
+              onRetry={() => refetchSessao()}
+            />
+
+            <TopProdutosMesCard
+              items={resumo?.top3MesPorQuantidade ?? []}
+              isLoading={resumoLoading}
+              isError={resumoError}
+              onRetry={() => refetchResumo()}
+            />
           </div>
         </>
       )}

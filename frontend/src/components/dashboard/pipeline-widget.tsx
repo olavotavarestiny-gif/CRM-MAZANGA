@@ -3,10 +3,21 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { getContacts, getPipelineStages } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import WidgetWrapper from './widget-wrapper';
 
 export default function PipelineWidget() {
-  const { data: contacts = [] } = useQuery({ queryKey: ['contacts'], queryFn: () => getContacts() });
-  const { data: stages = [] } = useQuery({ queryKey: ['pipeline-stages'], queryFn: () => import('@/lib/api').then(m => m.getPipelineStages()) });
+  const {
+    data: contacts = [],
+    isLoading: contactsLoading,
+    isError: contactsError,
+    refetch: refetchContacts,
+  } = useQuery({ queryKey: ['contacts'], queryFn: () => getContacts() });
+  const {
+    data: stages = [],
+    isLoading: stagesLoading,
+    isError: stagesError,
+    refetch: refetchStages,
+  } = useQuery({ queryKey: ['pipeline-stages'], queryFn: () => getPipelineStages() });
 
   const pipelineContacts = contacts.filter((c) => c.inPipeline);
   const total = pipelineContacts.length;
@@ -18,9 +29,17 @@ export default function PipelineWidget() {
         <Link href="/pipeline" className="text-xs text-[#0049e6] font-semibold hover:text-[#0049e6]/80 transition-colors">Ver pipeline</Link>
       </CardHeader>
       <CardContent>
-        {stages.length === 0 ? (
-          <p className="text-sm text-[#595c5e] py-4 text-center">Sem etapas configuradas</p>
-        ) : (
+        <WidgetWrapper
+          title="resumo do pipeline"
+          isLoading={contactsLoading || stagesLoading}
+          error={contactsError || stagesError}
+          isEmpty={!contactsLoading && !stagesLoading && !contactsError && !stagesError && stages.length === 0}
+          onRetry={() => {
+            refetchContacts();
+            refetchStages();
+          }}
+          className="border-0 bg-transparent p-0"
+        >
           <div className="space-y-2.5">
             {stages.map((stage) => {
               const count = pipelineContacts.filter((c) => c.stage === stage.name).length;
@@ -41,7 +60,7 @@ export default function PipelineWidget() {
               );
             })}
           </div>
-        )}
+        </WidgetWrapper>
       </CardContent>
     </Card>
   );

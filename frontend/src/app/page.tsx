@@ -1,24 +1,182 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
+import { isPast, isSameDay, parseISO } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
-import { getContacts, getTasks, getFinanceDashboard, getCurrentUser } from '@/lib/api';
-import { useDashboardConfig } from '@/components/dashboard/use-dashboard-config';
+import {
+  AlertTriangle,
+  Banknote,
+  BriefcaseBusiness,
+  Clock3,
+  CreditCard,
+  Settings2,
+  Workflow,
+} from 'lucide-react';
+import { getContacts, getCurrentUser, getFinanceDashboard, getTasks } from '@/lib/api';
+import { isComercio } from '@/lib/business-modes';
+import type { Contact, DashboardStats, Task } from '@/lib/types';
 import PainelComercialPage from '@/components/comercial/painel-comercial';
-import StatWidget from '@/components/dashboard/stat-widget';
-import GoalWidget from '@/components/dashboard/goal-widget';
-import TasksWidget from '@/components/dashboard/tasks-widget';
-import PipelineWidget from '@/components/dashboard/pipeline-widget';
-import WeeklyInsightCard from '@/components/dashboard/weekly-insight-card';
 import DashboardCustomizer from '@/components/dashboard/dashboard-customizer';
-import { WidgetSource, SOURCE_UNITS } from '@/components/dashboard/types';
+import GoalWidget from '@/components/dashboard/goal-widget';
+import PipelineWidget from '@/components/dashboard/pipeline-widget';
+import StatWidget from '@/components/dashboard/stat-widget';
+import TasksWidget from '@/components/dashboard/tasks-widget';
+import { SOURCE_UNITS, type DashboardWidget, type WidgetSource } from '@/components/dashboard/types';
+import { useDashboardConfig } from '@/components/dashboard/use-dashboard-config';
+import WeeklyInsightCard from '@/components/dashboard/weekly-insight-card';
+import WidgetWrapper from '@/components/dashboard/widget-wrapper';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
-import { Settings2 } from 'lucide-react';
-import { isSameDay, parseISO } from 'date-fns';
-import { isComercio } from '@/lib/business-modes';
+
+const CONTACT_SOURCES = new Set<WidgetSource>([
+  'contacts_total',
+  'contacts_month',
+  'pipeline_count',
+  'closed_total',
+  'closed_month',
+]);
+
+const TASK_SOURCES = new Set<WidgetSource>([
+  'tasks_pending',
+  'tasks_today',
+  'overdue_tasks',
+]);
+
+const FINANCE_SOURCES = new Set<WidgetSource>([
+  'revenue_month',
+  'expenses_month',
+  'profit_month',
+  'mrr',
+  'receivables',
+  'receivables_kz',
+]);
+
+function isOverdueTask(task: Task, today: Date) {
+  if (task.done || !task.dueDate) return false;
+
+  try {
+    const dueDate = parseISO(task.dueDate);
+    if (isSameDay(dueDate, today)) return false;
+    return isPast(dueDate);
+  } catch {
+    return false;
+  }
+}
+
+function buildContactSourceValues(contacts: Contact[], startOfMonth: Date) {
+  return {
+    contacts_total: contacts.length,
+    contacts_month: contacts.filter((contact) => new Date(contact.createdAt) >= startOfMonth).length,
+    pipeline_count: contacts.filter((contact) => contact.inPipeline).length,
+    closed_total: contacts.filter((contact) => contact.stage === 'Fechado').length,
+    closed_month: contacts.filter((contact) => contact.stage === 'Fechado' && new Date(contact.updatedAt) >= startOfMonth).length,
+  };
+}
+
+function buildTaskSourceValues(tasks: Task[], today: Date) {
+  return {
+    tasks_pending: tasks.length,
+    tasks_today: tasks.filter((task) => {
+      if (!task.dueDate) return false;
+
+      try {
+        return isSameDay(parseISO(task.dueDate), today);
+      } catch {
+        return false;
+      }
+    }).length,
+    overdue_tasks: tasks.filter((task) => isOverdueTask(task, today)).length,
+  };
+}
+
+function getFinanceValue(source: WidgetSource, financeStats?: DashboardStats) {
+  if (!financeStats) return 0;
+
+  switch (source) {
+    case 'revenue_month':
+      return financeStats.revenue;
+    case 'expenses_month':
+      return financeStats.expenses;
+    case 'profit_month':
+      return financeStats.profit;
+    case 'mrr':
+      return financeStats.mrr;
+    case 'receivables':
+      return financeStats.receivablesCount;
+    case 'receivables_kz':
+      return financeStats.receivablesTotal;
+    default:
+      return 0;
+  }
+}
+
+function getMetricIcon(source: WidgetSource) {
+  switch (source) {
+    case 'pipeline_count':
+      return Workflow;
+    case 'overdue_tasks':
+      return AlertTriangle;
+    case 'revenue_month':
+    case 'profit_month':
+      return Banknote;
+    case 'receivables':
+    case 'receivables_kz':
+      return CreditCard;
+    default:
+      return BriefcaseBusiness;
+  }
+}
+
+function FinanceMetricWidget({ widget }: { widget: DashboardWidget }) {
+  const source = widget.source;
+  const {
+    data: financeStats,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ['finance-dashboard'],
+    queryFn: () => getFinanceDashboard(),
+    retry: false,
+  });
+
+  if (!source) return null;
+
+  const value = getFinanceValue(source, financeStats);
+  const unit = widget.unit || SOURCE_UNITS[source] || '';
+  const delta = source === 'revenue_month' && financeStats && financeStats.prevRevenue > 0
+    ? ((financeStats.revenue - financeStats.prevRevenue) / financeStats.prevRevenue) * 100
+    : undefined;
+
+  return (
+    <WidgetWrapper
+      title={widget.title}
+      isLoading={isLoading}
+      error={isError}
+      onRetry={() => refetch()}
+    >
+      {widget.type === 'goal' && widget.target ? (
+        <GoalWidget
+          title={widget.title}
+          current={value}
+          target={widget.target}
+          unit={unit}
+          color={widget.color}
+        />
+      ) : (
+        <StatWidget
+          title={widget.title}
+          value={value}
+          unit={unit}
+          color={widget.color}
+          delta={delta}
+          icon={getMetricIcon(source)}
+        />
+      )}
+    </WidgetWrapper>
+  );
+}
 
 function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof getCurrentUser>> | undefined }) {
   const [customizerOpen, setCustomizerOpen] = useState(false);
@@ -30,22 +188,18 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
     isLoading: contactsLoading,
     isError: contactsError,
     refetch: refetchContacts,
-  } = useQuery({ queryKey: ['contacts'], queryFn: () => getContacts() });
+  } = useQuery({
+    queryKey: ['contacts'],
+    queryFn: () => getContacts(),
+  });
   const {
     data: tasks = [],
     isLoading: tasksLoading,
     isError: tasksError,
     refetch: refetchTasks,
-  } = useQuery({ queryKey: ['tasks', 'pending'], queryFn: () => getTasks({ done: false }) });
-  const {
-    data: financeStats,
-    isLoading: financeLoading,
-    isError: financeError,
-    refetch: refetchFinance,
   } = useQuery({
-    queryKey: ['finance-dashboard'],
-    queryFn: () => getFinanceDashboard(),
-    retry: false,
+    queryKey: ['tasks', 'pending'],
+    queryFn: () => getTasks({ done: false }),
   });
 
   const now = new Date();
@@ -53,21 +207,14 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   const sourceValues: Record<WidgetSource, number> = {
-    contacts_total:  contacts.length,
-    contacts_month:  contacts.filter((c) => new Date(c.createdAt) >= startOfMonth).length,
-    pipeline_count:  contacts.filter((c) => c.inPipeline).length,
-    closed_total:    contacts.filter((c) => c.stage === 'Fechado').length,
-    closed_month:    contacts.filter((c) => c.stage === 'Fechado' && new Date(c.updatedAt) >= startOfMonth).length,
-    tasks_pending:   tasks.length,
-    tasks_today:     tasks.filter((t) => {
-      if (!t.dueDate) return false;
-      try { const d = parseISO(t.dueDate); return isSameDay(new Date(d.getFullYear(), d.getMonth(), d.getDate()), today); }
-      catch { return false; }
-    }).length,
-    revenue_month:   financeStats?.revenue ?? 0,
-    expenses_month:  financeStats?.expenses ?? 0,
-    profit_month:    financeStats?.profit ?? 0,
-    mrr:             financeStats?.mrr ?? 0,
+    ...buildContactSourceValues(contacts, startOfMonth),
+    ...buildTaskSourceValues(tasks, today),
+    revenue_month: 0,
+    expenses_month: 0,
+    profit_month: 0,
+    mrr: 0,
+    receivables: 0,
+    receivables_kz: 0,
   };
 
   if (!loaded) {
@@ -92,34 +239,11 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
     );
   }
 
-  if (contactsLoading || tasksLoading || financeLoading) {
-    return (
-      <div className="p-6 max-w-6xl mx-auto">
-        <div className="animate-pulse space-y-6">
-          <div className="flex items-start justify-between">
-            <div className="space-y-3">
-              <div className="h-8 w-32 rounded-full bg-slate-200" />
-              <div className="h-4 w-56 rounded-full bg-slate-200" />
-            </div>
-            <div className="h-10 w-32 rounded-xl bg-slate-200" />
-          </div>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-36 rounded-2xl bg-slate-200" />
-            ))}
-          </div>
-          <div className="h-44 max-w-2xl rounded-3xl bg-slate-200" />
-        </div>
-      </div>
-    );
-  }
-
-  const visible = widgets.filter((w) => w.visible);
-  const statGoalWidgets = visible.filter((w) => w.type === 'stat' || w.type === 'goal');
-  const otherWidgets = visible.filter((w) => w.type === 'tasks' || w.type === 'pipeline');
+  const visible = widgets.filter((widget) => widget.visible);
+  const statGoalWidgets = visible.filter((widget) => widget.type === 'stat' || widget.type === 'goal');
+  const otherWidgets = visible.filter((widget) => widget.type === 'tasks' || widget.type === 'pipeline');
   const pipelineCount = sourceValues.pipeline_count;
   const pendingTasks = sourceValues.tasks_pending;
-  const hasDashboardError = contactsError || tasksError || financeError;
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -136,7 +260,7 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
         </Button>
       </div>
 
-      {hasDashboardError && (
+      {(contactsError || tasksError) && (
         <div className="mb-6">
           <ErrorState
             compact
@@ -145,39 +269,59 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
             onRetry={() => {
               refetchContacts();
               refetchTasks();
-              refetchFinance();
             }}
-            secondaryAction={{ label: 'Ir para Contactos', href: '/contacts' }}
           />
         </div>
       )}
 
-      {/* Stat / Goal widgets grid */}
       {statGoalWidgets.length > 0 && (
         <div data-tour="dashboard-stats" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-          {statGoalWidgets.map((w) => {
-            const value = sourceValues[w.source!] ?? 0;
-            const unit = w.unit || SOURCE_UNITS[w.source!] || '';
-            if (w.type === 'goal' && w.target) {
-              return (
-                <GoalWidget
-                  key={w.id}
-                  title={w.title}
-                  current={value}
-                  target={w.target}
-                  unit={unit}
-                  color={w.color}
-                />
-              );
+          {statGoalWidgets.map((widget) => {
+            const source = widget.source;
+            if (!source) return null;
+
+            if (FINANCE_SOURCES.has(source)) {
+              return <FinanceMetricWidget key={widget.id} widget={widget} />;
             }
+
+            const isContactsSource = CONTACT_SOURCES.has(source);
+            const isTasksSource = TASK_SOURCES.has(source);
+            const isLoading = isContactsSource ? contactsLoading : isTasksSource ? tasksLoading : false;
+            const hasError = isContactsSource ? contactsError : isTasksSource ? tasksError : false;
+            const unit = widget.unit || SOURCE_UNITS[source] || '';
+            const value = sourceValues[source] ?? 0;
+            const href = source === 'overdue_tasks' ? '/tasks?filter=atrasadas' : undefined;
+
             return (
-              <StatWidget
-                key={w.id}
-                title={w.title}
-                value={value}
-                unit={unit}
-                color={w.color}
-              />
+              <WidgetWrapper
+                key={widget.id}
+                title={widget.title}
+                isLoading={isLoading}
+                error={hasError}
+                onRetry={() => {
+                  if (isContactsSource) refetchContacts();
+                  if (isTasksSource) refetchTasks();
+                }}
+              >
+                {widget.type === 'goal' && widget.target ? (
+                  <GoalWidget
+                    title={widget.title}
+                    current={value}
+                    target={widget.target}
+                    unit={unit}
+                    color={widget.color}
+                  />
+                ) : (
+                  <StatWidget
+                    title={widget.title}
+                    value={value}
+                    unit={unit}
+                    color={widget.color}
+                    href={href}
+                    icon={getMetricIcon(source)}
+                  />
+                )}
+              </WidgetWrapper>
             );
           })}
         </div>
@@ -187,12 +331,15 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
         <WeeklyInsightCard pendingTasks={pendingTasks} pipelineCount={pipelineCount} />
       </div>
 
-      {/* Tasks / Pipeline widgets */}
       {otherWidgets.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {otherWidgets.map((w) => {
-            if (w.type === 'tasks') return <div key={w.id} data-tour="dashboard-tasks" className="col-span-full"><TasksWidget /></div>;
-            if (w.type === 'pipeline') return <PipelineWidget key={w.id} />;
+          {otherWidgets.map((widget) => {
+            if (widget.type === 'tasks') {
+              return <div key={widget.id} data-tour="dashboard-tasks" className="col-span-full"><TasksWidget /></div>;
+            }
+            if (widget.type === 'pipeline') {
+              return <PipelineWidget key={widget.id} />;
+            }
             return null;
           })}
         </div>

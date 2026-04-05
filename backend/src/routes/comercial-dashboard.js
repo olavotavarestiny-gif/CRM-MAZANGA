@@ -9,6 +9,25 @@ function startOfDay(date) {
   return d;
 }
 
+function startOfWeek(date) {
+  const d = startOfDay(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function endOfWeek(date) {
+  const d = startOfWeek(date);
+  d.setDate(d.getDate() + 6);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function startOfMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
+}
+
 function parseLines(lines) {
   try {
     const parsed = typeof lines === 'string' ? JSON.parse(lines) : lines;
@@ -31,8 +50,12 @@ router.get('/resumo', requireComercialPermission('dashboard_basic'), async (req,
     ontem.setDate(ontem.getDate() - 1);
     const amanha = startOfDay(new Date(hoje));
     amanha.setDate(amanha.getDate() + 1);
+    const inicioSemanaActual = startOfWeek(hoje);
+    const inicioSemanaAnterior = startOfWeek(new Date(inicioSemanaActual.getTime() - 24 * 60 * 60 * 1000));
+    const fimSemanaAnterior = endOfWeek(inicioSemanaAnterior);
+    const inicioMes = startOfMonth(hoje);
 
-    const [hojeAgg, ontemAgg, facturasHoje, estabelecimentos, produtosAlerta] = await Promise.all([
+    const [hojeAgg, ontemAgg, facturasHoje, estabelecimentos, produtosAlerta, semanaActualAgg, semanaAnteriorAgg, facturasMes] = await Promise.all([
       prisma.factura.aggregate({
         where: { userId, documentDate: { gte: hoje, lt: amanha }, documentStatus: 'N' },
         _sum: { grossTotal: true },
@@ -55,6 +78,18 @@ router.get('/resumo', requireComercialPermission('dashboard_basic'), async (req,
         where: { userId, active: true, stockMinimo: { not: null } },
         select: { id: true, stock: true, stockMinimo: true },
       }),
+      prisma.factura.aggregate({
+        where: { userId, documentDate: { gte: inicioSemanaActual, lt: amanha }, documentStatus: 'N' },
+        _sum: { grossTotal: true },
+      }),
+      prisma.factura.aggregate({
+        where: { userId, documentDate: { gte: inicioSemanaAnterior, lte: fimSemanaAnterior }, documentStatus: 'N' },
+        _sum: { grossTotal: true },
+      }),
+      prisma.factura.findMany({
+        where: { userId, documentDate: { gte: inicioMes, lt: amanha }, documentStatus: 'N' },
+        select: { lines: true },
+      }),
     ]);
 
     const totalHoje = toNumber(hojeAgg._sum.grossTotal);
@@ -62,8 +97,14 @@ router.get('/resumo', requireComercialPermission('dashboard_basic'), async (req,
     const variacao = totalOntem > 0
       ? Number((((totalHoje - totalOntem) / totalOntem) * 100).toFixed(1))
       : 0;
+    const totalSemanaActual = toNumber(semanaActualAgg._sum.grossTotal);
+    const totalSemanaAnterior = toNumber(semanaAnteriorAgg._sum.grossTotal);
+    const variacaoSemana = totalSemanaAnterior > 0
+      ? Number((((totalSemanaActual - totalSemanaAnterior) / totalSemanaAnterior) * 100).toFixed(1))
+      : 0;
 
     const produtoMap = {};
+    const produtoMapMes = {};
     const estabMap = {};
 
     for (const factura of facturasHoje) {
@@ -85,8 +126,27 @@ router.get('/resumo', requireComercialPermission('dashboard_basic'), async (req,
       estabMap[factura.estabelecimentoId] += toNumber(factura.grossTotal);
     }
 
+    for (const factura of facturasMes) {
+      for (const line of parseLines(factura.lines)) {
+        const key = line.productCode;
+        if (!produtoMapMes[key]) {
+          produtoMapMes[key] = {
+            productCode: key,
+            productDescription: line.productDescription,
+            quantidadeTotal: 0,
+            facturacaoTotal: 0,
+          };
+        }
+        produtoMapMes[key].quantidadeTotal += Number(line.quantity || 0);
+        produtoMapMes[key].facturacaoTotal += Number(line.quantity || 0) * Number(line.unitPrice || 0);
+      }
+    }
+
     const topProduto = Object.values(produtoMap)
       .sort((a, b) => b.quantidadeVendida - a.quantidadeVendida)[0] || null;
+    const top3MesPorQuantidade = Object.values(produtoMapMes)
+      .sort((a, b) => b.quantidadeTotal - a.quantidadeTotal)
+      .slice(0, 3);
 
     const topEstabId = Object.entries(estabMap).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
     const estabelecimentoDestaque = topEstabId
@@ -104,7 +164,11 @@ router.get('/resumo', requireComercialPermission('dashboard_basic'), async (req,
       vendasHoje: hojeAgg._count.id,
       totalOntem,
       variacao,
+      totalSemanaActual,
+      totalSemanaAnterior,
+      variacaoSemana,
       topProduto,
+      top3MesPorQuantidade,
       estabelecimentoDestaque,
       stockAlertaCount,
     });

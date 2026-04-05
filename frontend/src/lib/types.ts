@@ -415,6 +415,11 @@ export interface DashboardStats {
   profit: number;
   marginPercent: number;
   mrr: number;
+  prevRevenue: number;
+  prevExpenses: number;
+  prevProfit: number;
+  receivablesCount: number;
+  receivablesTotal: number;
 }
 
 export interface ClientProfitability {
@@ -539,12 +544,21 @@ export interface ComercialResumo {
   vendasHoje: number;
   totalOntem: number;
   variacao: number;
+  totalSemanaActual: number;
+  totalSemanaAnterior: number;
+  variacaoSemana: number;
   topProduto: {
     productCode: string;
     productDescription: string;
     quantidadeVendida: number;
     facturacaoTotal: number;
   } | null;
+  top3MesPorQuantidade: {
+    productCode: string;
+    productDescription: string;
+    quantidadeTotal: number;
+    facturacaoTotal: number;
+  }[];
   estabelecimentoDestaque: {
     id: string;
     nome: string;

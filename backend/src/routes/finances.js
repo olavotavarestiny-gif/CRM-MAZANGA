@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { requirePermission, requireDeletePermission } = require('../lib/permissions');
-const { getReconciliationReport } = require('../services/reconciliation.service');
+const { getReconciliationReport, isInvoicePaid } = require('../services/reconciliation.service');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -39,6 +39,14 @@ function formatKz(value) {
   return value ?? 0;
 }
 
+function getPreviousMonthDateRange(targetDate) {
+  const previousMonth = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth() - 1, 1, 0, 0, 0, 0));
+  return {
+    from: startOfMonth(previousMonth),
+    to: endOfMonth(previousMonth),
+  };
+}
+
 function parseReportDateRange(dateFrom, dateTo) {
   const start = parseDateBoundary(dateFrom, 'start');
   const end = parseDateBoundary(dateTo, 'end');
@@ -54,6 +62,7 @@ router.get('/dashboard', requirePermission('finances', 'transactions_view'), asy
     const targetDate = parseYearMonth(year, month) || new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
     const from = startOfMonth(targetDate);
     const to = endOfMonth(targetDate);
+    const previousRange = getPreviousMonthDateRange(targetDate);
 
     const baseWhere = {
       userId: req.user.effectiveUserId,
@@ -61,8 +70,12 @@ router.get('/dashboard', requirePermission('finances', 'transactions_view'), asy
       status: 'pago',
       date: { gte: from, lte: to },
     };
+    const previousBaseWhere = {
+      ...baseWhere,
+      date: { gte: previousRange.from, lte: previousRange.to },
+    };
 
-    const [revenueAgg, expensesAgg, mrrAgg] = await Promise.all([
+    const [revenueAgg, expensesAgg, mrrAgg, prevRevenueAgg, prevExpensesAgg, receivableInvoices] = await Promise.all([
       prisma.transaction.aggregate({
         where: { ...baseWhere, type: 'entrada' },
         _sum: { amountKz: true },
@@ -75,6 +88,28 @@ router.get('/dashboard', requirePermission('finances', 'transactions_view'), asy
         where: { ...baseWhere, type: 'entrada', revenueType: 'recorrente' },
         _sum: { amountKz: true },
       }),
+      prisma.transaction.aggregate({
+        where: { ...previousBaseWhere, type: 'entrada' },
+        _sum: { amountKz: true },
+      }),
+      prisma.transaction.aggregate({
+        where: { ...previousBaseWhere, type: 'saida' },
+        _sum: { amountKz: true },
+      }),
+      prisma.factura.findMany({
+        where: {
+          userId: req.user.effectiveUserId,
+          documentStatus: 'N',
+          documentDate: { gte: from, lte: to },
+        },
+        select: {
+          id: true,
+          documentNo: true,
+          documentType: true,
+          paymentMethod: true,
+          grossTotal: true,
+        },
+      }),
     ]);
 
     const revenue = formatKz(revenueAgg._sum.amountKz);
@@ -82,8 +117,54 @@ router.get('/dashboard', requirePermission('finances', 'transactions_view'), asy
     const profit = revenue - expenses;
     const marginPercent = revenue > 0 ? (profit / revenue) * 100 : 0;
     const mrr = formatKz(mrrAgg._sum.amountKz);
+    const prevRevenue = formatKz(prevRevenueAgg._sum.amountKz);
+    const prevExpenses = formatKz(prevExpensesAgg._sum.amountKz);
+    const prevProfit = prevRevenue - prevExpenses;
 
-    res.json({ revenue, expenses, profit, marginPercent: parseFloat(marginPercent.toFixed(1)), mrr });
+    const openReceivableInvoices = receivableInvoices.filter((invoice) => !isInvoicePaid(invoice));
+    const receivableInvoiceIds = openReceivableInvoices.map((invoice) => invoice.id);
+    const receivableDocumentNumbers = openReceivableInvoices.map((invoice) => invoice.documentNo);
+
+    const linkedPaidTransactions = receivableInvoiceIds.length || receivableDocumentNumbers.length
+      ? await prisma.transaction.findMany({
+          where: {
+            userId: req.user.effectiveUserId,
+            deleted: false,
+            status: 'pago',
+            type: 'entrada',
+            OR: [
+              ...(receivableInvoiceIds.length ? [{ invoiceId: { in: receivableInvoiceIds } }] : []),
+              ...(receivableDocumentNumbers.length ? [{ receiptNumber: { in: receivableDocumentNumbers } }] : []),
+            ],
+          },
+          select: {
+            invoiceId: true,
+            receiptNumber: true,
+          },
+        })
+      : [];
+
+    const paidByInvoiceId = new Set(linkedPaidTransactions.map((transaction) => transaction.invoiceId).filter(Boolean));
+    const paidByReceiptNumber = new Set(linkedPaidTransactions.map((transaction) => transaction.receiptNumber).filter(Boolean));
+
+    const unpaidReceivables = openReceivableInvoices.filter((invoice) => (
+      !paidByInvoiceId.has(invoice.id) && !paidByReceiptNumber.has(invoice.documentNo)
+    ));
+    const receivablesCount = unpaidReceivables.length;
+    const receivablesTotal = unpaidReceivables.reduce((sum, invoice) => sum + formatKz(invoice.grossTotal), 0);
+
+    res.json({
+      revenue,
+      expenses,
+      profit,
+      marginPercent: parseFloat(marginPercent.toFixed(1)),
+      mrr,
+      prevRevenue,
+      prevExpenses,
+      prevProfit,
+      receivablesCount,
+      receivablesTotal,
+    });
   } catch (error) {
     console.error('Error fetching dashboard:', error);
     res.status(500).json({ error: error.message });
