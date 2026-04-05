@@ -1300,21 +1300,24 @@ export async function dismissOnboarding(): Promise<void> {
   await api.post('/api/onboarding/dismiss');
 }
 
-export interface DailySuggestion {
+export interface DailyTipDeliveryResponse {
   show: boolean;
-  suggestion?: {
+  date?: string;
+  tipIndex?: number;
+  workspaceMode?: 'servicos' | 'comercio';
+  audienceBucket?: 'owner' | 'equipa';
+  tip?: {
     id: string;
-    type: 'insight' | 'action' | 'automation';
     title: string;
+    heading: string;
     message: string;
-    ctaLabel?: string;
-    ctaAction?: string;
-    priority: number;
+    personalizedMessage: string;
+    category?: string;
   };
 }
 
-export async function getDailySuggestion(): Promise<DailySuggestion> {
-  const res = await api.post<DailySuggestion>('/api/daily-tip/deliver');
+export async function getDailyTip(): Promise<DailyTipDeliveryResponse> {
+  const res = await api.post<DailyTipDeliveryResponse>('/api/daily-tip/deliver');
   return res.data;
 }
 

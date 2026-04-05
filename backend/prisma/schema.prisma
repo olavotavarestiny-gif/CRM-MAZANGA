@@ -60,7 +60,7 @@ model User {
   chatChannelMemberships    ChatChannelMember[]    @relation("ChatMemberUser")
   chatMessagesSent          ChatMessage[]          @relation("ChatSenderUser")
   contactNotes              ContactNote[]          @relation("NoteAuthor")
-  suggestionDeliveries      SuggestionDelivery[]
+  dailyTipDeliveries        DailyTipDelivery[]
 
   @@index([assignedEstabelecimentoId])
 }
@@ -695,7 +695,7 @@ model ChatMessage {
 model OnboardingProgress {
   id              String    @id @default(cuid())
   organization_id String    @unique // effectiveUserId as String
-  workspace_mode  String    // locked at creation: "servicos" | "comercio"
+  workspace_mode  String // locked at creation: "servicos" | "comercio"
   completed_steps String[]  @default([])
   dismissed       Boolean   @default(false)
   dismissed_at    DateTime?
@@ -704,14 +704,18 @@ model OnboardingProgress {
   updated_at      DateTime  @updatedAt
 }
 
-model SuggestionDelivery {
-  id           Int      @id @default(autoincrement())
-  userId       Int
-  date         String   // "YYYY-MM-DD" — one row per user per day
-  suggestionId String
-  payload      String?  // JSON — stored suggestion payload for consistent re-delivery
-  shownAt      DateTime @default(now())
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model DailyTipDelivery {
+  id             String   @id @default(cuid())
+  userId         Int
+  deliveryDate   String   @map("delivery_date") // "YYYY-MM-DD" em Africa/Luanda
+  workspaceMode  String   @map("workspace_mode")
+  audienceBucket String   @map("audience_bucket") // "owner" | "equipa"
+  tipId          String   @map("tip_id")
+  payload        Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, date])
+  @@unique([userId, deliveryDate])
+  @@index([deliveryDate])
+  @@map("daily_tip_delivery")
 }

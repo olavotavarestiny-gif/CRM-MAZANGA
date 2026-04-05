@@ -16,9 +16,9 @@ import {
   Trophy,
   Unlock,
 } from 'lucide-react';
-import { getCaixaSessaoAtual, getComercialAnalise, getComercialResumo, getCurrentUser, getDailySuggestion } from '@/lib/api';
+import { getCaixaSessaoAtual, getComercialAnalise, getComercialResumo, getCurrentUser, getDailyTip } from '@/lib/api';
 import type { User } from '@/lib/api';
-import SuggestionCard from '@/components/dashboard/suggestion-card';
+import DailyTipCard from '@/components/dashboard/daily-tip-card';
 import OnboardingChecklist from '@/components/onboarding/onboarding-checklist';
 import WidgetWrapper from '@/components/dashboard/widget-wrapper';
 import { CommerceButton as Button } from '@/components/ui/button-commerce';
@@ -431,10 +431,10 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
     enabled: !!currentUser && podeResumo,
   });
 
-  const { data: dailySuggestion } = useQuery({
-    queryKey: ['daily-suggestion'],
-    queryFn: getDailySuggestion,
-    staleTime: 1000 * 60 * 60 * 8,
+  const { data: dailyTip } = useQuery({
+    queryKey: ['daily-tip', currentUser?.id, currentUser?.workspaceMode],
+    queryFn: getDailyTip,
+    staleTime: 1000 * 60 * 60,
     retry: false,
     enabled: !!currentUser,
   });
@@ -562,8 +562,8 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            {dailySuggestion?.show && (
-              <SuggestionCard suggestion={dailySuggestion.suggestion} />
+            {dailyTip?.tip && (
+              <DailyTipCard dailyTip={dailyTip} />
             )}
 
             <Card className="border-slate-200 p-5 shadow-sm">

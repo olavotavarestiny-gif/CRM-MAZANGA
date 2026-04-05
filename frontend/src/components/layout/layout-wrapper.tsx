@@ -2,8 +2,9 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useIsFetching } from '@tanstack/react-query';
-import { getCurrentUser } from '@/lib/api';
+import { getCurrentUser, getDailyTip } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
 import Sidebar from './sidebar';
 import { Footer } from './footer';
@@ -17,6 +18,7 @@ import { Menu, Eye, Info, LogOut, X } from 'lucide-react';
 import type { User } from '@/lib/api';
 import { canAccessWorkspaceRoute, getWorkspaceFallbackRoute, hasFeature } from '@/lib/permissions';
 import { isComercio } from '@/lib/business-modes';
+import { useToast } from '@/components/ui/toast-provider';
 
 const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
 
@@ -73,6 +75,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { startTour } = useTour();
+  const { toast } = useToast();
   const fetchingCount = useIsFetching();
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -84,6 +87,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
   const [showTopProgress, setShowTopProgress] = useState(false);
   const authChecked = useRef(false);
   const currentSessionRef = useRef<string | null>(null);
+  const deliveredTipToastRef = useRef<string | null>(null);
 
   const isPublicPage =
     pathname === '/login' ||
@@ -96,6 +100,14 @@ function LayoutInner({ children }: { children: ReactNode }) {
     pathname === '/manutencao' ||
     pathname.startsWith('/f/') ||
     pathname.startsWith('/preview');
+
+  const { data: dailyTip } = useQuery({
+    queryKey: ['daily-tip', currentUser?.id, currentUser?.workspaceMode],
+    queryFn: getDailyTip,
+    enabled: !!currentUser && !isPublicPage,
+    staleTime: 1000 * 60 * 60,
+    retry: false,
+  });
 
   // Detect Supabase password recovery flow — fires when user clicks a reset-password email link
   // The link lands on / with hash tokens; Supabase fires PASSWORD_RECOVERY so we redirect.
@@ -151,6 +163,25 @@ function LayoutInner({ children }: { children: ReactNode }) {
     const timer = window.setTimeout(() => setShowTopProgress(false), 220);
     return () => window.clearTimeout(timer);
   }, [fetchingCount, routeTransitioning]);
+
+  useEffect(() => {
+    if (!dailyTip?.show || !dailyTip.tip || !dailyTip.date) {
+      return;
+    }
+
+    const deliveryKey = `${dailyTip.date}:${dailyTip.tip.id}`;
+    if (deliveredTipToastRef.current === deliveryKey) {
+      return;
+    }
+
+    deliveredTipToastRef.current = deliveryKey;
+    toast({
+      variant: 'info',
+      title: dailyTip.tip.title,
+      description: dailyTip.tip.personalizedMessage,
+      durationMs: 8000,
+    });
+  }, [dailyTip, toast]);
 
   useEffect(() => {
     try {

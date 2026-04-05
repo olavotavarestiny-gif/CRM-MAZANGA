@@ -11,6 +11,7 @@ type ToastItem = {
   title: string;
   description?: string;
   variant: ToastVariant;
+  durationMs?: number;
 };
 
 type ToastContextValue = {
@@ -41,7 +42,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const toast = useCallback((input: Omit<ToastItem, 'id'>) => {
     const id = Date.now() + Math.floor(Math.random() * 1000);
     setToasts((prev) => [...prev, { ...input, id }]);
-    window.setTimeout(() => dismiss(id), 4000);
+    window.setTimeout(() => dismiss(id), input.durationMs ?? 4000);
   }, [dismiss]);
 
   const value = useMemo(() => ({ toast }), [toast]);

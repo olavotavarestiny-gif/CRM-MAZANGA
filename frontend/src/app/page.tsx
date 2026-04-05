@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { isPast, isSameDay, parseISO } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -12,7 +12,7 @@ import {
   Settings2,
   Workflow,
 } from 'lucide-react';
-import { getContacts, getCurrentUser, getDailySuggestion, getFinanceDashboard, getTasks } from '@/lib/api';
+import { getContacts, getCurrentUser, getDailyTip, getFinanceDashboard, getTasks } from '@/lib/api';
 import { isComercio } from '@/lib/business-modes';
 import type { Contact, DashboardStats, Task } from '@/lib/types';
 import PainelComercialPage from '@/components/comercial/painel-comercial';
@@ -23,10 +23,9 @@ import StatWidget from '@/components/dashboard/stat-widget';
 import TasksWidget from '@/components/dashboard/tasks-widget';
 import { SOURCE_UNITS, type DashboardWidget, type WidgetSource } from '@/components/dashboard/types';
 import { useDashboardConfig } from '@/components/dashboard/use-dashboard-config';
-import SuggestionCard from '@/components/dashboard/suggestion-card';
+import DailyTipCard from '@/components/dashboard/daily-tip-card';
 import WidgetWrapper from '@/components/dashboard/widget-wrapper';
 import OnboardingChecklist from '@/components/onboarding/onboarding-checklist';
-import { useToast } from '@/components/ui/toast-provider';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
@@ -193,24 +192,14 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
   const [customizerOpen, setCustomizerOpen] = useState(false);
   const dashboardScope = currentUser?.id ?? 'demo-user';
   const { widgets, loaded } = useDashboardConfig(dashboardScope);
-  const { toast } = useToast();
-  const toastShownRef = useRef(false);
 
-  const { data: dailySuggestion } = useQuery({
-    queryKey: ['daily-suggestion'],
-    queryFn: getDailySuggestion,
-    staleTime: 1000 * 60 * 60 * 8,
+  const { data: dailyTip } = useQuery({
+    queryKey: ['daily-tip', currentUser?.id, currentUser?.workspaceMode],
+    queryFn: getDailyTip,
+    staleTime: 1000 * 60 * 60,
     retry: false,
+    enabled: !!currentUser,
   });
-
-  useEffect(() => {
-    if (toastShownRef.current) return;
-    const s = dailySuggestion?.suggestion;
-    if (s && s.type === 'action' && s.priority >= 9) {
-      toastShownRef.current = true;
-      toast({ title: s.title, description: s.message, variant: 'info' });
-    }
-  }, [dailySuggestion, toast]);
 
   const {
     data: contacts = [],
@@ -357,9 +346,9 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
         </div>
       )}
 
-      {dailySuggestion?.show && (
+      {dailyTip?.tip && (
         <div className="mb-6 max-w-2xl">
-          <SuggestionCard suggestion={dailySuggestion.suggestion} />
+          <DailyTipCard dailyTip={dailyTip} />
         </div>
       )}
 
