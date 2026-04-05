@@ -2,10 +2,8 @@
 
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { processRecorrentes } = require('../lib/faturacao/scheduler');
-
-const prisma = new PrismaClient();
 
 const INCLUDE = {
   serie:            { select: { seriesCode: true, seriesYear: true, documentType: true } },
@@ -123,16 +121,15 @@ router.put('/recorrentes/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/faturacao/recorrentes/:id  — soft delete (deactivate)
+// DELETE /api/faturacao/recorrentes/:id
 router.delete('/recorrentes/:id', async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const existing = await prisma.facturaRecorrente.findFirst({ where: { id: req.params.id, userId } });
     if (!existing) return res.status(404).json({ error: 'Não encontrado' });
 
-    await prisma.facturaRecorrente.update({
+    await prisma.facturaRecorrente.delete({
       where: { id: req.params.id },
-      data: { isActive: false },
     });
 
     res.json({ ok: true });

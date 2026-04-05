@@ -38,7 +38,10 @@ export function RecorrentesTab() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteRecorrente(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['recorrentes'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['recorrentes'] });
+      qc.invalidateQueries({ queryKey: ['finance-dashboard'] });
+    },
   });
 
   async function handleTrigger(id: string) {

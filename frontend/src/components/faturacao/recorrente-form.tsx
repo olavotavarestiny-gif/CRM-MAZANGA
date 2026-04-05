@@ -11,9 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Plus, Trash2, AlertCircle } from 'lucide-react';
 import { getSeries, getEstabelecimentos, createRecorrente } from '@/lib/api';
 import { ClienteAutocomplete } from './cliente-autocomplete';
+import { ProdutoAutocomplete } from './produto-autocomplete';
 import type { ClienteFaturacao } from '@/lib/types';
 
 interface LineState {
+  productId?: string;
   productCode: string;
   productDescription: string;
   quantity: number;
@@ -58,6 +60,7 @@ const FREQUENCIES = [
 ];
 
 const defaultLine = (): LineState => ({
+  productId: undefined,
   productCode: '', productDescription: '', quantity: 1,
   unitPrice: 0, unitOfMeasure: 'UN', taxPercentage: 14,
 });
@@ -332,11 +335,31 @@ export function RecorrenteForm({ open, onClose }: Props) {
               {lines.map((line, i) => (
                 <div key={i} className="grid grid-cols-12 gap-1.5 items-start">
                   <div className="col-span-4">
-                    <Input
-                      placeholder="Descrição *" value={line.productDescription}
-                      onChange={e => updateLine(i, { productDescription: e.target.value })}
-                      className="h-8 text-sm"
+                    <ProdutoAutocomplete
+                      value={line.productDescription}
+                      placeholder="Pesquisar produto..."
+                      hasSelection={!!line.productId}
+                      onChange={(produto) => updateLine(i, {
+                        productId: produto.id,
+                        productCode: produto.productCode,
+                        productDescription: produto.productDescription,
+                        unitPrice: produto.unitPrice,
+                        unitOfMeasure: produto.unitOfMeasure,
+                        taxPercentage: produto.taxPercentage,
+                      })}
                     />
+                    {!line.productId && (
+                      <Input
+                        placeholder="Ou escrever descrição manualmente *"
+                        value={line.productDescription}
+                        onChange={e => updateLine(i, {
+                          productId: undefined,
+                          productCode: '',
+                          productDescription: e.target.value,
+                        })}
+                        className="mt-1 h-8 text-sm"
+                      />
+                    )}
                   </div>
                   <div className="col-span-2">
                     <Input
@@ -348,7 +371,10 @@ export function RecorrenteForm({ open, onClose }: Props) {
                   <div className="col-span-2">
                     <Input
                       placeholder="Preço" type="number" min={0} step="any" value={line.unitPrice}
-                      onChange={e => updateLine(i, { unitPrice: parseFloat(e.target.value) || 0 })}
+                      onChange={e => updateLine(i, {
+                        productId: line.productId,
+                        unitPrice: parseFloat(e.target.value) || 0,
+                      })}
                       className="h-8 text-sm"
                     />
                   </div>
@@ -382,8 +408,8 @@ export function RecorrenteForm({ open, onClose }: Props) {
             {/* Totals preview */}
             {grossTotal > 0 && (
               <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end gap-4 text-sm text-gray-600">
-                <span>Total s/IVA: <b className="text-[#0A2540]">{netTotal.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz</b></span>
-                <span>Total c/IVA: <b className="text-violet-700">{grossTotal.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz</b></span>
+                <span>Total s/IVA: <b className="text-[#0A2540]">{netTotal.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} Kz</b></span>
+                <span>Total c/IVA: <b className="text-violet-700">{grossTotal.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} Kz</b></span>
               </div>
             )}
           </div>

@@ -101,7 +101,7 @@ function getFinanceValue(source: WidgetSource, financeStats?: DashboardStats) {
     case 'profit_month':
       return financeStats.profit;
     case 'mrr':
-      return financeStats.mrr;
+      return financeStats.receitaMensal ?? financeStats.mrr;
     case 'receivables':
       return financeStats.receivablesCount;
     case 'receivables_kz':
@@ -109,6 +109,14 @@ function getFinanceValue(source: WidgetSource, financeStats?: DashboardStats) {
     default:
       return 0;
   }
+}
+
+function getWidgetTitle(widget: DashboardWidget) {
+  if (widget.source === 'mrr' && (widget.title === 'MRR' || widget.title === 'Receita Mensal')) {
+    return 'Receita Mensal';
+  }
+
+  return widget.title;
 }
 
 function getMetricIcon(source: WidgetSource) {
@@ -143,6 +151,7 @@ function FinanceMetricWidget({ widget }: { widget: DashboardWidget }) {
 
   if (!source) return null;
 
+  const title = getWidgetTitle(widget);
   const value = getFinanceValue(source, financeStats);
   const unit = widget.unit || SOURCE_UNITS[source] || '';
   const delta = source === 'revenue_month' && financeStats && financeStats.prevRevenue > 0
@@ -151,14 +160,14 @@ function FinanceMetricWidget({ widget }: { widget: DashboardWidget }) {
 
   return (
     <WidgetWrapper
-      title={widget.title}
+      title={title}
       isLoading={isLoading}
       error={isError}
       onRetry={() => refetch()}
     >
       {widget.type === 'goal' && widget.target ? (
         <GoalWidget
-          title={widget.title}
+          title={title}
           current={value}
           target={widget.target}
           unit={unit}
@@ -166,7 +175,7 @@ function FinanceMetricWidget({ widget }: { widget: DashboardWidget }) {
         />
       ) : (
         <StatWidget
-          title={widget.title}
+          title={title}
           value={value}
           unit={unit}
           color={widget.color}
@@ -279,9 +288,10 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
           {statGoalWidgets.map((widget) => {
             const source = widget.source;
             if (!source) return null;
+            const title = getWidgetTitle(widget);
 
             if (FINANCE_SOURCES.has(source)) {
-              return <FinanceMetricWidget key={widget.id} widget={widget} />;
+              return <FinanceMetricWidget key={widget.id} widget={{ ...widget, title }} />;
             }
 
             const isContactsSource = CONTACT_SOURCES.has(source);
@@ -295,7 +305,7 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
             return (
               <WidgetWrapper
                 key={widget.id}
-                title={widget.title}
+                title={title}
                 isLoading={isLoading}
                 error={hasError}
                 onRetry={() => {
@@ -305,7 +315,7 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
               >
                 {widget.type === 'goal' && widget.target ? (
                   <GoalWidget
-                    title={widget.title}
+                    title={title}
                     current={value}
                     target={widget.target}
                     unit={unit}
@@ -313,7 +323,7 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
                   />
                 ) : (
                   <StatWidget
-                    title={widget.title}
+                    title={title}
                     value={value}
                     unit={unit}
                     color={widget.color}

@@ -1,7 +1,7 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getClientProfitabilityDetail, markTransactionPaid } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
+import { getClientProfitabilityDetail } from '@/lib/api';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { ClientProfitability } from '@/lib/types';
@@ -17,23 +17,12 @@ export default function ClientProfitabilityModal({
   client: ClientProfitability | null;
   onClose: () => void;
 }) {
-  const queryClient = useQueryClient();
   const open = !!client;
 
   const { data, isLoading } = useQuery({
     queryKey: ['profitability-detail', client?.clientId],
     queryFn: () => getClientProfitabilityDetail(client!.clientId),
     enabled: !!client,
-  });
-
-  const markPaidMutation = useMutation({
-    mutationFn: markTransactionPaid,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profitability-detail', client?.clientId] });
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['profitability'] });
-    },
   });
 
   const summary = data?.summary;
@@ -89,40 +78,43 @@ export default function ClientProfitabilityModal({
               </div>
             </div>
 
-            {/* Contratos recorrentes activos */}
-            {data.activeContracts.length > 0 && (
+            {/* Faturas recorrentes ativas */}
+            {data.activeRecurringInvoices.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-[#0A2540] mb-3">Contratos Recorrentes Activos</h3>
+                <h3 className="text-sm font-semibold text-[#0A2540] mb-3">Faturas Recorrentes Ativas</h3>
                 <div className="space-y-2">
-                  {data.activeContracts.map((contract) => (
+                  {data.activeRecurringInvoices.map((invoice) => (
                     <div
-                      key={contract.id}
+                      key={invoice.id}
                       className="flex items-center justify-between p-3 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0]"
                     >
                       <div>
-                        <div className="text-sm text-[#0A2540] font-medium">{contract.category}</div>
+                        <div className="text-sm text-[#0A2540] font-medium">{invoice.customerName}</div>
                         <div className="text-xs text-[#64748B]">
-                          {fmt(contract.amountKz)}/mês
-                          {contract.contractDurationMonths && ` · ${contract.contractDurationMonths} meses`}
+                          {fmt(invoice.monthlyAmountKz)}/mês · {fmt(invoice.grossTotalKz)} por ciclo
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <div className="text-xs text-[#64748B]">Próximo</div>
+                      <div className="grid grid-cols-2 gap-4 text-right">
+                        <div>
+                          <div className="text-xs text-[#64748B]">Frequência</div>
+                          <div className="text-sm font-medium text-[#0A2540]">
+                            {invoice.frequency === 'MONTHLY'
+                              ? 'Mensal'
+                              : invoice.frequency === 'QUARTERLY'
+                              ? 'Trimestral'
+                              : invoice.frequency === 'ANNUAL'
+                              ? 'Anual'
+                              : 'Semanal'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-[#64748B]">Próxima emissão</div>
                           <div className="text-sm font-medium text-amber-600">
-                            {contract.nextPaymentDate
-                              ? new Date(contract.nextPaymentDate).toLocaleDateString('pt-PT')
+                            {invoice.nextRunDate
+                              ? new Date(invoice.nextRunDate).toLocaleDateString('pt-PT')
                               : '—'}
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => markPaidMutation.mutate(contract.id)}
-                          disabled={markPaidMutation.isPending}
-                          className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs"
-                        >
-                          Marcar Pago
-                        </Button>
                       </div>
                     </div>
                   ))}

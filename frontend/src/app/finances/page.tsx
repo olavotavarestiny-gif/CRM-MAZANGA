@@ -304,7 +304,7 @@ export default function FinancesPage() {
             { label: 'Despesas', value: dashboard?.expenses || 0, color: 'red', icon: TrendingDown },
             { label: 'Lucro', value: dashboard?.profit || 0, color: 'blue', icon: DollarSign },
             { label: 'Margem', value: dashboard?.marginPercent || 0, color: 'purple', icon: Percent, isPercent: true },
-            { label: 'MRR', value: dashboard?.mrr || 0, color: 'cyan', icon: RefreshCw },
+            { label: 'Receita Mensal', value: (dashboard?.receitaMensal ?? dashboard?.mrr) || 0, color: 'cyan', icon: RefreshCw },
           ].map(({ label, value, color, icon: Icon, isPercent }) => {
             const c = CARD_COLORS[color] ?? CARD_COLORS.emerald;
             return (

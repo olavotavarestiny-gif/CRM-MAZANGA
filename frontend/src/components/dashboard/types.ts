@@ -39,7 +39,7 @@ export const SOURCE_LABELS: Record<WidgetSource, string> = {
   revenue_month:   'Receita (mês)',
   expenses_month:  'Despesas (mês)',
   profit_month:    'Lucro (mês)',
-  mrr:             'MRR',
+  mrr:             'Receita Mensal',
   receivables:     'Faturas por Cobrar',
   receivables_kz:  'Por Cobrar (Kz)',
 };

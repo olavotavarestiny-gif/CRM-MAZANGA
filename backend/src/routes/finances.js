@@ -54,6 +54,58 @@ function parseReportDateRange(dateFrom, dateTo) {
   return { start, end };
 }
 
+function parseRecurringLines(lines) {
+  if (!lines) return [];
+
+  try {
+    const parsed = typeof lines === 'string' ? JSON.parse(lines) : lines;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function calculateRecurringGrossTotalKz(recorrente) {
+  const grossTotal = parseRecurringLines(recorrente.lines).reduce((sum, line) => {
+    const quantity = Number(line?.quantity || 0);
+    const unitPrice = Number(line?.unitPrice || 0);
+    const baseAmount = quantity * unitPrice;
+    const taxes = Array.isArray(line?.taxes) ? line.taxes : [];
+    const taxAmount = taxes.reduce((taxSum, tax) => {
+      if (typeof tax?.taxAmount === 'number') {
+        return taxSum + Number(tax.taxAmount || 0);
+      }
+
+      const percentage = Number(tax?.taxPercentage || 0);
+      return taxSum + (baseAmount * percentage) / 100;
+    }, 0);
+
+    return sum + baseAmount + taxAmount;
+  }, 0);
+
+  if (!recorrente.currencyCode || recorrente.currencyCode === 'AOA') {
+    return grossTotal;
+  }
+
+  return grossTotal * Number(recorrente.exchangeRate || 1);
+}
+
+function monthlyizeRecurringRevenue(recorrente) {
+  const grossTotalKz = calculateRecurringGrossTotalKz(recorrente);
+
+  switch (recorrente.frequency) {
+    case 'WEEKLY':
+      return (grossTotalKz * 52) / 12;
+    case 'QUARTERLY':
+      return grossTotalKz / 3;
+    case 'ANNUAL':
+      return grossTotalKz / 12;
+    case 'MONTHLY':
+    default:
+      return grossTotalKz;
+  }
+}
+
 // ─── GET /api/finances/dashboard ────────────────────────────────────────────
 router.get('/dashboard', requirePermission('finances', 'transactions_view'), async (req, res) => {
   try {
@@ -75,7 +127,7 @@ router.get('/dashboard', requirePermission('finances', 'transactions_view'), asy
       date: { gte: previousRange.from, lte: previousRange.to },
     };
 
-    const [revenueAgg, expensesAgg, mrrAgg, prevRevenueAgg, prevExpensesAgg, receivableInvoices] = await Promise.all([
+    const [revenueAgg, expensesAgg, recurringInvoices, prevRevenueAgg, prevExpensesAgg, receivableInvoices] = await Promise.all([
       prisma.transaction.aggregate({
         where: { ...baseWhere, type: 'entrada' },
         _sum: { amountKz: true },
@@ -84,9 +136,18 @@ router.get('/dashboard', requirePermission('finances', 'transactions_view'), asy
         where: { ...baseWhere, type: 'saida' },
         _sum: { amountKz: true },
       }),
-      prisma.transaction.aggregate({
-        where: { ...baseWhere, type: 'entrada', revenueType: 'recorrente' },
-        _sum: { amountKz: true },
+      prisma.facturaRecorrente.findMany({
+        where: {
+          userId: req.user.effectiveUserId,
+          isActive: true,
+          startDate: { lte: to },
+        },
+        select: {
+          lines: true,
+          currencyCode: true,
+          exchangeRate: true,
+          frequency: true,
+        },
       }),
       prisma.transaction.aggregate({
         where: { ...previousBaseWhere, type: 'entrada' },
@@ -116,7 +177,8 @@ router.get('/dashboard', requirePermission('finances', 'transactions_view'), asy
     const expenses = formatKz(expensesAgg._sum.amountKz);
     const profit = revenue - expenses;
     const marginPercent = revenue > 0 ? (profit / revenue) * 100 : 0;
-    const mrr = formatKz(mrrAgg._sum.amountKz);
+    const receitaMensal = recurringInvoices.reduce((sum, recorrente) => sum + monthlyizeRecurringRevenue(recorrente), 0);
+    const mrr = formatKz(receitaMensal);
     const prevRevenue = formatKz(prevRevenueAgg._sum.amountKz);
     const prevExpenses = formatKz(prevExpensesAgg._sum.amountKz);
     const prevProfit = prevRevenue - prevExpenses;
@@ -159,6 +221,7 @@ router.get('/dashboard', requirePermission('finances', 'transactions_view'), asy
       profit,
       marginPercent: parseFloat(marginPercent.toFixed(1)),
       mrr,
+      receitaMensal: mrr,
       prevRevenue,
       prevExpenses,
       prevProfit,
@@ -565,16 +628,28 @@ router.get('/profitability/:clientId', requirePermission('finances', 'transactio
     ]);
 
     // Contratos recorrentes activos
-    const activeContracts = await prisma.transaction.findMany({
+    const activeRecurringInvoices = await prisma.facturaRecorrente.findMany({
       where: {
         userId: req.user.effectiveUserId,
-        deleted: false,
-        clientId,
-        type: 'entrada',
-        revenueType: 'recorrente',
-        nextPaymentDate: { not: null },
+        isActive: true,
+        clienteFaturacao: {
+          is: {
+            contactId: clientId,
+          },
+        },
       },
-      orderBy: { date: 'asc' },
+      orderBy: { nextRunDate: 'asc' },
+      select: {
+        id: true,
+        customerName: true,
+        frequency: true,
+        nextRunDate: true,
+        totalGenerated: true,
+        maxOccurrences: true,
+        lines: true,
+        currencyCode: true,
+        exchangeRate: true,
+      },
     });
 
     // Totais
@@ -600,7 +675,16 @@ router.get('/profitability/:clientId', requirePermission('finances', 'transactio
         total: c._sum.amountKz || 0,
       })),
       recentTransactions: transactions,
-      activeContracts,
+      activeRecurringInvoices: activeRecurringInvoices.map((invoice) => ({
+        id: invoice.id,
+        customerName: invoice.customerName,
+        frequency: invoice.frequency,
+        nextRunDate: invoice.nextRunDate,
+        totalGenerated: invoice.totalGenerated,
+        maxOccurrences: invoice.maxOccurrences,
+        grossTotalKz: calculateRecurringGrossTotalKz(invoice),
+        monthlyAmountKz: monthlyizeRecurringRevenue(invoice),
+      })),
     });
   } catch (error) {
     console.error('Error fetching client profitability:', error);

@@ -627,7 +627,16 @@ export async function getClientProfitabilityDetail(clientId: number): Promise<{
   summary: { totalRevenue: number; totalCosts: number; netMargin: number; marginPercent: number };
   costsByCategory: { category: string; total: number }[];
   recentTransactions: Transaction[];
-  activeContracts: Transaction[];
+  activeRecurringInvoices: {
+    id: string;
+    customerName: string;
+    frequency: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+    nextRunDate: string;
+    totalGenerated: number;
+    maxOccurrences?: number | null;
+    grossTotalKz: number;
+    monthlyAmountKz: number;
+  }[];
 }> {
   const response = await api.get(`/api/finances/profitability/${clientId}`);
   return response.data;

@@ -415,6 +415,7 @@ export interface DashboardStats {
   profit: number;
   marginPercent: number;
   mrr: number;
+  receitaMensal: number;
   prevRevenue: number;
   prevExpenses: number;
   prevProfit: number;
