@@ -149,6 +149,7 @@ function VelocityTrend({ row }: { row: PipelineAnalyticsVelocityStage }) {
 export default function PipelineAnalyticsPage() {
   const router = useRouter();
   const [period, setPeriod] = useState<PeriodOption>('30d');
+  const [processesOpen, setProcessesOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
 
   const currentUserQuery = useQuery({
@@ -354,99 +355,118 @@ export default function PipelineAnalyticsPage() {
 
       {!shouldShowLimitedView && (
         <>
-          {conversionQuery.isLoading ? (
-            <SectionSkeleton lines={6} />
-          ) : conversionQuery.isError ? (
-            <ErrorState
-              title="Falha ao carregar funil de conversão"
-              message="Não foi possível gerar o funil do pipeline para este período."
-              onRetry={() => conversionQuery.refetch()}
-            />
-          ) : conversionQuery.data?.totalContacts ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-[#1A6FD4]" />
-                  Funil de Conversão
-                </CardTitle>
-                <CardDescription>Barras horizontais por etapa com a percentagem de avanço da coorte.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <PipelineFunnelChart stages={conversionQuery.data.byStage} />
-
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {conversionQuery.data.byStage
-                    .filter((stage) => stage.stage !== 'Perdido')
-                    .map((stage) => (
-                      <div key={stage.stage} className="rounded-2xl border border-[#dde3ec] p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stage.color }} />
-                            <p className="text-sm font-medium text-[#0A2540]">{stage.stage}</p>
-                          </div>
-                          <span className="text-xs text-[#6b7e9a]">{stage.currentCount} actual</span>
-                        </div>
-                        <p className="mt-3 text-2xl font-semibold text-[#0A2540]">{formatPercent(stage.advancementRate)}</p>
-                        <p className="mt-1 text-xs text-[#6b7e9a]">
-                          Win rate estimada a partir desta etapa: {formatPercent(stage.stageConversionRate)}
-                        </p>
-                      </div>
-                    ))}
+          <Card>
+            <CardHeader>
+              <button
+                type="button"
+                onClick={() => setProcessesOpen((open) => !open)}
+                className="flex w-full items-center justify-between text-left"
+              >
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-[#1A6FD4]" />
+                    Processos
+                  </CardTitle>
+                  <CardDescription>
+                    Funil de conversão e velocidade por etapa, visíveis apenas quando expandires esta secção.
+                  </CardDescription>
                 </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <EmptyState
-              variant="empty"
-              icon={BarChart3}
-              title="Sem dados suficientes no período"
-              description="Ainda não há oportunidades criadas neste intervalo para calcular o funil."
-            />
-          )}
+                {processesOpen ? <ChevronUp className="h-5 w-5 text-[#6b7e9a]" /> : <ChevronDown className="h-5 w-5 text-[#6b7e9a]" />}
+              </button>
+            </CardHeader>
+            {processesOpen ? (
+              <CardContent className="space-y-6">
+                {conversionQuery.isLoading ? (
+                  <SectionSkeleton lines={6} />
+                ) : conversionQuery.isError ? (
+                  <ErrorState
+                    title="Falha ao carregar funil de conversão"
+                    message="Não foi possível gerar o funil do pipeline para este período."
+                    onRetry={() => conversionQuery.refetch()}
+                  />
+                ) : conversionQuery.data?.totalContacts ? (
+                  <div className="space-y-6">
+                    <div>
+                      <div className="mb-4">
+                        <h3 className="text-base font-semibold text-[#0A2540]">Funil de Conversão</h3>
+                        <p className="mt-1 text-sm text-[#6b7e9a]">Barras horizontais por etapa com a percentagem de avanço da coorte.</p>
+                      </div>
+                      <PipelineFunnelChart stages={conversionQuery.data.byStage} />
+                    </div>
 
-          {velocityQuery.isLoading ? (
-            <SectionSkeleton lines={7} />
-          ) : velocityQuery.isError ? (
-            <ErrorState
-              title="Falha ao carregar velocidade"
-              message="Não foi possível comparar o tempo médio por etapa."
-              onRetry={() => velocityQuery.refetch()}
-            />
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Velocidade por Etapa</CardTitle>
-                <CardDescription>Comparação do tempo médio actual com o período anterior.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Etapa</TableHead>
-                      <TableHead>Tempo Actual</TableHead>
-                      <TableHead>Tempo Anterior</TableHead>
-                      <TableHead>Tendência</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {velocityQuery.data?.byStage.map((row) => (
-                      <TableRow key={row.stage}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} />
-                            <span className="font-medium">{row.stage}</span>
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {conversionQuery.data.byStage
+                        .filter((stage) => stage.stage !== 'Perdido')
+                        .map((stage) => (
+                          <div key={stage.stage} className="rounded-2xl border border-[#dde3ec] p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stage.color }} />
+                                <p className="text-sm font-medium text-[#0A2540]">{stage.stage}</p>
+                              </div>
+                              <span className="text-xs text-[#6b7e9a]">{stage.currentCount} actual</span>
+                            </div>
+                            <p className="mt-3 text-2xl font-semibold text-[#0A2540]">{formatPercent(stage.advancementRate)}</p>
+                            <p className="mt-1 text-xs text-[#6b7e9a]">
+                              Win rate estimada a partir desta etapa: {formatPercent(stage.stageConversionRate)}
+                            </p>
                           </div>
-                        </TableCell>
-                        <TableCell>{formatDays(row.currentDays)}</TableCell>
-                        <TableCell>{formatDays(row.previousDays)}</TableCell>
-                        <TableCell><VelocityTrend row={row} /></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        ))}
+                    </div>
+                  </div>
+                ) : (
+                  <EmptyState
+                    variant="empty"
+                    icon={BarChart3}
+                    title="Sem dados suficientes no período"
+                    description="Ainda não há oportunidades criadas neste intervalo para calcular o funil."
+                  />
+                )}
+
+                {velocityQuery.isLoading ? (
+                  <SectionSkeleton lines={7} />
+                ) : velocityQuery.isError ? (
+                  <ErrorState
+                    title="Falha ao carregar velocidade"
+                    message="Não foi possível comparar o tempo médio por etapa."
+                    onRetry={() => velocityQuery.refetch()}
+                  />
+                ) : (
+                  <div>
+                    <div className="mb-4">
+                      <h3 className="text-base font-semibold text-[#0A2540]">Velocidade por Etapa</h3>
+                      <p className="mt-1 text-sm text-[#6b7e9a]">Comparação do tempo médio actual com o período anterior.</p>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Etapa</TableHead>
+                          <TableHead>Tempo Actual</TableHead>
+                          <TableHead>Tempo Anterior</TableHead>
+                          <TableHead>Tendência</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {velocityQuery.data?.byStage.map((row) => (
+                          <TableRow key={row.stage}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} />
+                                <span className="font-medium">{row.stage}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{formatDays(row.currentDays)}</TableCell>
+                            <TableCell>{formatDays(row.previousDays)}</TableCell>
+                            <TableCell><VelocityTrend row={row} /></TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
-            </Card>
-          )}
+            ) : null}
+          </Card>
 
           {privilegedUser ? (
             teamQuery.isLoading ? (
