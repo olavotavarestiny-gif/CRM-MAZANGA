@@ -355,27 +355,29 @@ export default function PipelineAnalyticsPage() {
 
       {!shouldShowLimitedView && (
         <>
-          <Card>
-            <CardHeader>
-              <button
-                type="button"
-                onClick={() => setProcessesOpen((open) => !open)}
-                className="flex w-full items-center justify-between text-left"
-              >
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-[#1A6FD4]" />
-                    Processos
-                  </CardTitle>
-                  <CardDescription>
-                    Funil de conversão e velocidade por etapa, visíveis apenas quando expandires esta secção.
-                  </CardDescription>
+          <Card className="overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setProcessesOpen((open) => !open)}
+              className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition-colors hover:bg-slate-50"
+            >
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-[#EEF5FC] p-3 text-[#1A6FD4]">
+                  <BarChart3 className="h-5 w-5" />
                 </div>
-                {processesOpen ? <ChevronUp className="h-5 w-5 text-[#6b7e9a]" /> : <ChevronDown className="h-5 w-5 text-[#6b7e9a]" />}
-              </button>
-            </CardHeader>
+                <div>
+                  <p className="text-base font-semibold text-[#0A2540]">
+                    {processesOpen ? 'Ocultar processos' : 'Mostrar processos'}
+                  </p>
+                  <p className="mt-1 text-sm text-[#6b7e9a]">
+                    Funil de conversão e velocidade por etapa.
+                  </p>
+                </div>
+              </div>
+              {processesOpen ? <ChevronUp className="h-5 w-5 text-[#6b7e9a]" /> : <ChevronDown className="h-5 w-5 text-[#6b7e9a]" />}
+            </button>
             {processesOpen ? (
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-6 border-t border-[#dde3ec] pt-6">
                 {conversionQuery.isLoading ? (
                   <SectionSkeleton lines={6} />
                 ) : conversionQuery.isError ? (
