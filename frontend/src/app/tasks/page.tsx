@@ -16,6 +16,8 @@ import {
 import TaskItem from '@/components/tasks/task-item';
 import TaskFormModal from '@/components/tasks/task-form-modal';
 import { ErrorState } from '@/components/ui/error-state';
+import { EmptyState } from '@/components/ui/empty-state';
+import { FilterBar } from '@/components/ui/filter-bar';
 import { isSameDay, isPast, parseISO } from 'date-fns';
 import { Plus, ClipboardList } from 'lucide-react';
 import { canDelete } from '@/lib/permissions';
@@ -25,6 +27,7 @@ type FilterType = 'todas' | 'hoje' | 'atrasadas' | 'concluidas';
 
 export default function TasksPage() {
   const [filter, setFilter] = useState<FilterType>('todas');
+  const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [settlingTaskIds, setSettlingTaskIds] = useState<number[]>([]);
@@ -94,8 +97,11 @@ export default function TasksPage() {
   const filterTasks = (): Task[] => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const q = search.toLowerCase().trim();
 
     return allTasks.filter((task) => {
+      // text search
+      if (q && !task.title.toLowerCase().includes(q) && !(task.notes ?? '').toLowerCase().includes(q) && !(task.contact?.name ?? '').toLowerCase().includes(q)) return false;
       if (filter === 'concluidas') return task.done;
       if (filter === 'todas') return true;
       if (!task.dueDate) return false;
@@ -196,10 +202,14 @@ export default function TasksPage() {
       </div>
 
       {/* Filter bar */}
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-[#6b7e9a]">
-          {filtered.length} {filter === 'concluidas' ? 'concluída' : 'tarefa'}{filtered.length !== 1 ? 's' : ''}
-        </p>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Pesquisar tarefas..."
+        hasActiveFilters={!!search || filter !== 'todas'}
+        onClearFilters={() => { setSearch(''); setFilter('todas'); }}
+        className="mb-4"
+      >
         <Select value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
           <SelectTrigger className="w-40">
             <SelectValue />
@@ -211,7 +221,10 @@ export default function TasksPage() {
             <SelectItem value="concluidas">Concluídas</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
+      <p className="mb-4 text-sm text-[#6b7e9a]">
+        {filtered.length} {filter === 'concluidas' ? 'concluída' : 'tarefa'}{filtered.length !== 1 ? 's' : ''}
+      </p>
 
       {/* Task list */}
       <Card data-tour="tasks-list" className="border-slate-200 shadow-sm">
@@ -281,24 +294,29 @@ export default function TasksPage() {
               )}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <ClipboardList className="w-10 h-10 text-[#dde3ec] mx-auto mb-3" />
-              <p className="text-[#6b7e9a] text-sm">
-                {filter === 'todas' ? 'Nenhuma tarefa pendente' :
-                 filter === 'hoje' ? 'Nenhuma tarefa para hoje' :
-                 filter === 'atrasadas' ? 'Nenhuma tarefa atrasada' :
-                 'Nenhuma tarefa concluída'}
-              </p>
-              {filter === 'todas' && (
-                <Button
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => { setEditingTask(null); setIsFormOpen(true); }}
-                >
-                  <Plus className="w-4 h-4 mr-1" /> Criar primeira tarefa
-                </Button>
-              )}
-            </div>
+            <EmptyState
+              variant={search ? 'no-results' : 'empty'}
+              icon={ClipboardList}
+              title={
+                search ? 'Sem resultados' :
+                filter === 'todas' ? 'Nenhuma tarefa pendente' :
+                filter === 'hoje' ? 'Nenhuma tarefa para hoje' :
+                filter === 'atrasadas' ? 'Nenhuma tarefa atrasada' :
+                'Nenhuma tarefa concluída'
+              }
+              description={
+                search ? `Nenhuma tarefa corresponde a "${search}".` :
+                filter === 'todas' ? 'Cria a primeira tarefa para começar a gerir a agenda da equipa.' :
+                filter === 'hoje' ? 'Não há tarefas agendadas para hoje.' :
+                filter === 'atrasadas' ? 'Tudo em dia! Não há tarefas em atraso.' :
+                undefined
+              }
+              action={!search && filter === 'todas' ? {
+                label: 'Criar primeira tarefa',
+                onClick: () => { setEditingTask(null); setIsFormOpen(true); },
+              } : undefined}
+              compact
+            />
           )}
         </CardContent>
       </Card>

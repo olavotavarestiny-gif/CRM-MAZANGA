@@ -11,14 +11,7 @@ import {
 import type { User } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { DataTable } from '@/components/ui/data-table';
 import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
@@ -28,7 +21,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import AutomationForm from '@/components/automations/automation-form';
-import { Trash2 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Trash2, Zap } from 'lucide-react';
 
 const TRIGGER_LABELS: Record<string, string> = {
   new_contact: 'Novo Contacto',
@@ -94,87 +88,96 @@ export default function AutomationsPage() {
         </Dialog>
       </div>
 
-      <Card>
-        {isLoading ? (
-          <div className="p-8 text-center text-sm text-gray-500">A carregar automações...</div>
-        ) : isError ? (
-          <div className="p-8 text-center text-sm text-red-600">
-            Não foi possível carregar as automações. Recarrega a página para tentar novamente.
-          </div>
-        ) : automations.length === 0 ? (
-          <div className="p-8 text-center">
-            <h2 className="text-lg font-semibold text-[#2c2f31]">Nenhuma automação criada</h2>
-            <p className="mt-2 text-sm text-gray-500">
-              Cria a primeira automação para automatizar ações do CRM.
-            </p>
-          </div>
+      <Card className="overflow-hidden">
+        {isError ? (
+          <EmptyState
+            variant="empty"
+            icon={Zap}
+            title="Não foi possível carregar as automações"
+            description="Recarrega a página para tentar novamente."
+            action={{ label: 'Recarregar', onClick: () => window.location.reload() }}
+          />
         ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Trigger</TableHead>
-                <TableHead className="hidden sm:table-cell">Condição</TableHead>
-                <TableHead>Ação</TableHead>
-                <TableHead className="hidden md:table-cell">Detalhe</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-          <TableBody>
-            {automations.map((automation) => (
-              <TableRow key={automation.id}>
-                <TableCell className="text-sm">
-                  {TRIGGER_LABELS[automation.trigger] || automation.trigger}
-                </TableCell>
-                <TableCell className="hidden sm:table-cell text-xs text-gray-500">
-                  {automation.trigger === 'form_submission'
-                    ? automation.form?.title || 'Todos os formulários'
-                    : automation.triggerValue || '—'}
-                </TableCell>
-                <TableCell className="text-sm">
-                  {automation.action === 'update_stage'
-                    ? `→ ${automation.targetStage}`
-                    : automation.action === 'create_task'
-                    ? 'Nova tarefa'
-                    : automation.action}
-                </TableCell>
-                <TableCell className="hidden md:table-cell text-xs">
-                  {automation.action === 'send_email'
-                    ? automation.emailSubject
-                    : automation.action === 'update_stage'
-                    ? `Mover para ${automation.targetStage}`
-                    : automation.action === 'create_task'
-                    ? `${automation.taskTitle || 'Sem título'}${automation.taskAssignedToUserId ? ` • Resp. #${automation.taskAssignedToUserId}` : ''}`
-                    : automation.templateName}
-                </TableCell>
-                <TableCell>
+          <DataTable
+            columns={[
+              {
+                key: 'trigger',
+                header: 'Trigger',
+                cell: (a) => <span className="text-sm">{TRIGGER_LABELS[a.trigger] || a.trigger}</span>,
+              },
+              {
+                key: 'condition',
+                header: 'Condição',
+                responsive: 'hidden sm:table-cell',
+                cell: (a) => (
+                  <span className="text-xs text-gray-500">
+                    {a.trigger === 'form_submission'
+                      ? a.form?.title || 'Todos os formulários'
+                      : a.triggerValue || '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'action',
+                header: 'Ação',
+                cell: (a) => (
+                  <span className="text-sm">
+                    {a.action === 'update_stage'
+                      ? `→ ${a.targetStage}`
+                      : a.action === 'create_task'
+                      ? 'Nova tarefa'
+                      : a.action}
+                  </span>
+                ),
+              },
+              {
+                key: 'detail',
+                header: 'Detalhe',
+                responsive: 'hidden md:table-cell',
+                cell: (a) => (
+                  <span className="text-xs">
+                    {a.action === 'send_email'
+                      ? a.emailSubject
+                      : a.action === 'update_stage'
+                      ? `Mover para ${a.targetStage}`
+                      : a.action === 'create_task'
+                      ? `${a.taskTitle || 'Sem título'}${a.taskAssignedToUserId ? ` • Resp. #${a.taskAssignedToUserId}` : ''}`
+                      : a.templateName}
+                  </span>
+                ),
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                cell: (a) => (
                   <Switch
-                    checked={automation.active}
-                    onCheckedChange={(checked) =>
-                      toggleMutation.mutate({
-                        id: automation.id,
-                        active: checked,
-                      })
-                    }
+                    checked={a.active}
+                    onCheckedChange={(checked) => toggleMutation.mutate({ id: a.id, active: checked })}
                   />
-                </TableCell>
-                <TableCell>
-                  {!currentUser?.accountOwnerId && (
+                ),
+              },
+              {
+                key: 'acoes',
+                header: 'Ações',
+                cell: (a) =>
+                  !currentUser?.accountOwnerId ? (
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => deleteMutation.mutate(automation.id)}
+                      onClick={() => deleteMutation.mutate(a.id)}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-          </Table>
-        </div>
+                  ) : null,
+              },
+            ]}
+            data={automations}
+            getRowKey={(a) => a.id}
+            isLoading={isLoading}
+            emptyTitle="Nenhuma automação criada"
+            emptyDescription="Cria a primeira automação para enviar mensagens, mover contactos ou atribuir tarefas automaticamente."
+            emptyAction={{ label: 'Nova Automação', onClick: () => setIsFormOpen(true) }}
+          />
         )}
       </Card>
     </div>

@@ -7,6 +7,7 @@ import { Task } from '@/lib/types';
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -164,7 +165,7 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form id="task-form" onSubmit={handleSubmit} className="space-y-4">
           {/* Título */}
           <div>
             <Label className="text-[#0A2540]">Título *</Label>
@@ -296,7 +297,7 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
             )}
           </div>
 
-          {/* Botões */}
+          {/* Erro inline */}
           {mutation.isError && (
             <ErrorState
               compact
@@ -306,21 +307,21 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
               secondaryAction={{ label: 'Fechar', onClick: onClose }}
             />
           )}
-
-          <div className="flex gap-2 justify-end pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancelar
-            </Button>
-            <LoadingButton
-              type="submit"
-              disabled={!title.trim() || !assignedToUserId}
-              loading={mutation.isPending}
-              loadingLabel={isEdit ? 'A guardar...' : 'A criar...'}
-            >
-              {isEdit ? 'Guardar' : 'Criar Tarefa'}
-            </LoadingButton>
-          </div>
         </form>
+        <DialogFooter className="pt-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <LoadingButton
+            type="submit"
+            form="task-form"
+            disabled={!title.trim() || !assignedToUserId}
+            loading={mutation.isPending}
+            loadingLabel={isEdit ? 'A guardar...' : 'A criar...'}
+          >
+            {isEdit ? 'Guardar' : 'Criar Tarefa'}
+          </LoadingButton>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

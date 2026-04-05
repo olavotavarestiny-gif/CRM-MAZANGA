@@ -14,9 +14,10 @@ import {
 import type { User } from '@/lib/api';
 import { Contact } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
+import { EmptyState } from '@/components/ui/empty-state';
+import { FilterBar } from '@/components/ui/filter-bar';
 import {
   Table,
   TableBody,
@@ -200,47 +201,39 @@ export default function ContactsPage() {
         </div>
       )}
 
-      <Card data-tour="contacts-filters" className="border-slate-200 shadow-sm">
-        <div className="p-4 flex flex-col sm:flex-row gap-4">
-          <Input
-            placeholder="Pesquisar por nome, telefone, empresa ou NIF..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 w-full"
-          />
-          <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger className="w-full sm:w-40">
-              <SelectValue placeholder="Estado do Lead" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Todos</SelectItem>
-              {pipelineStages.map((s) => (
-                <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={revenueFilter}
-            onValueChange={setRevenueFilter}
-          >
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Faturamento" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Todos</SelectItem>
-              <SelectItem value="- 50 Milhões De Kwanzas">- 50M = 50 Milhões</SelectItem>
-              <SelectItem value="Entre 50 - 100 Milhões">50M - 100M Milhões</SelectItem>
-              <SelectItem value="Entre 100 Milhões - 500 Milhões">100M - 500M Milhões</SelectItem>
-              <SelectItem value="+ 500 M">+500M Milhões</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {isSearching && (
-          <div className="border-t border-slate-100 px-4 py-3 text-sm text-[#6b7e9a]">
-            A procurar contactos com os filtros atuais...
-          </div>
-        )}
-      </Card>
+      <FilterBar
+        data-tour="contacts-filters"
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Pesquisar por nome, telefone, empresa ou NIF..."
+        isLoading={isSearching}
+        hasActiveFilters={hasActiveFilters}
+        onClearFilters={() => { setSearch(''); setDebouncedSearch(''); setStageFilter('ALL'); setRevenueFilter('ALL'); }}
+      >
+        <Select value={stageFilter} onValueChange={setStageFilter}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Estado do Lead" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Todos</SelectItem>
+            {pipelineStages.map((s) => (
+              <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={revenueFilter} onValueChange={setRevenueFilter}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Faturamento" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Todos</SelectItem>
+            <SelectItem value="- 50 Milhões De Kwanzas">- 50M = 50 Milhões</SelectItem>
+            <SelectItem value="Entre 50 - 100 Milhões">50M - 100M Milhões</SelectItem>
+            <SelectItem value="Entre 100 Milhões - 500 Milhões">100M - 500M Milhões</SelectItem>
+            <SelectItem value="+ 500 M">+500M Milhões</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterBar>
 
       <Card data-tour="contacts-table" className="border-slate-200 shadow-sm">
         {contactsQuery.isLoading ? (
@@ -259,37 +252,17 @@ export default function ContactsPage() {
             />
           </div>
         ) : contacts.length === 0 ? (
-          <div className="p-8 text-center">
-            <h2 className="text-lg font-semibold text-[#2c2f31]">
-              {hasActiveFilters ? 'Nenhum resultado para esta pesquisa' : 'Ainda não tens contactos'}
-            </h2>
-            <p className="mt-2 text-sm text-[#6b7e9a]">
-              {hasActiveFilters
-                ? 'Experimenta outro termo, remove filtros ou cria um novo contacto manualmente.'
-                : 'Começa por criar o primeiro contacto ou importa a tua base via CSV.'}
-            </p>
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              <Button onClick={() => setIsFormOpen(true)}>Criar primeiro contacto</Button>
-              {hasActiveFilters && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSearch('');
-                    setDebouncedSearch('');
-                    setStageFilter('ALL');
-                    setRevenueFilter('ALL');
-                  }}
-                >
-                  Limpar filtros
-                </Button>
-              )}
-            </div>
-            <p className="mt-3 text-xs text-slate-400">
-              {hasActiveFilters
-                ? 'A pesquisa continua ativa enquanto ajustas os filtros.'
-                : 'Também podes importar contactos para acelerar o arranque.'}
-            </p>
-          </div>
+          <EmptyState
+            variant={hasActiveFilters ? 'no-results' : 'empty'}
+            title={hasActiveFilters ? 'Nenhum resultado para esta pesquisa' : 'Ainda não tens contactos'}
+            description={
+              hasActiveFilters
+                ? 'Experimenta outro termo ou remove os filtros activos.'
+                : 'Começa por criar o primeiro contacto ou importa a tua base via CSV.'
+            }
+            action={{ label: hasActiveFilters ? 'Limpar filtros' : 'Criar primeiro contacto', onClick: hasActiveFilters ? () => { setSearch(''); setDebouncedSearch(''); setStageFilter('ALL'); setRevenueFilter('ALL'); } : () => setIsFormOpen(true) }}
+            secondaryAction={!hasActiveFilters ? { label: 'Importar CSV', onClick: () => setIsImportOpen(true) } : undefined}
+          />
         ) : (
           <div className="overflow-x-auto">
             <Table>

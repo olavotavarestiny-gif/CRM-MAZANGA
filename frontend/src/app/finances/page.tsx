@@ -25,7 +25,9 @@ import {
 import { isComercio } from '@/lib/business-modes';
 import TransactionForm from '@/components/finances/transaction-form';
 import ClientProfitabilityModal from '@/components/finances/client-profitability-modal';
-import { TrendingUp, TrendingDown, DollarSign, Percent, RefreshCw, Plus, Download, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Percent, RefreshCw, Plus, Download, ChevronLeft, ChevronRight, Pencil, Trash2, BarChart2, ArrowDownUp } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { FilterBar } from '@/components/ui/filter-bar';
 
 function fmt(n: number | null | undefined) {
   if (n == null || isNaN(n)) return '0 Kz';
@@ -221,8 +223,14 @@ export default function FinancesPage() {
             Rentabilidade por Cliente
           </h2>
           {profitability.length === 0 ? (
-            <div className="rounded-2xl border border-slate-200 bg-white py-12 text-center text-gray-400 shadow-sm">
-              Sem dados de rentabilidade disponíveis.
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <EmptyState
+                variant="empty"
+                icon={BarChart2}
+                title="Sem dados de rentabilidade"
+                description="Regista transações associadas a clientes para ver a margem por cliente aqui."
+                action={{ label: 'Nova Transação', onClick: () => { setEditTransaction(undefined); setFormOpen(true); setActiveTab('transacoes'); } }}
+              />
             </div>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -337,37 +345,39 @@ export default function FinancesPage() {
         </div>
 
         {/* Filtros */}
-        <div className="grid grid-cols-1 gap-3 mb-4 md:grid-cols-4">
-          <Input
-            placeholder="Pesquisar..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="md:col-span-2"
-          />
-          <Select value={filterType} onValueChange={(v) => { setFilterType(v === 'all' ? '' : v); setPage(1); }}>
-            <SelectTrigger>
+        <FilterBar
+          search={search}
+          onSearchChange={(v) => { setSearch(v); setPage(1); }}
+          placeholder="Pesquisar transações..."
+          isLoading={txLoading}
+          hasActiveFilters={!!search || !!filterType || !!filterStatus}
+          onClearFilters={() => { setSearch(''); setFilterType(''); setFilterStatus(''); setPage(1); }}
+          className="mb-4"
+        >
+          <Select value={filterType || 'all'} onValueChange={(v) => { setFilterType(v === 'all' ? '' : v); setPage(1); }}>
+            <SelectTrigger className="w-36">
               <SelectValue placeholder="Tipo" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="all">Todos os tipos</SelectItem>
               <SelectItem value="entrada">Entradas</SelectItem>
               <SelectItem value="saida">Saídas</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={filterStatus} onValueChange={(v) => { setFilterStatus(v === 'all' ? '' : v); setPage(1); }}>
-            <SelectTrigger>
+          <Select value={filterStatus || 'all'} onValueChange={(v) => { setFilterStatus(v === 'all' ? '' : v); setPage(1); }}>
+            <SelectTrigger className="w-36">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="all">Todos os estados</SelectItem>
               <SelectItem value="pago">Pago</SelectItem>
               <SelectItem value="pendente">Pendente</SelectItem>
               <SelectItem value="atrasado">Atrasado</SelectItem>
             </SelectContent>
           </Select>
-          <div className="flex items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 text-sm text-slate-600">
-            A mostrar movimentos de {activeMonthLabel}
-          </div>
+        </FilterBar>
+        <div className="mb-4 flex items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          A mostrar movimentos de {activeMonthLabel}
         </div>
 
         {/* Tabela */}
@@ -389,12 +399,23 @@ export default function FinancesPage() {
               <tbody>
                 {txLoading ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-gray-400">A carregar...</td>
+                    <td colSpan={8} className="p-0">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="h-12 animate-pulse border-b border-slate-100 bg-slate-50" />
+                      ))}
+                    </td>
                   </tr>
                 ) : (txData?.data || []).length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-gray-400">
-                      Sem movimentos em {activeMonthLabel}.
+                    <td colSpan={8}>
+                      <EmptyState
+                        variant={search || filterType || filterStatus ? 'no-results' : 'empty'}
+                        icon={ArrowDownUp}
+                        title={search || filterType || filterStatus ? 'Sem resultados' : `Sem movimentos em ${activeMonthLabel}`}
+                        description={search || filterType || filterStatus ? 'Tenta ajustar ou limpar os filtros.' : 'Regista a primeira receita ou despesa deste período.'}
+                        action={!search && !filterType && !filterStatus ? { label: 'Nova Transação', onClick: () => { setEditTransaction(undefined); setFormOpen(true); } } : undefined}
+                        compact
+                      />
                     </td>
                   </tr>
                 ) : (

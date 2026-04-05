@@ -6,10 +6,11 @@ import { getContacts, updateContact, getPipelineStages } from '@/lib/api';
 import { Contact } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import KanbanBoard from '@/components/pipeline/kanban-board';
 import PipelineStageManager from '@/components/pipeline/pipeline-stage-manager';
-import { Settings2 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Settings2, Users } from 'lucide-react';
 
 export default function PipelinePage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -91,11 +92,13 @@ export default function PipelinePage() {
 
             <div className="max-h-96 overflow-y-auto">
               {filteredContacts.length === 0 ? (
-                <p className="text-center text-[#6b7e9a] py-8">
-                  {searchTerm
-                    ? 'Nenhum contacto encontrado'
-                    : 'Todos os contactos estão no pipeline'}
-                </p>
+                <EmptyState
+                  variant={searchTerm ? 'no-results' : 'empty'}
+                  icon={Users}
+                  title={searchTerm ? 'Nenhum contacto encontrado' : 'Todos os contactos estão no pipeline'}
+                  description={searchTerm ? 'Tenta outro nome ou empresa.' : 'Cria novos contactos em /contactos para os adicionar ao pipeline.'}
+                  compact
+                />
               ) : (
                 <div className="space-y-2">
                   {filteredContacts.map((contact) => (
@@ -128,6 +131,12 @@ export default function PipelinePage() {
               )}
             </div>
           </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
