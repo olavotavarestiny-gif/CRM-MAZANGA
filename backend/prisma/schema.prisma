@@ -271,6 +271,8 @@ model Transaction {
   date                   DateTime
   clientId               Int?
   clientName             String?
+  invoiceId              String?   @map("invoice_id")
+  cashSessionId          String?   @map("cash_session_id")
   type                   String    // "entrada" | "saida"
   revenueType            String?   // "recorrente" | "one-off"
   contractDurationMonths Int?
@@ -286,10 +288,19 @@ model Transaction {
   receiptNumber          String?
   notes                  String?
   deleted                Boolean   @default(false)
+  reconciled             Boolean   @default(false)
+  reconciledAt           DateTime? @map("reconciled_at")
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
   user                   User?     @relation("TransactionUser", fields: [userId], references: [id], onDelete: SetNull)
   contact                Contact?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  invoice                Factura?  @relation("TransactionInvoice", fields: [invoiceId], references: [id], onDelete: SetNull)
+  cashSession            CaixaSessao? @relation("TransactionCashSession", fields: [cashSessionId], references: [id], onDelete: SetNull)
+
+  @@index([invoiceId])
+  @@index([cashSessionId])
+  @@index([userId, invoiceId])
+  @@index([userId, cashSessionId])
 }
 
 model FinancialCategory {
@@ -477,6 +488,7 @@ model Factura {
   clienteFaturacao     ClienteFaturacao? @relation(fields: [clienteFaturacaoId], references: [id])
   caixaSessaoId        String?
   caixaSessao          CaixaSessao?      @relation(fields: [caixaSessaoId], references: [id], onDelete: SetNull)
+  financeTransactions  Transaction[]     @relation("TransactionInvoice")
 
   @@unique([userId, documentNo])
 }
@@ -508,6 +520,7 @@ model CaixaSessao {
   closedBy              User?           @relation("CaixaSessaoClosedBy", fields: [closedByUserId], references: [id])
   estabelecimento       Estabelecimento @relation(fields: [estabelecimentoId], references: [id])
   facturas              Factura[]
+  financeTransactions   Transaction[]   @relation("TransactionCashSession")
 }
 
 model SaftPeriodo {

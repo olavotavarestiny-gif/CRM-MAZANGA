@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { requirePermission, requireDeletePermission } = require('../lib/permissions');
+const { getReconciliationReport } = require('../services/reconciliation.service');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,13 @@ function parseDateBoundary(value, boundary) {
 
 function formatKz(value) {
   return value ?? 0;
+}
+
+function parseReportDateRange(dateFrom, dateTo) {
+  const start = parseDateBoundary(dateFrom, 'start');
+  const end = parseDateBoundary(dateTo, 'end');
+
+  return { start, end };
 }
 
 // ─── GET /api/finances/dashboard ────────────────────────────────────────────
@@ -78,6 +86,22 @@ router.get('/dashboard', requirePermission('finances', 'transactions_view'), asy
     res.json({ revenue, expenses, profit, marginPercent: parseFloat(marginPercent.toFixed(1)), mrr });
   } catch (error) {
     console.error('Error fetching dashboard:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── GET /api/finances/reconciliation-report ────────────────────────────────
+router.get('/reconciliation-report', requirePermission('finances', 'transactions_view'), async (req, res) => {
+  try {
+    const { dateFrom, dateTo } = req.query;
+    const report = await getReconciliationReport(
+      req.user.effectiveUserId,
+      parseReportDateRange(dateFrom, dateTo)
+    );
+
+    res.json(report);
+  } catch (error) {
+    console.error('Error fetching reconciliation report:', error);
     res.status(500).json({ error: error.message });
   }
 });

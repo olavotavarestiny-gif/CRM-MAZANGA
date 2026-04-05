@@ -4,6 +4,11 @@ const prisma = require('../lib/prisma');
 const { createFactura } = require('../lib/faturacao/create-factura');
 const { isMock } = require('../lib/faturacao/agt-api');
 const { generateFacturaPDF } = require('../lib/faturacao/pdf');
+const { logEvent } = require('../lib/faturacao/audit');
+const {
+  isInvoicePaid,
+  reconcileInvoicePayment,
+} = require('../services/reconciliation.service');
 
 // GET /api/faturacao/dashboard
 router.get('/dashboard', async (req, res) => {
@@ -85,6 +90,15 @@ router.post('/facturas', async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const factura = await createFactura(userId, req.body, req);
+
+    if (isInvoicePaid(factura)) {
+      try {
+        await reconcileInvoicePayment(factura.id, userId);
+      } catch (reconciliationError) {
+        console.error('Invoice reconciliation error:', reconciliationError);
+      }
+    }
+
     res.status(201).json(factura);
   } catch (err) {
     console.error('Error creating factura:', err);

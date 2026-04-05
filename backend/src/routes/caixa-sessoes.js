@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { requireCaixaPermission } = require('../lib/permissions');
+const { reconcileCashSession } = require('../services/reconciliation.service');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -174,6 +175,12 @@ router.patch('/sessoes/:id/fechar', requireCaixaPermission('close'), async (req,
       },
       include: SESSION_INCLUDE,
     });
+
+    try {
+      await reconcileCashSession(updated.id, req.user.effectiveUserId);
+    } catch (reconciliationError) {
+      console.error('Cash session reconciliation error:', reconciliationError);
+    }
 
     res.json(updated);
   } catch (err) {

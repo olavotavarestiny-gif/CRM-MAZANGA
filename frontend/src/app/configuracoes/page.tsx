@@ -16,9 +16,9 @@ import {
 import {
   getFaturacaoConfig, updateFaturacaoConfig, getEstabelecimentos, createEstabelecimento,
   getCurrentUser, updateCurrentUserProfile, changePassword,
-  getTeamMembers, addTeamMember, removeTeamMember, updateWorkspaceMode,
+  getTeamMembers, addTeamMember, removeTeamMember,
 } from '@/lib/api';
-import { isComercio, getLandingRoute } from '@/lib/business-modes';
+import { isComercio } from '@/lib/business-modes';
 import type { PlanName, User } from '@/lib/api';
 import type { IBANEntry } from '@/lib/types';
 import MemberPermissionsModal from '@/components/configuracoes/member-permissions-modal';
@@ -334,25 +334,6 @@ function ConfiguracoesContent() {
     }
   };
 
-  // ── Workspace Mode ───────────────────────────────────────
-  const [workspaceSaving, setWorkspaceSaving] = useState(false);
-
-  const handleWorkspaceModeChange = async (mode: 'servicos' | 'comercio') => {
-    if (workspaceSaving || currentUser?.workspaceMode === mode) return;
-    setWorkspaceSaving(true);
-    try {
-      await updateWorkspaceMode(mode);
-      qc.invalidateQueries({ queryKey: ['currentUser'] });
-      toast({ variant: 'success', title: 'Modo alterado', description: `Workspace definido para ${mode === 'comercio' ? 'Comércio' : 'Serviços'}.` });
-      // Redirect to the new landing after a brief delay
-      setTimeout(() => { window.location.href = getLandingRoute(mode); }, 800);
-    } catch (err: any) {
-      toast({ variant: 'error', title: 'Erro', description: err.message || 'Não foi possível alterar o modo.' });
-    } finally {
-      setWorkspaceSaving(false);
-    }
-  };
-
   // ── Equipa: member permissions modal ──────────────────────
   const [permMember, setPermMember] = useState<User | null>(null);
 
@@ -471,35 +452,21 @@ function ConfiguracoesContent() {
               <div className="p-6 space-y-4">
                 <h2 className="text-base font-semibold text-[#0A2540]">Modo de Trabalho</h2>
                 <p className="text-sm text-gray-500">
-                  Define como a plataforma é apresentada para toda a conta.
+                  O workspace da organização é definido pela KukuGest e só pode ser alterado no painel de superadmin.
                 </p>
-                <div className="grid grid-cols-2 gap-3">
-                  {(['servicos', 'comercio'] as const).map((mode) => {
-                    const active = (currentUser?.workspaceMode ?? 'servicos') === mode;
-                    return (
-                      <button
-                        key={mode}
-                        onClick={() => handleWorkspaceModeChange(mode)}
-                        disabled={workspaceSaving}
-                        className={`flex flex-col items-start gap-1.5 rounded-xl border p-4 text-left transition-all ${
-                          active
-                            ? isComercioWorkspace
-                              ? 'border-[#B84D0E] bg-[#FDF2EA] ring-2 ring-[#B84D0E]/20'
-                              : 'border-[#0A2540] bg-[#EEF5FC] ring-2 ring-[#0A2540]/20'
-                            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                        }`}
-                      >
-                        <span className={`text-sm font-semibold ${active ? (isComercioWorkspace ? 'text-[#B84D0E]' : 'text-[#0A2540]') : 'text-[#2c2f31]'}`}>
-                          {mode === 'servicos' ? 'Serviços' : 'Comércio'}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          {mode === 'servicos'
-                            ? 'CRM, pipeline, automações e gestão de clientes.'
-                            : 'Venda rápida, ponto de venda, faturação direta.'}
-                        </span>
-                      </button>
-                    );
-                  })}
+                <div className={`rounded-xl border p-4 ${
+                  isComercioWorkspace
+                    ? 'border-[#B84D0E] bg-[#FDF2EA]'
+                    : 'border-[#0A2540] bg-[#EEF5FC]'
+                }`}>
+                  <p className={`text-sm font-semibold ${
+                    isComercioWorkspace ? 'text-[#B84D0E]' : 'text-[#0A2540]'
+                  }`}>
+                    Workspace ativo: {isComercioWorkspace ? 'Comércio' : 'Serviços'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Esta definição é aplicada à organização autenticada e não pode ser alterada nas configurações da conta.
+                  </p>
                 </div>
               </div>
             </Card>

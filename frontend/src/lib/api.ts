@@ -1175,12 +1175,4 @@ export async function emitQuickSale(payload: {
   return res.data;
 }
 
-// ============================================
-// WORKSPACE MODE
-// ============================================
-
-export async function updateWorkspaceMode(workspaceMode: 'servicos' | 'comercio'): Promise<void> {
-  await api.patch('/api/account/workspace-mode', { workspaceMode });
-}
-
 export default api;
