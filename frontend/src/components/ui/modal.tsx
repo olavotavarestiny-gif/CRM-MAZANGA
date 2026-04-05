@@ -33,6 +33,10 @@ interface ModalProps {
   scrollable?: boolean;
   children?: React.ReactNode;
   className?: string;
+  contentProps?: Omit<
+    React.ComponentPropsWithoutRef<typeof DialogContent>,
+    'className' | 'children'
+  >;
 }
 
 /**
@@ -56,6 +60,7 @@ export function Modal({
   scrollable = false,
   children,
   className,
+  contentProps,
 }: ModalProps) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -66,6 +71,7 @@ export function Modal({
           'bg-white text-[#0A2540]',
           className
         )}
+        {...contentProps}
       >
         <DialogHeader>
           <DialogTitle className="text-[#0A2540]">{title}</DialogTitle>

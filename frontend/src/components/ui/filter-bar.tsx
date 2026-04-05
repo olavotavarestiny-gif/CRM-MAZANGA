@@ -56,6 +56,14 @@ export function FilterBar({
   const [inputValue, setInputValue] = useState(search);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
   // Keep input in sync if parent resets the search externally
   useEffect(() => {
     setInputValue(search);

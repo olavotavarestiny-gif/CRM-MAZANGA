@@ -54,6 +54,11 @@ export interface DataTableProps<T> {
   };
   /** Server-side sort — called when header is clicked */
   onSortChange?: (key: string, direction: SortDirection) => void;
+  /** Controlled sort state for server-side sorting UIs */
+  sortState?: {
+    key: string | null;
+    direction: SortDirection;
+  };
   /** Client-side sort comparator — if provided AND onSortChange is not, sorts locally */
   sortComparator?: (a: T, b: T, key: string, direction: SortDirection) => number;
   /** Empty state props */
@@ -78,6 +83,7 @@ export function DataTable<T>({
   onSelectionChange,
   pagination,
   onSortChange,
+  sortState,
   sortComparator,
   emptyTitle = 'Sem dados',
   emptyDescription,
@@ -85,13 +91,17 @@ export function DataTable<T>({
   emptyVariant = 'empty',
   className,
 }: DataTableProps<T>) {
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<SortDirection>('asc');
+  const [internalSortKey, setInternalSortKey] = useState<string | null>(null);
+  const [internalSortDir, setInternalSortDir] = useState<SortDirection>('asc');
+  const sortKey = sortState?.key ?? internalSortKey;
+  const sortDir = sortState?.direction ?? internalSortDir;
 
   const handleSort = (key: string) => {
     const newDir: SortDirection = sortKey === key && sortDir === 'asc' ? 'desc' : 'asc';
-    setSortKey(key);
-    setSortDir(newDir);
+    if (!sortState) {
+      setInternalSortKey(key);
+      setInternalSortDir(newDir);
+    }
     onSortChange?.(key, newDir);
   };
 
