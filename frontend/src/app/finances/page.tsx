@@ -25,7 +25,7 @@ import {
 import { isComercio } from '@/lib/business-modes';
 import TransactionForm from '@/components/finances/transaction-form';
 import ClientProfitabilityModal from '@/components/finances/client-profitability-modal';
-import { TrendingUp, TrendingDown, DollarSign, Percent, RefreshCw, Plus, Download, ChevronLeft, ChevronRight, Pencil, Trash2, BarChart2, ArrowDownUp } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, RefreshCw, Plus, Download, ChevronLeft, ChevronRight, Pencil, Trash2, BarChart2, ArrowDownUp, Wallet, Landmark } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FilterBar } from '@/components/ui/filter-bar';
 
@@ -294,14 +294,15 @@ export default function FinancesPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
           {[
+            { label: 'Em caixa da empresa', value: dashboard?.companyCashBalance || 0, color: 'cyan', icon: Wallet },
+            { label: 'Saldo inicial do mês', value: dashboard?.openingBalance || 0, color: 'blue', icon: Landmark },
             { label: 'Receita', value: dashboard?.revenue || 0, color: 'emerald', icon: TrendingUp },
             { label: 'Despesas', value: dashboard?.expenses || 0, color: 'red', icon: TrendingDown },
-            { label: 'Lucro', value: dashboard?.profit || 0, color: 'blue', icon: DollarSign },
-            { label: 'Margem', value: dashboard?.marginPercent || 0, color: 'purple', icon: Percent, isPercent: true },
-            { label: 'Receita Mensal', value: (dashboard?.receitaMensal ?? dashboard?.mrr) || 0, color: 'cyan', icon: RefreshCw },
-          ].map(({ label, value, color, icon: Icon, isPercent }) => {
+            { label: 'Lucro', value: dashboard?.profit || 0, color: 'purple', icon: DollarSign },
+            { label: 'Receita Mensal', value: (dashboard?.receitaMensal ?? dashboard?.mrr) || 0, color: 'emerald', icon: RefreshCw },
+          ].map(({ label, value, color, icon: Icon }) => {
             const c = CARD_COLORS[color] ?? CARD_COLORS.emerald;
             return (
               <div key={label} className={`rounded-2xl border bg-white p-4 shadow-sm ${c.border}`}>
@@ -312,7 +313,7 @@ export default function FinancesPage() {
                   </span>
                 </div>
                 <div className={`text-lg font-bold ${c.text}`}>
-                  {isPercent ? `${(value as number).toFixed(1)}%` : fmt(value)}
+                  {fmt(value)}
                 </div>
               </div>
             );

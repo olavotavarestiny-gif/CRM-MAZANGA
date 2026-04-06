@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createTransaction, updateTransaction, getFinancialCategories, getContacts } from '@/lib/api';
-import { Transaction } from '@/lib/types';
+import { Contact, Transaction } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { AsyncSearchPicker, SearchGroup } from '@/components/search/async-search-picker';
 
 type FormData = {
   type: 'entrada' | 'saida';
@@ -83,10 +84,20 @@ export default function TransactionForm({
     queryFn: getFinancialCategories,
   });
 
-  const { data: contacts = [] } = useQuery({
-    queryKey: ['contacts'],
-    queryFn: () => getContacts(),
-  });
+  const contactSearchFn = useMemo(
+    () => async (query: string): Promise<SearchGroup<Contact>[]> => {
+      const contacts = await getContacts({ search: query });
+
+      return [
+        {
+          id: 'contacts',
+          label: 'Clientes',
+          items: contacts,
+        },
+      ];
+    },
+    []
+  );
 
   // Auto-calculate amountKz when amountForeign or exchangeRate changes (if moeda ≠ KZ)
   useEffect(() => {
@@ -239,11 +250,6 @@ export default function TransactionForm({
           next.exchangeRate = '1';
         }
       }
-      // Auto-fill clientName from contacts
-      if (key === 'clientId' && value) {
-        const contact = contacts.find((c) => c.id.toString() === value);
-        if (contact) next.clientName = contact.name;
-      }
       return next;
     });
   };
@@ -346,19 +352,50 @@ export default function TransactionForm({
             </div>
             <div>
               <Label className="text-[#0A2540] mb-1 block">Cliente</Label>
-              <Select value={form.clientId || 'none'} onValueChange={(v) => set('clientId', v === 'none' ? '' : v)}>
-                <SelectTrigger className="border-[#dde3ec] text-[#0A2540]">
-                  <SelectValue placeholder="Seleccionar..." />
-                </SelectTrigger>
-                <SelectContent className="bg-white border-[#E2E8F0]">
-                  <SelectItem value="none" className="text-[#6b7e9a]">Sem cliente</SelectItem>
-                  {contacts.map((c) => (
-                    <SelectItem key={c.id} value={c.id.toString()} className="text-[#0A2540]">
-                      {c.name} — {c.company}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <AsyncSearchPicker<Contact>
+                  label=""
+                  placeholder="Pesquisar por nome, empresa, telefone ou NIF..."
+                  initialValue={form.clientName}
+                  helperText="Seleciona um contacto do CRM para ligar esta transação à rentabilidade e aos relatórios."
+                  searchFn={contactSearchFn}
+                  getItemKey={(contact) => String(contact.id)}
+                  getSelectedLabel={(contact) => contact.name}
+                  onSelect={(contact) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      clientId: String(contact.id),
+                      clientName: contact.name,
+                    }));
+                  }}
+                  emptyState={{
+                    title: 'Nenhum cliente encontrado',
+                    message: 'Tenta outro nome, empresa, telefone ou NIF.',
+                  }}
+                  renderItem={(contact) => (
+                    <div>
+                      <p className="text-sm font-medium text-[#2c2f31]">{contact.name}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {[contact.company, contact.phone, contact.nif].filter(Boolean).join(' · ') || 'Sem dados adicionais'}
+                      </p>
+                    </div>
+                  )}
+                />
+                <div className="flex items-center justify-between rounded-xl border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-500">
+                  <span>
+                    {form.clientName ? `Cliente associado: ${form.clientName}` : 'Sem cliente associado a esta transação.'}
+                  </span>
+                  {(form.clientId || form.clientName) && (
+                    <button
+                      type="button"
+                      onClick={() => setForm((prev) => ({ ...prev, clientId: '', clientName: '' }))}
+                      className="font-medium text-[var(--workspace-primary)] underline underline-offset-4"
+                    >
+                      Remover
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 

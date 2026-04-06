@@ -106,6 +106,33 @@ function monthlyizeRecurringRevenue(recorrente) {
   }
 }
 
+async function calculateSignedBalance(userId, endDate) {
+  const [entradaAgg, saidaAgg] = await Promise.all([
+    prisma.transaction.aggregate({
+      where: {
+        userId,
+        deleted: false,
+        status: 'pago',
+        type: 'entrada',
+        date: { lte: endDate },
+      },
+      _sum: { amountKz: true },
+    }),
+    prisma.transaction.aggregate({
+      where: {
+        userId,
+        deleted: false,
+        status: 'pago',
+        type: 'saida',
+        date: { lte: endDate },
+      },
+      _sum: { amountKz: true },
+    }),
+  ]);
+
+  return formatKz(entradaAgg._sum.amountKz) - formatKz(saidaAgg._sum.amountKz);
+}
+
 // ─── GET /api/finances/dashboard ────────────────────────────────────────────
 router.get('/dashboard', requirePermission('finances', 'transactions_view'), async (req, res) => {
   try {
@@ -127,7 +154,7 @@ router.get('/dashboard', requirePermission('finances', 'transactions_view'), asy
       date: { gte: previousRange.from, lte: previousRange.to },
     };
 
-    const [revenueAgg, expensesAgg, recurringInvoices, prevRevenueAgg, prevExpensesAgg, receivableInvoices] = await Promise.all([
+    const [revenueAgg, expensesAgg, recurringInvoices, prevRevenueAgg, prevExpensesAgg, receivableInvoices, companyCashBalance, openingBalance] = await Promise.all([
       prisma.transaction.aggregate({
         where: { ...baseWhere, type: 'entrada' },
         _sum: { amountKz: true },
@@ -171,6 +198,8 @@ router.get('/dashboard', requirePermission('finances', 'transactions_view'), asy
           grossTotal: true,
         },
       }),
+      calculateSignedBalance(req.user.effectiveUserId, to),
+      calculateSignedBalance(req.user.effectiveUserId, previousRange.to),
     ]);
 
     const revenue = formatKz(revenueAgg._sum.amountKz);
@@ -225,6 +254,8 @@ router.get('/dashboard', requirePermission('finances', 'transactions_view'), asy
       prevRevenue,
       prevExpenses,
       prevProfit,
+      companyCashBalance,
+      openingBalance,
       receivablesCount,
       receivablesTotal,
     });

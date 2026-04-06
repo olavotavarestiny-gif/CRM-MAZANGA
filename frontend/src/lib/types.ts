@@ -469,6 +469,8 @@ export interface DashboardStats {
   prevRevenue: number;
   prevExpenses: number;
   prevProfit: number;
+  companyCashBalance: number;
+  openingBalance: number;
   receivablesCount: number;
   receivablesTotal: number;
 }
