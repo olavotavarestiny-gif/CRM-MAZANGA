@@ -24,6 +24,7 @@ import type { User } from '@/lib/api';
 
 const STEP_ICONS: Record<string, React.ElementType> = {
   add_contact:    UserPlus,
+  setup_store:    Building2,
   setup_pipeline: Kanban,
   create_task:    CheckSquare,
   create_form:    FileText,

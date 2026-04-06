@@ -208,7 +208,7 @@ export default function PipelineAnalyticsView() {
         <div>
           <h2 className="text-2xl font-bold text-[#0A2540]">Analytics</h2>
           <p className="mt-2 max-w-2xl text-sm text-[#6b7e9a]">
-            Conversão, velocidade e forecast das negociações activas no workspace de serviços.
+            Conversão, velocidade e forecast dos processos de venda activos no workspace de serviços.
           </p>
         </div>
 
@@ -236,7 +236,7 @@ export default function PipelineAnalyticsView() {
                 Precisas de pelo menos 5 negócios fechados para ver analytics de conversão
               </p>
               <p className="mt-1 text-sm text-amber-900/80">
-                Por enquanto mostramos apenas o valor actual do pipeline. Assim que houver histórico suficiente, o funil, velocidade e forecast completo ficam disponíveis.
+                Por enquanto mostramos apenas o valor actual dos processos de venda. Assim que houver histórico suficiente, o funil, velocidade e forecast completo ficam disponíveis.
               </p>
             </div>
           </CardContent>
@@ -248,10 +248,10 @@ export default function PipelineAnalyticsView() {
           forecastQuery.isLoading ? (
             <MetricCardSkeleton />
           ) : forecastQuery.isError ? (
-            <ErrorState compact title="Falha ao carregar valor do pipeline" message="Não foi possível calcular o valor actual do pipeline." />
+            <ErrorState compact title="Falha ao carregar valor dos processos" message="Não foi possível calcular o valor actual dos processos de venda." />
           ) : (
             <MetricCard
-              title="Valor Actual do Pipeline"
+              title="Valor Actual dos Processos"
               value={formatKz(forecastQuery.data?.currentValue)}
               description={
                 forecastQuery.data?.contactsUsingAverageTicket
@@ -299,10 +299,10 @@ export default function PipelineAnalyticsView() {
             {forecastQuery.isLoading ? (
               <MetricCardSkeleton />
             ) : forecastQuery.isError ? (
-              <ErrorState compact title="Falha ao carregar pipeline value" message="Não foi possível calcular o valor actual do pipeline." />
+              <ErrorState compact title="Falha ao carregar valor dos processos" message="Não foi possível calcular o valor actual dos processos de venda." />
             ) : (
               <MetricCard
-                title="Valor do Pipeline"
+                title="Valor dos Processos"
                 value={formatKz(forecastQuery.data?.currentValue)}
                 description={
                   forecastQuery.data?.contactsUsingAverageTicket
@@ -385,7 +385,7 @@ export default function PipelineAnalyticsView() {
                 ) : conversionQuery.isError ? (
                   <ErrorState
                     title="Falha ao carregar funil de conversão"
-                    message="Não foi possível gerar o funil do pipeline para este período."
+                    message="Não foi possível gerar o funil de processos de venda para este período."
                     onRetry={() => conversionQuery.refetch()}
                   />
                 ) : conversionQuery.data?.totalContacts ? (

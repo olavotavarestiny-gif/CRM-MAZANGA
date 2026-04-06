@@ -76,10 +76,10 @@ export default function PipelinePage() {
     c.company.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const pageTitle = activeTab === 'analytics' ? 'Processos e Analytics' : 'Negociações';
+  const pageTitle = activeTab === 'analytics' ? 'Processos de Venda e Analytics' : 'Processos de Venda';
   const pageDescription = activeTab === 'analytics'
-    ? 'Pipeline visual e analytics avançado no mesmo módulo.'
-    : 'Pipeline visual por etapas com gestão rápida de oportunidades.';
+    ? 'Processos de venda visuais e analytics avançado no mesmo módulo.'
+    : 'Processos de venda visuais por etapas com gestão rápida de oportunidades.';
 
   const tabButtonClass = (tab: 'pipeline' | 'analytics') =>
     activeTab === tab
@@ -107,7 +107,7 @@ export default function PipelinePage() {
               onClick={() => changeTab('pipeline')}
               className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${tabButtonClass('pipeline')}`}
             >
-              Pipeline
+              Processos
             </button>
             {canSeeAnalytics ? (
               <button
@@ -127,7 +127,7 @@ export default function PipelinePage() {
                 Gerir Etapas
               </Button>
               <Button className="w-full sm:w-auto" data-tour="pipeline-add" onClick={() => setIsAddModalOpen(true)}>
-                + Adicionar Contacto
+                + Adicionar aos Processos
               </Button>
             </div>
           ) : null}
@@ -151,7 +151,7 @@ export default function PipelinePage() {
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Adicionar Contacto ao Pipeline</DialogTitle>
+            <DialogTitle>Adicionar Contacto aos Processos de Venda</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -166,8 +166,8 @@ export default function PipelinePage() {
                 <EmptyState
                   variant={searchTerm ? 'no-results' : 'empty'}
                   icon={Users}
-                  title={searchTerm ? 'Nenhum contacto encontrado' : 'Todos os contactos estão no pipeline'}
-                  description={searchTerm ? 'Tenta outro nome ou empresa.' : 'Cria novos contactos em /contactos para os adicionar ao pipeline.'}
+                  title={searchTerm ? 'Nenhum contacto encontrado' : 'Todos os contactos já estão em Processos de Venda'}
+                  description={searchTerm ? 'Tenta outro nome ou empresa.' : 'Cria novos contactos em /contactos para os adicionar aos processos de venda.'}
                   compact
                 />
               ) : (

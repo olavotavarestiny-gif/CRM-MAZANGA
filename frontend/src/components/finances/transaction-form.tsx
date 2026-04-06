@@ -250,9 +250,9 @@ export default function TransactionForm({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-zinc-900 border-slate-200">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white border-slate-200">
         <DialogHeader>
-          <DialogTitle className="text-[#0A2540]">
+          <DialogTitle className="text-[#2c2f31]">
             {isEdit ? 'Editar Transação' : 'Nova Transação'}
           </DialogTitle>
         </DialogHeader>
@@ -260,7 +260,7 @@ export default function TransactionForm({
         <form onSubmit={handleSubmit} className="space-y-5 mt-2">
           {/* Tipo */}
           <div>
-            <Label className="text-[#0A2540] mb-2 block">Tipo *</Label>
+            <Label className="text-[#2c2f31] mb-2 block">Tipo *</Label>
             <div className="flex gap-3">
               {(['entrada', 'saida'] as const).map((t) => (
                 <button
@@ -268,11 +268,11 @@ export default function TransactionForm({
                   type="button"
                   onClick={() => set('type', t)}
                   className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                    form.type === t
-                      ? t === 'entrada'
-                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
-                        : 'bg-red-500/20 border-red-500/50 text-red-300'
-                      : 'border-[#dde3ec] text-[#6b7e9a] hover:border-[#0A2540]'
+                      form.type === t
+                        ? t === 'entrada'
+                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                          : 'bg-red-500/20 border-red-500/50 text-red-300'
+                      : 'border-[#dde3ec] text-[#6b7e9a] hover:border-[var(--workspace-primary)]'
                   }`}
                 >
                   {t === 'entrada' ? '↑ Entrada' : '↓ Saída'}
@@ -284,7 +284,7 @@ export default function TransactionForm({
           {/* Tipo de Receita (só para entradas) */}
           {form.type === 'entrada' && (
             <div>
-              <Label className="text-[#0A2540] mb-2 block">Tipo de Receita</Label>
+              <Label className="text-[#2c2f31] mb-2 block">Tipo de Receita</Label>
               <div className="flex gap-3">
                 {(['recorrente', 'one-off'] as const).map((rt) => (
                   <button
@@ -293,8 +293,8 @@ export default function TransactionForm({
                     onClick={() => set('revenueType', rt)}
                     className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${
                       form.revenueType === rt
-                        ? 'bg-purple-500/20 border-purple-500/50 text-blue-500'
-                        : 'border-[#dde3ec] text-[#6b7e9a] hover:border-[#0A2540]'
+                        ? 'border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)]'
+                        : 'border-[#dde3ec] text-[#6b7e9a] hover:border-[var(--workspace-primary)]'
                     }`}
                   >
                     {rt === 'recorrente' ? '🔄 Recorrente' : '⚡ Pontual'}
@@ -306,26 +306,26 @@ export default function TransactionForm({
 
           {/* Campos recorrentes */}
           {form.type === 'entrada' && form.revenueType === 'recorrente' && (
-            <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-blue-50 border border-blue-200">
+            <div className="grid grid-cols-2 gap-4 rounded-lg border border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] p-4">
               <div>
-                <Label className="text-[#0A2540] mb-1 block">Duração (meses) *</Label>
+                <Label className="text-[#2c2f31] mb-1 block">Duração (meses) *</Label>
                 <Input
                   type="number"
                   min="1"
                   value={form.contractDurationMonths}
                   onChange={(e) => set('contractDurationMonths', e.target.value)}
                   placeholder="ex: 12"
-                  className="border-[#dde3ec] text-[#0A2540]"
+                  className="border-[#dde3ec] text-[#2c2f31]"
                   required
                 />
               </div>
               <div>
-                <Label className="text-[#0A2540] mb-1 block">Próximo Pagamento *</Label>
+                <Label className="text-[#2c2f31] mb-1 block">Próximo Pagamento *</Label>
                 <Input
                   type="date"
                   value={form.nextPaymentDate}
                   onChange={(e) => set('nextPaymentDate', e.target.value)}
-                  className="border-[#dde3ec] text-[#0A2540]"
+                  className="border-[#dde3ec] text-[#2c2f31]"
                   required
                 />
               </div>

@@ -17,9 +17,9 @@ function fmt(n: number) {
 function RateRow({ label, base, iva, count }: { label: string; base: number; iva: number; count: number }) {
   return (
     <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-      <td className="px-4 py-3 text-sm font-medium text-[#0A2540]">{label}</td>
+      <td className="px-4 py-3 text-sm font-medium text-[#2c2f31]">{label}</td>
       <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{fmt(base)}</td>
-      <td className="px-4 py-3 text-sm text-right font-semibold text-[#0049e6] tabular-nums">{fmt(iva)}</td>
+      <td className="px-4 py-3 text-sm text-right font-semibold text-[var(--workspace-primary)] tabular-nums">{fmt(iva)}</td>
       <td className="px-4 py-3 text-sm text-right text-gray-500 tabular-nums">{fmt(base + iva)}</td>
       <td className="px-4 py-3 text-sm text-right text-gray-400 tabular-nums">{count}</td>
     </tr>
@@ -63,7 +63,7 @@ export function TabRelatorios() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-[#0A2540]">Relatórios Fiscais</h2>
+        <h2 className="text-base font-semibold text-[#2c2f31]">Relatórios Fiscais</h2>
       </div>
 
       {/* Report type toggle */}
@@ -71,7 +71,7 @@ export function TabRelatorios() {
         <button
           onClick={() => setActiveReport('iva')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeReport === 'iva' ? 'bg-white text-[#0A2540] shadow-sm' : 'text-gray-500 hover:text-[#0A2540]'
+            activeReport === 'iva' ? 'bg-white text-[var(--workspace-primary)] shadow-sm' : 'text-gray-500 hover:text-[var(--workspace-primary)]'
           }`}
         >
           <FileText className="w-4 h-4" /> Relatório IVA
@@ -79,7 +79,7 @@ export function TabRelatorios() {
         <button
           onClick={() => setActiveReport('vendas')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeReport === 'vendas' ? 'bg-white text-[#0A2540] shadow-sm' : 'text-gray-500 hover:text-[#0A2540]'
+            activeReport === 'vendas' ? 'bg-white text-[var(--workspace-primary)] shadow-sm' : 'text-gray-500 hover:text-[var(--workspace-primary)]'
           }`}
         >
           <BarChart2 className="w-4 h-4" /> Volume de Vendas
@@ -118,7 +118,7 @@ export function TabRelatorios() {
             <Button
               variant="outline"
               onClick={() => handleExport('iva')}
-              className="border-[#0049e6] text-[#0049e6] hover:bg-blue-50 gap-2"
+              className="gap-2 border-[var(--workspace-primary-border)] text-[var(--workspace-primary)] hover:bg-[var(--workspace-primary-soft)]"
             >
               <Download className="w-4 h-4" /> Exportar CSV
             </Button>
@@ -133,15 +133,15 @@ export function TabRelatorios() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="p-4 rounded-xl border border-gray-200 bg-white">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">Base Tributável</p>
-                  <p className="text-2xl font-bold text-[#0A2540] mt-1 tabular-nums">{fmt(ivaQuery.data.totalBase)}</p>
+                  <p className="text-2xl font-bold text-[#2c2f31] mt-1 tabular-nums">{fmt(ivaQuery.data.totalBase)}</p>
                 </div>
-                <div className="p-4 rounded-xl border border-[#0049e6]/20 bg-blue-50">
-                  <p className="text-xs text-[#0049e6] uppercase tracking-wide font-medium">IVA Liquidado</p>
-                  <p className="text-2xl font-bold text-[#0049e6] mt-1 tabular-nums">{fmt(ivaQuery.data.totalIva)}</p>
+                <div className="p-4 rounded-xl border border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)]">
+                  <p className="text-xs text-[var(--workspace-primary)] uppercase tracking-wide font-medium">IVA Liquidado</p>
+                  <p className="text-2xl font-bold text-[var(--workspace-primary)] mt-1 tabular-nums">{fmt(ivaQuery.data.totalIva)}</p>
                 </div>
                 <div className="p-4 rounded-xl border border-gray-200 bg-white">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">Total c/ IVA</p>
-                  <p className="text-2xl font-bold text-[#0A2540] mt-1 tabular-nums">{fmt(ivaQuery.data.totalGross)}</p>
+                  <p className="text-2xl font-bold text-[#2c2f31] mt-1 tabular-nums">{fmt(ivaQuery.data.totalGross)}</p>
                 </div>
               </div>
 
@@ -167,9 +167,9 @@ export function TabRelatorios() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
-                      <td className="px-4 py-3 text-sm text-[#0A2540]">Total</td>
+                      <td className="px-4 py-3 text-sm text-[#2c2f31]">Total</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-700 tabular-nums">{fmt(ivaQuery.data.totalBase)}</td>
-                      <td className="px-4 py-3 text-sm text-right text-[#0049e6] tabular-nums">{fmt(ivaQuery.data.totalIva)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-[var(--workspace-primary)] tabular-nums">{fmt(ivaQuery.data.totalIva)}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-700 tabular-nums">{fmt(ivaQuery.data.totalGross)}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-500">{ivaQuery.data.facturas.length}</td>
                     </tr>
@@ -188,9 +188,9 @@ export function TabRelatorios() {
                       <div key={f.documentNo} className="grid grid-cols-12 px-4 py-2.5 text-sm items-center hover:bg-gray-50">
                         <span className="col-span-3 font-mono text-gray-500">{f.documentNo}</span>
                         <span className="col-span-2 text-gray-400 text-xs">{new Date(f.documentDate).toLocaleDateString('pt-PT')}</span>
-                        <span className="col-span-4 text-[#0A2540] truncate">{f.customerName}</span>
+                        <span className="col-span-4 text-[#2c2f31] truncate">{f.customerName}</span>
                         <span className="col-span-1 text-right text-gray-500 tabular-nums text-xs">{fmt(f.netTotal)}</span>
-                        <span className="col-span-1 text-right text-[#0049e6] tabular-nums text-xs font-medium">{fmt(f.taxPayable)}</span>
+                        <span className="col-span-1 text-right text-[var(--workspace-primary)] tabular-nums text-xs font-medium">{fmt(f.taxPayable)}</span>
                         <span className="col-span-1 text-right text-gray-700 tabular-nums text-xs font-semibold">{fmt(f.grossTotal)}</span>
                       </div>
                     ))}
@@ -225,7 +225,7 @@ export function TabRelatorios() {
             <Button
               variant="outline"
               onClick={() => handleExport('vendas')}
-              className="border-[#0049e6] text-[#0049e6] hover:bg-blue-50 gap-2"
+              className="gap-2 border-[var(--workspace-primary-border)] text-[var(--workspace-primary)] hover:bg-[var(--workspace-primary-soft)]"
             >
               <Download className="w-4 h-4" /> Exportar CSV
             </Button>
@@ -240,19 +240,19 @@ export function TabRelatorios() {
               <div className="grid grid-cols-4 gap-4">
                 <div className="p-4 rounded-xl border border-gray-200 bg-white">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">Total Faturado</p>
-                  <p className="text-2xl font-bold text-[#0A2540] mt-1 tabular-nums">{fmt(vendasQuery.data.totals.grossTotal)}</p>
+                  <p className="text-2xl font-bold text-[#2c2f31] mt-1 tabular-nums">{fmt(vendasQuery.data.totals.grossTotal)}</p>
                 </div>
                 <div className="p-4 rounded-xl border border-gray-200 bg-white">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">Base s/IVA</p>
-                  <p className="text-2xl font-bold text-[#0A2540] mt-1 tabular-nums">{fmt(vendasQuery.data.totals.netTotal)}</p>
+                  <p className="text-2xl font-bold text-[#2c2f31] mt-1 tabular-nums">{fmt(vendasQuery.data.totals.netTotal)}</p>
                 </div>
-                <div className="p-4 rounded-xl border border-[#0049e6]/20 bg-blue-50">
-                  <p className="text-xs text-[#0049e6] uppercase tracking-wide font-medium">IVA Total</p>
-                  <p className="text-2xl font-bold text-[#0049e6] mt-1 tabular-nums">{fmt(vendasQuery.data.totals.taxPayable)}</p>
+                <div className="p-4 rounded-xl border border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)]">
+                  <p className="text-xs text-[var(--workspace-primary)] uppercase tracking-wide font-medium">IVA Total</p>
+                  <p className="text-2xl font-bold text-[var(--workspace-primary)] mt-1 tabular-nums">{fmt(vendasQuery.data.totals.taxPayable)}</p>
                 </div>
                 <div className="p-4 rounded-xl border border-gray-200 bg-white">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">Nº Documentos</p>
-                  <p className="text-2xl font-bold text-[#0A2540] mt-1">{vendasQuery.data.totals.count}</p>
+                  <p className="text-2xl font-bold text-[#2c2f31] mt-1">{vendasQuery.data.totals.count}</p>
                 </div>
               </div>
 
@@ -278,14 +278,14 @@ export function TabRelatorios() {
                       const pct = (m.grossTotal / maxGross) * 100;
                       return (
                         <tr key={m.month} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${m.count === 0 ? 'opacity-40' : ''}`}>
-                          <td className="px-4 py-3 text-sm font-medium text-[#0A2540]">{m.label}</td>
+                          <td className="px-4 py-3 text-sm font-medium text-[#2c2f31]">{m.label}</td>
                           <td className="px-4 py-3 text-sm text-right text-gray-500 tabular-nums">{m.count}</td>
                           <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{fmt(m.netTotal)}</td>
-                          <td className="px-4 py-3 text-sm text-right text-[#0049e6] tabular-nums">{fmt(m.taxPayable)}</td>
-                          <td className="px-4 py-3 text-sm text-right font-semibold text-[#0A2540] tabular-nums">{fmt(m.grossTotal)}</td>
+                          <td className="px-4 py-3 text-sm text-right text-[var(--workspace-primary)] tabular-nums">{fmt(m.taxPayable)}</td>
+                          <td className="px-4 py-3 text-sm text-right font-semibold text-[#2c2f31] tabular-nums">{fmt(m.grossTotal)}</td>
                           <td className="px-4 py-3 w-24">
                             <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                              <div className="h-full rounded-full bg-[#0049e6] transition-all" style={{ width: `${pct}%` }} />
+                              <div className="h-full rounded-full bg-[var(--workspace-primary)] transition-all" style={{ width: `${pct}%` }} />
                             </div>
                           </td>
                         </tr>
@@ -294,11 +294,11 @@ export function TabRelatorios() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
-                      <td className="px-4 py-3 text-sm text-[#0A2540]">Total {year}</td>
+                      <td className="px-4 py-3 text-sm text-[#2c2f31]">Total {year}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-700">{vendasQuery.data.totals.count}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-700 tabular-nums">{fmt(vendasQuery.data.totals.netTotal)}</td>
-                      <td className="px-4 py-3 text-sm text-right text-[#0049e6] tabular-nums">{fmt(vendasQuery.data.totals.taxPayable)}</td>
-                      <td className="px-4 py-3 text-sm text-right text-[#0A2540] tabular-nums">{fmt(vendasQuery.data.totals.grossTotal)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-[var(--workspace-primary)] tabular-nums">{fmt(vendasQuery.data.totals.taxPayable)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-[#2c2f31] tabular-nums">{fmt(vendasQuery.data.totals.grossTotal)}</td>
                       <td />
                     </tr>
                   </tfoot>

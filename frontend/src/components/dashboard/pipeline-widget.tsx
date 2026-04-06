@@ -25,12 +25,12 @@ export default function PipelineWidget() {
   return (
     <Card className="col-span-2 rounded-xl">
       <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="text-base font-bold">Resumo do Pipeline</CardTitle>
-        <Link href="/pipeline" className="text-xs font-semibold text-[var(--workspace-primary)] transition-colors hover:opacity-80">Ver pipeline</Link>
+        <CardTitle className="text-base font-bold">Resumo de Processos de Venda</CardTitle>
+        <Link href="/pipeline" className="text-xs font-semibold text-[var(--workspace-primary)] transition-colors hover:opacity-80">Ver processos</Link>
       </CardHeader>
       <CardContent>
         <WidgetWrapper
-          title="resumo do pipeline"
+          title="resumo de processos de venda"
           isLoading={contactsLoading || stagesLoading}
           error={contactsError || stagesError}
           isEmpty={!contactsLoading && !stagesLoading && !contactsError && !stagesError && stages.length === 0}

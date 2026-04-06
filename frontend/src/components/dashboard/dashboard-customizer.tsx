@@ -174,7 +174,7 @@ export default function DashboardCustomizer({
                     <p className="text-xs text-[#6b7e9a]">
                       {widget.type === 'goal' ? `Meta: ${widget.target?.toLocaleString('pt-PT')} ${widget.unit}` :
                        widget.type === 'tasks' ? 'Lista de tarefas' :
-                       widget.type === 'pipeline' ? 'Resumo do pipeline' :
+                       widget.type === 'pipeline' ? 'Resumo de processos de venda' :
                        SOURCE_LABELS[widget.source!] ?? widget.source}
                     </p>
                   </div>

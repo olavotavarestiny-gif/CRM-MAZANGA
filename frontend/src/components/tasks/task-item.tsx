@@ -31,7 +31,7 @@ function formatDueDate(dueDate?: string): { label: string; cls: string } {
     today.setHours(0, 0, 0, 0);
     const due = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-    if (isSameDay(due, today))   return { label: 'Hoje', cls: 'text-blue-600 bg-blue-50 border border-blue-100' };
+    if (isSameDay(due, today))   return { label: 'Hoje', cls: 'border border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)]' };
     if (isTomorrow(due))         return { label: 'Amanhã', cls: 'text-purple-600 bg-purple-50 border border-purple-100' };
     if (isPast(due))             return { label: 'Vencida', cls: 'text-red-600 bg-red-50 border border-red-100' };
     return { label: format(due, 'dd MMM', { locale: ptBR }), cls: 'text-[#6b7e9a] bg-[#F8FAFC] border border-[#E2E8F0]' };
@@ -129,7 +129,7 @@ export default function TaskItem({
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 w-7 p-0 text-[#6b7e9a] hover:text-[#0A2540]"
+          className="h-7 w-7 p-0 text-[#6b7e9a] hover:text-[var(--workspace-primary)]"
           onClick={() => onEdit(task)}
         >
           <Pencil className="w-3.5 h-3.5" />

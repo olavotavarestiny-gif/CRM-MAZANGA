@@ -212,9 +212,9 @@ export function RecorrenteForm({ open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={v => !v && handleClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-[#0A2540]">Nova Fatura Recorrente</DialogTitle>
+          <DialogTitle className="text-[#2c2f31]">Nova Fatura Recorrente</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
@@ -265,7 +265,7 @@ export function RecorrenteForm({ open, onClose }: Props) {
                 </>
               ) : (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-                  <p className="text-sm font-semibold text-[#0A2540]">
+                  <p className="text-sm font-semibold text-[#2c2f31]">
                     {selectedSerie
                       ? `${selectedSerie.seriesCode} / ${selectedSerie.seriesYear}`
                       : estabelecimentoId
@@ -306,7 +306,7 @@ export function RecorrenteForm({ open, onClose }: Props) {
               <Label className="text-xs text-gray-500">Cliente</Label>
               <button
                 type="button"
-                className="text-xs text-[#635BFF] hover:underline"
+                className="text-xs text-[var(--workspace-primary)] hover:underline"
                 onClick={() => { setManualCliente(v => !v); setCliente(undefined); setManualNif(''); setManualNome(''); }}
               >
                 {manualCliente ? 'Pesquisar cliente' : 'Introduzir manualmente'}
@@ -327,7 +327,7 @@ export function RecorrenteForm({ open, onClose }: Props) {
             <div className="flex items-center justify-between mb-2">
               <Label className="text-xs text-gray-500">Artigos / Serviços</Label>
               <button type="button" onClick={() => setLines(p => [...p, defaultLine()])}
-                className="text-xs text-[#635BFF] hover:underline flex items-center gap-1">
+                className="flex items-center gap-1 text-xs text-[var(--workspace-primary)] hover:underline">
                 <Plus className="w-3 h-3" />Adicionar linha
               </button>
             </div>
@@ -408,8 +408,8 @@ export function RecorrenteForm({ open, onClose }: Props) {
             {/* Totals preview */}
             {grossTotal > 0 && (
               <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end gap-4 text-sm text-gray-600">
-                <span>Total s/IVA: <b className="text-[#0A2540]">{netTotal.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} Kz</b></span>
-                <span>Total c/IVA: <b className="text-violet-700">{grossTotal.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} Kz</b></span>
+                <span>Total s/IVA: <b className="text-[#2c2f31]">{netTotal.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} Kz</b></span>
+                <span>Total c/IVA: <b className="text-[var(--workspace-primary)]">{grossTotal.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} Kz</b></span>
               </div>
             )}
           </div>
@@ -490,7 +490,7 @@ export function RecorrenteForm({ open, onClose }: Props) {
           <Button
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending}
-            className="bg-[#635BFF] hover:bg-[#4f46e5] text-white"
+            className="text-white"
           >
             {mutation.isPending ? 'A guardar...' : 'Criar Fatura Recorrente'}
           </Button>

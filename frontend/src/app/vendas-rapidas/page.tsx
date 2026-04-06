@@ -468,7 +468,7 @@ export default function VendasRapidasPage() {
         {/* Header */}
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100">
-            <ShoppingCart className="h-5 w-5 text-[#B84D0E]" />
+            <ShoppingCart className="h-5 w-5 text-[var(--workspace-primary)]" />
           </div>
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight text-[#2c2f31]">Venda Rápida</h1>
@@ -531,7 +531,7 @@ export default function VendasRapidasPage() {
                   </p>
                 )}
                 {!estabelecimentosError && assignedEstabelecimento && isRestrictedTeamMember && (
-                  <p className="mt-2 rounded-lg border border-[#FAC775] bg-[#FDF2EA] px-3 py-2 text-xs text-[#B84D0E]">
+                  <p className="mt-2 rounded-lg border border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] px-3 py-2 text-xs text-[var(--workspace-primary)]">
                     Este membro só pode abrir caixa em {assignedEstabelecimento.nome}.
                   </p>
                 )}
@@ -589,7 +589,7 @@ export default function VendasRapidasPage() {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100">
-            <ShoppingCart className="h-5 w-5 text-[#B84D0E]" />
+            <ShoppingCart className="h-5 w-5 text-[var(--workspace-primary)]" />
           </div>
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight text-[#2c2f31]">Venda Rápida</h1>
@@ -660,7 +660,7 @@ export default function VendasRapidasPage() {
         {/* Left: search + cart */}
         <div className="space-y-4">
           <div className="relative" ref={dropdownRef}>
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-[#B84D0E]/30">
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-[var(--workspace-primary)]/30">
               <Search className="h-4 w-4 shrink-0 text-[#6b7e9a]" />
               <input
                 ref={searchRef} type="text"
@@ -679,13 +679,13 @@ export default function VendasRapidasPage() {
                   <button
                     key={p.id} ref={(el) => { itemRefs.current[idx] = el; }}
                     onClick={() => addProduct(p)}
-                    className={`flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors ${idx === highlightedIndex ? 'bg-[#FDF2EA] text-[#B84D0E]' : 'hover:bg-slate-50'}`}
+                    className={`flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors ${idx === highlightedIndex ? 'bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)]' : 'hover:bg-slate-50'}`}
                   >
                     <div>
-                      <p className={`text-sm font-medium ${idx === highlightedIndex ? 'text-[#B84D0E]' : 'text-[#B84D0E]'}`}>{p.productDescription}</p>
+                      <p className="text-sm font-medium text-[var(--workspace-primary)]">{p.productDescription}</p>
                       <p className="text-xs text-slate-500">{p.productCode} · IVA {p.taxPercentage}%{p.stock != null ? ` · Stock: ${p.stock}` : ''}</p>
                     </div>
-                    <span className="ml-4 text-sm font-semibold text-[#B84D0E]">{formatKz(p.unitPrice)}</span>
+                    <span className="ml-4 text-sm font-semibold text-[var(--workspace-primary)]">{formatKz(p.unitPrice)}</span>
                   </button>
                 ))}
               </div>
@@ -715,7 +715,7 @@ export default function VendasRapidasPage() {
                         <input type="number" min={1} value={item.quantity} onChange={(e) => setQty(item.id, parseInt(e.target.value) || 1)} className="w-10 bg-transparent text-center text-sm font-semibold text-[#2c2f31] outline-none" />
                         <button onClick={() => updateQty(item.id, 1)} className="flex h-7 w-7 items-center justify-center rounded-r-lg text-slate-500 hover:bg-slate-100 transition-colors"><Plus className="h-3 w-3" /></button>
                       </div>
-                      <span className="w-24 text-right text-sm font-semibold text-[#B84D0E]">{formatKz(lineTotal)}</span>
+                      <span className="w-24 text-right text-sm font-semibold text-[var(--workspace-primary)]">{formatKz(lineTotal)}</span>
                       <button onClick={() => removeItem(item.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   );
@@ -764,7 +764,7 @@ export default function VendasRapidasPage() {
                     <p className="text-xs text-slate-500">NIF: {customerTaxID || 'em falta'}</p>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
-                    <button onClick={() => setShowClientePicker(true)} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#B84D0E] hover:bg-[#FDF2EA] transition-colors">Alterar</button>
+                    <button onClick={() => setShowClientePicker(true)} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--workspace-primary)] hover:bg-[var(--workspace-primary-soft)] transition-colors">Alterar</button>
                     {customerTaxID !== DEFAULT_CUSTOMER_TAX_ID && (
                       <button onClick={resetCustomer} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 transition-colors">Limpar</button>
                     )}
@@ -823,7 +823,7 @@ export default function VendasRapidasPage() {
                     onClick={() => setPaymentMethod(m.value)}
                     className={`flex flex-col items-center gap-1.5 rounded-xl border py-3 px-2 text-xs font-semibold transition-colors ${
                       active
-                        ? 'border-[#B84D0E] bg-[#FDF2EA] text-[#B84D0E]'
+                        ? 'border-[var(--workspace-primary)] bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)]'
                         : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
                     }`}
                   >
@@ -962,7 +962,7 @@ export default function VendasRapidasPage() {
                   autoFocus
                 />
                 {diferenca !== null && (
-                  <p className={`text-xs mt-1 font-medium ${diferenca === 0 ? 'text-green-600' : diferenca > 0 ? 'text-[#F06A1A]' : 'text-red-500'}`}>
+                  <p className={`text-xs mt-1 font-medium ${diferenca === 0 ? 'text-green-600' : diferenca > 0 ? 'text-[var(--workspace-primary)]' : 'text-red-500'}`}>
                     Diferença: {diferenca >= 0 ? '+' : ''}{formatKz(diferenca)}
                     {diferenca > 0 ? ' (excesso)' : diferenca < 0 ? ' (em falta)' : ' (conferido)'}
                   </p>

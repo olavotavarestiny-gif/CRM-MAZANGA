@@ -56,7 +56,7 @@ export function TabSaft() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-base font-semibold text-[#0A2540]">SAF-T — Ficheiro de Auditoria Fiscal</h2>
+      <h2 className="text-base font-semibold text-[#2c2f31]">SAF-T — Ficheiro de Auditoria Fiscal</h2>
 
       {/* Generator */}
       <div className="p-5 rounded-xl bg-gray-50 border border-gray-200 space-y-4">
@@ -95,7 +95,7 @@ export function TabSaft() {
             variant="outline"
             onClick={() => validateMutation.mutate()}
             disabled={validateMutation.isPending || generateMutation.isPending}
-            className="border-[#0049e6] text-[#0049e6] hover:bg-blue-50"
+            className="border-[var(--workspace-primary-border)] text-[var(--workspace-primary)] hover:bg-[var(--workspace-primary-soft)]"
           >
             {validateMutation.isPending ? (
               <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> A verificar...</>
@@ -164,10 +164,10 @@ export function TabSaft() {
           )}
           {periodos.map(p => (
             <div key={p.id} className="grid grid-cols-12 px-4 py-3 border-b border-gray-100 items-center">
-              <span className="col-span-3 text-[#0A2540] font-mono">{p.periodo}</span>
+              <span className="col-span-3 text-[#2c2f31] font-mono">{p.periodo}</span>
               <span className="col-span-2 text-gray-600">{p.totalFacturas} factura{p.totalFacturas !== 1 ? 's' : ''}</span>
               <span className="col-span-2">
-                <span className={`px-1.5 py-0.5 rounded text-xs border ${p.status === 'GENERATED' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
+                <span className={`px-1.5 py-0.5 rounded text-xs border ${p.status === 'GENERATED' ? 'bg-green-100 text-green-700 border-green-200' : 'border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)]'}`}>
                   {p.status === 'GENERATED' ? 'Gerado' : 'Submetido'}
                 </span>
               </span>

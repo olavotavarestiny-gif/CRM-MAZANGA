@@ -1,7 +1,7 @@
 export const PAGE_KEYS = [
   { key: 'painel',      label: 'Painel',       href: '/' },
   { key: 'contacts',    label: 'Clientes',      href: '/contacts' },
-  { key: 'pipeline',    label: 'Processos',     href: '/pipeline' },
+  { key: 'pipeline',    label: 'Processos de Venda', href: '/pipeline' },
   { key: 'tasks',       label: 'Tarefas',       href: '/tasks' },
   { key: 'vendas',      label: 'Vendas',        href: '/vendas' },
   { key: 'calendario',  label: 'Calendário',    href: '/calendario' },

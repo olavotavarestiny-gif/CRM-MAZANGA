@@ -8,7 +8,7 @@ const router = express.Router();
 
 const SERVICOS_STEPS = [
   { id: 'add_contact',    label: 'Adiciona o teu primeiro contacto',      href: '/contacts' },
-  { id: 'setup_pipeline', label: 'Cria uma etapa no pipeline',             href: '/pipeline' },
+  { id: 'setup_pipeline', label: 'Cria uma etapa em Processos de Venda',   href: '/pipeline' },
   { id: 'create_task',    label: 'Cria a tua primeira tarefa',             href: '/tasks' },
   { id: 'create_form',    label: 'Cria um formulário de captura de leads', href: '/forms' },
   { id: 'setup_billing',  label: 'Configura os dados da empresa',          href: '/faturacao/configuracao' },
@@ -16,8 +16,10 @@ const SERVICOS_STEPS = [
 ];
 
 const COMERCIO_STEPS = [
+  { id: 'setup_store',    label: 'Configura empresa e ponto de venda',     href: '/faturacao/configuracao' },
   { id: 'add_product',    label: 'Adiciona os teus primeiros produtos',    href: '/produtos' },
-  { id: 'setup_billing',  label: 'Configura os dados da empresa',          href: '/faturacao/configuracao' },
+  { id: 'add_contact',    label: 'Adiciona o teu primeiro cliente',        href: '/contacts' },
+  { id: 'create_task',    label: 'Cria a tua primeira tarefa',             href: '/tasks' },
   { id: 'open_cash',      label: 'Abre a primeira sessão de caixa',        href: '/caixa' },
   { id: 'first_sale',     label: 'Faz a tua primeira venda',               href: '/vendas-rapidas' },
   { id: 'invite_member',  label: 'Convida um membro da equipa',            href: '/configuracoes' },
@@ -26,8 +28,13 @@ const COMERCIO_STEPS = [
 // ─── Detection checks ─────────────────────────────────────────────────────────
 
 const CHECKS = {
-  add_contact: async (uid) => {
-    const n = await prisma.contact.count({ where: { userId: uid } });
+  add_contact: async (uid, workspaceMode) => {
+    const n = await prisma.contact.count({
+      where: {
+        userId: uid,
+        ...(workspaceMode === 'comercio' ? { contactType: 'cliente' } : {}),
+      },
+    });
     return n > 0;
   },
   setup_pipeline: async (uid) => {
@@ -41,6 +48,16 @@ const CHECKS = {
   create_form: async (uid) => {
     const n = await prisma.form.count({ where: { userId: uid } });
     return n > 0;
+  },
+  setup_store: async (uid) => {
+    const [cfg, estabelecimentos] = await Promise.all([
+      prisma.configuracaoFaturacao.findUnique({
+        where: { userId: uid },
+        select: { nifEmpresa: true },
+      }),
+      prisma.estabelecimento.count({ where: { userId: uid } }),
+    ]);
+    return !!(cfg && cfg.nifEmpresa && cfg.nifEmpresa.trim() !== '' && estabelecimentos > 0);
   },
   setup_billing: async (uid) => {
     const cfg = await prisma.configuracaoFaturacao.findUnique({
@@ -108,7 +125,7 @@ async function computeOnboarding(orgId, workspaceMode) {
   const results = await Promise.all(
     steps.map(async (step) => {
       const check = CHECKS[step.id];
-      const completed = check ? await check(parseInt(orgId, 10)).catch(() => false) : false;
+      const completed = check ? await check(parseInt(orgId, 10), workspaceMode).catch(() => false) : false;
       return { ...step, completed };
     })
   );

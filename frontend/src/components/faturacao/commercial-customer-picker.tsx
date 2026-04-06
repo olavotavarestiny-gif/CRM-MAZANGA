@@ -9,7 +9,7 @@ import {
 
 const SOURCE_BADGE_STYLES: Record<'crm' | 'faturacao', string> = {
   crm: 'border-slate-200 bg-slate-100 text-slate-600',
-  faturacao: 'border-blue-200 bg-blue-50 text-blue-700',
+  faturacao: 'border-[color:var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)]',
 };
 
 interface Props {
@@ -61,7 +61,7 @@ export function CommercialCustomerPicker({
       renderItem={(customer) => (
         <div>
           <div className="flex items-center gap-2">
-            <p className="text-sm font-medium text-[#0A2540]">{customer.customerName}</p>
+            <p className="text-sm font-medium text-[#2c2f31]">{customer.customerName}</p>
             <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SOURCE_BADGE_STYLES[customer.source]}`}>
               {customer.label}
             </span>

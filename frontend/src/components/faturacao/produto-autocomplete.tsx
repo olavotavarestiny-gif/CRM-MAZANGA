@@ -53,13 +53,13 @@ export function ProdutoAutocomplete({ onChange, onCreateNew, onEditCurrent, valu
         onChange={e => setSearch(e.target.value)}
         onFocus={() => search.length > 0 && setOpen(true)}
         placeholder={placeholder || 'Pesquisar produto...'}
-        className="bg-white border-[#E2E8F0] text-[#0A2540] placeholder:text-[#94a3b8] text-sm"
+        className="border-[#E2E8F0] bg-white text-[#2c2f31] placeholder:text-[#94a3b8] text-sm"
       />
       {hasSelection && onEditCurrent && (
         <button
           type="button"
           onClick={onEditCurrent}
-          className="shrink-0 px-2 h-9 rounded-md border border-[#E2E8F0] bg-white text-[#64748B] hover:text-[#0A2540] hover:bg-[#F8FAFC] transition-colors text-xs"
+          className="shrink-0 px-2 h-9 rounded-md border border-[#E2E8F0] bg-white text-[#64748B] hover:text-[var(--workspace-primary)] hover:bg-[var(--workspace-primary-soft)] transition-colors text-xs"
           title="Editar produto"
         >
           ✏️
@@ -74,18 +74,18 @@ export function ProdutoAutocomplete({ onChange, onCreateNew, onEditCurrent, valu
               className="w-full text-left px-3 py-2 hover:bg-[#F8FAFC] transition-colors"
               onClick={() => { onChange(p); setSearch(p.productDescription); setOpen(false); }}
             >
-              <p className="text-sm font-medium text-[#0A2540]">{p.productDescription}</p>
+              <p className="text-sm font-medium text-[#2c2f31]">{p.productDescription}</p>
               <p className="text-xs text-[#64748B]">{p.productCode} · {p.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })} · IVA {p.taxPercentage}%</p>
             </button>
           ))}
           {onCreateNew && (
             <button
               type="button"
-              className="w-full text-left px-3 py-2 hover:bg-violet-50 transition-colors border-t border-[#E2E8F0] flex items-center gap-2"
+              className="w-full text-left px-3 py-2 transition-colors border-t border-[#E2E8F0] flex items-center gap-2 hover:bg-[var(--workspace-primary-soft)]"
               onClick={() => { onCreateNew(search); setOpen(false); }}
             >
-              <Plus className="w-3.5 h-3.5 text-violet-600 shrink-0" />
-              <span className="text-sm text-violet-600">Criar &quot;{search || 'novo produto'}&quot;</span>
+              <Plus className="w-3.5 h-3.5 text-[var(--workspace-primary)] shrink-0" />
+              <span className="text-sm text-[var(--workspace-primary)]">Criar &quot;{search || 'novo produto'}&quot;</span>
             </button>
           )}
         </div>

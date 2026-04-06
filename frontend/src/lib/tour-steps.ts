@@ -39,8 +39,8 @@ export const TOUR_GROUPS: TourGroup[] = [
       {
         element: '[data-tour="sidebar-negociacoes"]',
         popover: {
-          title: 'Negociações',
-          description: 'O teu funil de vendas em Kanban. Arrasta os negócios entre fases para actualizar o estado.',
+          title: 'Processos de Venda',
+          description: 'Acompanha os teus processos de venda em Kanban. Arrasta os negócios entre fases para actualizar o estado.',
           side: 'right',
         },
       },
@@ -62,7 +62,7 @@ export const TOUR_GROUPS: TourGroup[] = [
         element: '[data-tour="dashboard-stats"]',
         popover: {
           title: 'Métricas principais',
-          description: 'KPIs do negócio: novos contactos, qualificados, fechados e nas negociações. Personaliza estes widgets ao teu gosto.',
+          description: 'KPIs do negócio: novos contactos, qualificados, fechados e em processos de venda. Personaliza estes widgets ao teu gosto.',
           side: 'bottom',
           align: 'start',
         },
@@ -85,8 +85,8 @@ export const TOUR_GROUPS: TourGroup[] = [
       {
         element: '[data-tour="pipeline-add"]',
         popover: {
-          title: 'Adicionar ao funil',
-          description: 'Clica aqui para mover um contacto existente para o funil de vendas e começar a acompanhar o negócio.',
+          title: 'Adicionar aos processos',
+          description: 'Clica aqui para mover um contacto existente para os processos de venda e começar a acompanhar o negócio.',
           side: 'bottom',
           align: 'end',
         },
@@ -94,7 +94,7 @@ export const TOUR_GROUPS: TourGroup[] = [
       {
         element: '[data-tour="pipeline-board"]',
         popover: {
-          title: 'Kanban de vendas',
+          title: 'Kanban de processos',
           description: 'Cada coluna é uma fase da venda. Arrasta os cartões entre colunas para actualizar o estado em tempo real.',
           side: 'bottom',
           align: 'start',

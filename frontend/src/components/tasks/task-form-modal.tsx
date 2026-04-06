@@ -158,9 +158,9 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md bg-white text-[#0A2540]">
+      <DialogContent className="max-w-md bg-white text-[#2c2f31]">
         <DialogHeader>
-          <DialogTitle className="text-[#0A2540]">
+          <DialogTitle className="text-[#2c2f31]">
             {isEdit ? 'Editar Tarefa' : 'Nova Tarefa'}
           </DialogTitle>
         </DialogHeader>
@@ -168,7 +168,7 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
         <form id="task-form" onSubmit={handleSubmit} className="space-y-4">
           {/* Título */}
           <div>
-            <Label className="text-[#0A2540]">Título *</Label>
+            <Label className="text-[#2c2f31]">Título *</Label>
             <Input
               className="mt-1"
               placeholder="Descrição da tarefa..."
@@ -181,7 +181,7 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
           {/* Data + Prioridade em linha */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-[#0A2540]">Data limite</Label>
+              <Label className="text-[#2c2f31]">Data limite</Label>
               <Input
                 type="date"
                 className="mt-1"
@@ -190,7 +190,7 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
               />
             </div>
             <div>
-              <Label className="text-[#0A2540]">Prioridade</Label>
+              <Label className="text-[#2c2f31]">Prioridade</Label>
               <Select value={priority} onValueChange={(v) => setPriority(v as typeof priority)}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
@@ -211,7 +211,7 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
           </div>
 
           <div>
-            <Label className="text-[#0A2540]">Responsável *</Label>
+            <Label className="text-[#2c2f31]">Responsável *</Label>
             <Select value={assignedToUserId} onValueChange={setAssignedToUserId}>
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Selecionar responsável" />
@@ -233,7 +233,7 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
 
           {/* Notas */}
           <div>
-            <Label className="text-[#0A2540]">Notas</Label>
+            <Label className="text-[#2c2f31]">Notas</Label>
             <Textarea
               className="mt-1 resize-none"
               placeholder="Detalhes adicionais..."
@@ -245,12 +245,12 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
 
           {/* Contacto (opcional) */}
           <div>
-            <Label className="text-[#0A2540]">Contacto <span className="text-[#6b7e9a] font-normal">(opcional)</span></Label>
+            <Label className="text-[#2c2f31]">Contacto <span className="text-[#6b7e9a] font-normal">(opcional)</span></Label>
 
             {selectedContact ? (
               <div className="mt-1 flex items-center justify-between p-2.5 border border-[#E2E8F0] rounded-lg bg-[#F8FAFC]">
                 <div>
-                  <p className="text-sm font-medium text-[#0A2540]">{selectedContact.name}</p>
+                  <p className="text-sm font-medium text-[#2c2f31]">{selectedContact.name}</p>
                   <p className="text-xs text-[#6b7e9a]">{selectedContact.company}</p>
                 </div>
                 <Button
@@ -287,7 +287,7 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
                           setShowContactList(false);
                         }}
                       >
-                        <p className="text-sm font-medium text-[#0A2540]">{c.name}</p>
+                        <p className="text-sm font-medium text-[#2c2f31]">{c.name}</p>
                         <p className="text-xs text-[#6b7e9a]">{c.company}</p>
                       </button>
                     ))}

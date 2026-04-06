@@ -102,7 +102,7 @@ const PAYMENT_METHODS = [
 
 const SOURCE_BADGE_STYLES: Record<'crm' | 'faturacao', string> = {
   crm: 'border-slate-200 bg-slate-100 text-slate-600',
-  faturacao: 'border-blue-200 bg-blue-50 text-blue-700',
+  faturacao: 'border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)]',
 };
 
 const blankCustomerFields: InvoiceCustomerFields = {
@@ -560,7 +560,7 @@ export function FacturaForm() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base text-[#0A2540]">Documento</CardTitle>
+          <CardTitle className="text-base text-[#2c2f31]">Documento</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {seriesQuery.isError || estabsQuery.isError ? (
@@ -644,7 +644,7 @@ export function FacturaForm() {
                       <button
                         type="button"
                         onClick={handleOpenSeriesModal}
-                        className="text-xs font-medium text-[#0A2540] underline underline-offset-4"
+                        className="text-xs font-medium text-[var(--workspace-primary)] underline underline-offset-4"
                       >
                         Criar série
                       </button>
@@ -676,7 +676,7 @@ export function FacturaForm() {
                     </>
                   ) : (
                     <div className="mt-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-                      <p className="text-sm font-semibold text-[#0A2540]">
+                      <p className="text-sm font-semibold text-[#2c2f31]">
                         {selectedSerie
                           ? `${selectedSerie.seriesCode} / ${selectedSerie.seriesYear}`
                           : estabelecimentoId
@@ -755,7 +755,7 @@ export function FacturaForm() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base text-[#0A2540]">Cliente</CardTitle>
+          <CardTitle className="text-base text-[#2c2f31]">Cliente</CardTitle>
           <button
             type="button"
             onClick={() => {
@@ -766,7 +766,7 @@ export function FacturaForm() {
                 setCustomerWarning('');
               }
             }}
-            className="text-xs font-medium text-[#0A2540] underline underline-offset-4"
+            className="text-xs font-medium text-[var(--workspace-primary)] underline underline-offset-4"
           >
             {customerMode === 'manual' ? 'Pesquisar cliente existente' : 'Introduzir manualmente'}
           </button>
@@ -774,7 +774,7 @@ export function FacturaForm() {
         <CardContent className="space-y-4">
           {customerMode === 'manual' ? (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-              <p className="text-sm font-medium text-[#0A2540]">Novo cliente</p>
+              <p className="text-sm font-medium text-[#2c2f31]">Novo cliente</p>
               <p className="mt-1 text-xs text-slate-500">
                 Estes dados serão usados na emissão e o cliente será criado automaticamente na faturação.
               </p>
@@ -797,7 +797,7 @@ export function FacturaForm() {
           {selectedCustomerMeta && (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-medium text-[#0A2540]">{customerFields.name || 'Cliente selecionado'}</p>
+                <p className="text-sm font-medium text-[#2c2f31]">{customerFields.name || 'Cliente selecionado'}</p>
                 <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${selectedCustomerMeta.source === 'crm' ? SOURCE_BADGE_STYLES.crm : SOURCE_BADGE_STYLES.faturacao}`}>
                   {customerSourceLabel}
                 </span>
@@ -892,7 +892,7 @@ export function FacturaForm() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base text-[#0A2540]">Artigos / Serviços</CardTitle>
+          <CardTitle className="text-base text-[#2c2f31]">Artigos / Serviços</CardTitle>
           <Button type="button" variant="outline" size="sm" onClick={addLine} className="border-gray-200 text-gray-700 hover:bg-gray-50">
             <Plus className="mr-1 h-3 w-3" /> Adicionar linha
           </Button>
@@ -1017,7 +1017,7 @@ export function FacturaForm() {
                   {line.isIncluded ? (
                     <span className="text-xs font-semibold text-emerald-700">Incluído</span>
                   ) : (
-                    <span className="font-mono text-sm text-[#0A2540]">
+            <span className="font-mono text-sm text-[#2c2f31]">
                       {(line.quantity * line.unitPrice).toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                       })}
@@ -1047,15 +1047,15 @@ export function FacturaForm() {
         <CardContent className="space-y-2 pt-4">
           <div className="flex justify-between text-sm text-gray-600">
             <span>Total sem IVA</span>
-            <span className="font-mono text-[#0A2540]">{fmtAmount(netTotal, currencyCode)}</span>
+            <span className="font-mono text-[#2c2f31]">{fmtAmount(netTotal, currencyCode)}</span>
           </div>
           <div className="flex justify-between text-sm text-gray-600">
             <span>IVA</span>
-            <span className="font-mono text-[#0A2540]">{fmtAmount(taxPayable, currencyCode)}</span>
+            <span className="font-mono text-[#2c2f31]">{fmtAmount(taxPayable, currencyCode)}</span>
           </div>
           <div className="flex justify-between border-t border-gray-200 pt-2 text-lg font-bold">
-            <span className="text-[#0A2540]">Total com IVA</span>
-            <span className="font-mono text-violet-700">{fmtAmount(grossTotal, currencyCode)}</span>
+            <span className="text-[#2c2f31]">Total com IVA</span>
+            <span className="font-mono text-[var(--workspace-primary)]">{fmtAmount(grossTotal, currencyCode)}</span>
           </div>
           {currencyCode !== 'AOA' && exchangeRate > 0 && (
             <div className="flex justify-between border-t border-gray-100 pt-2 text-sm text-gray-500">
@@ -1076,7 +1076,7 @@ export function FacturaForm() {
           }}
           loading={mutation.isPending}
           loadingLabel="A emitir..."
-          className="flex-1 bg-[#0A2540] font-semibold text-white hover:bg-[#0A2540]/90"
+          className="flex-1 font-semibold text-white"
         >
           Emitir Factura
         </LoadingButton>
@@ -1197,7 +1197,7 @@ export function FacturaForm() {
                 loading={dialogSaving}
                 loadingLabel="A guardar..."
                 disabled={!dialog.productDescription.trim()}
-                className="bg-[#0A2540] text-white hover:bg-[#0A2540]/90"
+                className="text-white"
               >
                 {dialog.mode === 'edit' ? 'Actualizar' : 'Criar e Adicionar'}
               </LoadingButton>
@@ -1324,7 +1324,7 @@ export function FacturaForm() {
                 !seriesForm.seriesCode.trim() ||
                 !seriesForm.seriesYear.trim()
               }
-              className="bg-[#0A2540] text-white hover:bg-[#0A2540]/90"
+              className="text-white"
             >
               Criar Série
             </LoadingButton>

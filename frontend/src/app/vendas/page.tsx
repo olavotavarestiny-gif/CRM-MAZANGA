@@ -28,7 +28,7 @@ export default function VendasPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100">
-            <ShoppingBag className="h-5 w-5 text-[#B84D0E]" />
+            <ShoppingBag className="h-5 w-5 text-[var(--workspace-primary)]" />
           </div>
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Vendas</h1>

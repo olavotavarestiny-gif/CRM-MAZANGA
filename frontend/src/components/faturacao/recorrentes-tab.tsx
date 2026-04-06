@@ -10,8 +10,8 @@ import { RecorrenteForm } from './recorrente-form';
 import type { FacturaRecorrente } from '@/lib/types';
 
 const FREQ_LABELS: Record<string, { label: string; color: string }> = {
-  WEEKLY:    { label: 'Semanal',    color: 'bg-blue-50 text-blue-700 border-blue-200' },
-  MONTHLY:   { label: 'Mensal',     color: 'bg-violet-50 text-violet-700 border-violet-200' },
+  WEEKLY:    { label: 'Semanal',    color: 'border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)]' },
+  MONTHLY:   { label: 'Mensal',     color: 'border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)]' },
   QUARTERLY: { label: 'Trimestral', color: 'bg-orange-50 text-orange-700 border-orange-200' },
   ANNUAL:    { label: 'Anual',      color: 'bg-green-50 text-green-700 border-green-200' },
 };
@@ -66,14 +66,14 @@ export function RecorrentesTab() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-[#0A2540]">Faturas Recorrentes</h2>
+          <h2 className="text-xl font-semibold text-[#2c2f31]">Faturas Recorrentes</h2>
           <p className="text-sm text-gray-500 mt-0.5">
             {active.length} ativa{active.length !== 1 ? 's' : ''} · {paused.length} pausada{paused.length !== 1 ? 's' : ''}
           </p>
         </div>
         <Button
           onClick={() => setShowForm(true)}
-          className="bg-[#635BFF] hover:bg-[#4f46e5] text-white gap-2"
+          className="gap-2"
         >
           <Plus className="w-4 h-4" /> Nova Recorrente
         </Button>
@@ -113,7 +113,7 @@ export function RecorrentesTab() {
                   {/* Left: info */}
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-[#0A2540] text-sm truncate">
+                      <span className="font-medium text-[#2c2f31] text-sm truncate">
                         {item.clienteFaturacao?.customerName ?? item.customerName}
                       </span>
                       <span className={`px-2 py-0.5 rounded-full text-xs border font-medium ${freq.color}`}>
@@ -140,7 +140,7 @@ export function RecorrentesTab() {
                       </span>
                       <span>
                         <span className="text-gray-400">Próxima emissão:</span>{' '}
-                        <span className={item.isActive ? 'text-[#0A2540] font-medium' : ''}>
+                        <span className={item.isActive ? 'text-[#2c2f31] font-medium' : ''}>
                           {fmtDate(item.nextRunDate)}
                         </span>
                       </span>
@@ -164,7 +164,7 @@ export function RecorrentesTab() {
                       variant="outline" size="sm"
                       disabled={triggering === item.id}
                       onClick={() => handleTrigger(item.id)}
-                      className="h-8 px-2.5 text-xs border-gray-200 text-gray-600 hover:bg-[#635BFF] hover:text-white hover:border-[#635BFF]"
+                      className="h-8 px-2.5 text-xs border-[var(--workspace-primary-border)] text-[var(--workspace-primary)] hover:bg-[var(--workspace-primary)] hover:text-[var(--workspace-on-primary)] hover:border-[var(--workspace-primary)]"
                       title="Emitir agora"
                     >
                       {triggering === item.id

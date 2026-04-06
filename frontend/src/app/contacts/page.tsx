@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getContacts,
@@ -11,7 +11,6 @@ import {
   getPipelineStages,
   getContactFieldConfigs,
 } from '@/lib/api';
-import type { User } from '@/lib/api';
 import { Contact } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -57,9 +56,18 @@ export default function ContactsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isFieldsOpen, setIsFieldsOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [contactTypeTab, setContactTypeTab] = useState<'interessado' | 'cliente'>('interessado');
-  const isComercioWorkspace = currentUser?.workspaceMode === 'comercio';
+
+  const { data: currentUser, isLoading: currentUserLoading } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: getCurrentUser,
+    staleTime: 30_000,
+  });
+
+  const workspaceResolved = !currentUserLoading;
+  const isComercioWorkspace = workspaceResolved && currentUser?.workspaceMode === 'comercio';
+  const effectiveContactType = isComercioWorkspace ? 'cliente' : contactTypeTab;
+  const canShowPipelineUi = workspaceResolved && !isComercioWorkspace;
 
   const { data: fieldDefs = [] } = useQuery({
     queryKey: ['contactFieldDefs'],
@@ -80,13 +88,10 @@ export default function ContactsPage() {
   const { data: pipelineStages = [] } = useQuery({
     queryKey: ['pipeline-stages'],
     queryFn: getPipelineStages,
+    enabled: canShowPipelineUi,
   });
 
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    getCurrentUser().then(setCurrentUser).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (isComercioWorkspace) {
@@ -103,21 +108,31 @@ export default function ContactsPage() {
   }, [search]);
 
   const contactsQuery = useQuery({
-    queryKey: ['contacts', debouncedSearch, stageFilter, revenueFilter, contactTypeTab],
+    queryKey: ['contacts', debouncedSearch, canShowPipelineUi ? stageFilter : 'ALL', revenueFilter, effectiveContactType],
     queryFn: () =>
       getContacts({
         search: debouncedSearch || undefined,
-        stage: stageFilter === 'ALL' ? undefined : stageFilter,
+        stage: canShowPipelineUi && stageFilter !== 'ALL' ? stageFilter : undefined,
         revenue: revenueFilter === 'ALL' ? undefined : revenueFilter,
-        contactType: isComercioWorkspace ? 'cliente' : contactTypeTab,
+        contactType: effectiveContactType,
       }),
     placeholderData: (previousData) => previousData,
     retry: false,
+    enabled: workspaceResolved,
   });
   const contacts = contactsQuery.data || [];
+  const isContactsLoading = !workspaceResolved || contactsQuery.isLoading;
+  const pageDescription = useMemo(() => {
+    if (!workspaceResolved) {
+      return 'Clientes, históricos e campos personalizados num espaço único.';
+    }
+    return isComercioWorkspace
+      ? 'Clientes e campos personalizados num fluxo alinhado com o comércio.'
+      : 'Interessados, clientes e campos personalizados num fluxo único.';
+  }, [isComercioWorkspace, workspaceResolved]);
   const hasActiveFilters =
-    debouncedSearch.length > 0 || stageFilter !== 'ALL' || revenueFilter !== 'ALL';
-  const isSearching = contactsQuery.isFetching && !contactsQuery.isLoading;
+    debouncedSearch.length > 0 || revenueFilter !== 'ALL' || (canShowPipelineUi && stageFilter !== 'ALL');
+  const isSearching = workspaceResolved && contactsQuery.isFetching && !contactsQuery.isLoading;
 
   const deleteMutation = useMutation({
     mutationFn: deleteContact,
@@ -131,11 +146,7 @@ export default function ContactsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Contactos</h1>
-          <p className="mt-1 text-sm text-[#6b7e9a]">
-            {isComercioWorkspace
-              ? 'Clientes e campos personalizados num fluxo alinhado com o comércio.'
-              : 'Interessados, clientes e campos personalizados num fluxo único.'}
-          </p>
+          <p className="mt-1 text-sm text-[#6b7e9a]">{pageDescription}</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Button
@@ -171,7 +182,7 @@ export default function ContactsPage() {
       <ImportCSVModal open={isImportOpen} onOpenChange={setIsImportOpen} />
       <ContactFieldsManager open={isFieldsOpen} onOpenChange={setIsFieldsOpen} />
 
-      {!isComercioWorkspace && (
+      {canShowPipelineUi && (
         <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
           {(['interessado', 'cliente'] as const).map(type => (
             <button
@@ -198,17 +209,19 @@ export default function ContactsPage() {
         hasActiveFilters={hasActiveFilters}
         onClearFilters={() => { setSearch(''); setDebouncedSearch(''); setStageFilter('ALL'); setRevenueFilter('ALL'); }}
       >
-        <Select value={stageFilter} onValueChange={setStageFilter}>
-          <SelectTrigger className="w-full sm:w-40">
-            <SelectValue placeholder="Estado do Lead" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">Todos</SelectItem>
-            {pipelineStages.map((s) => (
-              <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {canShowPipelineUi ? (
+          <Select value={stageFilter} onValueChange={setStageFilter}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Estado do Lead" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Todos</SelectItem>
+              {pipelineStages.map((s) => (
+                <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
         <Select value={revenueFilter} onValueChange={setRevenueFilter}>
           <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Faturamento" />
@@ -224,7 +237,7 @@ export default function ContactsPage() {
       </FilterBar>
 
       <Card data-tour="contacts-table" className="border-slate-200 shadow-sm">
-        {contactsQuery.isLoading ? (
+        {isContactsLoading ? (
           <div className="space-y-3 p-6">
             {Array.from({ length: 6 }).map((_, index) => (
               <div key={index} className="h-12 animate-pulse rounded-2xl bg-slate-100" />
@@ -264,7 +277,7 @@ export default function ContactsPage() {
                   {fieldDefs.map((f) => (
                     <TableHead key={f.id} className="hidden lg:table-cell">{f.label}</TableHead>
                   ))}
-                  <TableHead>Stage</TableHead>
+                  {canShowPipelineUi ? <TableHead>Etapa</TableHead> : null}
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -285,17 +298,19 @@ export default function ContactsPage() {
                         {contact.customFields?.[f.key] || '-'}
                       </TableCell>
                     ))}
-                    <TableCell>
-                      <Badge
-                        style={{
-                          background: (pipelineStages.find((s) => s.name === contact.stage)?.color ?? '#6B7280') + '22',
-                          color: pipelineStages.find((s) => s.name === contact.stage)?.color ?? '#6B7280',
-                          border: 'none',
-                        }}
-                      >
-                        {contact.stage}
-                      </Badge>
-                    </TableCell>
+                    {canShowPipelineUi ? (
+                      <TableCell>
+                        <Badge
+                          style={{
+                            background: (pipelineStages.find((s) => s.name === contact.stage)?.color ?? '#6B7280') + '22',
+                            color: pipelineStages.find((s) => s.name === contact.stage)?.color ?? '#6B7280',
+                            border: 'none',
+                          }}
+                        >
+                          {contact.stage}
+                        </Badge>
+                      </TableCell>
+                    ) : null}
                     <TableCell>
                       <div className="flex gap-2">
                         <Link href={`/contacts/${contact.id}`}>
@@ -321,14 +336,14 @@ export default function ContactsPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                            className="border-[var(--workspace-primary-border)] text-xs text-[var(--workspace-primary)] hover:bg-[var(--workspace-primary-soft)]"
                             title="Converter para Cliente"
                             onClick={() => updateContact(String(contact.id), { contactType: 'cliente' } as any).then(() => queryClient.invalidateQueries({ queryKey: ['contacts'] }))}
                           >
                             → Cliente
                           </Button>
                         )}
-                        {!currentUser?.accountOwnerId && (
+                        {currentUser && !currentUser.accountOwnerId && (
                           <Button
                             variant="destructive"
                             size="sm"

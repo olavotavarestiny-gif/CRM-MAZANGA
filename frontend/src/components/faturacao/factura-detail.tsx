@@ -99,7 +99,7 @@ export function FacturaDetail({ factura, isMock, ibans }: Props) {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold text-[#0A2540]">{factura.documentNo}</h1>
+            <h1 className="text-2xl font-bold text-[#2c2f31]">{factura.documentNo}</h1>
             <AgtBadge status={factura.agtValidationStatus} mock={isMock} />
             {factura.documentStatus === 'A' && (
               <span className="px-2 py-0.5 rounded-full text-xs bg-red-50 text-red-600 border border-red-200 line-through">ANULADA</span>
@@ -131,7 +131,7 @@ export function FacturaDetail({ factura, isMock, ibans }: Props) {
         <Card>
           <CardHeader><CardTitle className="text-sm text-gray-500">Emitente</CardTitle></CardHeader>
           <CardContent>
-            <p className="text-[#0A2540] font-medium">{factura.estabelecimento?.nome}</p>
+            <p className="text-[#2c2f31] font-medium">{factura.estabelecimento?.nome}</p>
             <p className="text-gray-500 text-sm">NIF: {emitenteNif}</p>
           </CardContent>
         </Card>
@@ -139,7 +139,7 @@ export function FacturaDetail({ factura, isMock, ibans }: Props) {
         <Card>
           <CardHeader><CardTitle className="text-sm text-gray-500">Cliente</CardTitle></CardHeader>
           <CardContent>
-            <p className="text-[#0A2540] font-medium">{factura.customerName}</p>
+            <p className="text-[#2c2f31] font-medium">{factura.customerName}</p>
             <p className="text-gray-500 text-sm">NIF: {factura.customerTaxID}</p>
             {factura.customerAddress && <p className="text-gray-500 text-sm">{factura.customerAddress}</p>}
           </CardContent>
@@ -148,7 +148,7 @@ export function FacturaDetail({ factura, isMock, ibans }: Props) {
 
       {/* Linhas */}
       <Card>
-        <CardHeader><CardTitle className="text-[#0A2540] text-base">Artigos</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-[#2c2f31] text-base">Artigos</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-2">
             <div className="grid grid-cols-12 text-xs text-gray-500 uppercase tracking-wide pb-2 border-b border-gray-100">
@@ -165,14 +165,14 @@ export function FacturaDetail({ factura, isMock, ibans }: Props) {
               return (
                 <div key={i} className="grid grid-cols-12 text-sm py-1.5">
                   <div className="col-span-5">
-                    <p className="text-[#0A2540]">{line.productDescription}</p>
+                    <p className="text-[#2c2f31]">{line.productDescription}</p>
                     <p className="text-gray-400 text-xs">{line.productCode}</p>
                   </div>
                   <span className="col-span-1 text-right text-gray-700">{line.quantity}</span>
                   <span className="col-span-2 text-right text-gray-700 font-mono">{line.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                   <span className="col-span-1 text-right text-gray-500">{tax}%</span>
                   <span className="col-span-2 text-right text-gray-700 font-mono">{sub.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                  <span className="col-span-1 text-right text-[#0A2540] font-mono font-medium">{(sub * (1 + tax / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span className="col-span-1 text-right text-[#2c2f31] font-mono font-medium">{(sub * (1 + tax / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 </div>
               );
             })}
@@ -187,8 +187,8 @@ export function FacturaDetail({ factura, isMock, ibans }: Props) {
               <span className="font-mono">{fmtAmount(factura.taxPayable, factura.currencyCode)}</span>
             </div>
             <div className="flex justify-between text-lg font-bold">
-              <span className="text-[#0A2540]">Total c/ IVA</span>
-              <span className="font-mono text-violet-700">{fmtAmount(factura.grossTotal, factura.currencyCode)}</span>
+              <span className="text-[#2c2f31]">Total c/ IVA</span>
+              <span className="font-mono text-[var(--workspace-primary)]">{fmtAmount(factura.grossTotal, factura.currencyCode)}</span>
             </div>
             {factura.currencyCode && factura.currencyCode !== 'AOA' && factura.exchangeRate && (
               <div className="flex justify-between text-sm text-gray-500 border-t border-gray-100 pt-2">
@@ -214,9 +214,9 @@ export function FacturaDetail({ factura, isMock, ibans }: Props) {
         <Card>
           <CardHeader><CardTitle className="text-sm text-gray-500">Informações AGT</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <div><span className="text-gray-500">Série: </span><span className="text-[#0A2540] font-medium">{factura.serie?.seriesCode}/{factura.serie?.seriesYear}</span></div>
+            <div><span className="text-gray-500">Série: </span><span className="text-[#2c2f31] font-medium">{factura.serie?.seriesCode}/{factura.serie?.seriesYear}</span></div>
             <div><span className="text-gray-500">Estado AGT: </span><AgtBadge status={factura.agtValidationStatus} mock={isMock} /></div>
-            {factura.agtRequestId && <div><span className="text-gray-500">Request ID: </span><span className="text-[#0A2540] font-mono text-xs">{factura.agtRequestId}</span></div>}
+            {factura.agtRequestId && <div><span className="text-gray-500">Request ID: </span><span className="text-[#2c2f31] font-mono text-xs">{factura.agtRequestId}</span></div>}
             <div><span className="text-gray-500">JWS: </span><span className="text-gray-400 font-mono text-xs">{factura.jwsSignature?.substring(0, 20)}...</span></div>
           </CardContent>
         </Card>
@@ -230,7 +230,7 @@ export function FacturaDetail({ factura, isMock, ibans }: Props) {
             {ibans.map((entry, i) => (
               <div key={i} className="flex items-baseline gap-2">
                 {entry.label && <span className="text-xs text-gray-500 shrink-0">{entry.label}:</span>}
-                <span className="text-[#0A2540] font-mono text-sm">{entry.iban}</span>
+                <span className="text-[#2c2f31] font-mono text-sm">{entry.iban}</span>
               </div>
             ))}
           </CardContent>

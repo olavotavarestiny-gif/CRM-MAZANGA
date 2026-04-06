@@ -37,9 +37,10 @@ export default function TasksPage() {
   const { toast } = useToast();
 
   const { data: currentUser } = useQuery({
-    queryKey: ['current-user'],
+    queryKey: ['currentUser'],
     queryFn: getCurrentUser,
   });
+  const isComercioWorkspace = currentUser?.workspaceMode === 'comercio';
 
   const { data: allTasks = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['tasks'],
@@ -169,7 +170,11 @@ export default function TasksPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Tarefas</h1>
-          <p className="mt-1 text-sm text-[#6b7e9a]">Agenda, prioridades e execução diária da equipa.</p>
+          <p className="mt-1 text-sm text-[#6b7e9a]">
+            {isComercioWorkspace
+              ? 'Execução diária da equipa de loja, vendas e operação.'
+              : 'Agenda, prioridades e execução diária da equipa.'}
+          </p>
         </div>
         <Button className="w-full sm:w-auto" data-tour="tasks-new" onClick={() => { setEditingTask(null); setIsFormOpen(true); }}>
           <Plus className="w-4 h-4 mr-2" />
@@ -187,10 +192,10 @@ export default function TasksPage() {
         </button>
         <button
           onClick={() => setFilter('hoje')}
-          className={`rounded-2xl border p-4 text-left shadow-sm transition-all ${filter === 'hoje' ? 'border-sky-600 bg-sky-600 text-white' : 'border-slate-200 bg-white text-[#0A2540] hover:bg-[#F8FAFC]'}`}
+          className={`rounded-2xl border p-4 text-left shadow-sm transition-all ${filter === 'hoje' ? 'border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)]' : 'border-slate-200 bg-white text-[#0A2540] hover:bg-[#F8FAFC]'}`}
         >
           <div className="text-2xl font-bold">{todayCount}</div>
-          <div className={`text-xs mt-0.5 ${filter === 'hoje' ? 'text-white/70' : 'text-[#6b7e9a]'}`}>Para hoje</div>
+          <div className={`text-xs mt-0.5 ${filter === 'hoje' ? 'text-[var(--workspace-primary)]/70' : 'text-[#6b7e9a]'}`}>Para hoje</div>
         </button>
         <button
           onClick={() => setFilter('atrasadas')}

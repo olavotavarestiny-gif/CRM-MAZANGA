@@ -41,7 +41,7 @@ export function ClienteAutocomplete({ onChange, value }: Props) {
       }}
       renderItem={(cliente) => (
         <div>
-          <p className="text-sm font-medium text-[#0A2540]">{cliente.customerName}</p>
+          <p className="text-sm font-medium text-[#2c2f31]">{cliente.customerName}</p>
           <p className="mt-0.5 text-xs text-slate-500">
             NIF: {cliente.customerTaxID}
             {cliente.customerPhone ? ` · ${cliente.customerPhone}` : ''}

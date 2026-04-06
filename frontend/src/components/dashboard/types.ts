@@ -30,7 +30,7 @@ export interface DashboardWidget {
 export const SOURCE_LABELS: Record<WidgetSource, string> = {
   contacts_total:  'Total de Contactos',
   contacts_month:  'Novos Contactos (mês)',
-  pipeline_count:  'Nas Negociações',
+  pipeline_count:  'Em Processos de Venda',
   closed_total:    'Fechados (total)',
   closed_month:    'Fechados (mês)',
   tasks_pending:   'Tarefas Pendentes',
@@ -62,10 +62,10 @@ export const SOURCE_UNITS: Record<WidgetSource, string> = {
 };
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
-  { id: 'stat-pipeline', type: 'stat', title: 'Nas Negociações', source: 'pipeline_count', color: '#F59E0B', visible: true },
+  { id: 'stat-pipeline', type: 'stat', title: 'Em Processos de Venda', source: 'pipeline_count', color: '#F59E0B', visible: true },
   { id: 'stat-overdue',  type: 'stat', title: 'Tarefas em Atraso', source: 'overdue_tasks', color: '#EF4444', visible: true },
   { id: 'stat-revenue',  type: 'stat', title: 'Receita do Mês', source: 'revenue_month', color: '#10B981', visible: true },
   { id: 'stat-recv',     type: 'stat', title: 'Faturas por Cobrar', source: 'receivables_kz', color: '#3B82F6', visible: true },
   { id: 'tasks-list',    type: 'tasks', title: 'Tarefas Pendentes', visible: true },
-  { id: 'pipeline-sum',  type: 'pipeline', title: 'Resumo do Pipeline', visible: true },
+  { id: 'pipeline-sum',  type: 'pipeline', title: 'Resumo de Processos de Venda', visible: true },
 ];

@@ -28,6 +28,7 @@ export default function DailyTipCard({
   }
 
   const AudienceIcon = getAudienceIcon(dailyTip.audienceBucket);
+  const isServicosWorkspace = dailyTip.workspaceMode === 'servicos';
 
   return (
     <div
@@ -36,8 +37,10 @@ export default function DailyTipCard({
         className
       )}
       style={{
-        background: 'linear-gradient(135deg, var(--workspace-primary) 0%, var(--workspace-primary-hover) 100%)',
-        borderColor: 'var(--workspace-primary-border)',
+        background: isServicosWorkspace
+          ? 'linear-gradient(135deg, #0f4fc3 0%, #1b70d8 100%)'
+          : 'linear-gradient(135deg, var(--workspace-primary) 0%, var(--workspace-primary-hover) 100%)',
+        borderColor: isServicosWorkspace ? '#8fb7f2' : 'var(--workspace-primary-border)',
       }}
     >
       <Lightbulb className="absolute -right-8 -bottom-8 h-32 w-32 opacity-10" />

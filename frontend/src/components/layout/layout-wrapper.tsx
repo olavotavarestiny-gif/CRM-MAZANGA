@@ -20,7 +20,7 @@ const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
 
 const ROUTE_LABELS: Record<string, string> = {
   '/contacts':       'Clientes',
-  '/pipeline':       'Processos',
+  '/pipeline':       'Processos de Venda',
   '/tasks':          'Tarefas',
   '/caixa':          'Caixa',
   '/vendas':         'Faturação',
