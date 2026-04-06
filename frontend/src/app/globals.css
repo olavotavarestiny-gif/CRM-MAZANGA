@@ -28,18 +28,18 @@
   --ring: 0 0% 7%;
   --ring-offset-background: 0 0% 100%;
   --radius: 0.75rem;
-  --workspace-primary: #111111;
-  --workspace-primary-hover: #2c2c2c;
-  --workspace-primary-soft: #f3f4f6;
-  --workspace-primary-border: #d6d8dc;
+  --workspace-primary: #0a2540;
+  --workspace-primary-hover: #143a63;
+  --workspace-primary-soft: #eef4fb;
+  --workspace-primary-border: #c9d8ea;
   --workspace-on-primary: #ffffff;
 }
 
 .workspace-servicos {
-  --workspace-primary: #111111;
-  --workspace-primary-hover: #2c2c2c;
-  --workspace-primary-soft: #f3f4f6;
-  --workspace-primary-border: #d6d8dc;
+  --workspace-primary: #0a2540;
+  --workspace-primary-hover: #143a63;
+  --workspace-primary-soft: #eef4fb;
+  --workspace-primary-border: #c9d8ea;
   --workspace-on-primary: #ffffff;
 }
 
