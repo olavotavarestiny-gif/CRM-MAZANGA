@@ -42,6 +42,19 @@ function isMissingJobTitleColumn(error) {
   return message.includes('User.jobTitle') && message.includes('does not exist');
 }
 
+function getRequestIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0].trim();
+  }
+
+  if (Array.isArray(forwarded) && forwarded.length > 0) {
+    return forwarded[0];
+  }
+
+  return req.ip || null;
+}
+
 async function getCurrentUserPayload(userId, impersonatedBy = null) {
   let user;
   try {
@@ -170,6 +183,40 @@ router.get('/me', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/log-login', requireAuth, async (req, res) => {
+  try {
+    const ip = getRequestIp(req);
+    const userAgent = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null;
+    const dedupeWindowStart = new Date(Date.now() - (2 * 60 * 1000));
+
+    const existingLog = await prisma.loginLog.findFirst({
+      where: {
+        userId: req.user.id,
+        ip,
+        userAgent,
+        createdAt: { gte: dedupeWindowStart },
+      },
+      select: { id: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!existingLog) {
+      await prisma.loginLog.create({
+        data: {
+          userId: req.user.id,
+          ip,
+          userAgent,
+        },
+      });
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error logging login event:', error);
+    res.status(204).send();
   }
 });
 

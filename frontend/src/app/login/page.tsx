@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { getCurrentUserWithToken } from '@/lib/api';
+import { getCurrentUserWithToken, logLoginWithToken } from '@/lib/api';
 import Link from 'next/link';
 import { Mail, Lock } from 'lucide-react';
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
@@ -45,6 +45,12 @@ export default function LoginPage() {
 
       // 2. Load user from our backend using the fresh token returned by Supabase
       const user = await getCurrentUserWithToken(accessToken);
+      try {
+        await logLoginWithToken(accessToken);
+      } catch (loginLogError) {
+        console.error('Não foi possível registar o login:', loginLogError);
+      }
+
       if (user.mustChangePassword) {
         router.push('/change-password');
       } else {

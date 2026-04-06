@@ -419,6 +419,18 @@ export async function getCurrentUserWithToken(accessToken: string) {
   return response.data;
 }
 
+export async function logLoginWithToken(accessToken: string): Promise<void> {
+  await api.post(
+    '/api/auth/log-login',
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+}
+
 export async function changePassword(newPassword: string) {
   const response = await api.post<{ message: string }>('/api/auth/change-password', {
     newPassword,
