@@ -506,6 +506,7 @@ export interface FacturaLine {
   unitPrice: number;
   unitOfMeasure: string;
   settlementAmount: number;
+  isIncluded?: boolean;
   taxes: FacturaTax[];
 }
 
@@ -529,15 +530,27 @@ export interface Factura {
   agtRequestId?: string;
   agtValidationStatus: 'P' | 'V' | 'I' | 'A';
   agtSubmittedAt?: string;
+  baseCurrency: string;
+  displayCurrency: string;
   isOffline: boolean;
   documentDate: string;
   createdAt: string;
   currencyCode: string;
   currencyAmount?: number;
   exchangeRate?: number;
+  exchangeRateDate?: string;
+  displayMode?: 'DOCUMENT_ONLY' | 'DOCUMENT_PLUS_INTERNAL';
   paymentMethod?: string;
+  paymentDue?: string;
   serie?: { seriesCode: string; seriesYear: number; documentType: string };
-  estabelecimento?: { id: string; nome: string; nif?: string };
+  estabelecimento?: { id: string; nome: string; nif?: string; morada?: string; telefone?: string; email?: string };
+  clienteFaturacao?: {
+    customerName?: string;
+    customerTaxID?: string;
+    customerAddress?: string;
+    customerPhone?: string;
+    customerEmail?: string;
+  };
 }
 
 export interface Serie {
@@ -764,6 +777,9 @@ export interface FaturacaoConfig {
   nifEmpresa: string;
   nomeEmpresa: string;
   moradaEmpresa: string;
+  telefoneEmpresa: string;
+  emailEmpresa: string;
+  websiteEmpresa: string;
   iban: string;
   logoUrl?: string;
   agtMockMode: boolean;
@@ -792,8 +808,12 @@ export interface FacturaRecorrente {
   customerAddress?: string;
   documentType: string;
   lines: string;
+  baseCurrency: string;
+  displayCurrency: string;
   currencyCode: string;
   exchangeRate?: number;
+  exchangeRateDate?: string;
+  displayMode?: 'DOCUMENT_ONLY' | 'DOCUMENT_PLUS_INTERNAL';
   paymentMethod: string;
   frequency: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
   startDate: string;

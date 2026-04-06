@@ -105,6 +105,11 @@ const SOURCE_BADGE_STYLES: Record<'crm' | 'faturacao', string> = {
   faturacao: 'border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)]',
 };
 
+const DISPLAY_MODES = [
+  { value: 'DOCUMENT_ONLY', label: 'Só moeda do documento' },
+  { value: 'DOCUMENT_PLUS_INTERNAL', label: 'Moeda do documento + referência interna em AOA' },
+] as const;
+
 const blankCustomerFields: InvoiceCustomerFields = {
   taxId: '',
   name: '',
@@ -152,6 +157,7 @@ export function FacturaForm() {
   ]);
   const [currencyCode, setCurrencyCode] = useState('AOA');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [displayMode, setDisplayMode] = useState<'DOCUMENT_ONLY' | 'DOCUMENT_PLUS_INTERNAL'>('DOCUMENT_ONLY');
   const [paymentMethod, setPaymentMethod] = useState('Transferência Bancária');
   const [error, setError] = useState('');
   const [dialog, setDialog] = useState<ProdutoDialogState | null>(null);
@@ -226,6 +232,9 @@ export function FacturaForm() {
       }
 
       const isAOA = currencyCode === 'AOA';
+      if (!isAOA && (!exchangeRate || exchangeRate <= 0)) {
+        throw new Error(`Defina uma taxa de câmbio válida para emitir em ${currencyCode}.`);
+      }
 
       return createFactura({
         documentType,
@@ -235,9 +244,11 @@ export function FacturaForm() {
         customerName,
         customerAddress,
         clienteFaturacaoId,
+        baseCurrency: 'AOA',
+        displayCurrency: currencyCode,
         currencyCode,
-        currencyAmount: isAOA ? undefined : grossTotal,
         exchangeRate: isAOA ? undefined : exchangeRate,
+        displayMode: isAOA ? 'DOCUMENT_ONLY' : displayMode,
         paymentMethod,
         lines: lines.map((line) => ({
           productCode:
@@ -701,6 +712,9 @@ export function FacturaForm() {
                     onValueChange={(value) => {
                       setCurrencyCode(value);
                       setExchangeRate(1);
+                      if (value === 'AOA') {
+                        setDisplayMode('DOCUMENT_ONLY');
+                      }
                     }}
                   >
                     <SelectTrigger className="mt-1">
@@ -718,18 +732,38 @@ export function FacturaForm() {
               </div>
 
               {currencyCode !== 'AOA' && (
-                <div>
-                  <Label className="text-xs text-gray-600">
-                    Taxa de câmbio (1 {currencyCode} = ? AOA)
-                  </Label>
-                  <Input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={exchangeRate}
-                    onChange={(event) => setExchangeRate(parseFloat(event.target.value) || 1)}
-                    className="mt-1 w-full sm:w-52"
-                  />
+                <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[190px_minmax(0,1fr)]">
+                  <div>
+                    <Label className="text-xs text-gray-600">
+                      Taxa de câmbio (1 {currencyCode} = ? AOA)
+                    </Label>
+                    <Input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={exchangeRate}
+                      onChange={(event) => setExchangeRate(parseFloat(event.target.value) || 0)}
+                      className="mt-1 w-full"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-600">Modo de apresentação</Label>
+                    <Select value={displayMode} onValueChange={(value) => setDisplayMode(value as 'DOCUMENT_ONLY' | 'DOCUMENT_PLUS_INTERNAL')}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DISPLAY_MODES.map((mode) => (
+                          <SelectItem key={mode.value} value={mode.value}>
+                            {mode.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-2 text-xs text-slate-500">
+                      O PDF vai usar {currencyCode} como moeda principal. A referência em AOA só aparece se ativares esta opção.
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -1057,7 +1091,7 @@ export function FacturaForm() {
             <span className="text-[#2c2f31]">Total com IVA</span>
             <span className="font-mono text-[var(--workspace-primary)]">{fmtAmount(grossTotal, currencyCode)}</span>
           </div>
-          {currencyCode !== 'AOA' && exchangeRate > 0 && (
+          {currencyCode !== 'AOA' && displayMode === 'DOCUMENT_PLUS_INTERNAL' && exchangeRate > 0 && (
             <div className="flex justify-between border-t border-gray-100 pt-2 text-sm text-gray-500">
               <span>Equivalente AOA (taxa {exchangeRate})</span>
               <span className="font-mono">

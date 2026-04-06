@@ -12,6 +12,7 @@ const { isValidRate, getTaxCode } = require('../fiscal/iva-rates');
 const { computeDocumentHash } = require('../fiscal/hash-chain');
 const { registerFacturaFinanceEntry } = require('./register-finance-entry');
 const { logInvoiceCreatedActivity } = require('../activity-log');
+const { normalizeInvoiceCurrencyInput } = require('./currency');
 
 /**
  * @param {number} userId  - effectiveUserId (accountOwnerId or id)
@@ -29,9 +30,12 @@ async function createFactura(userId, body, req = null) {
     customerAddress,
     clienteFaturacaoId,
     lines,
+    baseCurrency,
     currencyCode,
-    currencyAmount,
+    displayCurrency,
     exchangeRate,
+    exchangeRateDate,
+    displayMode,
     paymentMethod,
   } = body;
 
@@ -53,6 +57,22 @@ async function createFactura(userId, body, req = null) {
       select: { defaultSerieId: true },
     });
     serieId = estabelecimento?.defaultSerieId || null;
+  }
+
+  const currencyPresentation = normalizeInvoiceCurrencyInput({
+    baseCurrency,
+    currencyCode,
+    displayCurrency,
+    exchangeRate,
+    exchangeRateDate,
+    displayMode,
+  });
+
+  if (currencyPresentation.isForeign && (!currencyPresentation.exchangeRate || currencyPresentation.exchangeRate <= 0)) {
+    throw Object.assign(
+      new Error(`Taxa de câmbio obrigatória para documentos em ${currencyPresentation.displayCurrency}.`),
+      { status: 400 }
+    );
   }
 
   // ── Line processing ──────────────────────────────────────────
@@ -132,9 +152,6 @@ async function createFactura(userId, body, req = null) {
   }
 
   // ── Persist ──────────────────────────────────────────────────
-  const resolvedCurrencyCode = currencyCode || 'AOA';
-  const resolvedCurrencyAmount = currencyAmount ? Number(currencyAmount) : null;
-  const resolvedExchangeRate = exchangeRate ? Number(exchangeRate) : null;
   const resolvedPaymentMethod = paymentMethod || 'Transferência Bancária';
 
   const factura = await prisma.$transaction(async (tx) => {
@@ -160,9 +177,13 @@ async function createFactura(userId, body, req = null) {
         agtRequestId,
         agtValidationStatus,
         agtSubmittedAt: new Date(),
-        currencyCode: resolvedCurrencyCode,
-        currencyAmount: resolvedCurrencyAmount,
-        exchangeRate: resolvedExchangeRate,
+        baseCurrency: currencyPresentation.baseCurrency,
+        displayCurrency: currencyPresentation.displayCurrency,
+        currencyCode: currencyPresentation.currencyCode,
+        currencyAmount: currencyPresentation.isForeign ? grossTotal : null,
+        exchangeRate: currencyPresentation.exchangeRate,
+        exchangeRateDate: currencyPresentation.exchangeRateDate,
+        displayMode: currencyPresentation.displayMode,
         paymentMethod: resolvedPaymentMethod,
       },
     });
@@ -176,9 +197,9 @@ async function createFactura(userId, body, req = null) {
       customerName,
       clienteFaturacaoId: clienteFaturacaoId || null,
       grossTotal,
-      currencyCode: resolvedCurrencyCode,
-      currencyAmount: resolvedCurrencyAmount,
-      exchangeRate: resolvedExchangeRate,
+      currencyCode: currencyPresentation.displayCurrency,
+      currencyAmount: currencyPresentation.isForeign ? grossTotal : null,
+      exchangeRate: currencyPresentation.exchangeRate,
       paymentMethod: resolvedPaymentMethod,
     });
 

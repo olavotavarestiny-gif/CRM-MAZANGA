@@ -6,6 +6,7 @@ const { isMock } = require('../lib/faturacao/agt-api');
 const { generateFacturaPDF } = require('../lib/faturacao/pdf');
 const { logEvent } = require('../lib/faturacao/audit');
 const { logInvoiceStatusChangeActivity } = require('../lib/activity-log');
+const { getDocumentEquivalentInBase } = require('../lib/faturacao/currency');
 const {
   isInvoicePaid,
   reconcileInvoicePayment,
@@ -19,16 +20,27 @@ router.get('/dashboard', async (req, res) => {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    const [totalMes, receitaMes, pendentesAGT, totalGeral] = await Promise.all([
+    const [totalMes, receitaMesInvoices, pendentesAGT, totalGeral] = await Promise.all([
       prisma.factura.count({ where: { userId, documentDate: { gte: startOfMonth, lte: endOfMonth }, documentStatus: 'N' } }),
-      prisma.factura.aggregate({ where: { userId, documentDate: { gte: startOfMonth, lte: endOfMonth }, documentStatus: 'N' }, _sum: { grossTotal: true } }),
+      prisma.factura.findMany({
+        where: { userId, documentDate: { gte: startOfMonth, lte: endOfMonth }, documentStatus: 'N' },
+        select: {
+          grossTotal: true,
+          baseCurrency: true,
+          displayCurrency: true,
+          currencyCode: true,
+          exchangeRate: true,
+        },
+      }),
       prisma.factura.count({ where: { userId, agtValidationStatus: 'P', documentStatus: 'N' } }),
       prisma.factura.count({ where: { userId, documentStatus: 'N' } }),
     ]);
 
+    const receitaMes = receitaMesInvoices.reduce((sum, invoice) => sum + getDocumentEquivalentInBase(invoice), 0);
+
     res.json({
       totalMes,
-      receitaMes: receitaMes._sum.grossTotal || 0,
+      receitaMes,
       pendentesAGT,
       totalGeral,
       mockMode: isMock(),
@@ -61,6 +73,8 @@ router.get('/facturas', async (req, res) => {
           id: true, documentNo: true, documentType: true, documentStatus: true,
           customerName: true, customerTaxID: true, documentDate: true,
           netTotal: true, taxPayable: true, grossTotal: true,
+          baseCurrency: true, displayCurrency: true,
+          currencyCode: true, exchangeRate: true, displayMode: true,
           agtValidationStatus: true, isOffline: true, createdAt: true,
         },
       }),
@@ -77,7 +91,19 @@ router.get('/facturas/:id', async (req, res) => {
   try {
     const factura = await prisma.factura.findUnique({
       where: { id: req.params.id },
-      include: { serie: true, estabelecimento: true },
+      include: {
+        serie: true,
+        estabelecimento: true,
+        clienteFaturacao: {
+          select: {
+            customerPhone: true,
+            customerEmail: true,
+            customerAddress: true,
+            customerName: true,
+            customerTaxID: true,
+          },
+        },
+      },
     });
     if (!factura || factura.userId !== req.user.effectiveUserId) return res.status(404).json({ error: 'Factura não encontrada' });
     res.json({ ...factura, lines: typeof factura.lines === 'string' ? JSON.parse(factura.lines) : factura.lines });
@@ -157,7 +183,19 @@ router.get('/facturas/:id/pdf', async (req, res) => {
   try {
     const factura = await prisma.factura.findUnique({
       where: { id: req.params.id },
-      include: { serie: true, estabelecimento: true },
+      include: {
+        serie: true,
+        estabelecimento: true,
+        clienteFaturacao: {
+          select: {
+            customerPhone: true,
+            customerEmail: true,
+            customerAddress: true,
+            customerName: true,
+            customerTaxID: true,
+          },
+        },
+      },
     });
     if (!factura || factura.userId !== req.user.effectiveUserId)
       return res.status(404).json({ error: 'Factura não encontrada' });

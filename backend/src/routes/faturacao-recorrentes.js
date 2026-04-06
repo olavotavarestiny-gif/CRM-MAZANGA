@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { processRecorrentes } = require('../lib/faturacao/scheduler');
+const { normalizeInvoiceCurrencyInput } = require('../lib/faturacao/currency');
 
 const INCLUDE = {
   serie:            { select: { seriesCode: true, seriesYear: true, documentType: true } },
@@ -34,8 +35,9 @@ router.post('/recorrentes', async (req, res) => {
     const {
       serieId, estabelecimentoId, clienteFaturacaoId,
       customerTaxID, customerName, customerAddress,
-      documentType = 'FT', lines, currencyCode = 'AOA',
-      exchangeRate, paymentMethod = 'Transferência Bancária',
+      documentType = 'FT', lines, baseCurrency, currencyCode = 'AOA',
+      displayCurrency, exchangeRate, exchangeRateDate, displayMode,
+      paymentMethod = 'Transferência Bancária',
       frequency, startDate, maxOccurrences, notes,
     } = req.body;
 
@@ -67,6 +69,18 @@ router.post('/recorrentes', async (req, res) => {
     if (!serie) return res.status(400).json({ error: 'Série não encontrada' });
 
     const startDateObj = new Date(startDate);
+    const currencyPresentation = normalizeInvoiceCurrencyInput({
+      baseCurrency,
+      currencyCode,
+      displayCurrency,
+      exchangeRate,
+      exchangeRateDate,
+      displayMode,
+    }, startDateObj);
+
+    if (currencyPresentation.isForeign && (!currencyPresentation.exchangeRate || currencyPresentation.exchangeRate <= 0)) {
+      return res.status(400).json({ error: `Taxa de câmbio obrigatória para recorrentes em ${currencyPresentation.displayCurrency}.` });
+    }
 
     const rec = await prisma.facturaRecorrente.create({
       data: {
@@ -75,8 +89,12 @@ router.post('/recorrentes', async (req, res) => {
         customerTaxID, customerName, customerAddress: customerAddress || null,
         documentType,
         lines: typeof lines === 'string' ? lines : JSON.stringify(lines),
-        currencyCode,
-        exchangeRate: exchangeRate ? parseFloat(exchangeRate) : null,
+        baseCurrency: currencyPresentation.baseCurrency,
+        displayCurrency: currencyPresentation.displayCurrency,
+        currencyCode: currencyPresentation.currencyCode,
+        exchangeRate: currencyPresentation.exchangeRate,
+        exchangeRateDate: currencyPresentation.exchangeRateDate,
+        displayMode: currencyPresentation.displayMode,
         paymentMethod, frequency,
         startDate:   startDateObj,
         nextRunDate: startDateObj,

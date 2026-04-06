@@ -59,6 +59,11 @@ const FREQUENCIES = [
   { value: 'ANNUAL',    label: 'Anual' },
 ];
 
+const DISPLAY_MODES = [
+  { value: 'DOCUMENT_ONLY', label: 'Só moeda do documento' },
+  { value: 'DOCUMENT_PLUS_INTERNAL', label: 'Moeda do documento + referência interna em AOA' },
+] as const;
+
 const defaultLine = (): LineState => ({
   productId: undefined,
   productCode: '', productDescription: '', quantity: 1,
@@ -93,6 +98,7 @@ export function RecorrenteForm({ open, onClose }: Props) {
   const [paymentMethod, setPaymentMethod] = useState('Transferência Bancária');
   const [currency, setCurrency] = useState('AOA');
   const [exchangeRate, setExchangeRate] = useState('');
+  const [displayMode, setDisplayMode] = useState<'DOCUMENT_ONLY' | 'DOCUMENT_PLUS_INTERNAL'>('DOCUMENT_ONLY');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
 
@@ -159,6 +165,9 @@ export function RecorrenteForm({ open, onClose }: Props) {
       const nome = manualCliente ? manualNome : (cliente?.customerName ?? '');
       if (!nif || !nome)        throw new Error('Selecione ou introduza os dados do cliente');
       if (!estabelecimentoId)   throw new Error('Selecione um estabelecimento');
+      if (currency !== 'AOA' && (!exchangeRate || parseFloat(exchangeRate) <= 0)) {
+        throw new Error(`Defina uma taxa de câmbio válida para recorrentes em ${currency}.`);
+      }
       if (lines.some(l => !l.productDescription || l.quantity <= 0 || l.unitPrice < 0))
         throw new Error('Verifique as linhas: descrição, quantidade e preço são obrigatórios');
 
@@ -182,8 +191,11 @@ export function RecorrenteForm({ open, onClose }: Props) {
         documentType,
         lines: linesPayload as unknown as string,
         paymentMethod,
+        baseCurrency: 'AOA',
+        displayCurrency: currency,
         currencyCode: currency,
         exchangeRate: currency !== 'AOA' && exchangeRate ? parseFloat(exchangeRate) : undefined,
+        displayMode: currency === 'AOA' ? 'DOCUMENT_ONLY' : displayMode,
         frequency: frequency as 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL',
         startDate,
         maxOccurrences: maxOccurrences ? parseInt(maxOccurrences) as unknown as number : undefined,
@@ -202,7 +214,7 @@ export function RecorrenteForm({ open, onClose }: Props) {
     setShowSeriesOverride(false);
     setCliente(undefined); setManualNif(''); setManualNome(''); setManualCliente(false);
     setLines([defaultLine()]); setFrequency('MONTHLY'); setStartDate(tomorrow());
-    setMaxOccurrences(''); setPaymentMethod('Transferência Bancária'); setCurrency('AOA'); setExchangeRate(''); setNotes(''); setError('');
+    setMaxOccurrences(''); setPaymentMethod('Transferência Bancária'); setCurrency('AOA'); setExchangeRate(''); setDisplayMode('DOCUMENT_ONLY'); setNotes(''); setError('');
     onClose();
   }
 
@@ -456,7 +468,16 @@ export function RecorrenteForm({ open, onClose }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs text-gray-500 mb-1 block">Moeda</Label>
-              <Select value={currency} onValueChange={setCurrency}>
+              <Select
+                value={currency}
+                onValueChange={(value) => {
+                  setCurrency(value);
+                  if (value === 'AOA') {
+                    setDisplayMode('DOCUMENT_ONLY');
+                    setExchangeRate('');
+                  }
+                }}
+              >
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {CURRENCIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
@@ -475,6 +496,26 @@ export function RecorrenteForm({ open, onClose }: Props) {
               </div>
             )}
           </div>
+          {currency !== 'AOA' && (
+            <div>
+              <Label className="text-xs text-gray-500 mb-1 block">Modo de apresentação</Label>
+              <Select value={displayMode} onValueChange={(value) => setDisplayMode(value as 'DOCUMENT_ONLY' | 'DOCUMENT_PLUS_INTERNAL')}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DISPLAY_MODES.map((mode) => (
+                    <SelectItem key={mode.value} value={mode.value}>
+                      {mode.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-2 text-xs text-slate-500">
+                Cada emissão vai usar {currency} como moeda principal do documento.
+              </p>
+            </div>
+          )}
 
           <div>
             <Label className="text-xs text-gray-500 mb-1 block">Notas internas</Label>

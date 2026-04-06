@@ -522,9 +522,13 @@ model Factura {
   agtRequestId         String?
   agtValidationStatus  String            @default("P") // P=Pendente, V=Válida, I=Inválida, A=Anulada
   agtSubmittedAt       DateTime?
+  baseCurrency         String            @default("AOA")
+  displayCurrency      String            @default("AOA")
   currencyCode         String            @default("AOA")
   currencyAmount       Float?
   exchangeRate         Float?
+  exchangeRateDate     DateTime?
+  displayMode          String            @default("DOCUMENT_ONLY")
   paymentMethod        String            @default("Transferência Bancária")
   isOffline            Boolean           @default(false)
   offlineEmittedAt     DateTime?
@@ -609,8 +613,12 @@ model FacturaRecorrente {
   customerAddress    String?
   documentType       String            @default("FT")
   lines              String // JSON array (template das linhas)
+  baseCurrency       String            @default("AOA")
+  displayCurrency    String            @default("AOA")
   currencyCode       String            @default("AOA")
   exchangeRate       Float?
+  exchangeRateDate   DateTime?
+  displayMode        String            @default("DOCUMENT_ONLY")
   paymentMethod      String            @default("Transferência Bancária")
   frequency          String // WEEKLY | MONTHLY | QUARTERLY | ANNUAL
   startDate          DateTime
@@ -635,6 +643,9 @@ model ConfiguracaoFaturacao {
   nifEmpresa               String    @default("")
   nomeEmpresa              String    @default("")
   moradaEmpresa            String    @default("")
+  telefoneEmpresa          String    @default("")
+  emailEmpresa             String    @default("")
+  websiteEmpresa           String    @default("")
   iban                     String    @default("")
   logoUrl                  String?
   agtMockMode              Boolean   @default(true)

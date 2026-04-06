@@ -22,14 +22,44 @@ router.get('/config', async (req, res) => {
 // PUT /api/faturacao/config
 router.put('/config', async (req, res) => {
   try {
-    const { nifEmpresa, nomeEmpresa, moradaEmpresa, iban, logoUrl, agtMockMode, agtCertNumber, defaultSerieId, defaultEstabelecimentoId } = req.body;
+    const {
+      nifEmpresa,
+      nomeEmpresa,
+      moradaEmpresa,
+      telefoneEmpresa,
+      emailEmpresa,
+      websiteEmpresa,
+      iban,
+      logoUrl,
+      agtMockMode,
+      agtCertNumber,
+      defaultSerieId,
+      defaultEstabelecimentoId,
+    } = req.body;
     const config = await prisma.configuracaoFaturacao.upsert({
       where: { userId: req.user.effectiveUserId },
-      create: { userId: req.user.effectiveUserId, nifEmpresa, nomeEmpresa, moradaEmpresa, iban, logoUrl, agtMockMode, agtCertNumber, defaultSerieId, defaultEstabelecimentoId },
+      create: {
+        userId: req.user.effectiveUserId,
+        nifEmpresa,
+        nomeEmpresa,
+        moradaEmpresa,
+        telefoneEmpresa,
+        emailEmpresa,
+        websiteEmpresa,
+        iban,
+        logoUrl,
+        agtMockMode,
+        agtCertNumber,
+        defaultSerieId,
+        defaultEstabelecimentoId,
+      },
       update: {
         ...(nifEmpresa !== undefined && { nifEmpresa }),
         ...(nomeEmpresa !== undefined && { nomeEmpresa }),
         ...(moradaEmpresa !== undefined && { moradaEmpresa }),
+        ...(telefoneEmpresa !== undefined && { telefoneEmpresa }),
+        ...(emailEmpresa !== undefined && { emailEmpresa }),
+        ...(websiteEmpresa !== undefined && { websiteEmpresa }),
         ...(iban !== undefined && { iban }),
         ...(logoUrl !== undefined && { logoUrl }),
         ...(agtMockMode !== undefined && { agtMockMode }),

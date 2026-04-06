@@ -6,6 +6,7 @@ const { generateQRCode } = require('./qrcode');
 const { registarFatura } = require('./agt-api');
 const { registerFacturaFinanceEntry } = require('./register-finance-entry');
 const { logInvoiceCreatedActivity, buildActivityActor } = require('../activity-log');
+const { normalizeInvoiceCurrencyInput } = require('./currency');
 
 const prisma = new PrismaClient();
 
@@ -32,6 +33,7 @@ function calcNextRunDate(current, frequency) {
  */
 async function processOne(rec, actor = null) {
   const lines = JSON.parse(rec.lines);
+  const currencyPresentation = normalizeInvoiceCurrencyInput(rec);
 
   // Calculate totals from line template
   let netTotal = 0;
@@ -92,8 +94,14 @@ async function processOne(rec, actor = null) {
         grossTotal,
         qrCodeImage:       qrCodeImage ?? null,
         jwsSignature:      'PLACEHOLDER',
-        currencyCode:      rec.currencyCode,
-        exchangeRate:      rec.exchangeRate ?? null,
+        baseCurrency:      currencyPresentation.baseCurrency,
+        displayCurrency:   currencyPresentation.displayCurrency,
+        currencyCode:      currencyPresentation.currencyCode,
+        exchangeRate:      currencyPresentation.exchangeRate,
+        exchangeRateDate:  currencyPresentation.isForeign
+          ? (currencyPresentation.exchangeRateDate || new Date())
+          : null,
+        displayMode:       currencyPresentation.displayMode,
         paymentMethod:     rec.paymentMethod,
         agtValidationStatus: agtResult.status ?? 'P',
         agtRequestId:      agtResult.requestId ?? null,
@@ -109,9 +117,9 @@ async function processOne(rec, actor = null) {
       customerName: rec.customerName,
       clienteFaturacaoId: rec.clienteFaturacaoId ?? null,
       grossTotal,
-      currencyCode: rec.currencyCode,
-      currencyAmount: rec.currencyCode && rec.currencyCode !== 'AOA' ? grossTotal : null,
-      exchangeRate: rec.exchangeRate ?? null,
+      currencyCode: currencyPresentation.displayCurrency,
+      currencyAmount: currencyPresentation.isForeign ? grossTotal : null,
+      exchangeRate: currencyPresentation.exchangeRate,
       paymentMethod: rec.paymentMethod,
     });
 

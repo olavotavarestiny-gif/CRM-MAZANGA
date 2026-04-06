@@ -752,7 +752,9 @@ export async function createFactura(data: {
   documentType: string; serieId?: string; estabelecimentoId: string;
   customerTaxID: string; customerName: string; customerAddress?: string;
   clienteFaturacaoId?: string; lines: Omit<FacturaLine, 'lineNumber'>[];
-  currencyCode?: string; currencyAmount?: number; exchangeRate?: number; paymentMethod?: string;
+  baseCurrency?: string; displayCurrency?: string; currencyCode?: string;
+  currencyAmount?: number; exchangeRate?: number; exchangeRateDate?: string;
+  displayMode?: 'DOCUMENT_ONLY' | 'DOCUMENT_PLUS_INTERNAL'; paymentMethod?: string;
 }): Promise<Factura> {
   const res = await api.post('/api/faturacao/facturas', data);
   return res.data;

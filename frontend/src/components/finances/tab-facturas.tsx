@@ -9,6 +9,7 @@ import { FilterBar } from '@/components/ui/filter-bar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, FileText, TrendingUp, Clock } from 'lucide-react';
 import { getFacturas, getFaturacaoDashboard } from '@/lib/api';
+import { formatInvoiceAmount, resolveInvoiceDisplayCurrency } from '@/lib/invoice-presentation';
 
 function fmtKz(n: number) {
   return n.toLocaleString('pt-AO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kz';
@@ -173,7 +174,9 @@ export function TabFacturas() {
               <p className="text-gray-400 text-xs">{f.customerTaxID}</p>
             </div>
             <span className="col-span-2 text-gray-600 text-sm">{new Date(f.documentDate).toLocaleDateString('pt-PT')}</span>
-            <span className="col-span-2 text-right text-[#2c2f31] font-mono text-sm">{fmtKz(f.grossTotal)}</span>
+            <span className="col-span-2 text-right text-[#2c2f31] font-mono text-sm">
+              {formatInvoiceAmount(f.grossTotal, resolveInvoiceDisplayCurrency(f))}
+            </span>
             <span className="col-span-2 flex justify-end">
               {f.documentStatus === 'A' ? (
                 <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-400 border border-gray-200 line-through">Anulada</span>

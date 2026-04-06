@@ -1,469 +1,808 @@
 'use strict';
 
 const PDFDocument = require('pdfkit');
-const path        = require('path');
+const path = require('path');
+const {
+  DISPLAY_MODES,
+  resolveBaseCurrency,
+  resolveDisplayCurrency,
+  resolveStoredDisplayMode,
+} = require('./currency');
 
-// ── Fontes Inter ──────────────────────────────────────────────
-const FONT_BASE     = path.join(__dirname, '..', '..', '..', 'node_modules', '@expo-google-fonts', 'inter');
-const FONT_REGULAR  = path.join(FONT_BASE, '400Regular',  'Inter_400Regular.ttf');
-const FONT_MEDIUM   = path.join(FONT_BASE, '500Medium',   'Inter_500Medium.ttf');
+const FONT_BASE = path.join(__dirname, '..', '..', '..', 'node_modules', '@expo-google-fonts', 'inter');
+const FONT_REGULAR = path.join(FONT_BASE, '400Regular', 'Inter_400Regular.ttf');
+const FONT_MEDIUM = path.join(FONT_BASE, '500Medium', 'Inter_500Medium.ttf');
 const FONT_SEMIBOLD = path.join(FONT_BASE, '600SemiBold', 'Inter_600SemiBold.ttf');
-const FONT_BOLD     = path.join(FONT_BASE, '700Bold',     'Inter_700Bold.ttf');
+const FONT_BOLD = path.join(FONT_BASE, '700Bold', 'Inter_700Bold.ttf');
 
-// ── Paleta ───────────────────────────────────────────────────
-const NAVY   = '#0A2540';
-const INDIGO = '#4F46E5';
-const GRAY   = '#64748B';
-const LIGHT  = '#F8FAFC';
-const BORDER = '#E2E8F0';
-const WHITE  = '#FFFFFF';
-const RED    = '#DC2626';
+const PAGE_W = 595.28;
+const PAGE_H = 841.89;
+const MARGIN = 42;
+const CONTENT_W = PAGE_W - (MARGIN * 2);
 
-// ── Dimensões A4 ─────────────────────────────────────────────
-const PAGE_W  = 595.28;
-const PAGE_H  = 841.89;
-const MARGIN  = 50;
-const INNER_W = PAGE_W - MARGIN * 2;   // 495.28
+const COLORS = {
+  ink: '#0F172A',
+  primary: '#0A2540',
+  accent: '#2563EB',
+  accentSoft: '#EFF6FF',
+  muted: '#64748B',
+  mutedLight: '#94A3B8',
+  line: '#E2E8F0',
+  panel: '#F8FAFC',
+  white: '#FFFFFF',
+  green: '#047857',
+  greenSoft: '#ECFDF5',
+  amber: '#B45309',
+  amberSoft: '#FFFBEB',
+  red: '#B91C1C',
+  redSoft: '#FEF2F2',
+};
 
-// ── Helpers ───────────────────────────────────────────────────
 function fmtNum(n, decimals = 2) {
-  if (typeof n !== 'number' || isNaN(n)) return '0,00';
-  return n.toLocaleString('pt-PT', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-}
-function fmtAmount(n, cur = 'AOA') {
-  if (cur === 'AOA') return fmtNum(n) + ' Kz';
-  const sym = { USD: 'USD ', EUR: '€ ', GBP: '£ ' }[cur] ?? (cur + ' ');
-  return sym + fmtNum(n);
-}
-function fmtDate(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-function docTypeLabel(t) {
-  return { FT: 'Factura', FR: 'Factura/Recibo', ND: 'Nota de Débito', NC: 'Nota de Crédito', FA: 'Factura Simpl.', PF: 'Proforma' }[t] || t;
-}
-function agtStatusLabel(s) {
-  return { P: 'Pendente AGT', V: 'Válida', I: 'Inválida', A: 'Anulada' }[s] || s;
+  if (!Number.isFinite(Number(n))) return '0,00';
+  return Number(n).toLocaleString('pt-PT', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
 }
 
-/** Apenas PNG / JPEG / WebP são suportados pelo PDFKit */
+function fmtAmount(n, currency = 'AOA') {
+  const code = (currency || 'AOA').toUpperCase();
+  if (code === 'AOA') return `${fmtNum(n)} Kz`;
+  const symbol = {
+    USD: 'USD',
+    EUR: 'EUR',
+    GBP: 'GBP',
+    CHF: 'CHF',
+    CNY: 'CNY',
+  }[code] || code;
+
+  return `${symbol} ${fmtNum(n)}`;
+}
+
+function fmtDate(date) {
+  if (!date) return '—';
+  return new Date(date).toLocaleDateString('pt-PT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+function fmtDateTime(date) {
+  if (!date) return '—';
+  return new Date(date).toLocaleString('pt-PT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function measureTextHeight(doc, text, width, font = 'R', size = 8.5) {
+  doc.font(font).fontSize(size);
+  return doc.heightOfString(text || '', { width });
+}
+
+function docTypeLabel(type) {
+  return {
+    FT: 'Factura',
+    FR: 'Factura-Recibo',
+    ND: 'Nota de Débito',
+    NC: 'Nota de Crédito',
+    FA: 'Factura Simplificada',
+    PF: 'Proforma',
+  }[type] || type;
+}
+
+function agtStatusLabel(status) {
+  return {
+    P: 'Pendente AGT',
+    V: 'Válida',
+    I: 'Inválida',
+    A: 'Anulada',
+    NA: 'Não fiscal',
+  }[status] || status;
+}
+
+function statusLabel(status) {
+  return {
+    N: 'Normal',
+    A: 'Anulada',
+  }[status] || status;
+}
+
+function statusTone(status) {
+  if (status === 'A') return { fill: COLORS.redSoft, text: COLORS.red };
+  return { fill: COLORS.panel, text: COLORS.primary };
+}
+
 function isSupportedImage(url) {
   if (!url || !url.startsWith('data:image')) return false;
   const mime = url.split(';')[0].replace('data:', '').toLowerCase();
   return ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(mime);
 }
 
-/** Valida os magic bytes do buffer antes de passar ao PDFKit */
 function isValidImageBuffer(buf, mimeType) {
   if (!buf || buf.length < 12) return false;
-  if (mimeType === 'image/png')
-    return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47;
-  if (mimeType === 'image/jpeg' || mimeType === 'image/jpg')
-    return buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF;
-  if (mimeType === 'image/webp')
-    return buf.slice(0, 4).toString() === 'RIFF' && buf.slice(8, 12).toString() === 'WEBP';
+  if (mimeType === 'image/png') return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47;
+  if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') return buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF;
+  if (mimeType === 'image/webp') return buf.slice(0, 4).toString() === 'RIFF' && buf.slice(8, 12).toString() === 'WEBP';
   return false;
 }
 
-// ── Gerador ───────────────────────────────────────────────────
-async function generateFacturaPDF(factura, config) {
+function parseImage(url) {
+  if (!isSupportedImage(url)) return null;
+  try {
+    const mime = url.split(';')[0].replace('data:', '').toLowerCase();
+    const commaIndex = url.indexOf(',');
+    const buf = Buffer.from(url.slice(commaIndex + 1), 'base64');
+    return isValidImageBuffer(buf, mime) ? buf : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseIbans(config) {
+  try {
+    if (!config.iban) return [];
+    const parsed = JSON.parse(config.iban);
+    if (Array.isArray(parsed)) return parsed.filter((entry) => entry?.iban);
+  } catch {
+    if (config.iban) return [{ label: 'Principal', iban: config.iban }];
+  }
+
+  return config.iban ? [{ label: 'Principal', iban: config.iban }] : [];
+}
+
+function companyInitials(name) {
+  if (!name) return 'KG';
+  const letters = String(name)
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || '')
+    .join('');
+  return letters || 'KG';
+}
+
+function buildModel(factura, config) {
+  const displayCurrency = resolveDisplayCurrency(factura);
+  const baseCurrency = resolveBaseCurrency(factura);
+  const displayMode = resolveStoredDisplayMode(factura);
+  const showBaseReference = (
+    displayCurrency !== baseCurrency &&
+    displayMode === DISPLAY_MODES.DOCUMENT_PLUS_INTERNAL &&
+    Number(factura.exchangeRate || 0) > 0
+  );
+  const isProforma = factura.documentType === 'PF';
+  const issuerName = config.nomeEmpresa?.trim() || factura.estabelecimento?.nome || 'Empresa';
+  const issuerTaxId = config.nifEmpresa?.trim() || factura.estabelecimento?.nif || '—';
+  const issuerAddress = config.moradaEmpresa?.trim() || factura.estabelecimento?.morada || '';
+  const issuerPhone = config.telefoneEmpresa?.trim() || factura.estabelecimento?.telefone || '';
+  const issuerEmail = config.emailEmpresa?.trim() || factura.estabelecimento?.email || '';
+  const issuerWebsite = config.websiteEmpresa?.trim() || '';
+  const customerIsFinal = !factura.customerTaxID || factura.customerTaxID === '000000000';
+  const customerName = factura.customerName || 'Consumidor Final';
+  const customerTaxId = customerIsFinal ? 'Consumidor Final' : factura.customerTaxID;
+  const customerAddress = factura.customerAddress || factura.clienteFaturacao?.customerAddress || '';
+  const customerPhone = factura.clienteFaturacao?.customerPhone || '';
+  const customerEmail = factura.clienteFaturacao?.customerEmail || '';
+  const logoBuffer = parseImage(config.logoUrl);
+  const ibans = parseIbans(config);
+  const lines = Array.isArray(factura.lines) ? factura.lines : JSON.parse(factura.lines || '[]');
+  const supportRows = [
+    { label: 'Pagamento', value: factura.paymentMethod || '—' },
+    { label: 'Moeda do documento', value: displayCurrency },
+  ];
+
+  if (displayCurrency !== baseCurrency) {
+    supportRows.push({ label: 'Moeda base interna', value: baseCurrency });
+    supportRows.push({
+      label: 'Taxa usada',
+      value: factura.exchangeRate
+        ? `1 ${displayCurrency} = ${fmtAmount(factura.exchangeRate, baseCurrency)}`
+        : '—',
+    });
+    supportRows.push({
+      label: 'Data da taxa',
+      value: factura.exchangeRateDate ? fmtDateTime(factura.exchangeRateDate) : '—',
+    });
+  }
+
+  ibans.forEach((entry) => {
+    supportRows.push({
+      label: entry.label || 'IBAN',
+      value: entry.iban,
+    });
+  });
+
+  if (factura.documentCancelReason) {
+    supportRows.push({
+      label: 'Motivo de anulação',
+      value: factura.documentCancelReason,
+    });
+  }
+
+  return {
+    invoice: factura,
+    lines,
+    displayCurrency,
+    baseCurrency,
+    displayMode,
+    showBaseReference,
+    isProforma,
+    logoBuffer,
+    ibans,
+    issuer: {
+      name: issuerName,
+      taxId: issuerTaxId,
+      address: issuerAddress,
+      phone: issuerPhone,
+      email: issuerEmail,
+      website: issuerWebsite,
+    },
+    customer: {
+      name: customerName,
+      taxId: customerTaxId,
+      address: customerAddress,
+      phone: customerPhone,
+      email: customerEmail,
+    },
+    supportRows,
+  };
+}
+
+function registerFonts(doc) {
+  doc.registerFont('R', FONT_REGULAR);
+  doc.registerFont('M', FONT_MEDIUM);
+  doc.registerFont('SB', FONT_SEMIBOLD);
+  doc.registerFont('B', FONT_BOLD);
+}
+
+function drawPill(doc, x, y, label, colors) {
+  const width = doc.widthOfString(label, { font: 'SB', size: 7 }) + 18;
+  doc.roundedRect(x, y, width, 18, 9).fill(colors.fill);
+  doc.font('SB').fontSize(7).fillColor(colors.text).text(label, x + 9, y + 5, {
+    width: width - 18,
+    align: 'center',
+    lineBreak: false,
+  });
+  return width;
+}
+
+function drawPageFrame(state) {
+  const { doc, pageNumber, model } = state;
+  doc.save();
+  doc.rect(0, 0, PAGE_W, 6).fill(COLORS.primary);
+  doc.restore();
+
+  if (model.invoice.documentStatus === 'A') {
+    doc.save();
+    doc.rotate(-32, { origin: [PAGE_W / 2, PAGE_H / 2] });
+    doc.font('B').fontSize(84).fillColor(COLORS.red).opacity(0.06)
+      .text('ANULADA', 48, PAGE_H / 2 - 46, { width: PAGE_W - 96, align: 'center' });
+    doc.restore().opacity(1);
+  } else if (model.isProforma) {
+    doc.save();
+    doc.rotate(-32, { origin: [PAGE_W / 2, PAGE_H / 2] });
+    doc.font('B').fontSize(74).fillColor(COLORS.amber).opacity(0.08)
+      .text('PROFORMA', 48, PAGE_H / 2 - 38, { width: PAGE_W - 96, align: 'center' });
+    doc.restore().opacity(1);
+  }
+
+  doc.moveTo(MARGIN, PAGE_H - 32).lineTo(PAGE_W - MARGIN, PAGE_H - 32)
+    .lineWidth(0.5).strokeColor(COLORS.line).stroke();
+  doc.font('M').fontSize(7).fillColor(COLORS.muted)
+    .text(`Documento gerado no KukuGest`, MARGIN, PAGE_H - 25, { width: 180, lineBreak: false });
+  doc.font('M').fontSize(7).fillColor(COLORS.muted)
+    .text(`Página ${pageNumber}`, PAGE_W - MARGIN - 60, PAGE_H - 25, { width: 60, align: 'right', lineBreak: false });
+}
+
+function addPage(state) {
+  state.doc.addPage();
+  state.pageNumber += 1;
+  state.cursorY = MARGIN;
+  drawPageFrame(state);
+}
+
+function ensureSpace(state, height) {
+  if (state.cursorY + height <= PAGE_H - 56) return;
+  addPage(state);
+}
+
+function drawCompanyIdentity(doc, model, x, y, width) {
+  const markSize = 56;
+  if (model.logoBuffer) {
+    doc.image(model.logoBuffer, x, y, { fit: [markSize, markSize], align: 'left', valign: 'top' });
+  } else {
+    doc.roundedRect(x, y, markSize, markSize, 16).fill(COLORS.accentSoft);
+    doc.font('B').fontSize(18).fillColor(COLORS.accent)
+      .text(companyInitials(model.issuer.name), x, y + 18, { width: markSize, align: 'center', lineBreak: false });
+  }
+
+  const textX = x + markSize + 14;
+  const textW = width - markSize - 14;
+  let cursor = y + 2;
+
+  doc.font('M').fontSize(8).fillColor(COLORS.accent)
+    .text('Emitido com KukuGest', textX, cursor, { width: textW });
+  cursor += 14;
+
+  doc.font('B').fontSize(16).fillColor(COLORS.primary);
+  const companyNameHeight = measureTextHeight(doc, model.issuer.name, textW, 'B', 16);
+  doc.text(model.issuer.name, textX, cursor, { width: textW });
+  cursor += companyNameHeight + 4;
+
+  doc.font('M').fontSize(9).fillColor(COLORS.ink)
+    .text(`NIF: ${model.issuer.taxId}`, textX, cursor, { width: textW });
+  cursor += 14;
+
+  const secondaryLines = [
+    model.issuer.address,
+    [model.issuer.phone, model.issuer.email].filter(Boolean).join(' · '),
+    model.issuer.website,
+  ].filter(Boolean);
+
+  secondaryLines.forEach((line) => {
+    const height = measureTextHeight(doc, line, textW, 'R', 8.5);
+    doc.font('R').fontSize(8.5).fillColor(COLORS.muted)
+      .text(line, textX, cursor, { width: textW });
+    cursor += height + 3;
+  });
+
+  return Math.max(markSize, cursor - y);
+}
+
+function drawDocumentHeader(state) {
+  const { doc, model } = state;
+  const leftX = MARGIN;
+  const rightW = 214;
+  const gap = 24;
+  const rightX = PAGE_W - MARGIN - rightW;
+  const leftW = rightX - leftX - gap;
+  const topY = MARGIN + 6;
+
+  const leftHeight = drawCompanyIdentity(doc, model, leftX, topY + 6, leftW);
+
+  doc.roundedRect(rightX, topY, rightW, 148, 18).fillAndStroke(COLORS.panel, COLORS.line);
+  doc.roundedRect(rightX, topY, 6, 148, 18).fill(COLORS.accent);
+  doc.font('M').fontSize(8).fillColor(COLORS.muted)
+    .text('Documento Fiscal', rightX + 18, topY + 14, { width: rightW - 32 });
+  doc.font('B').fontSize(21).fillColor(COLORS.primary)
+    .text(docTypeLabel(model.invoice.documentType).toUpperCase(), rightX + 18, topY + 28, { width: rightW - 32 });
+  doc.font('SB').fontSize(11).fillColor(COLORS.accent)
+    .text(model.invoice.documentNo, rightX + 18, topY + 56, { width: rightW - 32 });
+
+  let pillX = rightX + 18;
+  const statusWidth = drawPill(doc, pillX, topY + 76, statusLabel(model.invoice.documentStatus), statusTone(model.invoice.documentStatus));
+  pillX += statusWidth + 8;
+  drawPill(doc, pillX, topY + 76, agtStatusLabel(model.invoice.agtValidationStatus), {
+    fill: model.invoice.agtValidationStatus === 'V' ? COLORS.greenSoft : COLORS.accentSoft,
+    text: model.invoice.agtValidationStatus === 'V' ? COLORS.green : COLORS.accent,
+  });
+
+  const metaRows = [
+    { label: 'Emissão', value: fmtDate(model.invoice.documentDate) },
+    { label: 'Série', value: model.invoice.serie ? `${model.invoice.serie.seriesCode}/${model.invoice.serie.seriesYear}` : '—' },
+    { label: 'Ponto de venda', value: model.invoice.estabelecimento?.nome || '—' },
+    { label: 'Moeda', value: model.displayCurrency },
+    { label: 'Pagamento', value: model.invoice.paymentMethod || '—' },
+    { label: 'Vencimento', value: model.invoice.paymentDue ? fmtDate(model.invoice.paymentDue) : '—' },
+  ];
+
+  let metaY = topY + 103;
+  metaRows.forEach((row) => {
+    doc.font('M').fontSize(7).fillColor(COLORS.mutedLight)
+      .text(row.label.toUpperCase(), rightX + 18, metaY, { width: 70, lineBreak: false });
+    doc.font('SB').fontSize(8).fillColor(COLORS.ink)
+      .text(row.value, rightX + 94, metaY - 1, { width: rightW - 112, align: 'right', lineBreak: false });
+    metaY += 13;
+  });
+
+  const headerBottom = Math.max(topY + leftHeight + 6, topY + 148) + 18;
+  doc.moveTo(MARGIN, headerBottom).lineTo(PAGE_W - MARGIN, headerBottom)
+    .lineWidth(0.8).strokeColor(COLORS.line).stroke();
+  state.cursorY = headerBottom + 18;
+}
+
+function measureCardHeight(doc, width, lines) {
+  const innerW = width - 32;
+  let height = 52;
+
+  lines.forEach((line) => {
+    const size = line.size || (line.emphasis ? 10 : 8.5);
+    const lineHeight = measureTextHeight(doc, line.text, innerW, line.emphasis ? 'SB' : 'R', size);
+    height += lineHeight + (line.tight ? 1 : 4);
+  });
+
+  return Math.max(height + 10, 122);
+}
+
+function drawInfoCard(doc, x, y, width, title, lines) {
+  const height = measureCardHeight(doc, width, lines);
+  const innerW = width - 32;
+  let cursor = y + 16;
+
+  doc.roundedRect(x, y, width, height, 18).fillAndStroke(COLORS.white, COLORS.line);
+  doc.font('M').fontSize(8).fillColor(COLORS.accent)
+    .text(title.toUpperCase(), x + 16, cursor, { width: innerW, lineBreak: false });
+  cursor += 18;
+
+  lines.forEach((line) => {
+    const font = line.emphasis ? 'SB' : 'R';
+    const size = line.size || (line.emphasis ? 10 : 8.5);
+    const color = line.color || (line.emphasis ? COLORS.ink : COLORS.muted);
+    const lineHeight = measureTextHeight(doc, line.text, innerW, font, size);
+    doc.font(font).fontSize(size).fillColor(color)
+      .text(line.text, x + 16, cursor, { width: innerW });
+    cursor += lineHeight + (line.tight ? 1 : 4);
+  });
+
+  return height;
+}
+
+function drawParties(state) {
+  const { doc, model } = state;
+  ensureSpace(state, 160);
+
+  const leftLines = [
+    { text: model.issuer.name, emphasis: true, size: 11 },
+    { text: `NIF: ${model.issuer.taxId}` },
+    ...(model.issuer.address ? [{ text: model.issuer.address }] : []),
+    ...(model.issuer.phone ? [{ text: `Telefone: ${model.issuer.phone}` }] : []),
+    ...(model.issuer.email ? [{ text: `Email: ${model.issuer.email}` }] : []),
+    ...(model.issuer.website ? [{ text: model.issuer.website, color: COLORS.accent }] : []),
+  ];
+
+  const rightLines = [
+    { text: model.customer.name, emphasis: true, size: 11 },
+    { text: `NIF: ${model.customer.taxId}` },
+    ...(model.customer.address ? [{ text: model.customer.address }] : []),
+    ...(model.customer.phone ? [{ text: `Telefone: ${model.customer.phone}` }] : []),
+    ...(model.customer.email ? [{ text: `Email: ${model.customer.email}` }] : []),
+  ];
+
+  const boxW = (CONTENT_W - 18) / 2;
+  const leftH = drawInfoCard(doc, MARGIN, state.cursorY, boxW, 'Emitente', leftLines);
+  const rightH = drawInfoCard(doc, MARGIN + boxW + 18, state.cursorY, boxW, 'Cliente / Faturado a', rightLines);
+  state.cursorY += Math.max(leftH, rightH) + 18;
+}
+
+function getTableColumns() {
+  return [
+    { key: 'description', label: 'Descrição', width: 246, align: 'left' },
+    { key: 'qty', label: 'Qtd.', width: 48, align: 'right' },
+    { key: 'unitPrice', label: 'Preço Unit.', width: 84, align: 'right' },
+    { key: 'tax', label: 'IVA', width: 48, align: 'right' },
+    { key: 'total', label: 'Total', width: 85.28, align: 'right' },
+  ];
+}
+
+function drawTableHeader(state, continuation = false) {
+  const { doc, model } = state;
+  const headerY = state.cursorY;
+  const columns = getTableColumns();
+
+  if (continuation) {
+    doc.font('M').fontSize(7.5).fillColor(COLORS.muted)
+      .text(`Continuação · ${docTypeLabel(model.invoice.documentType)} ${model.invoice.documentNo}`, MARGIN, headerY, {
+        width: CONTENT_W,
+      });
+    state.cursorY += 15;
+  }
+
+  doc.roundedRect(MARGIN, state.cursorY, CONTENT_W, 24, 12).fill(COLORS.primary);
+  let x = MARGIN;
+  columns.forEach((column) => {
+    doc.font('SB').fontSize(7.5).fillColor(COLORS.white)
+      .text(column.label, x + 8, state.cursorY + 8, {
+        width: column.width - 16,
+        align: column.align,
+        lineBreak: false,
+      });
+    x += column.width;
+  });
+
+  state.cursorY += 30;
+}
+
+function addTablePage(state) {
+  addPage(state);
+  drawTableHeader(state, true);
+}
+
+function drawItemRows(state) {
+  const { doc, model } = state;
+  drawTableHeader(state, false);
+  const columns = getTableColumns();
+
+  model.lines.forEach((line, index) => {
+    const displayDescription = line.productDescription || '—';
+    const lineCode = line.productCode ? `Código: ${line.productCode}` : '';
+    const descriptionHeight = measureTextHeight(doc, displayDescription, columns[0].width - 16, 'SB', 9);
+    const codeHeight = lineCode
+      ? measureTextHeight(doc, lineCode, columns[0].width - 16, 'R', 7.5)
+      : 0;
+    const rowHeight = Math.max(34, descriptionHeight + codeHeight + 18);
+    if (state.cursorY + rowHeight > PAGE_H - 72) {
+      addTablePage(state);
+    }
+
+    const qty = Number(line.quantity || 0);
+    const unitPrice = Number(line.unitPrice || 0);
+    const tax = line.taxes?.[0]?.taxPercentage ?? 14;
+    const total = line.isIncluded ? 0 : (qty * unitPrice * (1 + (tax / 100)));
+    const rowBg = line.isIncluded
+      ? COLORS.greenSoft
+      : index % 2 === 0
+        ? COLORS.white
+        : COLORS.panel;
+
+    doc.rect(MARGIN, state.cursorY, CONTENT_W, rowHeight).fill(rowBg);
+    doc.moveTo(MARGIN, state.cursorY + rowHeight).lineTo(PAGE_W - MARGIN, state.cursorY + rowHeight)
+      .lineWidth(0.5).strokeColor(COLORS.line).stroke();
+
+    let x = MARGIN;
+    columns.forEach((column) => {
+      const valueX = x + 8;
+      const width = column.width - 16;
+
+      if (column.key === 'description') {
+        doc.font('SB').fontSize(9).fillColor(line.isIncluded ? COLORS.green : COLORS.ink)
+          .text(displayDescription, valueX, state.cursorY + 7, { width });
+        if (lineCode) {
+          doc.font('R').fontSize(7.5).fillColor(COLORS.muted)
+            .text(lineCode, valueX, state.cursorY + 11 + descriptionHeight, { width });
+        }
+      } else if (column.key === 'qty') {
+        doc.font('R').fontSize(8.5).fillColor(COLORS.ink)
+          .text(fmtNum(qty), valueX, state.cursorY + 8, { width, align: 'right', lineBreak: false });
+      } else if (column.key === 'unitPrice') {
+        doc.font(line.isIncluded ? 'SB' : 'R').fontSize(8.5).fillColor(line.isIncluded ? COLORS.green : COLORS.ink)
+          .text(
+            line.isIncluded ? 'Incluído' : fmtAmount(unitPrice, model.displayCurrency),
+            valueX,
+            state.cursorY + 8,
+            { width, align: 'right', lineBreak: false }
+          );
+      } else if (column.key === 'tax') {
+        doc.font('R').fontSize(8.5).fillColor(COLORS.muted)
+          .text(line.isIncluded ? '—' : `${fmtNum(tax, 0)}%`, valueX, state.cursorY + 8, { width, align: 'right', lineBreak: false });
+      } else if (column.key === 'total') {
+        doc.font('SB').fontSize(8.5).fillColor(line.isIncluded ? COLORS.green : COLORS.ink)
+          .text(
+            line.isIncluded ? 'Incluído' : fmtAmount(total, model.displayCurrency),
+            valueX,
+            state.cursorY + 8,
+            { width, align: 'right', lineBreak: false }
+          );
+      }
+
+      x += column.width;
+    });
+
+    state.cursorY += rowHeight;
+  });
+
+  doc.moveTo(MARGIN, state.cursorY).lineTo(PAGE_W - MARGIN, state.cursorY)
+    .lineWidth(1).strokeColor(COLORS.primary).stroke();
+  state.cursorY += 18;
+}
+
+function estimateSupportHeight(doc, rows, width) {
+  const valueWidth = width - 126;
+  let height = 56;
+  rows.forEach((row) => {
+    const valueHeight = measureTextHeight(doc, row.value || '—', valueWidth, 'R', 8.5);
+    height += Math.max(12, valueHeight) + 8;
+  });
+  return Math.max(height + 10, 136);
+}
+
+function drawSupportCard(doc, model, x, y, width, height) {
+  doc.roundedRect(x, y, width, height, 18).fillAndStroke(COLORS.white, COLORS.line);
+  doc.font('M').fontSize(8).fillColor(COLORS.accent)
+    .text('Pagamento e referências'.toUpperCase(), x + 16, y + 16, { width: width - 32 });
+
+  let cursor = y + 36;
+  const labelWidth = 94;
+  const valueWidth = width - 32 - labelWidth;
+  model.supportRows.forEach((row) => {
+    const value = row.value || '—';
+    const valueHeight = measureTextHeight(doc, value, valueWidth, 'R', 8.5);
+    doc.font('M').fontSize(7.5).fillColor(COLORS.mutedLight)
+      .text(row.label.toUpperCase(), x + 16, cursor + 1, { width: labelWidth - 8 });
+    doc.font('R').fontSize(8.5).fillColor(COLORS.ink)
+      .text(value, x + 16 + labelWidth, cursor, { width: valueWidth });
+    cursor += Math.max(13, valueHeight) + 8;
+  });
+
+  if (model.isProforma) {
+    doc.font('M').fontSize(8).fillColor(COLORS.amber)
+      .text('Documento proforma sem validade fiscal.', x + 16, y + height - 22, { width: width - 32 });
+  }
+}
+
+function drawTotalsCard(doc, model, x, y, width) {
+  const rows = [
+    { label: 'Subtotal', value: fmtAmount(model.invoice.netTotal, model.displayCurrency) },
+    { label: 'IVA', value: fmtAmount(model.invoice.taxPayable, model.displayCurrency) },
+  ];
+  let height = 132;
+  if (model.showBaseReference) height += 32;
+
+  doc.roundedRect(x, y, width, height, 20).fillAndStroke(COLORS.primary, COLORS.primary);
+  doc.font('M').fontSize(8).fillColor('#BFDBFE')
+    .text('Resumo financeiro'.toUpperCase(), x + 18, y + 16, { width: width - 36 });
+
+  let cursor = y + 38;
+  rows.forEach((row) => {
+    doc.font('M').fontSize(9).fillColor('#CBD5E1')
+      .text(row.label, x + 18, cursor, { width: 100, lineBreak: false });
+    doc.font('SB').fontSize(9).fillColor(COLORS.white)
+      .text(row.value, x + 118, cursor - 1, { width: width - 136, align: 'right', lineBreak: false });
+    cursor += 20;
+  });
+
+  doc.moveTo(x + 18, cursor + 4).lineTo(x + width - 18, cursor + 4)
+    .lineWidth(0.7).strokeColor('#33507A').stroke();
+  cursor += 16;
+
+  doc.font('M').fontSize(9).fillColor('#BFDBFE')
+    .text('Total do documento', x + 18, cursor, { width: 118, lineBreak: false });
+  doc.font('B').fontSize(15).fillColor(COLORS.white)
+    .text(fmtAmount(model.invoice.grossTotal, model.displayCurrency), x + 126, cursor - 3, {
+      width: width - 144,
+      align: 'right',
+      lineBreak: false,
+    });
+
+  if (model.showBaseReference) {
+    cursor += 30;
+    doc.roundedRect(x + 16, cursor - 6, width - 32, 28, 12).fill('#173659');
+    doc.font('M').fontSize(7.5).fillColor('#CBD5E1')
+      .text(`Equivalente interno ${model.baseCurrency}`, x + 28, cursor + 2, {
+        width: width - 56,
+      });
+    doc.font('SB').fontSize(8.5).fillColor(COLORS.white)
+      .text(
+        fmtAmount(model.invoice.grossTotal * Number(model.invoice.exchangeRate || 1), model.baseCurrency),
+        x + 28,
+        cursor + 13,
+        { width: width - 56, align: 'left', lineBreak: false }
+      );
+  }
+
+  return height;
+}
+
+function drawSummary(state) {
+  const { doc, model } = state;
+  const leftW = 262;
+  const gap = 18;
+  const rightW = CONTENT_W - leftW - gap;
+  const supportHeight = estimateSupportHeight(doc, model.supportRows, leftW);
+  const totalsHeight = model.showBaseReference ? 164 : 132;
+  const footerHeight = 130;
+
+  ensureSpace(state, Math.max(supportHeight, totalsHeight) + footerHeight + 18);
+
+  const y = state.cursorY;
+  drawSupportCard(doc, model, MARGIN, y, leftW, supportHeight);
+  drawTotalsCard(doc, model, MARGIN + leftW + gap, y, rightW);
+
+  state.cursorY += Math.max(supportHeight, totalsHeight) + 18;
+}
+
+function drawComplianceFooter(state) {
+  const { doc, model } = state;
+  const footerTop = state.cursorY;
+  const qrSize = 78;
+  const qrX = PAGE_W - MARGIN - qrSize;
+  const qrY = footerTop + 18;
+  const infoWidth = CONTENT_W - qrSize - 20;
+
+  doc.moveTo(MARGIN, footerTop).lineTo(PAGE_W - MARGIN, footerTop)
+    .lineWidth(0.8).strokeColor(COLORS.line).stroke();
+
+  doc.font('M').fontSize(8).fillColor(COLORS.accent)
+    .text('Rodapé documental'.toUpperCase(), MARGIN, footerTop + 14, { width: infoWidth });
+
+  let cursor = footerTop + 32;
+  const issuerFooterLines = [
+    [model.issuer.website, model.issuer.email].filter(Boolean).join(' · '),
+    model.issuer.phone ? `Contacto: ${model.issuer.phone}` : '',
+    'Obrigado pela sua preferência.',
+  ].filter(Boolean);
+
+  issuerFooterLines.forEach((line) => {
+    const height = measureTextHeight(doc, line, 214, 'R', 8.5);
+    doc.font('R').fontSize(8.5).fillColor(COLORS.muted)
+      .text(line, MARGIN, cursor, { width: 214 });
+    cursor += height + 4;
+  });
+
+  let agtY = footerTop + 32;
+  const agtX = MARGIN + 236;
+  const agtW = infoWidth - 236;
+  doc.font('M').fontSize(7.5).fillColor(COLORS.mutedLight)
+    .text('INFORMAÇÃO TÉCNICA', agtX, agtY, { width: agtW });
+  agtY += 14;
+
+  [
+    model.invoice.serie ? `Série: ${model.invoice.serie.seriesCode}/${model.invoice.serie.seriesYear}` : '',
+    `Estado AGT: ${agtStatusLabel(model.invoice.agtValidationStatus)}${model.isProforma ? ' · Proforma' : ''}`,
+    model.invoice.agtRequestId ? `Request ID: ${model.invoice.agtRequestId}` : '',
+    model.invoice.jwsSignature && model.invoice.jwsSignature !== 'PLACEHOLDER'
+      ? `Assinatura: ${String(model.invoice.jwsSignature).slice(0, 34)}...`
+      : '',
+  ].filter(Boolean).forEach((line) => {
+    const height = measureTextHeight(doc, line, agtW, 'R', 7.5);
+    doc.font('R').fontSize(7.5).fillColor(COLORS.ink)
+      .text(line, agtX, agtY, { width: agtW });
+    agtY += height + 4;
+  });
+
+  if (!model.isProforma && model.invoice.qrCodeImage) {
+    const qrBuffer = parseImage(model.invoice.qrCodeImage);
+    if (qrBuffer) {
+      doc.roundedRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 30, 16).fillAndStroke(COLORS.white, COLORS.line);
+      doc.image(qrBuffer, qrX, qrY, { fit: [qrSize, qrSize] });
+      doc.font('M').fontSize(6.5).fillColor(COLORS.muted)
+        .text('Consulta fiscal AGT', qrX - 8, qrY + qrSize + 8, {
+          width: qrSize + 16,
+          align: 'center',
+          lineBreak: false,
+        });
+    }
+  }
+
+  const legalText = model.isProforma
+    ? `Documento proforma emitido por ${model.issuer.name} · NIF ${model.issuer.taxId} · Sem efeito fiscal.`
+    : `Documento processado por programa informático certificado · Nº Cert.: ${model.invoice.agtValidationStatus === 'NA' ? 'N/A' : (state.config.agtCertNumber || 'PENDENTE')} · ${model.issuer.name} · NIF ${model.issuer.taxId}.`;
+
+  doc.moveTo(MARGIN, PAGE_H - 52).lineTo(PAGE_W - MARGIN, PAGE_H - 52)
+    .lineWidth(0.5).strokeColor(COLORS.line).stroke();
+  doc.font('R').fontSize(6.8).fillColor(COLORS.muted)
+    .text(legalText, MARGIN, PAGE_H - 46, { width: CONTENT_W, align: 'center' });
+}
+
+async function generateFacturaPDF(factura, config = {}) {
   return new Promise((resolve, reject) => {
+    const model = buildModel(factura, config);
     const doc = new PDFDocument({
       size: 'A4',
       margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
       info: {
-        Title:   `${docTypeLabel(factura.documentType)} ${factura.documentNo}`,
-        Author:  config.nomeEmpresa || 'KukuGest',
+        Title: `${docTypeLabel(factura.documentType)} ${factura.documentNo}`,
+        Author: model.issuer.name || 'KukuGest',
         Creator: 'KukuGest',
       },
     });
 
-    doc.registerFont('R',  FONT_REGULAR);
-    doc.registerFont('M',  FONT_MEDIUM);
-    doc.registerFont('SB', FONT_SEMIBOLD);
-    doc.registerFont('B',  FONT_BOLD);
+    registerFonts(doc);
 
     const chunks = [];
-    doc.on('data',  c => chunks.push(c));
-    doc.on('end',  () => resolve(Buffer.concat(chunks)));
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    const lines    = Array.isArray(factura.lines) ? factura.lines : JSON.parse(factura.lines || '[]');
-    const ibans    = (() => {
-      try { return config.iban ? JSON.parse(config.iban) : []; }
-      catch { return config.iban ? [{ label: 'Principal', iban: config.iban }] : []; }
-    })();
-    const currency = factura.currencyCode || 'AOA';
-
-    // ═══════════════════════════════════════════════════════════
-    // BARRA DE TOPO
-    // ═══════════════════════════════════════════════════════════
-    doc.rect(0, 0, PAGE_W, 5).fill(NAVY);
-
-    // ═══════════════════════════════════════════════════════════
-    // CABEÇALHO — 2 colunas independentes, altura dinâmica
-    // ═══════════════════════════════════════════════════════════
-    const LOGO_MAX_W = 72;
-    const LOGO_MAX_H = 52;
-    const RIGHT_W    = 190;
-    const rightX     = PAGE_W - MARGIN - RIGHT_W;   // 355.28
-    const LEFT_W     = rightX - MARGIN - 15;         // 290.28  (gap de 15pt)
-
-    let leftY  = 18;
-    let rightY = 18;
-
-    // ── Coluna esquerda: logo + dados empresa ─────────────────
-    let textX = MARGIN;
-    let textW = LEFT_W;
-
-    if (isSupportedImage(config.logoUrl)) {
-      try {
-        const mime   = config.logoUrl.split(';')[0].replace('data:', '').toLowerCase();
-        const ci     = config.logoUrl.indexOf(',');
-        const imgBuf = Buffer.from(config.logoUrl.slice(ci + 1), 'base64');
-        if (isValidImageBuffer(imgBuf, mime)) {
-          doc.image(imgBuf, MARGIN, leftY, { fit: [LOGO_MAX_W, LOGO_MAX_H] });
-          textX = MARGIN + LOGO_MAX_W + 12;
-          textW = LEFT_W - LOGO_MAX_W - 12;
-        }
-      } catch { /* logo corrompido — usar texto normal */ }
-    }
-
-    // Nome da empresa (pode fazer wrap dentro de textW)
-    doc.font('B').fontSize(13).fillColor(NAVY);
-    const nameH = doc.heightOfString(config.nomeEmpresa || 'Empresa', { width: textW });
-    doc.text(config.nomeEmpresa || 'Empresa', textX, leftY + 4, { width: textW });
-    leftY += 4 + nameH + 3;
-
-    // NIF
-    doc.font('R').fontSize(8.5).fillColor(GRAY)
-       .text(`NIF: ${config.nifEmpresa || '—'}`, textX, leftY, { width: textW });
-    leftY += 13;
-
-    // Morada (pode fazer wrap)
-    if (config.moradaEmpresa) {
-      doc.font('R').fontSize(8.5).fillColor(GRAY);
-      const moradaH = doc.heightOfString(config.moradaEmpresa, { width: textW });
-      doc.text(config.moradaEmpresa, textX, leftY, { width: textW });
-      leftY += moradaH + 3;
-    }
-
-    // ── Coluna direita: tipo doc + número + data ───────────────
-    doc.font('B').fontSize(20).fillColor(NAVY)
-       .text(docTypeLabel(factura.documentType).toUpperCase(), rightX, rightY, { width: RIGHT_W, align: 'right', lineBreak: false });
-    rightY += 27;
-
-    doc.font('SB').fontSize(11).fillColor(INDIGO)
-       .text(factura.documentNo, rightX, rightY, { width: RIGHT_W, align: 'right', lineBreak: false });
-    rightY += 17;
-
-    doc.font('R').fontSize(8.5).fillColor(GRAY)
-       .text(`Data: ${fmtDate(factura.documentDate)}`, rightX, rightY, { width: RIGHT_W, align: 'right', lineBreak: false });
-    rightY += 13;
-
-    if (factura.paymentDue) {
-      doc.font('R').fontSize(8.5).fillColor(GRAY)
-         .text(`Venc.: ${fmtDate(factura.paymentDue)}`, rightX, rightY, { width: RIGHT_W, align: 'right', lineBreak: false });
-      rightY += 13;
-    }
-    if (factura.paymentMethod) {
-      doc.font('R').fontSize(8).fillColor(GRAY)
-         .text(factura.paymentMethod, rightX, rightY, { width: RIGHT_W, align: 'right', lineBreak: false });
-      rightY += 13;
-    }
-
-    // Separador abaixo do conteúdo mais alto
-    const minLogoBottom = isSupportedImage(config.logoUrl) ? 18 + LOGO_MAX_H + 4 : 0;
-    const headerBottom  = Math.max(leftY, rightY, minLogoBottom) + 12;
-
-    doc.moveTo(MARGIN, headerBottom)
-       .lineTo(MARGIN + INNER_W, headerBottom)
-       .lineWidth(0.5).strokeColor(BORDER).stroke();
-
-    let y = headerBottom + 14;
-
-    // ═══════════════════════════════════════════════════════════
-    // EMITENTE / CLIENTE
-    // ═══════════════════════════════════════════════════════════
-    const boxW = (INNER_W - 10) / 2;
-    const boxH = 80;
-    const pad  = 12;
-
-    doc.rect(MARGIN, y, boxW, boxH).fillAndStroke(LIGHT, BORDER);
-    doc.font('SB').fontSize(6.5).fillColor(INDIGO)
-       .text('EMITENTE', MARGIN + pad, y + pad);
-    doc.font('SB').fontSize(9.5).fillColor(NAVY)
-       .text(factura.estabelecimento?.nome || config.nomeEmpresa || '—', MARGIN + pad, y + pad + 13, { width: boxW - pad * 2 });
-    const emitenteNif =
-      config.workspaceMode === 'comercio'
-        ? (config.nifEmpresa || factura.estabelecimento?.nif || '—')
-        : (factura.estabelecimento?.nif || config.nifEmpresa || '—');
-    doc.font('R').fontSize(8).fillColor(GRAY)
-       .text(`NIF: ${emitenteNif}`, MARGIN + pad, y + pad + 29, { width: boxW - pad * 2 });
-    if (config.moradaEmpresa) {
-      doc.font('R').fontSize(7.5).fillColor(GRAY)
-         .text(config.moradaEmpresa, MARGIN + pad, y + pad + 42, { width: boxW - pad * 2 });
-    }
-
-    const cxBox = MARGIN + boxW + 10;
-    doc.rect(cxBox, y, boxW, boxH).fillAndStroke(LIGHT, BORDER);
-    doc.font('SB').fontSize(6.5).fillColor(INDIGO)
-       .text('CLIENTE', cxBox + pad, y + pad);
-    doc.font('SB').fontSize(9.5).fillColor(NAVY)
-       .text(factura.customerName || '—', cxBox + pad, y + pad + 13, { width: boxW - pad * 2 });
-    doc.font('R').fontSize(8).fillColor(GRAY)
-       .text(`NIF: ${factura.customerTaxID || '—'}`, cxBox + pad, y + pad + 29, { width: boxW - pad * 2 });
-    if (factura.customerAddress) {
-      doc.font('R').fontSize(7.5).fillColor(GRAY)
-         .text(factura.customerAddress, cxBox + pad, y + pad + 42, { width: boxW - pad * 2 });
-    }
-
-    y += boxH + 16;
-
-    // ═══════════════════════════════════════════════════════════
-    // TABELA DE ARTIGOS
-    // ═══════════════════════════════════════════════════════════
-    const tableW = INNER_W;
-    const hdrH   = 24;
-    const rowH   = 22;
-
-    const cols = [
-      { label: 'Nº',          w: 22,   align: 'center' },
-      { label: 'Descrição',   w: null, align: 'left'   },
-      { label: 'Qtd.',        w: 40,   align: 'right'  },
-      { label: 'Preço Unit.', w: 76,   align: 'right'  },
-      { label: 'IVA',         w: 36,   align: 'right'  },
-      { label: 'Total',       w: 78,   align: 'right'  },
-    ];
-    const fixedW = cols.reduce((s, c) => s + (c.w || 0), 0);
-    cols[1].w = tableW - fixedW;
-
-    doc.rect(MARGIN, y, tableW, hdrH).fill(NAVY);
-    let cx = MARGIN;
-    doc.font('SB').fontSize(7.5).fillColor(WHITE);
-    for (const col of cols) {
-      doc.text(col.label, cx + 5, y + 8, { width: col.w - 10, align: col.align, lineBreak: false });
-      cx += col.w;
-    }
-    y += hdrH;
-
-    lines.forEach((line, idx) => {
-      const incl = !!line.isIncluded;
-      const qty  = Number(line.quantity)  || 0;
-      const uprc = incl ? 0 : (Number(line.unitPrice) || 0);
-      const sub  = qty * uprc;
-      const tax  = incl ? 0 : (line.taxes?.[0]?.taxPercentage ?? 14);
-      const tot  = sub * (1 + tax / 100);
-
-      if (y > PAGE_H - 200) { doc.addPage(); y = MARGIN; }
-
-      // Linhas "incluído" têm fundo verde suave
-      const rowBg = incl ? '#F0FDF4' : (idx % 2 === 0 ? WHITE : LIGHT);
-      doc.rect(MARGIN, y, tableW, rowH).fill(rowBg);
-      doc.moveTo(MARGIN, y + rowH).lineTo(MARGIN + tableW, y + rowH)
-         .lineWidth(0.4).strokeColor(BORDER).stroke();
-
-      // Renderizar cada célula com posição absoluta (evita cursor drift do PDFKit)
-      let colX = MARGIN;
-      cols.forEach((col, ci) => {
-        if (ci === 1) {
-          // Coluna de descrição — posição fixa y+5 com código abaixo (só linhas normais)
-          doc.font('SB').fontSize(8.5).fillColor(incl ? '#059669' : NAVY)
-             .text(line.productDescription || '—', colX + 5, y + 5, { width: col.w - 10, lineBreak: false, ellipsis: true });
-          if (!incl && line.productCode) {
-            doc.font('R').fontSize(7).fillColor(GRAY)
-               .text(line.productCode, colX + 5, y + 15, { width: col.w - 10, lineBreak: false, ellipsis: true });
-          }
-        } else if (ci === 0) {
-          doc.font('R').fontSize(8.5).fillColor(NAVY)
-             .text(String(line.lineNumber ?? 1), colX + 5, y + 7, { width: col.w - 10, align: 'center', lineBreak: false });
-        } else if (ci === 2) {
-          doc.font('R').fontSize(8.5).fillColor(NAVY)
-             .text(fmtNum(qty), colX + 5, y + 7, { width: col.w - 10, align: 'right', lineBreak: false });
-        } else if (ci === 3) {
-          if (incl) {
-            doc.font('SB').fontSize(8).fillColor('#059669')
-               .text('Incluído', colX + 5, y + 7, { width: col.w - 10, align: 'right', lineBreak: false });
-          } else {
-            doc.font('R').fontSize(8.5).fillColor(NAVY)
-               .text(fmtNum(uprc), colX + 5, y + 7, { width: col.w - 10, align: 'right', lineBreak: false });
-          }
-        } else if (ci === 4) {
-          doc.font('R').fontSize(8.5).fillColor(NAVY)
-             .text(incl ? '—' : `${tax}%`, colX + 5, y + 7, { width: col.w - 10, align: 'right', lineBreak: false });
-        } else if (ci === 5) {
-          if (incl) {
-            doc.font('SB').fontSize(8).fillColor('#059669')
-               .text('Incluído', colX + 5, y + 7, { width: col.w - 10, align: 'right', lineBreak: false });
-          } else {
-            doc.font('R').fontSize(8.5).fillColor(NAVY)
-               .text(fmtNum(tot), colX + 5, y + 7, { width: col.w - 10, align: 'right', lineBreak: false });
-          }
-        }
-        colX += col.w;
-      });
-      y += rowH;
-    });
-
-    // Borda inferior da tabela
-    doc.moveTo(MARGIN, y).lineTo(MARGIN + tableW, y).lineWidth(1).strokeColor(NAVY).stroke();
-    y += 16;
-
-    // ═══════════════════════════════════════════════════════════
-    // TOTAIS
-    // ═══════════════════════════════════════════════════════════
-    const TOT_W = 215;
-    const totX  = PAGE_W - MARGIN - TOT_W;
-    const totPad = 10;
-
-    const drawTotRow = (label, value, opts = {}) => {
-      const { bold = false, highlight = false, size = 9 } = opts;
-      if (highlight) doc.rect(totX, y, TOT_W, 24).fill('#EEF2FF');
-      const ty = y + (highlight ? 6 : 4);
-      doc.font(bold ? 'SB' : 'R').fontSize(size)
-         .fillColor(highlight ? INDIGO : GRAY)
-         .text(label, totX + totPad, ty, { width: 118, align: 'left', lineBreak: false });
-      doc.font(bold ? 'B' : 'R').fontSize(bold ? size + 1 : size)
-         .fillColor(highlight ? INDIGO : NAVY)
-         .text(value, totX + totPad + 118, ty, { width: TOT_W - totPad * 2 - 118, align: 'right', lineBreak: false });
-      y += highlight ? 24 : 20;
+    const state = {
+      doc,
+      model,
+      config,
+      pageNumber: 1,
+      cursorY: MARGIN,
     };
 
-    doc.moveTo(totX, y).lineTo(totX + TOT_W, y).lineWidth(0.5).strokeColor(BORDER).stroke();
-    y += 8;
-    drawTotRow('Subtotal (sem IVA)', fmtAmount(factura.netTotal, currency));
-    drawTotRow('IVA', fmtAmount(factura.taxPayable, currency));
-    doc.moveTo(totX, y).lineTo(totX + TOT_W, y).lineWidth(0.5).strokeColor(BORDER).stroke();
-    y += 6;
-    drawTotRow('TOTAL A PAGAR', fmtAmount(factura.grossTotal, currency), { bold: true, highlight: true, size: 10 });
-    if (currency !== 'AOA' && factura.exchangeRate) {
-      drawTotRow(
-        `Equiv. AOA (câmbio ${factura.exchangeRate})`,
-        fmtNum(factura.grossTotal * factura.exchangeRate) + ' Kz',
-        { size: 8 }
-      );
-    }
-
-    y += 12;
-
-    // ═══════════════════════════════════════════════════════════
-    // DADOS DE PAGAMENTO
-    // ═══════════════════════════════════════════════════════════
-    if (ibans.length > 0 || factura.paymentMethod) {
-      doc.moveTo(MARGIN, y).lineTo(MARGIN + INNER_W, y).lineWidth(0.4).strokeColor(BORDER).stroke();
-      y += 12;
-      doc.font('SB').fontSize(7).fillColor(INDIGO).text('DADOS DE PAGAMENTO', MARGIN, y);
-      y += 13;
-      if (factura.paymentMethod) {
-        doc.font('R').fontSize(8.5).fillColor(GRAY)
-           .text('Método: ', MARGIN, y, { continued: true, lineBreak: false })
-           .font('SB').fillColor(NAVY).text(factura.paymentMethod);
-        y += 14;
-      }
-      ibans.forEach(entry => {
-        doc.font('R').fontSize(7.5).fillColor(GRAY)
-           .text((entry.label || 'IBAN') + ': ', MARGIN, y, { continued: true, lineBreak: false })
-           .font('M').fillColor(NAVY).text(entry.iban);
-        y += 13;
-      });
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // MARCA DE ÁGUA ANULADA / PROFORMA
-    // ═══════════════════════════════════════════════════════════
-    if (factura.documentStatus === 'A') {
-      doc.save();
-      doc.rotate(-35, { origin: [PAGE_W / 2, PAGE_H / 2] });
-      doc.font('B').fontSize(90).fillColor(RED).opacity(0.07)
-         .text('ANULADA', 60, PAGE_H / 2 - 50, { width: PAGE_W - 120, align: 'center' });
-      doc.restore().opacity(1);
-    }
-    if (factura.documentType === 'PF') {
-      doc.save();
-      doc.rotate(-35, { origin: [PAGE_W / 2, PAGE_H / 2] });
-      doc.font('B').fontSize(72).fillColor('#F59E0B').opacity(0.08)
-         .text('PROFORMA', 40, PAGE_H / 2 - 40, { width: PAGE_W - 80, align: 'center' });
-      doc.restore().opacity(1);
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // RODAPÉ — QR CODE + AGT
-    // ═══════════════════════════════════════════════════════════
-    const footerY = PAGE_H - MARGIN - 118;
-    doc.moveTo(MARGIN, footerY).lineTo(MARGIN + INNER_W, footerY)
-       .lineWidth(0.5).strokeColor(BORDER).stroke();
-
-    const isProforma = factura.documentType === 'PF';
-
-    if (isProforma) {
-      // Rodapé simplificado para Proforma — sem QR nem AGT
-      let ay = footerY + 12;
-      doc.font('SB').fontSize(8).fillColor('#F59E0B')
-         .text('DOCUMENTO PROFORMA — SEM VALIDADE FISCAL', MARGIN, ay, { width: INNER_W, align: 'center' });
-      ay += 14;
-      doc.font('R').fontSize(7.5).fillColor(GRAY)
-         .text('Este documento é uma proposta comercial. Não substitui factura nem tem qualquer efeito fiscal ou legal.', MARGIN, ay, { width: INNER_W, align: 'center' });
-      ay += 12;
-      if (factura.serie) {
-        doc.font('R').fontSize(7.5).fillColor(GRAY)
-           .text(`Série: ${factura.serie.seriesCode}/${factura.serie.seriesYear}   ·   Emitido em: ${fmtDate(factura.documentDate)}   ·   ${config.nomeEmpresa || ''} · NIF: ${config.nifEmpresa || ''}`, MARGIN, ay, { width: INNER_W, align: 'center' });
-      }
-    } else {
-      const qrSize = 80;
-      const qrX    = PAGE_W - MARGIN - qrSize;
-      const qrY    = footerY + 10;
-
-      if (factura.qrCodeImage) {
-        try {
-          const ci    = factura.qrCodeImage.indexOf(',');
-          const qrBuf = Buffer.from(ci >= 0 ? factura.qrCodeImage.slice(ci + 1) : factura.qrCodeImage, 'base64');
-          if (isValidImageBuffer(qrBuf, 'image/png')) {
-            doc.image(qrBuf, qrX, qrY, { fit: [qrSize, qrSize] });
-            doc.font('R').fontSize(6).fillColor(GRAY)
-               .text('Consultar em AGT', qrX, qrY + qrSize + 3, { width: qrSize, align: 'center' });
-          }
-        } catch { /* qr inválido */ }
-      }
-
-      const agtW = INNER_W - qrSize - 16;
-      let ay = footerY + 12;
-      doc.font('SB').fontSize(7).fillColor(INDIGO).text('INFORMAÇÕES AGT', MARGIN, ay);
-      ay += 13;
-      doc.font('R').fontSize(8).fillColor(NAVY);
-      if (factura.serie) {
-        doc.text(
-          `Série: ${factura.serie.seriesCode}/${factura.serie.seriesYear}   ·   Tipo: ${docTypeLabel(factura.documentType)}`,
-          MARGIN, ay, { width: agtW }
-        );
-        ay += 12;
-      }
-      doc.text(
-        `Estado AGT: ${agtStatusLabel(factura.agtValidationStatus)}${config.agtMockMode ? '  (modo MOCK)' : ''}`,
-        MARGIN, ay, { width: agtW }
-      );
-      ay += 12;
-      if (factura.agtRequestId) {
-        doc.font('R').fontSize(7.5).fillColor(GRAY)
-           .text(`Request ID: ${factura.agtRequestId}`, MARGIN, ay, { width: agtW });
-        ay += 11;
-      }
-      if (factura.jwsSignature && factura.jwsSignature !== 'PLACEHOLDER') {
-        doc.font('R').fontSize(6.5).fillColor(GRAY)
-           .text(`Assinatura: ${factura.jwsSignature.substring(0, 50)}...`, MARGIN, ay, { width: agtW });
-      }
-    }
-
-    // Rodapé legal
-    const legalY = PAGE_H - MARGIN - 14;
-    doc.moveTo(0, legalY - 6).lineTo(PAGE_W, legalY - 6)
-       .lineWidth(0.4).strokeColor(BORDER).stroke();
-    doc.font('R').fontSize(6.5).fillColor(GRAY)
-       .text(
-         isProforma
-           ? `Proposta comercial emitida por ${config.nomeEmpresa || ''} · NIF: ${config.nifEmpresa || ''} · Documento sem efeito fiscal`
-           : `Documento processado por programa informático certificado · Nº Cert.: ${config.agtCertNumber || 'PENDENTE'} · ${config.nomeEmpresa || ''} · NIF: ${config.nifEmpresa || ''}`,
-         MARGIN, legalY, { width: INNER_W, align: 'center' }
-       );
+    drawPageFrame(state);
+    drawDocumentHeader(state);
+    drawParties(state);
+    drawItemRows(state);
+    drawSummary(state);
+    drawComplianceFooter(state);
 
     doc.end();
   });

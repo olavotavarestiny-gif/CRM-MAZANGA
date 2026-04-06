@@ -40,12 +40,10 @@ export default function FacturaDetailPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Link href="/finances?tab=facturas" className="text-gray-500 hover:text-[#0A2540] transition-colors">
-          <ChevronLeft className="w-5 h-5" />
-        </Link>
-        <h1 className="text-2xl font-bold text-[#0A2540]">Factura</h1>
-      </div>
+      <Link href="/finances?tab=facturas" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-[#0A2540]">
+        <ChevronLeft className="h-4 w-4" />
+        Voltar às faturas
+      </Link>
       <FacturaDetail factura={factura} isMock={config?.agtMockMode} ibans={ibans} />
     </div>
   );

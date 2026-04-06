@@ -171,7 +171,14 @@ function ConfiguracoesContent() {
 
   // ── Empresa & AGT ────────────────────────────────────────
   const [configForm, setConfigForm] = useState({
-    nifEmpresa: '', nomeEmpresa: '', moradaEmpresa: '', agtCertNumber: '', agtMockMode: true,
+    nifEmpresa: '',
+    nomeEmpresa: '',
+    moradaEmpresa: '',
+    telefoneEmpresa: '',
+    emailEmpresa: '',
+    websiteEmpresa: '',
+    agtCertNumber: '',
+    agtMockMode: true,
   });
   const [ibans, setIbans] = useState<IBANEntry[]>([]);
   const [logoUrl, setLogoUrl] = useState<string>('');
@@ -207,6 +214,9 @@ function ConfiguracoesContent() {
         nifEmpresa: config.nifEmpresa,
         nomeEmpresa: config.nomeEmpresa,
         moradaEmpresa: config.moradaEmpresa,
+        telefoneEmpresa: config.telefoneEmpresa || '',
+        emailEmpresa: config.emailEmpresa || '',
+        websiteEmpresa: config.websiteEmpresa || '',
         agtCertNumber: config.agtCertNumber,
         agtMockMode: config.agtMockMode,
       });
@@ -731,7 +741,7 @@ function ConfiguracoesContent() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <Label className="text-gray-700">NIF da Empresa</Label>
                   <Input value={configForm.nifEmpresa} onChange={e => setConfigForm(p => ({ ...p, nifEmpresa: e.target.value }))} placeholder="5000123456" className="mt-1" />
@@ -744,6 +754,20 @@ function ConfiguracoesContent() {
               <div>
                 <Label className="text-gray-700">Morada</Label>
                 <Input value={configForm.moradaEmpresa} onChange={e => setConfigForm(p => ({ ...p, moradaEmpresa: e.target.value }))} placeholder="Luanda, Angola" className="mt-1" />
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div>
+                  <Label className="text-gray-700">Telefone</Label>
+                  <Input value={configForm.telefoneEmpresa} onChange={e => setConfigForm(p => ({ ...p, telefoneEmpresa: e.target.value }))} placeholder="+244 923 000 000" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-gray-700">Email</Label>
+                  <Input value={configForm.emailEmpresa} onChange={e => setConfigForm(p => ({ ...p, emailEmpresa: e.target.value }))} placeholder="financeiro@empresa.ao" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-gray-700">Website</Label>
+                  <Input value={configForm.websiteEmpresa} onChange={e => setConfigForm(p => ({ ...p, websiteEmpresa: e.target.value }))} placeholder="www.empresa.ao" className="mt-1" />
+                </div>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
