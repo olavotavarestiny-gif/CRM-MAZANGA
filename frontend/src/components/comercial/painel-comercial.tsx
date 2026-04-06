@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BarChart3,
   CreditCard,
@@ -16,7 +16,7 @@ import {
   Trophy,
   Unlock,
 } from 'lucide-react';
-import { getCaixaSessaoAtual, getComercialAnalise, getComercialResumo, getCurrentUser, getDailyTip } from '@/lib/api';
+import { dismissDailyTip, getCaixaSessaoAtual, getComercialAnalise, getComercialResumo, getCurrentUser, getDailyTip } from '@/lib/api';
 import type { User } from '@/lib/api';
 import DailyTipCard from '@/components/dashboard/daily-tip-card';
 import OnboardingChecklist from '@/components/onboarding/onboarding-checklist';
@@ -400,6 +400,7 @@ function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
 
 export default function PainelComercialPage({ currentUser: currentUserProp }: { currentUser?: User }) {
   const [modo, setModo] = useState<'resumo' | 'analise'>('resumo');
+  const queryClient = useQueryClient();
   const {
     data: fetchedCurrentUser,
     isLoading: loadingUser,
@@ -437,6 +438,20 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
     staleTime: 1000 * 60 * 60,
     retry: false,
     enabled: !!currentUser,
+  });
+  const dismissDailyTipMutation = useMutation({
+    mutationFn: dismissDailyTip,
+    onSuccess: () => {
+      queryClient.setQueryData(['daily-tip', currentUser?.id, currentUser?.workspaceMode], (old: any) =>
+        old
+          ? {
+              ...old,
+              visibleInDashboard: false,
+              dismissedAt: new Date().toISOString(),
+            }
+          : old
+      );
+    },
   });
 
   const {
@@ -562,8 +577,12 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            {dailyTip?.tip && (
-              <DailyTipCard dailyTip={dailyTip} />
+            {dailyTip?.tip && dailyTip.visibleInDashboard !== false && (
+              <DailyTipCard
+                dailyTip={dailyTip}
+                onDismiss={() => dismissDailyTipMutation.mutate()}
+                dismissing={dismissDailyTipMutation.isPending}
+              />
             )}
 
             <Card className="border-slate-200 p-5 shadow-sm">

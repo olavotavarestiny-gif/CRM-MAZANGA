@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { isPast, isSameDay, parseISO } from 'date-fns';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   Banknote,
@@ -12,7 +12,7 @@ import {
   Settings2,
   Workflow,
 } from 'lucide-react';
-import { getContacts, getCurrentUser, getDailyTip, getFinanceDashboard, getTasks } from '@/lib/api';
+import { dismissDailyTip, getContacts, getCurrentUser, getDailyTip, getFinanceDashboard, getTasks } from '@/lib/api';
 import { isComercio } from '@/lib/business-modes';
 import type { Contact, DashboardStats, Task } from '@/lib/types';
 import PainelComercialPage from '@/components/comercial/painel-comercial';
@@ -190,6 +190,7 @@ function FinanceMetricWidget({ widget }: { widget: DashboardWidget }) {
 
 function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof getCurrentUser>> | undefined }) {
   const [customizerOpen, setCustomizerOpen] = useState(false);
+  const queryClient = useQueryClient();
   const dashboardScope = currentUser?.id ?? 'demo-user';
   const { widgets, loaded } = useDashboardConfig(dashboardScope);
 
@@ -199,6 +200,20 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
     staleTime: 1000 * 60 * 60,
     retry: false,
     enabled: !!currentUser,
+  });
+  const dismissDailyTipMutation = useMutation({
+    mutationFn: dismissDailyTip,
+    onSuccess: () => {
+      queryClient.setQueryData(['daily-tip', currentUser?.id, currentUser?.workspaceMode], (old: any) =>
+        old
+          ? {
+              ...old,
+              visibleInDashboard: false,
+              dismissedAt: new Date().toISOString(),
+            }
+          : old
+      );
+    },
   });
 
   const {
@@ -237,7 +252,7 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
 
   if (!loaded) {
     return (
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="mx-auto max-w-6xl p-4 md:p-6">
         <div className="animate-pulse space-y-6">
           <div className="flex items-start justify-between">
             <div className="space-y-3">
@@ -262,15 +277,15 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
   const otherWidgets = visible.filter((widget) => widget.type === 'tasks' || widget.type === 'pipeline');
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div className="mx-auto max-w-6xl p-4 md:p-6">
+      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold text-[#2c2f31] tracking-tight">Painel</h1>
           <p className="text-sm text-[#595c5e] mt-0.5">
             {new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setCustomizerOpen(true)}>
+        <Button variant="outline" size="sm" onClick={() => setCustomizerOpen(true)} className="w-full md:w-auto">
           <Settings2 className="w-4 h-4 mr-2" />
           Personalizar
         </Button>
@@ -346,9 +361,13 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
         </div>
       )}
 
-      {dailyTip?.tip && (
+      {dailyTip?.tip && dailyTip.visibleInDashboard !== false && (
         <div className="mb-6 max-w-2xl">
-          <DailyTipCard dailyTip={dailyTip} />
+          <DailyTipCard
+            dailyTip={dailyTip}
+            onDismiss={() => dismissDailyTipMutation.mutate()}
+            dismissing={dismissDailyTipMutation.isPending}
+          />
         </div>
       )}
 

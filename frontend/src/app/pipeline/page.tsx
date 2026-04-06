@@ -83,8 +83,8 @@ export default function PipelinePage() {
 
   const tabButtonClass = (tab: 'pipeline' | 'analytics') =>
     activeTab === tab
-      ? 'bg-[#0A2540] text-white shadow-sm'
-      : 'text-[#6b7e9a] hover:bg-slate-100 hover:text-[#0A2540]';
+      ? 'bg-[var(--workspace-primary)] text-[var(--workspace-on-primary)] shadow-sm'
+      : 'text-[#6b7e9a] hover:bg-[var(--workspace-primary-soft)] hover:text-[var(--workspace-primary)]';
 
   const changeTab = (tab: 'pipeline' | 'analytics') => {
     setActiveTab(tab);
@@ -92,7 +92,7 @@ export default function PipelinePage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">{pageTitle}</h1>
@@ -101,11 +101,11 @@ export default function PipelinePage() {
           </p>
         </div>
         <div className="flex flex-col gap-3 lg:items-end">
-          <div className="inline-flex items-center gap-1 rounded-2xl border border-[#dde3ec] bg-white p-1">
+          <div className="inline-flex w-full items-center gap-1 overflow-x-auto rounded-2xl border border-[#dde3ec] bg-white p-1 lg:w-auto">
             <button
               type="button"
               onClick={() => changeTab('pipeline')}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${tabButtonClass('pipeline')}`}
+              className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${tabButtonClass('pipeline')}`}
             >
               Pipeline
             </button>
@@ -113,7 +113,7 @@ export default function PipelinePage() {
               <button
                 type="button"
                 onClick={() => changeTab('analytics')}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${tabButtonClass('analytics')}`}
+                className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${tabButtonClass('analytics')}`}
               >
                 Analytics
               </button>
@@ -121,12 +121,12 @@ export default function PipelinePage() {
           </div>
 
           {activeTab === 'pipeline' ? (
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setIsStageManagerOpen(true)} className="border-slate-200 bg-white">
+            <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+              <Button variant="outline" onClick={() => setIsStageManagerOpen(true)} className="w-full border-slate-200 bg-white sm:w-auto">
                 <Settings2 className="w-4 h-4 mr-2" />
                 Gerir Etapas
               </Button>
-              <Button data-tour="pipeline-add" onClick={() => setIsAddModalOpen(true)}>
+              <Button className="w-full sm:w-auto" data-tour="pipeline-add" onClick={() => setIsAddModalOpen(true)}>
                 + Adicionar Contacto
               </Button>
             </div>

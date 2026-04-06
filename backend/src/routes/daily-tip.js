@@ -80,6 +80,23 @@ function buildDailyTipPayload({ user, dateString, workspaceMode }) {
   };
 }
 
+function normalizeStoredPayload(storedPayload, fallbackPayload) {
+  if (storedPayload && typeof storedPayload === 'object' && !Array.isArray(storedPayload)) {
+    return storedPayload;
+  }
+
+  return fallbackPayload;
+}
+
+function buildDeliveryResponse(existing, payload, show) {
+  return {
+    show,
+    visibleInDashboard: !existing?.dismissedInDashboard,
+    dismissedAt: existing?.dismissedAt ?? null,
+    ...payload,
+  };
+}
+
 router.post('/deliver', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -97,17 +114,12 @@ router.post('/deliver', requireAuth, async (req, res) => {
     });
 
     if (existing) {
-      const storedPayload = existing.payload && typeof existing.payload === 'object'
-        ? existing.payload
-        : payload;
+      const storedPayload = normalizeStoredPayload(existing.payload, payload);
 
-      return res.json({
-        show: false,
-        ...storedPayload,
-      });
+      return res.json(buildDeliveryResponse(existing, storedPayload, false));
     }
 
-    await prisma.dailyTipDelivery.create({
+    const created = await prisma.dailyTipDelivery.create({
       data: {
         userId,
         deliveryDate: dateString,
@@ -118,13 +130,51 @@ router.post('/deliver', requireAuth, async (req, res) => {
       },
     });
 
-    return res.json({
-      show: true,
-      ...payload,
-    });
+    return res.json(buildDeliveryResponse(created, payload, true));
   } catch (err) {
     console.error('[daily-tip] error:', err);
-    return res.json({ show: false });
+    return res.json({ show: false, visibleInDashboard: false });
+  }
+});
+
+router.post('/dismiss', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const dateString = getLuandaDateString();
+    const workspaceMode = await getWorkspaceMode(req.user);
+    const payload = buildDailyTipPayload({ user: req.user, dateString, workspaceMode });
+
+    await prisma.dailyTipDelivery.upsert({
+      where: {
+        userId_deliveryDate: {
+          userId,
+          deliveryDate: dateString,
+        },
+      },
+      create: {
+        userId,
+        deliveryDate: dateString,
+        workspaceMode: payload.workspaceMode,
+        audienceBucket: payload.audienceBucket,
+        tipId: payload.tip.id,
+        payload,
+        dismissedInDashboard: true,
+        dismissedAt: new Date(),
+      },
+      update: {
+        payload,
+        workspaceMode: payload.workspaceMode,
+        audienceBucket: payload.audienceBucket,
+        tipId: payload.tip.id,
+        dismissedInDashboard: true,
+        dismissedAt: new Date(),
+      },
+    });
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[daily-tip] dismiss error:', err);
+    return res.status(500).json({ error: 'Não foi possível esconder a dica do dia' });
   }
 });
 

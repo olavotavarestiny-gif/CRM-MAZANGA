@@ -76,14 +76,28 @@ const CHECKS = {
 const cache = new Map(); // orgId → { data, expiresAt }
 const CACHE_TTL = 60_000;
 
-function getCached(orgId) {
-  const entry = cache.get(orgId);
+function getCacheKey(orgId, workspaceMode) {
+  return `${orgId}:${workspaceMode}`;
+}
+
+function getCached(orgId, workspaceMode) {
+  const entry = cache.get(getCacheKey(orgId, workspaceMode));
   if (entry && entry.expiresAt > Date.now()) return entry.data;
   return null;
 }
 
-function setCache(orgId, data) {
-  cache.set(orgId, { data, expiresAt: Date.now() + CACHE_TTL });
+function setCache(orgId, workspaceMode, data) {
+  cache.set(getCacheKey(orgId, workspaceMode), { data, expiresAt: Date.now() + CACHE_TTL });
+}
+
+async function getWorkspaceMode(user) {
+  const ownerUserId = user?.effectiveUserId || user?.id;
+  const owner = await prisma.user.findUnique({
+    where: { id: ownerUserId },
+    select: { workspaceMode: true },
+  });
+
+  return owner?.workspaceMode === 'comercio' ? 'comercio' : 'servicos';
 }
 
 // ─── Core logic ───────────────────────────────────────────────────────────────
@@ -107,11 +121,16 @@ async function computeOnboarding(orgId, workspaceMode) {
 router.get('/', requireAuth, async (req, res) => {
   try {
     const orgId = String(req.user.effectiveUserId);
-    const workspaceMode = req.user.workspaceMode ?? 'servicos';
+    const workspaceMode = await getWorkspaceMode(req.user);
 
     // Ensure OnboardingProgress record exists
     let record = await prisma.onboardingProgress.findUnique({
-      where: { organization_id: orgId },
+      where: {
+        organization_id_workspace_mode: {
+          organization_id: orgId,
+          workspace_mode: workspaceMode,
+        },
+      },
     });
 
     if (!record) {
@@ -125,10 +144,10 @@ router.get('/', requireAuth, async (req, res) => {
 
     if (record.dismissed) {
       const steps = workspaceMode === 'comercio' ? COMERCIO_STEPS : SERVICOS_STEPS;
-      const cached = getCached(orgId);
+      const cached = getCached(orgId, workspaceMode);
       const completedCount = cached
         ? cached.steps.filter((s) => s.completed).length
-        : 0;
+        : record.completed_steps.length;
       return res.json({
         show: false,
         dismissed: true,
@@ -138,7 +157,7 @@ router.get('/', requireAuth, async (req, res) => {
     }
 
     // Use cache if fresh
-    const cached = getCached(orgId);
+    const cached = getCached(orgId, workspaceMode);
     if (cached) return res.json(cached);
 
     // Compute step states
@@ -148,18 +167,23 @@ router.get('/', requireAuth, async (req, res) => {
     const allDone = completedCount === totalCount;
 
     // Persist completed_at when first fully complete
-    if (allDone && !record.completed_at) {
-      await prisma.onboardingProgress.update({
-        where: { organization_id: orgId },
-        data: {
-          completed_at: new Date(),
-          completed_steps: steps.map((s) => s.id),
+    const completedSteps = steps.filter((s) => s.completed).map((s) => s.id);
+
+    await prisma.onboardingProgress.update({
+      where: {
+        organization_id_workspace_mode: {
+          organization_id: orgId,
+          workspace_mode: workspaceMode,
         },
-      });
-    }
+      },
+      data: {
+        completed_steps: completedSteps,
+        completed_at: allDone ? record.completed_at ?? new Date() : null,
+      },
+    });
 
     const payload = {
-      show: true,
+      show: !allDone,
       dismissed: false,
       completedCount,
       totalCount,
@@ -167,7 +191,7 @@ router.get('/', requireAuth, async (req, res) => {
       steps,
     };
 
-    setCache(orgId, payload);
+    setCache(orgId, workspaceMode, payload);
     return res.json(payload);
   } catch (err) {
     console.error('[onboarding] GET error:', err);
@@ -180,12 +204,18 @@ router.get('/', requireAuth, async (req, res) => {
 router.post('/dismiss', requireAuth, async (req, res) => {
   try {
     const orgId = String(req.user.effectiveUserId);
+    const workspaceMode = await getWorkspaceMode(req.user);
 
     await prisma.onboardingProgress.upsert({
-      where: { organization_id: orgId },
+      where: {
+        organization_id_workspace_mode: {
+          organization_id: orgId,
+          workspace_mode: workspaceMode,
+        },
+      },
       create: {
         organization_id: orgId,
-        workspace_mode: req.user.workspaceMode ?? 'servicos',
+        workspace_mode: workspaceMode,
         dismissed: true,
         dismissed_at: new Date(),
       },
@@ -196,7 +226,7 @@ router.post('/dismiss', requireAuth, async (req, res) => {
     });
 
     // Invalidate cache so next GET reflects dismissed state
-    cache.delete(orgId);
+    cache.delete(getCacheKey(orgId, workspaceMode));
 
     return res.json({ success: true });
   } catch (err) {

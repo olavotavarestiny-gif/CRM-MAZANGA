@@ -55,7 +55,7 @@ export default function StatWidget({
         {subtitle && <p className="text-xs text-[#595c5e] mt-1">{subtitle}</p>}
         {unit && unit !== 'Kz' && <p className="text-xs text-[#595c5e] mt-0.5">{unit}</p>}
         {href && (
-          <div className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-[#0049e6]">
+          <div className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-[var(--workspace-primary)]">
             <span>Ver detalhe</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </div>

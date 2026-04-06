@@ -127,7 +127,7 @@ export default function ContactsPage() {
   });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6">
+    <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Contactos</h1>
@@ -179,8 +179,8 @@ export default function ContactsPage() {
               onClick={() => setContactTypeTab(type)}
               className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
                 contactTypeTab === type
-                  ? 'bg-[#0A2540] text-white shadow-sm'
-                  : 'text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540]'
+                  ? 'bg-[var(--workspace-primary)] text-[var(--workspace-on-primary)] shadow-sm'
+                  : 'text-[#6b7e9a] hover:bg-[var(--workspace-primary-soft)] hover:text-[var(--workspace-primary)]'
               }`}
             >
               {type === 'interessado' ? 'Interessados' : 'Clientes'}
@@ -199,7 +199,7 @@ export default function ContactsPage() {
         onClearFilters={() => { setSearch(''); setDebouncedSearch(''); setStageFilter('ALL'); setRevenueFilter('ALL'); }}
       >
         <Select value={stageFilter} onValueChange={setStageFilter}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Estado do Lead" />
           </SelectTrigger>
           <SelectContent>
@@ -210,7 +210,7 @@ export default function ContactsPage() {
           </SelectContent>
         </Select>
         <Select value={revenueFilter} onValueChange={setRevenueFilter}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Faturamento" />
           </SelectTrigger>
           <SelectContent>

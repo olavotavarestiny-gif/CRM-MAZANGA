@@ -1,17 +1,11 @@
 'use client';
 
-import { Lightbulb, ShieldCheck, Users } from 'lucide-react';
+import { Lightbulb, ShieldCheck, Users, X } from 'lucide-react';
 import type { DailyTipDeliveryResponse } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 function getAudienceLabel(bucket?: 'owner' | 'equipa') {
   return bucket === 'owner' ? 'Owner e Admin' : 'Equipa';
-}
-
-function getAccentClasses(workspaceMode?: 'servicos' | 'comercio') {
-  return workspaceMode === 'comercio'
-    ? 'from-[#7A2E0B] via-[#B84D0E] to-[#F06A1A]'
-    : 'from-[#0A2540] via-[#114A84] to-[#1A6FD4]';
 }
 
 function getAudienceIcon(bucket?: 'owner' | 'equipa') {
@@ -20,12 +14,16 @@ function getAudienceIcon(bucket?: 'owner' | 'equipa') {
 
 export default function DailyTipCard({
   dailyTip,
+  onDismiss,
+  dismissing = false,
   className = '',
 }: {
   dailyTip?: DailyTipDeliveryResponse | null;
+  onDismiss?: () => void;
+  dismissing?: boolean;
   className?: string;
 }) {
-  if (!dailyTip?.tip) {
+  if (!dailyTip?.tip || dailyTip.visibleInDashboard === false) {
     return null;
   }
 
@@ -34,12 +32,26 @@ export default function DailyTipCard({
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-3xl bg-gradient-to-br p-6 text-white shadow-lg',
-        getAccentClasses(dailyTip.workspaceMode),
+        'relative overflow-hidden rounded-3xl border p-5 text-white shadow-lg md:p-6',
         className
       )}
+      style={{
+        background: 'linear-gradient(135deg, var(--workspace-primary) 0%, var(--workspace-primary-hover) 100%)',
+        borderColor: 'var(--workspace-primary-border)',
+      }}
     >
       <Lightbulb className="absolute -right-8 -bottom-8 h-32 w-32 opacity-10" />
+      {onDismiss ? (
+        <button
+          type="button"
+          onClick={onDismiss}
+          disabled={dismissing}
+          className="absolute right-4 top-4 z-20 rounded-full border border-white/15 bg-black/10 p-2 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+          aria-label="Esconder dica do dia"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      ) : null}
 
       <div className="relative z-10 space-y-3">
         <div className="flex flex-wrap items-center gap-2">

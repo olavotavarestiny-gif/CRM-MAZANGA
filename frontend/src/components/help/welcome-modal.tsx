@@ -18,7 +18,7 @@ export default function WelcomeModal({ open, onClose, onStartTour }: Props) {
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-md p-0 gap-0 bg-white overflow-hidden">
         {/* Hero */}
-        <div className="bg-[#0A2540] px-8 py-8 text-center">
+        <div className="bg-[var(--workspace-primary)] px-8 py-8 text-center">
           <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center mx-auto mb-4">
             <span className="text-white font-black text-xl" style={{ fontFamily: "'Montserrat', sans-serif" }}>K</span>
           </div>
@@ -39,11 +39,11 @@ export default function WelcomeModal({ open, onClose, onStartTour }: Props) {
                   key={section.id}
                   className="flex items-start gap-3 p-3 rounded-xl bg-[#f8fafc] border border-gray-100"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-[#0A2540]/8 flex items-center justify-center flex-shrink-0">
-                    <Icon className="w-4 h-4 text-[#0A2540]" />
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--workspace-primary-soft)]">
+                    <Icon className="h-4 w-4 text-[var(--workspace-primary)]" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-[#0A2540]">{section.title}</p>
+                    <p className="text-xs font-semibold text-[var(--workspace-primary)]">{section.title}</p>
                     <p className="text-[11px] text-[#6b7e9a] leading-snug mt-0.5 line-clamp-2">
                       {section.description}
                     </p>
@@ -56,13 +56,13 @@ export default function WelcomeModal({ open, onClose, onStartTour }: Props) {
           <div className="space-y-2">
             <button
               onClick={onClose}
-              className="w-full py-2.5 rounded-lg bg-[#0A2540] text-white text-sm font-medium hover:bg-[#0A2540]/90 transition-colors"
+              className="w-full rounded-lg bg-[var(--workspace-primary)] py-2.5 text-sm font-medium text-[var(--workspace-on-primary)] transition-colors hover:bg-[var(--workspace-primary-hover)]"
             >
               Começar a usar →
             </button>
             <button
               onClick={onStartTour}
-              className="w-full py-2.5 rounded-lg border border-gray-200 text-[#0A2540] text-sm font-medium hover:bg-[#f8fafc] transition-colors"
+              className="w-full rounded-lg border border-[var(--workspace-primary-border)] py-2.5 text-sm font-medium text-[var(--workspace-primary)] transition-colors hover:bg-[var(--workspace-primary-soft)]"
             >
               Abrir guia de início →
             </button>

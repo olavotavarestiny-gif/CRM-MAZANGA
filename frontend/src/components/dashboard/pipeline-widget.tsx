@@ -26,7 +26,7 @@ export default function PipelineWidget() {
     <Card className="col-span-2 rounded-xl">
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-base font-bold">Resumo do Pipeline</CardTitle>
-        <Link href="/pipeline" className="text-xs text-[#0049e6] font-semibold hover:text-[#0049e6]/80 transition-colors">Ver pipeline</Link>
+        <Link href="/pipeline" className="text-xs font-semibold text-[var(--workspace-primary)] transition-colors hover:opacity-80">Ver pipeline</Link>
       </CardHeader>
       <CardContent>
         <WidgetWrapper

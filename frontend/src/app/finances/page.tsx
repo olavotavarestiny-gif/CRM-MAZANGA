@@ -76,13 +76,9 @@ export default function FinancesPage() {
   const subtitle = isComercioWorkspace
     ? 'Movimentos financeiros, despesas e rentabilidade operacional do negócio.'
     : 'Receitas, despesas e rentabilidade por cliente.';
-  const primaryAccent = isComercioWorkspace ? '#F06A1A' : '#0A2540';
-  const tabActiveClass = isComercioWorkspace
-    ? 'bg-[#F06A1A] text-white shadow-sm'
-    : 'bg-[#0A2540] text-white shadow-sm';
-  const tabIdleClass = isComercioWorkspace
-    ? 'text-[#6b7e9a] hover:bg-[#FDF2EA] hover:text-[#F06A1A]'
-    : 'text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540]';
+  const primaryAccent = 'var(--workspace-primary)';
+  const tabActiveClass = 'bg-[var(--workspace-primary)] text-[var(--workspace-on-primary)] shadow-sm';
+  const tabIdleClass = 'text-[#6b7e9a] hover:bg-[var(--workspace-primary-soft)] hover:text-[var(--workspace-primary)]';
   const bannerClass = isComercioWorkspace
     ? 'rounded-2xl border border-[#F6D2BC] bg-[#FFF7F1] px-4 py-3 text-sm text-[#8A4313] shadow-sm'
     : 'rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-[#6b7e9a] shadow-sm';
@@ -174,7 +170,7 @@ export default function FinancesPage() {
   ] as const;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">{title}</h1>
@@ -183,7 +179,7 @@ export default function FinancesPage() {
         {activeTab === 'transacoes' && (
           <Button
             onClick={() => { setEditTransaction(undefined); setFormOpen(true); }}
-            className="gap-2"
+            className="w-full gap-2 lg:w-auto"
             style={{ backgroundColor: primaryAccent, borderColor: primaryAccent }}
           >
             <Plus className="w-4 h-4" />
@@ -192,7 +188,7 @@ export default function FinancesPage() {
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+      <div className="flex flex-nowrap gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
         {TABS.map(tab => (
           <button
             key={tab.id}

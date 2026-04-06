@@ -307,10 +307,10 @@ export default function CaixaPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
           <Button
             variant="outline"
-            className="gap-2"
+            className="w-full gap-2 sm:w-auto"
             onClick={() => {
               if (activeTab === 'historico' || activeTab === 'auditoria') {
                 refetchHistorico();
@@ -324,12 +324,12 @@ export default function CaixaPage() {
           </Button>
 
           {sessaoAberta && podeFecharCaixa ? (
-            <Button variant="destructive" className="gap-2" onClick={() => { setFecharErr(''); setShowFecharCaixa(true); }}>
+            <Button variant="destructive" className="w-full gap-2 sm:w-auto" onClick={() => { setFecharErr(''); setShowFecharCaixa(true); }}>
               <Lock className="h-4 w-4" />
               Fechar Caixa
             </Button>
           ) : !sessaoAberta && podeAbrirCaixa ? (
-            <Button className="gap-2 bg-green-600 text-white hover:bg-green-700" onClick={() => { setAbrirErr(''); setShowAbrirCaixa(true); }}>
+            <Button className="w-full gap-2 bg-green-600 text-white hover:bg-green-700 sm:w-auto" onClick={() => { setAbrirErr(''); setShowAbrirCaixa(true); }}>
               <Unlock className="h-4 w-4" />
               Abrir Caixa
             </Button>
@@ -337,13 +337,13 @@ export default function CaixaPage() {
         </div>
       </div>
 
-      <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+      <div className="inline-flex max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
         <button
           type="button"
           onClick={() => setActiveTab('sessao')}
           className={cn(
-            'rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
-            activeTab === 'sessao' ? 'bg-[#B84D0E] text-white' : 'text-slate-600 hover:bg-slate-100'
+            'shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+            activeTab === 'sessao' ? 'bg-[var(--workspace-primary)] text-[var(--workspace-on-primary)]' : 'text-slate-600 hover:bg-[var(--workspace-primary-soft)] hover:text-[var(--workspace-primary)]'
           )}
         >
           Sessão Atual
@@ -354,8 +354,8 @@ export default function CaixaPage() {
               type="button"
               onClick={() => setActiveTab('historico')}
               className={cn(
-                'rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
-                activeTab === 'historico' ? 'bg-[#B84D0E] text-white' : 'text-slate-600 hover:bg-slate-100'
+                'shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+                activeTab === 'historico' ? 'bg-[var(--workspace-primary)] text-[var(--workspace-on-primary)]' : 'text-slate-600 hover:bg-[var(--workspace-primary-soft)] hover:text-[var(--workspace-primary)]'
               )}
             >
               Histórico
@@ -364,8 +364,8 @@ export default function CaixaPage() {
               type="button"
               onClick={() => setActiveTab('auditoria')}
               className={cn(
-                'rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
-                activeTab === 'auditoria' ? 'bg-[#B84D0E] text-white' : 'text-slate-600 hover:bg-slate-100'
+                'shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+                activeTab === 'auditoria' ? 'bg-[var(--workspace-primary)] text-[var(--workspace-on-primary)]' : 'text-slate-600 hover:bg-[var(--workspace-primary-soft)] hover:text-[var(--workspace-primary)]'
               )}
             >
               Auditoria

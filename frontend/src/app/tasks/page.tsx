@@ -165,22 +165,22 @@ export default function TasksPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
+    <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Tarefas</h1>
           <p className="mt-1 text-sm text-[#6b7e9a]">Agenda, prioridades e execução diária da equipa.</p>
         </div>
-        <Button data-tour="tasks-new" onClick={() => { setEditingTask(null); setIsFormOpen(true); }}>
+        <Button className="w-full sm:w-auto" data-tour="tasks-new" onClick={() => { setEditingTask(null); setIsFormOpen(true); }}>
           <Plus className="w-4 h-4 mr-2" />
           Nova Tarefa
         </Button>
       </div>
 
-      <div data-tour="tasks-stats" className="grid grid-cols-3 gap-3 mb-6">
+      <div data-tour="tasks-stats" className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <button
           onClick={() => setFilter('todas')}
-          className={`rounded-2xl border p-4 text-left shadow-sm transition-all ${filter === 'todas' ? 'border-[#0A2540] bg-[#0A2540] text-white' : 'border-slate-200 bg-white text-[#0A2540] hover:bg-[#F8FAFC]'}`}
+          className={`rounded-2xl border p-4 text-left shadow-sm transition-all ${filter === 'todas' ? 'border-[var(--workspace-primary)] bg-[var(--workspace-primary)] text-[var(--workspace-on-primary)]' : 'border-slate-200 bg-white text-[#0A2540] hover:bg-[#F8FAFC]'}`}
         >
           <div className={`text-2xl font-bold`}>{pending}</div>
           <div className={`text-xs mt-0.5 ${filter === 'todas' ? 'text-white/70' : 'text-[#6b7e9a]'}`}>Pendentes</div>

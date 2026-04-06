@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -48,13 +48,11 @@ export default function OnboardingChecklist({ currentUser }: OnboardingChecklist
   const router = useRouter();
   const queryClient = useQueryClient();
   const [showDismissConfirm, setShowDismissConfirm] = useState(false);
-  const [allDoneVisible, setAllDoneVisible] = useState(false);
-  const prevAllDoneRef = useRef(false);
 
   const eligible = isEligible(currentUser);
 
   const { data } = useQuery({
-    queryKey: ['onboarding'],
+    queryKey: ['onboarding', currentUser?.workspaceMode],
     queryFn: getOnboarding,
     staleTime: 60_000,
     refetchInterval: 60_000,
@@ -64,48 +62,22 @@ export default function OnboardingChecklist({ currentUser }: OnboardingChecklist
   const dismiss = useMutation({
     mutationFn: dismissOnboarding,
     onSuccess: () => {
-      queryClient.setQueryData(['onboarding'], (old: typeof data) =>
+      queryClient.setQueryData(['onboarding', currentUser?.workspaceMode], (old: typeof data) =>
         old ? { ...old, show: false, dismissed: true } : old
       );
     },
   });
 
-  // Auto-hide 3s after reaching 100%
-  useEffect(() => {
-    if (!data?.allDone) return;
-    if (!prevAllDoneRef.current && data.allDone) {
-      prevAllDoneRef.current = true;
-      setAllDoneVisible(true);
-      const t = setTimeout(() => setAllDoneVisible(false), 3000);
-      return () => clearTimeout(t);
-    }
-  }, [data?.allDone]);
-
   if (!eligible) return null;
   if (!data || !data.show) return null;
   if (data.dismissed) return null;
+  if (data.allDone) return null;
 
   const { steps = [], completedCount, totalCount } = data;
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-  if (data.allDone && !allDoneVisible) return null;
-
-  if (data.allDone && allDoneVisible) {
-    return (
-      <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
-        <div className="flex items-center gap-3">
-          <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-emerald-600" />
-          <div>
-            <p className="text-sm font-semibold text-emerald-800">Configuração completa!</p>
-            <p className="text-sm text-emerald-700">A tua conta está pronta. Bom trabalho.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="mb-6 rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="mb-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <div className="flex items-center gap-3">
@@ -119,7 +91,7 @@ export default function OnboardingChecklist({ currentUser }: OnboardingChecklist
         <div className="flex items-center gap-3">
           <div className="h-2 w-32 overflow-hidden rounded-full bg-slate-100">
             <div
-              className="h-full rounded-full bg-[#1A6FD4] transition-all duration-500"
+              className="h-full rounded-full bg-[var(--workspace-primary)] transition-all duration-500"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -173,8 +145,8 @@ export default function OnboardingChecklist({ currentUser }: OnboardingChecklist
               {step.completed ? (
                 <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-emerald-500" />
               ) : isNext ? (
-                <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 border-[#1A6FD4]">
-                  <div className="h-2 w-2 rounded-full bg-[#1A6FD4]" />
+                <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 border-[var(--workspace-primary)]">
+                  <div className="h-2 w-2 rounded-full bg-[var(--workspace-primary)]" />
                 </div>
               ) : (
                 <Circle className="h-5 w-5 flex-shrink-0 text-slate-300" />
@@ -182,7 +154,7 @@ export default function OnboardingChecklist({ currentUser }: OnboardingChecklist
 
               <Icon
                 className={`h-4 w-4 flex-shrink-0 ${
-                  step.completed ? 'text-emerald-400' : isNext ? 'text-[#1A6FD4]' : 'text-slate-300'
+                  step.completed ? 'text-emerald-400' : isNext ? 'text-[var(--workspace-primary)]' : 'text-slate-300'
                 }`}
               />
 
@@ -203,7 +175,7 @@ export default function OnboardingChecklist({ currentUser }: OnboardingChecklist
                   onClick={() => router.push(step.href)}
                   className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
                     isNext
-                      ? 'bg-[#1A6FD4] text-white hover:bg-[#1558a8]'
+                      ? 'bg-[var(--workspace-primary)] text-[var(--workspace-on-primary)] hover:bg-[var(--workspace-primary-hover)]'
                       : 'border border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
                   }`}
                 >

@@ -1302,6 +1302,8 @@ export async function dismissOnboarding(): Promise<void> {
 
 export interface DailyTipDeliveryResponse {
   show: boolean;
+  visibleInDashboard?: boolean;
+  dismissedAt?: string | null;
   date?: string;
   tipIndex?: number;
   workspaceMode?: 'servicos' | 'comercio';
@@ -1319,6 +1321,10 @@ export interface DailyTipDeliveryResponse {
 export async function getDailyTip(): Promise<DailyTipDeliveryResponse> {
   const res = await api.post<DailyTipDeliveryResponse>('/api/daily-tip/deliver');
   return res.data;
+}
+
+export async function dismissDailyTip(): Promise<void> {
+  await api.post('/api/daily-tip/dismiss');
 }
 
 export default api;

@@ -2,23 +2,19 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useIsFetching } from '@tanstack/react-query';
-import { getCurrentUser, getDailyTip } from '@/lib/api';
+import { getCurrentUser } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
 import Sidebar from './sidebar';
 import { Footer } from './footer';
 import WelcomeModal from '@/components/help/welcome-modal';
-import OnboardingChecklist from '@/components/help/onboarding-checklist';
-import { ONBOARDING_OPEN } from '@/lib/onboarding-tasks';
 import ProductTourProvider, { useTour } from '@/components/help/product-tour';
-import KukuGestLogo, { KukuGestWorkspaceLogo } from '@/components/KukuGestLogo';
+import KukuGestLogo from '@/components/KukuGestLogo';
 import { ReactNode } from 'react';
 import { Menu, Eye, Info, LogOut, X } from 'lucide-react';
 import type { User } from '@/lib/api';
 import { canAccessWorkspaceRoute, getWorkspaceFallbackRoute, hasFeature } from '@/lib/permissions';
 import { isComercio } from '@/lib/business-modes';
-import { useToast } from '@/components/ui/toast-provider';
 
 const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
 
@@ -75,7 +71,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { startTour } = useTour();
-  const { toast } = useToast();
   const fetchingCount = useIsFetching();
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -87,7 +82,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
   const [showTopProgress, setShowTopProgress] = useState(false);
   const authChecked = useRef(false);
   const currentSessionRef = useRef<string | null>(null);
-  const deliveredTipToastRef = useRef<string | null>(null);
 
   const isPublicPage =
     pathname === '/login' ||
@@ -100,14 +94,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
     pathname === '/manutencao' ||
     pathname.startsWith('/f/') ||
     pathname.startsWith('/preview');
-
-  const { data: dailyTip } = useQuery({
-    queryKey: ['daily-tip', currentUser?.id, currentUser?.workspaceMode],
-    queryFn: getDailyTip,
-    enabled: !!currentUser && !isPublicPage,
-    staleTime: 1000 * 60 * 60,
-    retry: false,
-  });
 
   // Detect Supabase password recovery flow — fires when user clicks a reset-password email link
   // The link lands on / with hash tokens; Supabase fires PASSWORD_RECOVERY so we redirect.
@@ -163,25 +149,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
     const timer = window.setTimeout(() => setShowTopProgress(false), 220);
     return () => window.clearTimeout(timer);
   }, [fetchingCount, routeTransitioning]);
-
-  useEffect(() => {
-    if (!dailyTip?.show || !dailyTip.tip || !dailyTip.date) {
-      return;
-    }
-
-    const deliveryKey = `${dailyTip.date}:${dailyTip.tip.id}`;
-    if (deliveredTipToastRef.current === deliveryKey) {
-      return;
-    }
-
-    deliveredTipToastRef.current = deliveryKey;
-    toast({
-      variant: 'info',
-      title: dailyTip.tip.title,
-      description: dailyTip.tip.personalizedMessage,
-      durationMs: 8000,
-    });
-  }, [dailyTip, toast]);
 
   useEffect(() => {
     try {
@@ -285,9 +252,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
   const handleStartChecklist = () => {
     localStorage.setItem('kukugest_guide_seen', '1');
     setShowWelcome(false);
-    localStorage.setItem(ONBOARDING_OPEN, '1');
-    // Trigger re-render of OnboardingChecklist by dispatching a storage event
-    window.dispatchEvent(new StorageEvent('storage', { key: ONBOARDING_OPEN }));
+    router.push('/');
   };
 
   if (isLoading && !isPublicPage) {
@@ -299,12 +264,12 @@ function LayoutInner({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen bg-[#f5f7f9]">
+    <div className={`flex h-screen bg-[#f5f7f9] ${comercio ? 'workspace-comercio' : 'workspace-servicos'}`}>
       <div className="pointer-events-none fixed inset-x-0 top-0 z-[80]">
         <div
           className={`h-1 origin-left transition-all duration-300 ease-out ${
             showTopProgress ? 'opacity-100' : 'opacity-0'
-          } ${routeTransitioning || fetchingCount > 0 ? 'w-2/3' : 'w-full'} ${comercio ? 'bg-[#F06A1A]' : 'bg-[#1A6FD4]'}`}
+          } ${routeTransitioning || fetchingCount > 0 ? 'w-2/3' : 'w-full'} bg-[var(--workspace-primary)]`}
         />
       </div>
       {/* Sidebar Desktop */}
@@ -352,16 +317,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
               <span className="text-sm font-medium text-[#2c2f31]">Menu</span>
             </button>
             <div className="min-w-0 overflow-hidden">
-              {currentUser ? (
-                <KukuGestWorkspaceLogo
-                  workspace={comercio ? 'comercio' : 'servicos'}
-                  height={36}
-                  compact
-                  className="max-w-full"
-                />
-              ) : (
-                <KukuGestLogo height={24} className="max-w-full" />
-              )}
+              <KukuGestLogo height={24} className="max-w-full" />
             </div>
           </div>
           <UserWidget user={currentUser} compact />
@@ -421,7 +377,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
         onClose={() => { localStorage.setItem('kukugest_guide_seen', '1'); setShowWelcome(false); }}
         onStartTour={handleStartChecklist}
       />
-      <OnboardingChecklist />
     </div>
   );
 }
@@ -458,8 +413,8 @@ function UserWidget({ user, compact = false }: { user: User | null; compact?: bo
         className={`rounded-full flex items-center justify-center flex-shrink-0 ${compact ? 'h-8 w-8' : 'w-9 h-9'}`}
         style={{
           background: comercio
-            ? 'linear-gradient(135deg, #F06A1A 0%, #FFA040 100%)'
-            : 'linear-gradient(135deg, #1A6FD4 0%, #5EB0F5 100%)',
+            ? 'linear-gradient(135deg, var(--workspace-primary) 0%, var(--workspace-primary-hover) 100%)'
+            : 'linear-gradient(135deg, var(--workspace-primary) 0%, var(--workspace-primary-hover) 100%)',
         }}
       >
         <span className={`text-white font-bold ${compact ? 'text-[11px]' : 'text-xs'}`}>{initials}</span>

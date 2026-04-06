@@ -17,7 +17,6 @@ import type { User } from '@/lib/api';
 import { getChatUnreadCount, getOnboarding } from '@/lib/api';
 import { canAccessCommerceRoute, canView } from '@/lib/permissions';
 import type { ModuleKey } from '@/lib/permissions';
-import { ONBOARDING_OPEN, ONBOARDING_DISMISSED } from '@/lib/onboarding-tasks';
 import { getPlanBadgeClasses } from '@/lib/plan-utils';
 
 const TOUR_ATTR: Record<string, string> = {
@@ -63,7 +62,7 @@ export default function Sidebar({
     currentUser && (currentUser.isSuperAdmin || currentUser.role === 'admin' || !currentUser.accountOwnerId)
   );
   const { data: onboarding } = useQuery({
-    queryKey: ['onboarding'],
+    queryKey: ['onboarding', currentUser?.workspaceMode],
     queryFn: getOnboarding,
     staleTime: 60_000,
     refetchInterval: 60_000,
@@ -79,8 +78,8 @@ export default function Sidebar({
   const navItemClass = (active: boolean) => cn(
     'flex items-center gap-3 px-3 py-2 transition-all text-sm font-medium rounded-xl',
     active
-      ? comercio ? 'bg-[#FDF2EA] text-[#F06A1A] font-semibold' : 'bg-[#EEF5FC] text-[#1A6FD4] font-semibold'
-      : comercio ? 'text-[#6b7e9a] hover:text-[#F06A1A] hover:bg-[#FDF2EA]' : 'text-[#6b7e9a] hover:text-[#1A6FD4] hover:bg-[#EEF5FC]'
+      ? 'bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)] font-semibold'
+      : 'text-[#6b7e9a] hover:bg-[var(--workspace-primary-soft)] hover:text-[var(--workspace-primary)]'
   );
 
   const comercio = isComercio(currentUser?.workspaceMode);
@@ -320,14 +319,14 @@ export default function Sidebar({
               <p className="text-xs font-semibold text-[#2c2f31]">Configuração inicial</p>
               <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
                 <div
-                  className="h-full rounded-full bg-[#1A6FD4] transition-all"
+                  className="h-full rounded-full bg-[var(--workspace-primary)] transition-all"
                   style={{
                     width: `${Math.round(((onboarding?.completedCount ?? 0) / (onboarding?.totalCount ?? 1)) * 100)}%`,
                   }}
                 />
               </div>
             </div>
-            <span className="flex-shrink-0 text-xs font-bold text-[#1A6FD4]">
+            <span className="flex-shrink-0 text-xs font-bold text-[var(--workspace-primary)]">
               {onboarding?.completedCount}/{onboarding?.totalCount}
             </span>
           </Link>
@@ -340,9 +339,7 @@ export default function Sidebar({
         )}
         <button
           onClick={() => {
-            localStorage.removeItem(ONBOARDING_DISMISSED);
-            localStorage.setItem(ONBOARDING_OPEN, '1');
-            window.dispatchEvent(new StorageEvent('storage', { key: ONBOARDING_OPEN }));
+            window.location.href = '/';
             onClose();
           }}
           className={navItemClass(false)}

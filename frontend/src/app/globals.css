@@ -6,28 +6,49 @@
 @tailwind utilities;
 
 :root {
-  /* MD3 Surface Palette — Electric Blue + Light Surfaces */
+  /* Light surface palette + workspace accents */
   --background: 0 0% 100%;
   --foreground: 210 15% 17%;          /* #2c2f31 */
   --card: 0 0% 100%;
   --card-foreground: 210 15% 17%;
   --popover: 0 0% 100%;
   --popover-foreground: 210 15% 17%;
-  --primary: 210 100% 48%;            /* #0049e6 electric blue */
+  --primary: 0 0% 7%;
   --primary-foreground: 0 0% 100%;
   --secondary: 210 30% 97%;           /* near-white surface */
   --secondary-foreground: 210 15% 17%;
   --muted: 210 20% 96%;
   --muted-foreground: 210 8% 35%;     /* #595c5e */
-  --accent: 210 100% 48%;             /* #0049e6 */
+  --accent: 0 0% 7%;
   --accent-foreground: 0 0% 100%;
   --destructive: 0 82% 45%;           /* #b31b25 */
   --destructive-foreground: 0 0% 100%;
   --border: 210 10% 92%;              /* softer border */
   --input: 210 10% 92%;
-  --ring: 210 100% 48%;               /* #0049e6 */
+  --ring: 0 0% 7%;
   --ring-offset-background: 0 0% 100%;
   --radius: 0.75rem;
+  --workspace-primary: #111111;
+  --workspace-primary-hover: #2c2c2c;
+  --workspace-primary-soft: #f3f4f6;
+  --workspace-primary-border: #d6d8dc;
+  --workspace-on-primary: #ffffff;
+}
+
+.workspace-servicos {
+  --workspace-primary: #111111;
+  --workspace-primary-hover: #2c2c2c;
+  --workspace-primary-soft: #f3f4f6;
+  --workspace-primary-border: #d6d8dc;
+  --workspace-on-primary: #ffffff;
+}
+
+.workspace-comercio {
+  --workspace-primary: #f06a1a;
+  --workspace-primary-hover: #c44f0f;
+  --workspace-primary-soft: #fdf2ea;
+  --workspace-primary-border: #fac775;
+  --workspace-on-primary: #ffffff;
 }
 
 * {
@@ -98,14 +119,14 @@ h4, h5, h6 { font-weight: 600; }
   cursor: pointer;
 }
 .driver-popover-next-btn {
-  background: #0A2540 !important;
+  background: var(--workspace-primary) !important;
   color: #ffffff !important;
   border: none !important;
 }
 .driver-popover-next-btn:hover { opacity: 0.85 !important; }
 .driver-popover-prev-btn {
   background: transparent !important;
-  color: #0A2540 !important;
+  color: var(--workspace-primary) !important;
   border: 1px solid #dde3ec !important;
 }
 .driver-popover-close-btn { color: #6b7e9a !important; }

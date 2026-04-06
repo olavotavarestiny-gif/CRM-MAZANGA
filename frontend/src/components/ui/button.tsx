@@ -5,16 +5,16 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap text-sm font-semibold ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+  "inline-flex items-center justify-center whitespace-nowrap text-sm font-semibold ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--workspace-primary)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
   {
     variants: {
       variant: {
-        default:     "rounded-lg bg-[#0A2540] text-white hover:bg-[#0d3060]",
+        default:     "rounded-lg bg-[var(--workspace-primary)] text-[var(--workspace-on-primary)] hover:bg-[var(--workspace-primary-hover)]",
         destructive: "rounded-lg bg-red-600 text-white hover:bg-red-700",
-        outline:     "rounded-lg border border-[#0A2540] bg-white text-[#0A2540] hover:bg-[#0A2540] hover:text-white",
-        secondary:   "rounded-lg bg-white text-[#0A2540] border border-[#dde3ec] hover:bg-[#f5f7fa]",
-        ghost:       "rounded-lg text-[#0A2540] hover:bg-[#f5f7fa]",
-        link:        "text-[#0A2540] underline-offset-4 hover:underline",
+        outline:     "rounded-lg border border-[var(--workspace-primary)] bg-white text-[var(--workspace-primary)] hover:bg-[var(--workspace-primary)] hover:text-[var(--workspace-on-primary)]",
+        secondary:   "rounded-lg border border-[#dde3ec] bg-white text-[var(--workspace-primary)] hover:bg-[var(--workspace-primary-soft)]",
+        ghost:       "rounded-lg text-[var(--workspace-primary)] hover:bg-[var(--workspace-primary-soft)]",
+        link:        "text-[var(--workspace-primary)] underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-5 py-2",

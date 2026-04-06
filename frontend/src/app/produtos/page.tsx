@@ -295,18 +295,18 @@ export default function ProdutosPage() {
   );
 
   return (
-    <div className="p-6 space-y-8">
+    <div className="space-y-8 p-4 md:p-6">
       {/* Header */}
-      <div>
+      <div className="space-y-1">
         <h1 className="text-2xl font-bold text-[#0A2540]">Produtos & Serviços</h1>
         <p className="text-gray-500 text-sm mt-1">Catálogo de produtos e séries de numeração</p>
       </div>
 
       {/* ── SECÇÃO 1: Produtos ── */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">Catálogo</h2>
-          <Button onClick={openNew} className="gap-2">
+          <Button onClick={openNew} className="w-full gap-2 sm:w-auto">
             <Plus className="w-4 h-4" /> Novo Produto
           </Button>
         </div>
@@ -332,8 +332,8 @@ export default function ProdutosPage() {
           </Select>
         </div>
 
-        <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
-          <div className="grid grid-cols-12 text-xs text-gray-500 font-medium uppercase tracking-wide px-4 py-2 border-b border-gray-200">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-gray-50">
+          <div className="grid min-w-[860px] grid-cols-12 border-b border-gray-200 px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-500">
             <span className="col-span-2">Código</span>
             <span className="col-span-3">Descrição</span>
             <span className="col-span-1 text-center">Tipo</span>
@@ -353,7 +353,7 @@ export default function ProdutosPage() {
           {produtosFiltrados.map(p => {
             const margin = p.margin ?? calcMargin(p.cost ?? '', p.unitPrice);
             return (
-              <div key={p.id} className="grid grid-cols-12 px-4 py-3 border-b border-gray-100 items-center hover:bg-white transition-colors">
+              <div key={p.id} className="grid min-w-[860px] grid-cols-12 items-center border-b border-gray-100 px-4 py-3 transition-colors hover:bg-white">
                 <span className="col-span-2 text-gray-500 font-mono text-sm">{p.productCode}</span>
                 <div className="col-span-3 min-w-0">
                   <span className="block truncate text-[#0A2540] text-sm" title={p.productDescription}>{p.productDescription}</span>
@@ -429,12 +429,12 @@ export default function ProdutosPage() {
 
       {/* ── SECÇÃO 2: Séries ── */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">Séries de Numeração</h2>
             <p className="text-gray-400 text-xs mt-0.5">Sequências de numeração para emissão de documentos fiscais</p>
           </div>
-          <Button onClick={() => setShowNewSerie(true)} variant="outline" className="border-gray-200 text-gray-600 hover:bg-gray-50 gap-2">
+          <Button onClick={() => setShowNewSerie(true)} variant="outline" className="w-full gap-2 border-gray-200 text-gray-600 hover:bg-gray-50 sm:w-auto">
             <Plus className="w-4 h-4" /> Nova Série
           </Button>
         </div>
@@ -445,8 +445,8 @@ export default function ProdutosPage() {
           </div>
         )}
 
-        <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
-          <div className="grid grid-cols-12 text-xs text-gray-500 font-medium uppercase tracking-wide px-4 py-2 border-b border-gray-200">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-gray-50">
+          <div className="grid min-w-[860px] grid-cols-12 border-b border-gray-200 px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-500">
             <span className="col-span-2">Código</span>
             <span className="col-span-1">Tipo</span>
             <span className="col-span-2">Ano</span>
@@ -465,7 +465,7 @@ export default function ProdutosPage() {
           {series.map(s => {
             const st = STATUS_MAP[s.seriesStatus] || STATUS_MAP.A;
             return (
-              <div key={s.id} className="grid grid-cols-12 px-4 py-3 border-b border-gray-100 items-center hover:bg-white transition-colors">
+              <div key={s.id} className="grid min-w-[860px] grid-cols-12 items-center border-b border-gray-100 px-4 py-3 transition-colors hover:bg-white">
                 <span className="col-span-2 text-[#0A2540] font-mono font-medium">{s.seriesCode}</span>
                 <span className="col-span-1 text-purple-600 font-medium text-sm">{s.documentType}</span>
                 <span className="col-span-2 text-gray-600">{s.seriesYear}</span>

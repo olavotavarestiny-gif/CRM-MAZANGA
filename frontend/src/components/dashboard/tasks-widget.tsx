@@ -53,7 +53,7 @@ export default function TasksWidget() {
       <Card className="col-span-full rounded-xl">
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <CardTitle className="text-base font-bold">Tarefas Pendentes</CardTitle>
-          <Link href="/tasks" className="text-xs text-[#0049e6] font-semibold hover:text-[#0049e6]/80 transition-colors">Ver todas</Link>
+          <Link href="/tasks" className="text-xs font-semibold text-[var(--workspace-primary)] transition-colors hover:opacity-80">Ver todas</Link>
         </CardHeader>
         <CardContent className="divide-y divide-slate-100">
           <WidgetWrapper
@@ -76,7 +76,7 @@ export default function TasksWidget() {
                 />
               ))}
               {tasks.length > 8 && (
-                <Link href="/tasks" className="text-xs text-[#0049e6] font-semibold hover:text-[#0049e6]/80 transition-colors block pt-2">
+                <Link href="/tasks" className="block pt-2 text-xs font-semibold text-[var(--workspace-primary)] transition-colors hover:opacity-80">
                   + {tasks.length - 8} mais tarefas
                 </Link>
               )}

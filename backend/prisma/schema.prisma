@@ -694,7 +694,7 @@ model ChatMessage {
 
 model OnboardingProgress {
   id              String    @id @default(cuid())
-  organization_id String    @unique // effectiveUserId as String
+  organization_id String // effectiveUserId as String
   workspace_mode  String // locked at creation: "servicos" | "comercio"
   completed_steps String[]  @default([])
   dismissed       Boolean   @default(false)
@@ -702,18 +702,22 @@ model OnboardingProgress {
   completed_at    DateTime?
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
+
+  @@unique([organization_id, workspace_mode])
 }
 
 model DailyTipDelivery {
-  id             String   @id @default(cuid())
-  userId         Int
-  deliveryDate   String   @map("delivery_date") // "YYYY-MM-DD" em Africa/Luanda
-  workspaceMode  String   @map("workspace_mode")
-  audienceBucket String   @map("audience_bucket") // "owner" | "equipa"
-  tipId          String   @map("tip_id")
-  payload        Json?
-  createdAt      DateTime @default(now()) @map("created_at")
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String    @id @default(cuid())
+  userId               Int
+  deliveryDate         String    @map("delivery_date") // "YYYY-MM-DD" em Africa/Luanda
+  workspaceMode        String    @map("workspace_mode")
+  audienceBucket       String    @map("audience_bucket") // "owner" | "equipa"
+  tipId                String    @map("tip_id")
+  payload              Json?
+  dismissedInDashboard Boolean   @default(false) @map("dismissed_in_dashboard")
+  dismissedAt          DateTime? @map("dismissed_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, deliveryDate])
   @@index([deliveryDate])
