@@ -336,6 +336,7 @@ model Transaction {
   status                 String       @default("pago") // "pago" | "pendente" | "atrasado"
   receiptNumber          String?
   notes                  String?
+  attachments            String       @default("[]")
   deleted                Boolean      @default(false)
   reconciled             Boolean      @default(false)
   reconciledAt           DateTime?    @map("reconciled_at")

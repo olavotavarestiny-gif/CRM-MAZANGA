@@ -425,6 +425,14 @@ export type TransactionStatus = 'pago' | 'pendente' | 'atrasado';
 export type RevenueType = 'recorrente' | 'one-off';
 export type CurrencyOrigin = 'KZ' | 'CHF' | 'EUR' | 'USD';
 
+export interface TransactionAttachment {
+  url: string;
+  name: string;
+  size?: number;
+  type?: string;
+  uploadedAt: string;
+}
+
 export interface Transaction {
   id: string;
   date: string;
@@ -444,6 +452,7 @@ export interface Transaction {
   status: TransactionStatus;
   receiptNumber?: string;
   notes?: string;
+  attachments?: TransactionAttachment[];
   deleted: boolean;
   createdAt: string;
   updatedAt: string;

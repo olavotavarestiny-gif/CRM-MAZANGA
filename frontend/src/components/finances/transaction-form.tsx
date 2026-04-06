@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createTransaction, updateTransaction, getFinancialCategories, getContacts } from '@/lib/api';
-import { Contact, Transaction } from '@/lib/types';
+import { Contact, Transaction, TransactionAttachment } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +21,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { AsyncSearchPicker, SearchGroup } from '@/components/search/async-search-picker';
+import { useFileUpload } from '@/hooks/use-file-upload';
+import { formatFileSize } from '@/lib/file-utils';
+import { Paperclip, Upload, Trash2, Loader2, ExternalLink } from 'lucide-react';
 
 type FormData = {
   type: 'entrada' | 'saida';
@@ -39,6 +42,7 @@ type FormData = {
   status: 'pago' | 'pendente' | 'atrasado';
   receiptNumber: string;
   notes: string;
+  attachments: TransactionAttachment[];
   contractDurationMonths: string;
   nextPaymentDate: string;
 };
@@ -60,6 +64,7 @@ const defaultForm: FormData = {
   status: 'pago',
   receiptNumber: '',
   notes: '',
+  attachments: [],
   contractDurationMonths: '',
   nextPaymentDate: '',
 };
@@ -78,6 +83,7 @@ export default function TransactionForm({
 
   const [form, setForm] = useState<FormData>(defaultForm);
   const [error, setError] = useState('');
+  const { upload, uploading, error: uploadError, reset: resetUpload } = useFileUpload();
 
   const { data: categories = [] } = useQuery({
     queryKey: ['financial-categories'],
@@ -138,6 +144,7 @@ export default function TransactionForm({
         status: transaction.status || 'pago',
         receiptNumber: transaction.receiptNumber || '',
         notes: transaction.notes || '',
+        attachments: transaction.attachments || [],
         contractDurationMonths: transaction.contractDurationMonths?.toString() || '',
         nextPaymentDate: transaction.nextPaymentDate?.slice(0, 10) || '',
       });
@@ -145,6 +152,7 @@ export default function TransactionForm({
       setForm(defaultForm);
     }
     setError('');
+    resetUpload();
   }, [transaction, open]);
 
   const filteredCategories = categories.filter((c) => c.type === form.type);
@@ -212,6 +220,7 @@ export default function TransactionForm({
       status: form.status,
       receiptNumber: form.receiptNumber || undefined,
       notes: form.notes || undefined,
+      attachments: form.type === 'saida' ? form.attachments : undefined,
       revenueType: form.type === 'entrada' && form.revenueType ? (form.revenueType as any) : undefined,
       contractDurationMonths:
         form.type === 'entrada' && form.revenueType === 'recorrente' && form.contractDurationMonths
@@ -234,6 +243,7 @@ export default function TransactionForm({
         next.category = '';
         next.subcategory = '';
         if (value === 'saida') next.revenueType = '';
+        if (value === 'entrada') next.attachments = [];
       }
       // Reset subcategory when category changes
       if (key === 'category') next.subcategory = '';
@@ -252,6 +262,39 @@ export default function TransactionForm({
       }
       return next;
     });
+  };
+
+  const handleAttachmentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    for (const file of files) {
+      const result = await upload(file, 'attachments');
+      if (!result) continue;
+
+      setForm((prev) => ({
+        ...prev,
+        attachments: [
+          ...prev.attachments,
+          {
+            url: result.url,
+            name: file.name,
+            size: result.size,
+            type: result.contentType,
+            uploadedAt: new Date().toISOString(),
+          },
+        ],
+      }));
+    }
+
+    event.target.value = '';
+  };
+
+  const removeAttachment = (url: string) => {
+    setForm((prev) => ({
+      ...prev,
+      attachments: prev.attachments.filter((attachment) => attachment.url !== url),
+    }));
   };
 
   return (
@@ -447,6 +490,71 @@ export default function TransactionForm({
               className="border-[#dde3ec] text-[#0A2540]"
             />
           </div>
+
+          {form.type === 'saida' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-[#0A2540]">Documentos da despesa</Label>
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[var(--workspace-primary-border)] px-3 py-2 text-sm font-medium text-[var(--workspace-primary)] hover:bg-[var(--workspace-primary-soft)]">
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  {uploading ? 'A carregar...' : 'Adicionar documento'}
+                  <input
+                    type="file"
+                    className="hidden"
+                    multiple
+                    accept="image/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    onChange={handleAttachmentUpload}
+                    disabled={uploading}
+                  />
+                </label>
+              </div>
+              <p className="text-xs text-slate-500">
+                Anexa faturas de fornecedores, comprovativos ou outros documentos de suporte desta saída.
+              </p>
+              {uploadError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {uploadError}
+                </div>
+              )}
+              {form.attachments.length > 0 ? (
+                <div className="space-y-2">
+                  {form.attachments.map((attachment) => (
+                    <div key={attachment.url} className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2">
+                      <Paperclip className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-[#2c2f31]">{attachment.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {attachment.size ? `${formatFileSize(attachment.size)} · ` : ''}
+                          {new Date(attachment.uploadedAt).toLocaleDateString('pt-PT')}
+                        </p>
+                      </div>
+                      <a
+                        href={attachment.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                        title="Abrir documento"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(attachment.url)}
+                        className="rounded p-1 text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
+                        title="Remover documento"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-4 text-sm text-slate-500">
+                  Ainda não adicionou documentos a esta despesa.
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Valores e Moeda - Layout adaptativo */}
           {form.currencyOrigin === 'KZ' ? (

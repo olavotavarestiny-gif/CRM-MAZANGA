@@ -39,6 +39,36 @@ function formatKz(value) {
   return value ?? 0;
 }
 
+function parseTransactionAttachments(value) {
+  if (Array.isArray(value)) {
+    return value
+      .filter(Boolean)
+      .map((item) => ({
+        url: typeof item.url === 'string' ? item.url : '',
+        name: typeof item.name === 'string' ? item.name : 'Documento',
+        size: typeof item.size === 'number' ? item.size : undefined,
+        type: typeof item.type === 'string' ? item.type : undefined,
+        uploadedAt: typeof item.uploadedAt === 'string' ? item.uploadedAt : new Date().toISOString(),
+      }))
+      .filter((item) => item.url);
+  }
+
+  if (typeof value !== 'string' || !value.trim()) return [];
+
+  try {
+    return parseTransactionAttachments(JSON.parse(value));
+  } catch {
+    return [];
+  }
+}
+
+function serializeTransaction(transaction) {
+  return {
+    ...transaction,
+    attachments: parseTransactionAttachments(transaction.attachments),
+  };
+}
+
 function getPreviousMonthDateRange(targetDate) {
   const previousMonth = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth() - 1, 1, 0, 0, 0, 0));
   return {
@@ -336,7 +366,7 @@ router.get('/transactions', requirePermission('finances', 'transactions_view'), 
     ]);
 
     res.json({
-      data,
+      data: data.map(serializeTransaction),
       total,
       page: pageNum,
       totalPages: Math.ceil(total / limitNum),
@@ -368,6 +398,7 @@ router.post('/transactions', requirePermission('finances', 'transactions_edit'),
       status,
       receiptNumber,
       notes,
+      attachments,
     } = req.body;
 
     // Validações obrigatórias
@@ -421,13 +452,14 @@ router.post('/transactions', requirePermission('finances', 'transactions_edit'),
         status,
         receiptNumber: receiptNumber || null,
         notes: notes || null,
+        attachments: type === 'saida' ? JSON.stringify(parseTransactionAttachments(attachments)) : '[]',
       },
       include: {
         contact: { select: { id: true, name: true, company: true } },
       },
     });
 
-    res.status(201).json(transaction);
+    res.status(201).json(serializeTransaction(transaction));
   } catch (error) {
     console.error('Error creating transaction:', error);
     res.status(500).json({ error: error.message });
@@ -446,6 +478,7 @@ router.put('/transactions/:id', requirePermission('finances', 'transactions_edit
       date, clientId, clientName, type, revenueType, contractDurationMonths,
       nextPaymentDate, category, subcategory, description, amountKz,
       currencyOrigin, exchangeRate, paymentMethod, status, receiptNumber, notes,
+      attachments,
     } = req.body;
 
     const data = {};
@@ -466,6 +499,10 @@ router.put('/transactions/:id', requirePermission('finances', 'transactions_edit
     if (status !== undefined) data.status = status;
     if (receiptNumber !== undefined) data.receiptNumber = receiptNumber || null;
     if (notes !== undefined) data.notes = notes || null;
+    if (attachments !== undefined) data.attachments = (type ?? existing.type) === 'saida'
+      ? JSON.stringify(parseTransactionAttachments(attachments))
+      : '[]';
+    if (type !== undefined && type === 'entrada' && attachments === undefined) data.attachments = '[]';
 
     const transaction = await prisma.transaction.update({
       where: { id: req.params.id },
@@ -473,7 +510,7 @@ router.put('/transactions/:id', requirePermission('finances', 'transactions_edit
       include: { contact: { select: { id: true, name: true, company: true } } },
     });
 
-    res.json(transaction);
+    res.json(serializeTransaction(transaction));
   } catch (error) {
     console.error('Error updating transaction:', error);
     res.status(500).json({ error: error.message });

@@ -25,7 +25,7 @@ import {
 import { isComercio } from '@/lib/business-modes';
 import TransactionForm from '@/components/finances/transaction-form';
 import ClientProfitabilityModal from '@/components/finances/client-profitability-modal';
-import { TrendingUp, TrendingDown, DollarSign, RefreshCw, Plus, Download, ChevronLeft, ChevronRight, Pencil, Trash2, BarChart2, ArrowDownUp, Wallet, Landmark } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, RefreshCw, Plus, Download, ChevronLeft, ChevronRight, Pencil, Trash2, BarChart2, ArrowDownUp, Wallet, Landmark, Paperclip } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FilterBar } from '@/components/ui/filter-bar';
 
@@ -438,6 +438,12 @@ export default function FinancesPage() {
                         {tx.subcategory && (
                           <span className="text-gray-400 text-xs ml-1">/ {tx.subcategory}</span>
                         )}
+                        {!!tx.attachments?.length && (
+                          <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                            <Paperclip className="h-3 w-3" />
+                            {tx.attachments.length} documento{tx.attachments.length > 1 ? 's' : ''}
+                          </div>
+                        )}
                       </td>
                       <td className={`py-3 px-4 text-right font-medium ${
                         tx.type === 'entrada' ? 'text-emerald-600' : 'text-red-600'
@@ -479,6 +485,17 @@ export default function FinancesPage() {
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
+                          {!!tx.attachments?.length && (
+                            <a
+                              href={tx.attachments[0].url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 rounded transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                              title={tx.attachments.length > 1 ? 'Abrir primeiro documento anexado' : 'Abrir documento anexado'}
+                            >
+                              <Paperclip className="w-3.5 h-3.5" />
+                            </a>
+                          )}
                           <button
                             onClick={() => handleDelete(tx.id)}
                             className="p-1 hover:bg-red-500/10 rounded transition-colors text-gray-500 hover:text-red-400"
