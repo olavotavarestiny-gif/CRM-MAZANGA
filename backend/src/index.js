@@ -37,6 +37,7 @@ const caixaSessoesRouter = require('./routes/caixa-sessoes');
 const activityRouter = require('./routes/activity');
 const dailyTipRouter = require('./routes/daily-tip');
 const onboardingRouter = require('./routes/onboarding');
+const uploadsRouter = require('./routes/uploads');
 const requireAuth = require('./middleware/auth');
 const { requireSuperAdmin } = require('./middleware/auth');
 const { requirePlanFeature } = require('./lib/plan-limits');
@@ -139,6 +140,7 @@ app.use('/api/caixa', requireAuth, requirePlanFeature('vendas'), caixaSessoesRou
 app.use('/api/activity', requireAuth, activityRouter);
 app.use('/api/daily-tip', requireAuth, dailyTipRouter);
 app.use('/api/onboarding', requireAuth, onboardingRouter);
+app.use('/api/uploads', uploadsRouter);
 app.use('/api', requireAuth, notesRouter);
 
 // Scheduler: process recurring invoices daily at 00:05
