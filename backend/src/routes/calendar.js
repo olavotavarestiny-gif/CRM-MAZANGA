@@ -42,7 +42,7 @@ router.get('/auth', async (req, res) => {
       select: { id: true, accountOwnerId: true },
     });
     if (!user) return res.status(401).send('Utilizador não encontrado');
-    userId = user.accountOwnerId || user.id;
+    userId = user.id;
   } catch {
     return res.status(401).send('Token inválido');
   }
@@ -123,7 +123,7 @@ router.get('/callback', async (req, res) => {
 router.get('/status', requireAuth, async (req, res) => {
   try {
     const token = await prisma.googleCalendarToken.findUnique({
-      where: { userId: req.user.effectiveUserId },
+      where: { userId: req.user.id },
       select: { googleEmail: true },
     });
     res.json({ connected: !!token, email: token?.googleEmail || null });
@@ -136,7 +136,7 @@ router.get('/status', requireAuth, async (req, res) => {
 router.delete('/disconnect', requireAuth, async (req, res) => {
   try {
     await prisma.googleCalendarToken.deleteMany({
-      where: { userId: req.user.effectiveUserId },
+      where: { userId: req.user.id },
     });
     res.json({ message: 'Desconectado com sucesso' });
   } catch (err) {
@@ -148,7 +148,7 @@ router.delete('/disconnect', requireAuth, async (req, res) => {
 router.get('/events', requireAuth, async (req, res) => {
   try {
     const tokenRecord = await prisma.googleCalendarToken.findUnique({
-      where: { userId: req.user.effectiveUserId },
+      where: { userId: req.user.id },
     });
 
     if (!tokenRecord) {
@@ -164,7 +164,7 @@ router.get('/events', requireAuth, async (req, res) => {
     // Renovar token se expirado
     if (tokenRecord.expiresAt < new Date()) {
       if (!tokenRecord.refreshToken) {
-        await prisma.googleCalendarToken.delete({ where: { userId: req.user.effectiveUserId } });
+        await prisma.googleCalendarToken.delete({ where: { userId: req.user.id } });
         return res.status(401).json({ error: 'Token expirado, reconecte o Google Calendar' });
       }
       const { credentials } = await oauth2Client.refreshAccessToken();
@@ -172,7 +172,7 @@ router.get('/events', requireAuth, async (req, res) => {
         ? new Date(credentials.expiry_date)
         : new Date(Date.now() + 3600 * 1000);
       await prisma.googleCalendarToken.update({
-        where: { userId: req.user.effectiveUserId },
+        where: { userId: req.user.id },
         data: { accessToken: credentials.access_token, expiresAt },
       });
       oauth2Client.setCredentials(credentials);

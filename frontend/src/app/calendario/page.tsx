@@ -154,7 +154,7 @@ export default function CalendarioPage() {
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Calendário</h1>
           <p className="mt-1 text-sm text-[#6b7e9a]">
-            Tarefas do CRM e eventos Google numa vista mensal única.
+            Tarefas do CRM e eventos Google numa vista mensal única. Cada utilizador pode ligar a sua própria Google Agenda.
           </p>
         </div>
         <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-[#526277] shadow-sm">
