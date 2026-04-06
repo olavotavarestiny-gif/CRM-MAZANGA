@@ -35,6 +35,28 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
+function getUploadErrorMessage(error: unknown): string {
+  const rawMessage = error instanceof Error ? error.message : '';
+
+  if (rawMessage.includes('BLOB_READ_WRITE_TOKEN')) {
+    return 'Uploads não configurados no ambiente actual. Defina a variável BLOB_READ_WRITE_TOKEN no frontend.';
+  }
+
+  if (/token|unauthorized|forbidden|access denied|not authorized/i.test(rawMessage)) {
+    return 'A configuração do storage está inválida. Verifique o token do Vercel Blob.';
+  }
+
+  if (/network|fetch failed|timeout|econn|dns/i.test(rawMessage)) {
+    return 'O serviço de ficheiros está indisponível neste momento. Tente novamente em instantes.';
+  }
+
+  if (rawMessage.trim()) {
+    return rawMessage;
+  }
+
+  return 'Erro interno ao fazer upload';
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const ip =
     request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown';
@@ -95,7 +117,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } catch (err) {
     console.error('[upload] Error:', err);
     return NextResponse.json(
-      { error: 'Erro interno ao fazer upload' },
+      { error: getUploadErrorMessage(err) },
       { status: 500 }
     );
   }

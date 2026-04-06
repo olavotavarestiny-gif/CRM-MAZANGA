@@ -24,6 +24,12 @@ export async function uploadFile(
   file: File,
   folder: UploadFolder
 ): Promise<UploadResult> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error(
+      'Uploads não configurados neste ambiente. Defina a variável BLOB_READ_WRITE_TOKEN no serviço do frontend.'
+    );
+  }
+
   const sanitized = sanitizeFilename(file.name);
   const pathname = `${folder}/${Date.now()}-${sanitized}`;
 
