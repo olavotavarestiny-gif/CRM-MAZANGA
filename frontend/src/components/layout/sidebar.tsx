@@ -15,7 +15,7 @@ import KukuGestLogo from '@/components/KukuGestLogo';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
 import { getChatUnreadCount, getOnboarding } from '@/lib/api';
-import { canAccessCommerceRoute, canView } from '@/lib/permissions';
+import { canAccessCommerceRoute, canView, canViewReports } from '@/lib/permissions';
 import type { ModuleKey } from '@/lib/permissions';
 import { getPlanBadgeClasses } from '@/lib/plan-utils';
 
@@ -83,6 +83,7 @@ export default function Sidebar({
   );
 
   const comercio = isComercio(currentUser?.workspaceMode);
+  const reportsHref = comercio ? '/relatorios/comercio' : '/relatorios/servicos';
 
   // Map href to module key for permission checks
   const hrefToModule: Record<string, ModuleKey | null> = {
@@ -100,6 +101,7 @@ export default function Sidebar({
   const isVisible = (href: string) => {
     if (!currentUser) return false;
     if (href === '/activity') return canSeeActivity;
+    if (href === reportsHref) return canViewReports(currentUser);
     if (comercio) return canAccessCommerceRoute(currentUser, href);
     const module = hrefToModule[href];
     if (module === null) return true; // always visible (painel)
@@ -138,12 +140,14 @@ export default function Sidebar({
   const comercioGestaoInternaLinks = comercio ? [
     { href: '/vendas', label: 'Faturação', icon: ShoppingBag, module: 'vendas' as const },
     { href: '/finances', label: 'Finanças', icon: DollarSign, module: 'finances' as const },
+    { href: reportsHref, label: 'Relatórios', icon: BarChart3 },
     ...(canSeeActivity ? [{ href: '/activity', label: 'Atividade', icon: Clock3 }] : []),
     { href: '/configuracoes', label: 'Configurações', icon: Settings },
   ].filter(l => isVisible(l.href)) : [];
 
   const allGestaoLinks = [
     { href: '/finances', label: 'Finanças', icon: DollarSign },
+    { href: reportsHref, label: 'Relatórios', icon: BarChart3 },
     ...(canSeeActivity ? [{ href: '/activity', label: 'Atividade', icon: Clock3 }] : []),
   ];
 

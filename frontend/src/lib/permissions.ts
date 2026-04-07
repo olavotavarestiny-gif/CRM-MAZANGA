@@ -254,6 +254,15 @@ export function canFinanceTransactionsEdit(user: User): boolean {
   return finances.transactions === 'edit';
 }
 
+export function canViewReports(user: User): boolean {
+  if (!hasFeature(user, 'financas')) return false;
+  if (hasFullAccess(user)) return true;
+  if (!user.permissions) return true;
+  const finances = (parsePermissions(user.permissions) as UserPermissions).finances;
+  if (!finances) return true;
+  return finances.view_reports === true;
+}
+
 export function canAccessCommerceRoute(user: User, pathname: string): boolean {
   const path = normalizePath(pathname);
 
@@ -266,6 +275,9 @@ export function canAccessCommerceRoute(user: User, pathname: string): boolean {
   if (path.startsWith('/vendas')) return canAccessBilling(user);
   if (path.startsWith('/faturacao')) return canAccessBilling(user);
   if (path.startsWith('/finances')) return canFinanceTransactionsView(user);
+  if (path === '/relatorios' || path.startsWith('/relatorios/')) {
+    return canViewReports(user) && (path === '/relatorios' || path.startsWith('/relatorios/comercio'));
+  }
   if (path.startsWith('/configuracoes')) return true;
 
   return false;
@@ -280,6 +292,16 @@ export function canAccessWorkspaceRoute(
 
   if (GLOBAL_PRIVATE_ROUTE_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix + '/'))) {
     return true;
+  }
+
+  if (path === '/relatorios' || path.startsWith('/relatorios/')) {
+    if (!canViewReports(user)) return false;
+
+    if (workspaceMode === 'comercio') {
+      return path === '/relatorios' || path.startsWith('/relatorios/comercio');
+    }
+
+    return path === '/relatorios' || path.startsWith('/relatorios/servicos');
   }
 
   if (workspaceMode === 'comercio') {

@@ -225,17 +225,35 @@ function PainelAnalise() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div className="space-y-4">
       <Card className="border-slate-200 p-5 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[#2c2f31]">Análise comercial reforçada</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Este painel continua como resumo rápido. A leitura completa agora vive na área dedicada de relatórios avançados.
+            </p>
+          </div>
+          <Button asChild variant="outline" className="justify-start gap-2">
+            <Link href="/relatorios/comercio">
+              <BarChart3 className="h-4 w-4" />
+              Abrir relatórios avançados
+            </Link>
+          </Button>
+        </div>
+      </Card>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card className="border-slate-200 p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Performance</p>
         <div className="mt-4 space-y-3 text-sm">
           <div className="flex items-center justify-between"><span className="text-slate-500">Total vendido</span><strong>{formatKz(data.totalVendas)}</strong></div>
           <div className="flex items-center justify-between"><span className="text-slate-500">Número de vendas</span><strong>{data.numVendas}</strong></div>
           <div className="flex items-center justify-between"><span className="text-slate-500">Ticket médio</span><strong>{formatKz(data.ticketMedio)}</strong></div>
         </div>
-      </Card>
+        </Card>
 
-      <Card className="border-slate-200 p-5 shadow-sm">
+        <Card className="border-slate-200 p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Top por Quantidade</p>
         <div className="mt-4 space-y-3">
           {data.topPorQuantidade.slice(0, 5).map((item) => (
@@ -249,9 +267,9 @@ function PainelAnalise() {
           ))}
           {data.topPorQuantidade.length === 0 ? <p className="text-sm text-slate-500">Sem vendas no período.</p> : null}
         </div>
-      </Card>
+        </Card>
 
-      <Card className="border-slate-200 p-5 shadow-sm">
+        <Card className="border-slate-200 p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Top por Faturação</p>
         <div className="mt-4 space-y-3">
           {data.topPorFacturacao.slice(0, 5).map((item) => (
@@ -265,9 +283,9 @@ function PainelAnalise() {
           ))}
           {data.topPorFacturacao.length === 0 ? <p className="text-sm text-slate-500">Sem faturação no período.</p> : null}
         </div>
-      </Card>
+        </Card>
 
-      <Card className="border-slate-200 p-5 shadow-sm">
+        <Card className="border-slate-200 p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Produtos Parados</p>
         <div className="mt-4 space-y-3">
           {data.produtosParados.slice(0, 5).map((produto) => (
@@ -281,7 +299,8 @@ function PainelAnalise() {
           ))}
           {data.produtosParados.length === 0 ? <p className="text-sm text-slate-500">Todos os produtos tiveram rotação no período.</p> : null}
         </div>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,57 @@
 import axios from 'axios';
-import type { Contact, ContactFieldDef, ContactFieldConfig, SystemFieldKey, Automation, AutomationLogsResponse, AutomationStatsResponse, Task, CRMForm, FormField, FormSubmission, Transaction, FinancialCategory, DashboardStats, ClientProfitability, PipelineStage, PipelineAnalyticsConversionResponse, PipelineAnalyticsVelocityResponse, PipelineAnalyticsForecastResponse, PipelineAnalyticsTeamResponse, CalendarEvent, Factura, FacturaLine, Serie, Estabelecimento, ClienteFaturacao, Produto, ProdutoCategoria, ComercialResumo, ComercialAnalise, StockMovement, CaixaSessao, FaturacaoDashboard, FaturacaoConfig, SaftPeriodo, FacturaRecorrente, ChatChannel, ChatMessage, PlanUsage, ClientAccount, ActivityEntityHistoryResponse, ActivityFeedResponse } from './types';
+import type {
+  ActivityEntityHistoryResponse,
+  ActivityFeedResponse,
+  Automation,
+  AutomationLogsResponse,
+  AutomationStatsResponse,
+  CalendarEvent,
+  CaixaSessao,
+  ChatChannel,
+  ChatMessage,
+  ClientAccount,
+  ClientProfitability,
+  ClienteFaturacao,
+  ComercialAnalise,
+  ComercialResumo,
+  CommercialAdvancedLocationsResponse,
+  CommercialAdvancedOverviewResponse,
+  CommercialAdvancedProductsResponse,
+  CommercialAdvancedSalesResponse,
+  CommercialAdvancedTeamResponse,
+  Contact,
+  ContactFieldConfig,
+  ContactFieldDef,
+  CRMForm,
+  DashboardStats,
+  Estabelecimento,
+  Factura,
+  FacturaLine,
+  FacturaRecorrente,
+  FaturacaoConfig,
+  FaturacaoDashboard,
+  FinancialCategory,
+  FormField,
+  FormSubmission,
+  PipelineAnalyticsConversionResponse,
+  PipelineAnalyticsForecastResponse,
+  PipelineAnalyticsTeamResponse,
+  PipelineAnalyticsVelocityResponse,
+  PipelineStage,
+  PlanUsage,
+  Produto,
+  ProdutoCategoria,
+  SaftPeriodo,
+  Serie,
+  ServicesAdvancedOverviewResponse,
+  ServicesAdvancedPipelineResponse,
+  ServicesAdvancedRevenueResponse,
+  ServicesAdvancedTeamResponse,
+  StockMovement,
+  SystemFieldKey,
+  Task,
+  Transaction,
+} from './types';
 import { createClient } from './supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -942,6 +994,59 @@ export async function getComercialAnalise(params?: {
   estabelecimentoId?: string;
 }): Promise<ComercialAnalise> {
   const res = await api.get('/api/comercial/analise', { params });
+  return res.data;
+}
+
+export interface AdvancedReportParams {
+  period?: '7d' | '30d' | '90d' | 'month' | 'custom';
+  startDate?: string;
+  endDate?: string;
+  estabelecimentoId?: string;
+  userId?: number;
+}
+
+export async function getServicesAdvancedOverview(params?: AdvancedReportParams): Promise<ServicesAdvancedOverviewResponse> {
+  const res = await api.get('/api/reports/servicos/advanced/overview', { params });
+  return res.data;
+}
+
+export async function getServicesAdvancedPipeline(params?: AdvancedReportParams): Promise<ServicesAdvancedPipelineResponse> {
+  const res = await api.get('/api/reports/servicos/advanced/pipeline', { params });
+  return res.data;
+}
+
+export async function getServicesAdvancedRevenue(params?: AdvancedReportParams): Promise<ServicesAdvancedRevenueResponse> {
+  const res = await api.get('/api/reports/servicos/advanced/revenue', { params });
+  return res.data;
+}
+
+export async function getServicesAdvancedTeam(params?: AdvancedReportParams): Promise<ServicesAdvancedTeamResponse> {
+  const res = await api.get('/api/reports/servicos/advanced/team', { params });
+  return res.data;
+}
+
+export async function getCommercialAdvancedOverview(params?: AdvancedReportParams): Promise<CommercialAdvancedOverviewResponse> {
+  const res = await api.get('/api/reports/comercio/advanced/overview', { params });
+  return res.data;
+}
+
+export async function getCommercialAdvancedSales(params?: AdvancedReportParams): Promise<CommercialAdvancedSalesResponse> {
+  const res = await api.get('/api/reports/comercio/advanced/sales', { params });
+  return res.data;
+}
+
+export async function getCommercialAdvancedProducts(params?: AdvancedReportParams): Promise<CommercialAdvancedProductsResponse> {
+  const res = await api.get('/api/reports/comercio/advanced/products', { params });
+  return res.data;
+}
+
+export async function getCommercialAdvancedLocations(params?: AdvancedReportParams): Promise<CommercialAdvancedLocationsResponse> {
+  const res = await api.get('/api/reports/comercio/advanced/locations', { params });
+  return res.data;
+}
+
+export async function getCommercialAdvancedTeam(params?: AdvancedReportParams): Promise<CommercialAdvancedTeamResponse> {
+  const res = await api.get('/api/reports/comercio/advanced/team', { params });
   return res.data;
 }
 

@@ -669,6 +669,300 @@ export interface ComercialAnalise {
   }[];
 }
 
+export interface AdvancedReportRange {
+  period: '7d' | '30d' | '90d' | 'month' | 'custom';
+  granularity: 'day' | 'week' | 'month';
+  dayCount: number;
+  start: string;
+  end: string;
+  previousStart: string;
+  previousEnd: string;
+}
+
+export interface AdvancedReportComparison {
+  current: number;
+  previous: number;
+  growthPercent: number | null;
+}
+
+export interface ServicesAdvancedOverviewResponse {
+  range: AdvancedReportRange;
+  totals: {
+    totalContacts: number;
+    contactsAdded: number;
+    contactsAddedPrevious: number;
+    contactsAddedGrowthPercent: number | null;
+    activePipelineContacts: number;
+    wonDeals: number;
+    lostDeals: number;
+    negotiationValue: number;
+    invoicesIssued: number;
+    receivablesCount: number;
+    receivablesTotal: number;
+  };
+  revenue: {
+    received: AdvancedReportComparison;
+    issued: AdvancedReportComparison;
+  };
+  topClients: Array<{
+    clientId: number | null;
+    clientName: string;
+    revenue: number;
+  }>;
+}
+
+export interface ServicesAdvancedPipelineResponse {
+  range: AdvancedReportRange;
+  summary: {
+    totalContacts: number;
+    previousTotalContacts: number;
+    totalValue: number;
+    previousTotalValue: number;
+    totalConversionRate: number | null;
+    previousConversionRate: number | null;
+    wonDeals: number;
+    lostDeals: number;
+    averageCloseDays: number;
+    previousAverageCloseDays: number;
+    bottleneckStage: {
+      stage: string;
+      conversionRate: number | null;
+      advancementRate: number | null;
+    } | null;
+  };
+  byStage: Array<{
+    stage: string;
+    color: string;
+    count: number;
+    previousCount: number;
+    deltaCount: number;
+    value: number;
+    previousValue: number;
+    deltaValue: number;
+    reachedCount: number;
+    advancementRate: number | null;
+    stageConversionRate: number | null;
+  }>;
+  stageTime: {
+    available: boolean;
+    reason?: string | null;
+  };
+}
+
+export interface ServicesAdvancedRevenueResponse {
+  range: AdvancedReportRange;
+  summary: {
+    received: AdvancedReportComparison;
+    issued: AdvancedReportComparison;
+    activeRecurringMonthlyRevenue: number;
+    recurringReceivedRevenue: number;
+    estimatedNonRecurringReceivedRevenue: number;
+    estimatedNonRecurringIssuedRevenue: number;
+    averageBillingPerClient: number;
+    invoicesIssued: number;
+    invoicesPaid: number;
+    receivablesCount: number;
+    receivablesTotal: number;
+    top5RevenueConcentrationPercent: number | null;
+    classificationNote: string;
+  };
+  topProfitableClients: Array<{
+    clientId: number | null;
+    clientName: string;
+    revenue: number;
+    costs: number;
+    netMargin: number;
+    marginPercent: number | null;
+  }>;
+  topRevenueClients: Array<{
+    clientId: number | null;
+    clientName: string;
+    revenue: number;
+    costs: number;
+    netMargin: number;
+    marginPercent: number | null;
+  }>;
+}
+
+export interface ServicesAdvancedTeamResponse {
+  range: AdvancedReportRange;
+  summary: {
+    members: number;
+    totalTaskCompletions: number;
+    totalOverdueTasks: number;
+    totalContactsCreated: number;
+    totalActivityEvents: number;
+    totalClosedDeals: number;
+    closedDealsAttribution: {
+      available: boolean;
+      reason: string | null;
+    };
+  };
+  members: Array<{
+    userId: number;
+    name: string;
+    email: string;
+    role: string;
+    tasksCompleted: number;
+    overdueTasks: number;
+    contactsCreated: number;
+    activityCount: number;
+    closedDeals: number;
+  }>;
+}
+
+export interface CommercialAdvancedOverviewResponse {
+  range: AdvancedReportRange;
+  summary: {
+    totalSales: number;
+    previousTotalSales: number;
+    growthPercent: number | null;
+    invoiceCount: number;
+    previousInvoiceCount: number;
+    ticketAverage: number;
+    previousTicketAverage: number;
+    criticalStockCount: number;
+  };
+  paymentMethods: Array<{
+    method: string;
+    total: number;
+    count: number;
+  }>;
+  establishments: Array<{
+    estabelecimentoId: string;
+    nome: string;
+    total: number;
+    count: number;
+    ticketAverage: number;
+  }>;
+  topProducts: Array<{
+    productId: string | null;
+    productCode: string;
+    productDescription: string;
+    quantityTotal: number;
+    revenueTotal: number;
+    estimatedMargin: number | null;
+    marginPercent: number | null;
+    turnoverRatio: number | null;
+    stock: number | null;
+    stockMinimo: number | null;
+  }>;
+  topClients: Array<{
+    customerTaxID: string | null;
+    customerName: string;
+    count: number;
+    total: number;
+    averageTicket: number;
+  }>;
+  criticalProducts: Array<{
+    productId: string;
+    productCode: string;
+    productDescription: string;
+    stock: number;
+    stockMinimo: number;
+  }>;
+}
+
+export interface CommercialAdvancedSalesResponse {
+  range: AdvancedReportRange;
+  summary: {
+    totalSales: number;
+    previousTotalSales: number;
+    growthPercent: number | null;
+    documentCount: number;
+    previousDocumentCount: number;
+    ticketAverage: number;
+    previousTicketAverage: number;
+    trendGrowthPercent: number | null;
+  };
+  series: Array<{
+    key: string;
+    label: string;
+    total: number;
+    count: number;
+  }>;
+}
+
+export interface CommercialAdvancedProductsResponse {
+  range: AdvancedReportRange;
+  summary: {
+    totalProducts: number;
+    soldProducts: number;
+    unsoldProducts: number;
+    criticalStockCount: number;
+  };
+  topSold: CommercialAdvancedOverviewResponse['topProducts'];
+  leastSold: CommercialAdvancedOverviewResponse['topProducts'];
+  topRevenue: CommercialAdvancedOverviewResponse['topProducts'];
+  lowMovement: CommercialAdvancedOverviewResponse['topProducts'];
+  criticalProducts: Array<{
+    productId: string;
+    productCode: string;
+    productDescription: string;
+    stock: number;
+    stockMinimo: number;
+  }>;
+  unsoldProducts: Array<{
+    productId: string;
+    productCode: string;
+    productDescription: string;
+    stock: number;
+    stockMinimo: number;
+  }>;
+}
+
+export interface CommercialAdvancedLocationsResponse {
+  range: AdvancedReportRange;
+  summary: {
+    locations: number;
+    bestLocation: {
+      id: string;
+      nome: string;
+      totalSales: number;
+      previousTotalSales: number;
+      growthPercent: number | null;
+      salesCount: number;
+      previousSalesCount: number;
+      ticketAverage: number;
+      totalCashInSessions: number;
+    } | null;
+    totalCashInSessions: number;
+  };
+  locations: Array<{
+    id: string;
+    nome: string;
+    totalSales: number;
+    previousTotalSales: number;
+    growthPercent: number | null;
+    salesCount: number;
+    previousSalesCount: number;
+    ticketAverage: number;
+    totalCashInSessions: number;
+  }>;
+}
+
+export interface CommercialAdvancedTeamResponse {
+  range: AdvancedReportRange;
+  summary: {
+    members: number;
+    totalSalesCount: number;
+    totalSold: number;
+    sessionsOpened: number;
+    sessionsClosed: number;
+    attributionNote: string;
+  };
+  members: Array<{
+    userId: number;
+    name: string;
+    email: string;
+    role: string;
+    salesCount: number;
+    totalSold: number;
+    sessionsOpened: number;
+    sessionsClosed: number;
+  }>;
+}
+
 export interface Produto {
   id: string;
   productCode: string;
