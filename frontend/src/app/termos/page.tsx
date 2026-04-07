@@ -69,7 +69,7 @@ export default function TermosPage() {
           <ul className="mt-3 space-y-2 list-disc list-inside text-gray-700">
             <li>Manter a confidencialidade das credenciais de acesso</li>
             <li>Todas as actividades realizadas sob a sua conta</li>
-            <li>Notificar imediatamente qualquer acesso não autorizado para <a href="mailto:suporte@mazanga.digital" className="text-[#635BFF] hover:underline">suporte@mazanga.digital</a></li>
+            <li>Notificar imediatamente qualquer acesso não autorizado para <a href="mailto:suporte@kukugest.ao" className="text-[#635BFF] hover:underline">suporte@kukugest.ao</a></li>
           </ul>
           <p className="mt-3">
             O titular da conta (Account Owner) pode criar utilizadores adicionais dentro da sua organização. Esses utilizadores ficam sujeitos aos mesmos Termos e a responsabilidade pelas suas acções recai sobre o titular da conta.
@@ -168,7 +168,7 @@ export default function TermosPage() {
 
         <Section number="10" title="Suspensão e Cancelamento">
           <p>
-            O utilizador pode cancelar a sua subscrição a qualquer momento através das definições da conta ou contactando <a href="mailto:suporte@mazanga.digital" className="text-[#635BFF] hover:underline">suporte@mazanga.digital</a>.
+            O utilizador pode cancelar a sua subscrição a qualquer momento através das definições da conta ou contactando <a href="mailto:suporte@kukugest.ao" className="text-[#635BFF] hover:underline">suporte@kukugest.ao</a>.
             O cancelamento tem efeito no final do período de facturação em curso.
           </p>
           <p className="mt-3">
@@ -197,8 +197,8 @@ export default function TermosPage() {
             <p><strong>Mazanga Marketing Lda</strong></p>
             <p>NIF: 5001636863</p>
             <p>Luanda, República de Angola</p>
-            <p>Email geral: <a href="mailto:suporte@mazanga.digital" className="text-[#635BFF] hover:underline">suporte@mazanga.digital</a></p>
-            <p>Privacidade: <a href="mailto:privacidade@mazanga.digital" className="text-[#635BFF] hover:underline">privacidade@mazanga.digital</a></p>
+            <p>Email geral: <a href="mailto:suporte@kukugest.ao" className="text-[#635BFF] hover:underline">suporte@kukugest.ao</a></p>
+            <p>Privacidade: <a href="mailto:privacidade@kukugest.ao" className="text-[#635BFF] hover:underline">privacidade@kukugest.ao</a></p>
           </div>
         </Section>
 
@@ -207,7 +207,7 @@ export default function TermosPage() {
           <span>© 2026 KukuGest · Mazanga Marketing Lda</span>
           <div className="flex gap-6">
             <Link href="/privacidade" className="hover:text-[#0A2540] transition-colors">Política de Privacidade</Link>
-            <a href="mailto:suporte@mazanga.digital" className="hover:text-[#0A2540] transition-colors">Suporte</a>
+            <a href="mailto:suporte@kukugest.ao" className="hover:text-[#0A2540] transition-colors">Suporte</a>
           </div>
         </div>
       </div>

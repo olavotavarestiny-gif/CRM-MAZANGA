@@ -63,8 +63,8 @@ const USER_SELECT = {
 };
 
 // Bootstrap: emails that always get superadmin regardless of DB field value
-const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'olavo@mazanga.digital';
-const SUPER_ADMIN_EMAILS = [SUPER_ADMIN_EMAIL, 'olavo@kukugest.ao'];
+const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'olavo@kukugest.ao';
+const SUPER_ADMIN_EMAILS = [...new Set([SUPER_ADMIN_EMAIL, 'olavo@kukugest.ao'])];
 
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;

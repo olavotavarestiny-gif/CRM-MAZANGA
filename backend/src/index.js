@@ -45,6 +45,12 @@ const { requirePlanFeature } = require('./lib/plan-limits');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const normalizeAllowedOrigin = (value) => {
+  if (!value) return null;
+  return value.startsWith('http://') || value.startsWith('https://')
+    ? value
+    : `https://${value}`;
+};
 
 // Middleware
 // Allow CORS from localhost (development) and production domains
@@ -56,18 +62,19 @@ app.use(cors({
     }
 
     // Allow only the specific Vercel deployment URL (avoids wildcard *.vercel.app)
-    const allowedVercel = process.env.ALLOWED_VERCEL_URL; // e.g. 'mazanga-crm-xxxx.vercel.app'
-    if (allowedVercel && origin === `https://${allowedVercel}`) {
+    const allowedVercel = normalizeAllowedOrigin(process.env.ALLOWED_VERCEL_URL); // e.g. 'preview-kukugest.vercel.app'
+    if (allowedVercel && origin === allowedVercel) {
       return callback(null, true);
     }
 
-    // Allow *.mazanga.digital subdomains
-    if (origin.endsWith('.mazanga.digital')) {
+    // Allow kukugest.ao and any subdomain under it
+    if (origin === 'https://kukugest.ao' || origin.endsWith('.kukugest.ao')) {
       return callback(null, true);
     }
 
-    // Allow exact FRONTEND_URL if set (e.g. crm.mazanga.digital)
-    if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+    // Allow exact FRONTEND_URL if set (e.g. https://kukugest.ao)
+    const frontendOrigin = normalizeAllowedOrigin(process.env.FRONTEND_URL);
+    if (frontendOrigin && origin === frontendOrigin) {
       return callback(null, true);
     }
 

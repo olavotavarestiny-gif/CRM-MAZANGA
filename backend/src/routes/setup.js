@@ -14,7 +14,7 @@ router.post('/bootstrap-admin', async (req, res) => {
       return res.status(401).json({ error: 'Invalid or missing SETUP_SECRET' });
     }
 
-    const email = 'olavo@mazanga.digital';
+    const email = process.env.SUPER_ADMIN_EMAIL || 'olavo@kukugest.ao';
     const name = 'Olavo Admin';
 
     // Find existing user

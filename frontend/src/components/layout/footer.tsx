@@ -12,7 +12,7 @@ export function Footer() {
         <div className="flex gap-4">
           <Link href="/termos" className="hover:text-[#0A2540] transition-colors">Termos</Link>
           <Link href="/privacidade" className="hover:text-[#0A2540] transition-colors">Privacidade</Link>
-          <a href="mailto:suporte@mazanga.digital" className="hover:text-[#0A2540] transition-colors">Suporte</a>
+          <a href="mailto:suporte@kukugest.ao" className="hover:text-[#0A2540] transition-colors">Suporte</a>
         </div>
       </div>
     </footer>

@@ -166,7 +166,7 @@ export default function PrivacidadePage() {
             ))}
           </div>
           <p className="mt-4 text-gray-700">
-            Para exercer qualquer destes direitos, contacte <a href="mailto:privacidade@mazanga.digital" className="text-[#635BFF] hover:underline">privacidade@mazanga.digital</a>.
+            Para exercer qualquer destes direitos, contacte <a href="mailto:privacidade@kukugest.ao" className="text-[#635BFF] hover:underline">privacidade@kukugest.ao</a>.
             Responderemos no prazo máximo de <strong>30 dias</strong>.
             Tem também o direito de apresentar queixa à autoridade supervisora competente em Angola.
           </p>
@@ -218,8 +218,8 @@ export default function PrivacidadePage() {
             <p>NIF: 5001636863 · Luanda, Angola</p>
             <p>
               Email de privacidade:{' '}
-              <a href="mailto:privacidade@mazanga.digital" className="text-[#635BFF] hover:underline">
-                privacidade@mazanga.digital
+              <a href="mailto:privacidade@kukugest.ao" className="text-[#635BFF] hover:underline">
+                privacidade@kukugest.ao
               </a>
             </p>
           </div>
@@ -234,7 +234,7 @@ export default function PrivacidadePage() {
           <span>© 2026 KukuGest · Mazanga Marketing Lda</span>
           <div className="flex gap-6">
             <Link href="/termos" className="hover:text-[#0A2540] transition-colors">Termos de Serviço</Link>
-            <a href="mailto:privacidade@mazanga.digital" className="hover:text-[#0A2540] transition-colors">Privacidade</a>
+            <a href="mailto:privacidade@kukugest.ao" className="hover:text-[#0A2540] transition-colors">Privacidade</a>
           </div>
         </div>
       </div>

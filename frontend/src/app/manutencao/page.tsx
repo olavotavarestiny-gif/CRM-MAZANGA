@@ -42,7 +42,7 @@ export default function ManutencaoPage() {
             <p className="text-white/60 text-sm">Precisa de ajuda urgente?</p>
             <div className="flex flex-col sm:flex-row gap-2">
               <a
-                href="mailto:suporte@mazanga.digital"
+                href="mailto:suporte@kukugest.ao"
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white text-sm hover:bg-white/20 transition-colors"
               >
                 <Mail className="w-4 h-4" />
