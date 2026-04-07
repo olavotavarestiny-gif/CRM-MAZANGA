@@ -88,7 +88,7 @@ export default function PricingSection({
         {showFooter ? (
           <div className="mt-10 rounded-3xl border border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] px-6 py-6 text-center">
             <p className="text-sm font-medium text-[var(--workspace-primary)]">
-              Todos os planos incluem faturação completa. Mensagens em massa chegam em breve no plano Pro.
+              Todos os planos incluem faturação completa. Mensagens em massa chegam em breve no plano Estabilidade.
             </p>
             <p className="mt-2 text-sm text-[#425466]">Precisa de algo personalizado? Fale connosco.</p>
             <div className="mt-5 flex justify-center">

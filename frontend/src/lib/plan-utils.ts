@@ -53,8 +53,8 @@ const WORKSPACE_PRICING_CATALOG: Record<WorkspaceMode, PricingTier[]> = {
     {
       key: 'starter',
       internalPlan: 'essencial',
-      name: 'Starter',
-      price: '10 USD',
+      name: 'Inicial',
+      price: '9.999 Kz',
       description: 'Para quem está a começar a organizar o negócio',
       features: [
         '1 utilizador',
@@ -70,38 +70,38 @@ const WORKSPACE_PRICING_CATALOG: Record<WorkspaceMode, PricingTier[]> = {
     {
       key: 'growth',
       internalPlan: 'profissional',
-      name: 'Growth',
-      price: '25 USD',
+      name: 'Crescimento',
+      price: '29.999 Kz',
       description: 'Para empresas em crescimento que precisam de mais controlo',
       features: [
         'Até 5 utilizadores',
         'Até 5.000 contactos',
-        'Tudo do Starter',
+        'Tudo do Inicial',
         'Formulários',
         'Finanças',
         'Relatórios básicos',
         'Automações básicas',
       ],
-      buttonText: 'Escolher Growth',
+      buttonText: 'Escolher Crescimento',
       badge: 'Mais escolhido',
       highlight: true,
     },
     {
       key: 'pro',
       internalPlan: 'enterprise',
-      name: 'Pro',
-      price: '50 USD',
+      name: 'Estabilidade',
+      price: '54.999 Kz',
       description: 'Para empresas estruturadas que querem crescer com mais inteligência',
       features: [
         'Utilizadores ilimitados',
         'Contactos ilimitados',
-        'Tudo do Growth',
+        'Tudo do Crescimento',
         'Relatórios avançados',
         'Automações completas',
         'Permissões avançadas',
         'Mensagens em massa (Em breve)',
       ],
-      buttonText: 'Escolher Pro',
+      buttonText: 'Escolher Estabilidade',
       emphasize: true,
     },
   ],
@@ -109,8 +109,8 @@ const WORKSPACE_PRICING_CATALOG: Record<WorkspaceMode, PricingTier[]> = {
     {
       key: 'starter',
       internalPlan: 'essencial',
-      name: 'Starter',
-      price: '10 USD',
+      name: 'Inicial',
+      price: '9.999 Kz',
       description: 'Para pequenas lojas que precisam de vender com simplicidade',
       features: [
         '1 utilizador',
@@ -125,37 +125,37 @@ const WORKSPACE_PRICING_CATALOG: Record<WorkspaceMode, PricingTier[]> = {
     {
       key: 'growth',
       internalPlan: 'profissional',
-      name: 'Growth',
-      price: '20 USD',
+      name: 'Crescimento',
+      price: '29.999 Kz',
       description: 'Para lojas em crescimento com mais movimento',
       features: [
         'Até 5 utilizadores',
         'Até 3.000 clientes',
-        'Tudo do Starter',
+        'Tudo do Inicial',
         'Caixa',
         'Stock',
         'Relatórios básicos',
       ],
-      buttonText: 'Escolher Growth',
+      buttonText: 'Escolher Crescimento',
       badge: 'Mais escolhido',
       highlight: true,
     },
     {
       key: 'pro',
       internalPlan: 'enterprise',
-      name: 'Pro',
-      price: '50 USD',
+      name: 'Estabilidade',
+      price: '54.999 Kz',
       description: 'Para operações estruturadas com controlo total',
       features: [
         'Utilizadores ilimitados',
         'Clientes ilimitados',
-        'Tudo do Growth',
+        'Tudo do Crescimento',
         'Multi-estabelecimento',
         'Gestão de equipa',
         'Relatórios avançados',
         'Mensagens em massa (Em breve)',
       ],
-      buttonText: 'Escolher Pro',
+      buttonText: 'Escolher Estabilidade',
       emphasize: true,
     },
   ],
@@ -163,20 +163,20 @@ const WORKSPACE_PRICING_CATALOG: Record<WorkspaceMode, PricingTier[]> = {
 
 const WORKSPACE_PLAN_COMPARISON: Record<WorkspaceMode, PlanComparisonItem[]> = {
   servicos: [
-    { feature: 'Relatórios básicos', availabilityLabel: 'Growth e Pro', tone: 'growth' },
-    { feature: 'Relatórios avançados', availabilityLabel: 'Pro', tone: 'pro' },
-    { feature: 'Formulários', availabilityLabel: 'Growth e Pro', tone: 'growth' },
-    { feature: 'Automações básicas', availabilityLabel: 'Growth', tone: 'growth' },
-    { feature: 'Automações completas', availabilityLabel: 'Pro', tone: 'pro' },
-    { feature: 'Mensagens em massa', availabilityLabel: 'Pro (Em breve)', tone: 'soon' },
+    { feature: 'Relatórios básicos', availabilityLabel: 'Crescimento e Estabilidade', tone: 'growth' },
+    { feature: 'Relatórios avançados', availabilityLabel: 'Estabilidade', tone: 'pro' },
+    { feature: 'Formulários', availabilityLabel: 'Crescimento e Estabilidade', tone: 'growth' },
+    { feature: 'Automações básicas', availabilityLabel: 'Crescimento', tone: 'growth' },
+    { feature: 'Automações completas', availabilityLabel: 'Estabilidade', tone: 'pro' },
+    { feature: 'Mensagens em massa', availabilityLabel: 'Estabilidade (Em breve)', tone: 'soon' },
   ],
   comercio: [
-    { feature: 'Caixa', availabilityLabel: 'Growth e Pro', tone: 'growth' },
-    { feature: 'Stock', availabilityLabel: 'Growth e Pro', tone: 'growth' },
-    { feature: 'Multi-estabelecimento', availabilityLabel: 'Pro', tone: 'pro' },
-    { feature: 'Relatórios avançados', availabilityLabel: 'Pro', tone: 'pro' },
-    { feature: 'Gestão de equipa', availabilityLabel: 'Pro', tone: 'pro' },
-    { feature: 'Mensagens em massa', availabilityLabel: 'Pro (Em breve)', tone: 'soon' },
+    { feature: 'Caixa', availabilityLabel: 'Crescimento e Estabilidade', tone: 'growth' },
+    { feature: 'Stock', availabilityLabel: 'Crescimento e Estabilidade', tone: 'growth' },
+    { feature: 'Multi-estabelecimento', availabilityLabel: 'Estabilidade', tone: 'pro' },
+    { feature: 'Relatórios avançados', availabilityLabel: 'Estabilidade', tone: 'pro' },
+    { feature: 'Gestão de equipa', availabilityLabel: 'Estabilidade', tone: 'pro' },
+    { feature: 'Mensagens em massa', availabilityLabel: 'Estabilidade (Em breve)', tone: 'soon' },
   ],
 };
 
@@ -186,35 +186,35 @@ const WORKSPACE_UPGRADE_SUMMARY: Record<
 > = {
   servicos: {
     starter: {
-      title: 'Próximo passo recomendado: Growth',
+      title: 'Próximo passo recomendado: Crescimento',
       description: 'Desbloqueia o controlo operacional que normalmente começa a fazer falta quando o negócio deixa de estar numa fase inicial.',
       bullets: ['Formulários', 'Finanças', 'Relatórios básicos', 'Automações básicas predefinidas'],
     },
     growth: {
-      title: 'Próximo passo: Pro',
+      title: 'Próximo passo: Estabilidade',
       description: 'Leva a operação para um nível mais estruturado, com análise e automação mais fortes.',
       bullets: ['Relatórios avançados', 'Automações completas', 'Permissões avançadas', 'Mensagens em massa (Em breve)'],
     },
     pro: {
       title: 'Está no plano mais completo',
-      description: 'O plano Pro já cobre a camada mais avançada do CRM para serviços.',
+      description: 'O plano Estabilidade já cobre a camada mais avançada do CRM para serviços.',
       bullets: ['Utilizadores ilimitados', 'Contactos ilimitados', 'Relatórios avançados', 'Permissões avançadas'],
     },
   },
   comercio: {
     starter: {
-      title: 'Próximo passo recomendado: Growth',
+      title: 'Próximo passo recomendado: Crescimento',
       description: 'É a evolução natural para lojas que começam a ter mais volume diário e precisam de controlo operacional.',
       bullets: ['Caixa', 'Stock', 'Relatórios básicos', 'Até 5 utilizadores'],
     },
     growth: {
-      title: 'Próximo passo: Pro',
+      title: 'Próximo passo: Estabilidade',
       description: 'Prepara a operação para escala, equipa e gestão multi-estabelecimento.',
       bullets: ['Multi-estabelecimento', 'Gestão de equipa', 'Relatórios avançados', 'Mensagens em massa (Em breve)'],
     },
     pro: {
       title: 'Está no plano mais completo',
-      description: 'O plano Pro cobre a operação comercial mais completa disponível hoje no KukuGest.',
+      description: 'O plano Estabilidade cobre a operação comercial mais completa disponível hoje no KukuGest.',
       bullets: ['Clientes ilimitados', 'Multi-estabelecimento', 'Gestão de equipa', 'Relatórios avançados'],
     },
   },
@@ -245,7 +245,7 @@ export function getPlanFromPricingTier(tier: PricingTierKey): PlanName {
 
 export function getPricingTierLabel(plan?: PlanName | null) {
   const tier = mapPlanNameToPricingTier(plan);
-  return tier === 'starter' ? 'Starter' : tier === 'growth' ? 'Growth' : 'Pro';
+  return tier === 'starter' ? 'Inicial' : tier === 'growth' ? 'Crescimento' : 'Estabilidade';
 }
 
 export function getPricingTierDetails(
@@ -357,7 +357,7 @@ export function buildWhatsAppPlanLink({
     visualPlanLabel ||
     (normalizedPlan === 'essencial' || normalizedPlan === 'profissional' || normalizedPlan === 'enterprise'
       ? getPricingTierLabel(normalizedPlan)
-      : normalizedPlan || 'Growth');
+      : normalizedPlan || 'Crescimento');
   const workspaceLabel = workspaceMode ? ` para o workspace ${getWorkspaceLabel(workspaceMode)}` : '';
   const billingLabel = billing ? ` (${billing})` : '';
   const sourceLabel = source ? ` Origem: ${source}.` : '';
@@ -397,55 +397,55 @@ export function getBlockedFeatureCopy({
 }) {
   if (featureName === 'bulkMessages') {
     return {
-      title: 'Disponível em breve no plano Pro',
-      description: 'Mensagens em massa disponíveis em breve no plano Pro.',
+      title: 'Disponível em breve no plano Estabilidade',
+      description: 'Mensagens em massa disponíveis em breve no plano Estabilidade.',
       ctaLabel: 'Ver planos',
     };
   }
 
   if (featureName === 'advancedReports' || pathname?.startsWith('/relatorios')) {
     return {
-      title: 'Upgrade para o plano Pro',
-      description: 'Os relatórios avançados estão disponíveis no plano Pro.',
+      title: 'Upgrade para o plano Estabilidade',
+      description: 'Os relatórios avançados estão disponíveis no plano Estabilidade.',
       ctaLabel: 'Fazer upgrade',
     };
   }
 
   if (featureName === 'fullAutomations') {
     return {
-      title: 'Upgrade para o plano Pro',
-      description: 'As automações completas estão disponíveis no plano Pro.',
+      title: 'Upgrade para o plano Estabilidade',
+      description: 'As automações completas estão disponíveis no plano Estabilidade.',
       ctaLabel: 'Fazer upgrade',
     };
   }
 
   if (featureName === 'formularios') {
     return {
-      title: 'Upgrade para o plano Growth',
-      description: 'Os formulários estão disponíveis no plano Growth.',
+      title: 'Upgrade para o plano Crescimento',
+      description: 'Os formulários estão disponíveis no plano Crescimento.',
       ctaLabel: 'Ver planos',
     };
   }
 
   if (featureName === 'financas') {
     return {
-      title: 'Upgrade para o plano Growth',
-      description: 'A área de finanças está disponível no plano Growth.',
+      title: 'Upgrade para o plano Crescimento',
+      description: 'A área de finanças está disponível no plano Crescimento.',
       ctaLabel: 'Ver planos',
     };
   }
 
   if (featureName === 'automacoes' || pathname?.startsWith('/automations')) {
     return {
-      title: 'Upgrade para o plano Growth',
-      description: 'As automações básicas estão disponíveis no plano Growth.',
+      title: 'Upgrade para o plano Crescimento',
+      description: 'As automações básicas estão disponíveis no plano Crescimento.',
       ctaLabel: 'Ver planos',
     };
   }
 
   return {
-    title: 'Upgrade para o plano Growth',
-    description: 'Esta funcionalidade está disponível no plano Growth.',
+    title: 'Upgrade para o plano Crescimento',
+    description: 'Esta funcionalidade está disponível no plano Crescimento.',
     ctaLabel: 'Ver planos',
   };
 }
@@ -486,7 +486,7 @@ export function getPlanLimitModalCopy({
   if (plan === 'enterprise') {
     return {
       title: 'Limite do plano atual',
-      description: 'O plano Pro é o mais completo. Fale com a equipa para um ajuste personalizado.',
+      description: 'O plano Estabilidade é o mais completo. Fale com a equipa para um ajuste personalizado.',
       ctaLabel: 'Falar com a equipa',
     };
   }
@@ -494,7 +494,7 @@ export function getPlanLimitModalCopy({
   if (plan === 'profissional') {
     return {
       title: 'Upgrade disponível',
-      description: 'Esta utilização pode exigir o plano Pro para continuares sem limitações.',
+      description: 'Esta utilização pode exigir o plano Estabilidade para continuares sem limitações.',
       ctaLabel: 'Fazer upgrade',
     };
   }

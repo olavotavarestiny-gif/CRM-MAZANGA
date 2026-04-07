@@ -71,7 +71,7 @@ export default function PlanosPage() {
         <div>
           <h2 className="text-xl font-bold tracking-tight text-[#0A2540]">Compare os planos do seu workspace</h2>
           <p className="mt-1 text-sm text-[#6b7e9a]">
-            O plano Growth fica em destaque como a evolução mais natural para a maioria das contas.
+            O plano Crescimento fica em destaque como a evolução mais natural para a maioria das contas.
           </p>
         </div>
 
@@ -148,7 +148,7 @@ export default function PlanosPage() {
 
       <Card className="border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 p-6 text-sm text-[#5f728e] md:flex-row md:items-center md:justify-between">
-          <p>Todos os planos incluem faturação completa. Mensagens em massa aparecem apenas no Pro e continuam marcadas como Em breve.</p>
+          <p>Todos os planos incluem faturação completa. Mensagens em massa aparecem apenas no Estabilidade e continuam marcadas como Em breve.</p>
           <Button asChild variant="outline">
             <a
               href={buildWhatsAppPlanLink({
