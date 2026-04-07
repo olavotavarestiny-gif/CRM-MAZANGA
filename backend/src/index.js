@@ -67,12 +67,12 @@ app.use(cors({
       return callback(null, true);
     }
 
-    // Allow kukugest.ao and any subdomain under it
-    if (origin === 'https://kukugest.ao' || origin.endsWith('.kukugest.ao')) {
+    // Allow app.kukugest.ao and any subdomain under it
+    if (origin === 'https://app.kukugest.ao' || origin.endsWith('.app.kukugest.ao')) {
       return callback(null, true);
     }
 
-    // Allow exact FRONTEND_URL if set (e.g. https://kukugest.ao)
+    // Allow exact FRONTEND_URL if set (e.g. https://app.kukugest.ao)
     const frontendOrigin = normalizeAllowedOrigin(process.env.FRONTEND_URL);
     if (frontendOrigin && origin === frontendOrigin) {
       return callback(null, true);

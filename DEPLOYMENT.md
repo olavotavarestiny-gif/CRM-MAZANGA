@@ -35,7 +35,7 @@ Auth    -> Supabase
 | `SUPABASE_URL` | sim | URL do projeto Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | sim | usada em operações administrativas |
 | `JWT_SECRET` | sim | usado para impersonation tokens |
-| `FRONTEND_URL` | sim | origem completa do frontend em produção, por exemplo `https://kukugest.ao` |
+| `FRONTEND_URL` | sim | origem completa do frontend em produção, por exemplo `https://app.kukugest.ao` |
 
 ### Variáveis opcionais por módulo
 
@@ -109,7 +109,7 @@ Verifique:
 
 Verifique:
 
-- `FRONTEND_URL` com a origem exata do frontend, por exemplo `https://kukugest.ao`
+- `FRONTEND_URL` com a origem exata do frontend, por exemplo `https://app.kukugest.ao`
 - `ALLOWED_VERCEL_URL` se quiser liberar uma URL específica do Vercel, com ou sem protocolo
 
 ### Build do backend falha
