@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   CheckCircle2, Plus, Building2, Settings, User as UserIcon,
@@ -22,17 +23,15 @@ import { isComercio } from '@/lib/business-modes';
 import type { PlanName, User } from '@/lib/api';
 import type { IBANEntry } from '@/lib/types';
 import MemberPermissionsModal from '@/components/configuracoes/member-permissions-modal';
-import { PlanComparisonGrid } from '@/components/plans/plan-comparison-grid';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { useToast } from '@/components/ui/toast-provider';
 import {
-  PLAN_FEATURE_LABELS,
   buildWhatsAppPlanLink,
-  formatLimitValue,
-  getPlanBadgeClasses,
-  getPlanBillingOptions,
-  getSortedPlanEntries,
+  getPricingTierDetails,
+  getUpgradeSummary,
+  getUpgradeTargetPlan,
+  getWorkspaceLabel,
 } from '@/lib/plan-utils';
 
 function ConfiguracoesContent() {
@@ -63,13 +62,10 @@ function ConfiguracoesContent() {
   const isComercioWorkspace = currentUser?.workspaceMode === 'comercio';
   const platformAdminHref = isSuperAdmin ? '/superadmin?section=organizations' : null;
   const currentPlan = (currentUser?.plan || 'essencial') as PlanName;
-  const currentPlanCatalog = currentUser?.availablePlans?.[currentPlan];
-  const planEntries = getSortedPlanEntries(currentUser?.availablePlans);
-  const [selectedBilling, setSelectedBilling] = useState<Record<PlanName, string>>({
-    essencial: 'Mensal',
-    profissional: '6 meses',
-    enterprise: 'Personalizado',
-  });
+  const currentTier = getPricingTierDetails(currentUser?.workspaceMode || 'servicos', currentPlan);
+  const upgradeSummary = getUpgradeSummary(currentUser?.workspaceMode || 'servicos', currentPlan);
+  const upgradePlan = getUpgradeTargetPlan(currentPlan);
+  const isTopPlan = currentPlan === 'enterprise';
 
   useEffect(() => {
     if (requestedSection === 'faturacao') {
@@ -517,140 +513,82 @@ function ConfiguracoesContent() {
         </div>
       )}
 
-      {activeTab === 'plano' && currentPlanCatalog && (
-        <div className="space-y-4 max-w-4xl">
+      {activeTab === 'plano' && (
+        <div className="max-w-5xl space-y-4">
           <Card className="border-slate-200 shadow-sm">
-            <div className="p-6 space-y-4">
+            <div className="space-y-5 p-6">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Plano Atual</p>
-                  <h2 className="mt-2 text-2xl font-bold text-[#0A2540]">{currentPlanCatalog.label}</h2>
-                  <p className="mt-2 max-w-2xl text-sm text-gray-500">{currentPlanCatalog.description}</p>
+                  <Badge variant="secondary" className="border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)]">
+                    Plano atual
+                  </Badge>
+                  <h2 className="mt-3 text-3xl font-black tracking-tight text-[#0A2540]">{currentTier.name}</h2>
+                  <p className="mt-2 max-w-2xl text-sm text-gray-500">{currentTier.description}</p>
                 </div>
-                <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getPlanBadgeClasses(currentPlan)}`}>
-                  {currentPlan.toUpperCase()}
-                </span>
+                <Link href="/planos" className="text-sm font-semibold text-[var(--workspace-primary)] hover:underline">
+                  Abrir página completa de planos
+                </Link>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {[
-                  { key: 'users', label: 'Utilizadores' },
-                  { key: 'contacts', label: 'Contactos' },
-                  { key: 'tasks', label: 'Tarefas' },
-                  { key: 'automations', label: 'Automações' },
-                ].map(({ key, label }) => (
-                  <div key={key} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">{label}</p>
-                    <p className="mt-2 text-lg font-bold text-[#0A2540]">
-                      {formatLimitValue(currentPlanCatalog.limits[key as keyof typeof currentPlanCatalog.limits])}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Card>
-
-          <Card className="border-slate-200 shadow-sm">
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-semibold text-[#0A2540]">Funcionalidades incluídas</h2>
-                  <p className="mt-1 text-sm text-gray-500">O acesso final na aplicação cruza plano e permissões da conta.</p>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Plano atual</p>
+                  <p className="mt-2 text-2xl font-black text-[#0A2540]">{currentTier.name}</p>
                 </div>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                {Object.entries(currentPlanCatalog.features).map(([feature, enabled]) => (
-                  <div
-                    key={feature}
-                    className={`flex items-center justify-between rounded-xl border px-4 py-3 ${
-                      enabled
-                        ? 'border-emerald-200 bg-emerald-50/60'
-                        : 'border-slate-200 bg-slate-50'
-                    }`}
-                  >
-                    <span className="text-sm font-medium text-[#0A2540]">
-                      {PLAN_FEATURE_LABELS[feature as keyof typeof PLAN_FEATURE_LABELS]}
-                    </span>
-                    <span className={`text-xs font-semibold ${enabled ? 'text-emerald-700' : 'text-slate-500'}`}>
-                      {enabled ? 'Ativo' : 'Indisponível'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Card>
-
-          <Card className="border-slate-200 shadow-sm">
-            <div className="p-6 space-y-4">
-              <div>
-                <h2 className="text-base font-semibold text-[#0A2540]">Upgrade e ativação</h2>
-                <p className="mt-1 text-sm text-gray-500">Ativação manual via WhatsApp. Escolhe a modalidade pretendida e fala connosco.</p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {getPlanBillingOptions(currentPlan).map((billing) => (
-                  <button
-                    key={billing}
-                    type="button"
-                    onClick={() => setSelectedBilling((prev) => ({ ...prev, [currentPlan]: billing }))}
-                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                      (selectedBilling[currentPlan] || getPlanBillingOptions(currentPlan)[0]) === billing
-                        ? isComercioWorkspace ? 'border-[#B84D0E] bg-[#B84D0E] text-white' : 'border-[#0A2540] bg-[#0A2540] text-white'
-                        : isComercioWorkspace ? 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-[#B84D0E]' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-[#0A2540]'
-                    }`}
-                  >
-                    {billing}
-                  </button>
-                ))}
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Workspace atual</p>
+                  <p className="mt-2 text-2xl font-black text-[#0A2540]">{getWorkspaceLabel(currentUser?.workspaceMode)}</p>
+                </div>
+                <div className="rounded-2xl border border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] px-4 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--workspace-primary)]/70">Estado</p>
+                  <p className="mt-2 text-2xl font-black text-[var(--workspace-primary)]">Ativo</p>
+                </div>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <p className="text-sm text-gray-500">
-                  Pedido preparado para <strong>{currentPlanCatalog.label}</strong> ({selectedBilling[currentPlan] || getPlanBillingOptions(currentPlan)[0]}).
-                </p>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <Button asChild className="gap-2">
-                    <a
-                      href={buildWhatsAppPlanLink({
-                        plan: currentPlan,
-                        billing: selectedBilling[currentPlan] || getPlanBillingOptions(currentPlan)[0],
-                        name: currentUser?.name,
-                        company: companyNameForPlan,
-                      })}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                <p className="text-sm font-semibold text-[#0A2540]">{upgradeSummary.title}</p>
+                <p className="mt-2 text-sm leading-6 text-[#5f728e]">{upgradeSummary.description}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {upgradeSummary.bullets.map((bullet) => (
+                    <span
+                      key={bullet}
+                      className="rounded-full border border-[var(--workspace-primary-border)] bg-white px-3 py-1 text-xs font-medium text-[var(--workspace-primary)]"
                     >
-                      Falar no WhatsApp
-                    </a>
-                  </Button>
-                  <p className="text-xs text-gray-400">Ativação manual via WhatsApp</p>
+                      {bullet}
+                    </span>
+                  ))}
                 </div>
               </div>
-            </div>
-          </Card>
 
-          {planEntries.length > 0 && (
-            <div className="space-y-3">
-              <div>
-                <h2 className="text-base font-semibold text-[#0A2540]">Comparar planos</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  A mesma grelha de comparação usada em <Link href="/planos" className="font-medium text-[#0A2540] hover:underline">/planos</Link>, com ativação manual via WhatsApp.
-                </p>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button asChild variant="outline">
+                  <Link href="/planos">Abrir página completa de planos</Link>
+                </Button>
+                <Button asChild className="bg-[var(--workspace-primary)] text-[var(--workspace-on-primary)] hover:bg-[var(--workspace-primary-hover)]">
+                  <a
+                    href={buildWhatsAppPlanLink({
+                      plan: upgradePlan,
+                      workspaceMode: currentUser?.workspaceMode || 'servicos',
+                      source: 'settings',
+                      name: currentUser?.name,
+                      company: companyNameForPlan,
+                      note: isTopPlan
+                        ? 'Quero ajuda para ajustar a minha conta no plano mais completo.'
+                        : `Quero fazer upgrade para o plano ${getPricingTierDetails(currentUser?.workspaceMode || 'servicos', upgradePlan).name}.`,
+                    })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {isTopPlan ? 'Falar com a equipa' : 'Fazer upgrade'}
+                  </a>
+                </Button>
               </div>
 
-              <PlanComparisonGrid
-                planEntries={planEntries}
-                currentPlan={currentPlan}
-                selectedBilling={selectedBilling}
-                onBillingChange={(plan, billing) =>
-                  setSelectedBilling((prev) => ({ ...prev, [plan]: billing }))
-                }
-                name={currentUser?.name}
-                company={companyNameForPlan}
-              />
+              <p className="text-sm text-gray-500">
+                A comparação completa dos 3 planos fica em <Link href="/planos" className="font-medium text-[var(--workspace-primary)] hover:underline">/planos</Link>. Aqui mantemos apenas um resumo curto para não duplicar a experiência.
+              </p>
             </div>
-          )}
+          </Card>
         </div>
       )}
 

@@ -4,6 +4,7 @@ import { X, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { UsageBar } from '@/components/common/usage-bar';
+import { buildWhatsAppPlanLink, getPlanLimitModalCopy, getPricingTierLabel, getUpgradeTargetPlan } from '@/lib/plan-utils';
 
 interface PlanLimitModalProps {
   feature: string;
@@ -16,7 +17,9 @@ interface PlanLimitModalProps {
 
 export function PlanLimitModal({ feature, featureLabel, current, limit, plan, onClose }: PlanLimitModalProps) {
   const router = useRouter();
-  const planLabel = plan === 'enterprise' ? 'Enterprise' : plan === 'profissional' ? 'Profissional' : 'Essencial';
+  const planLabel = getPricingTierLabel(plan as any);
+  const modalCopy = getPlanLimitModalCopy({ featureLabel, plan });
+  const upgradePlan = getUpgradeTargetPlan(plan as any);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -39,25 +42,49 @@ export function PlanLimitModal({ feature, featureLabel, current, limit, plan, on
         <p className="text-[#374151] text-sm mb-4">
           Atingiste o limite de <strong>{limit} {featureLabel}</strong> do plano{' '}
           <strong>{planLabel}</strong>.
-          {plan === 'essencial' && ' Faz upgrade para o Profissional para aumentares os teus limites.'}
         </p>
+
+        <div className="mb-4 rounded-xl border border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] px-4 py-3 text-sm text-[var(--workspace-primary)]">
+          <p className="font-semibold">{modalCopy.title}</p>
+          <p className="mt-1">{modalCopy.description}</p>
+        </div>
 
         <div className="mb-6">
           <UsageBar label={featureLabel} current={current} limit={limit} />
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <Button variant="outline" className="flex-1" onClick={onClose}>
             Fechar
           </Button>
-          {plan === 'essencial' && (
-            <Button
-              className="flex-1 bg-[#0A2540] hover:bg-[#0A2540]/90 text-white"
-              onClick={() => { onClose(); router.push('/planos'); }}
-            >
-              Ver Planos →
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => {
+              onClose();
+              router.push('/planos');
+            }}
+          >
+            Ver planos
+          </Button>
+          <Button
+            className="flex-1 bg-[var(--workspace-primary)] text-[var(--workspace-on-primary)] hover:bg-[var(--workspace-primary-hover)]"
+            onClick={() => {
+              onClose();
+              window.open(
+                buildWhatsAppPlanLink({
+                  plan: upgradePlan,
+                  visualPlanLabel: getPricingTierLabel(upgradePlan),
+                  source: 'blocked-feature',
+                  note: `${modalCopy.description} Limite atual: ${feature}.`,
+                }),
+                '_blank',
+                'noopener,noreferrer'
+              );
+            }}
+          >
+            {modalCopy.ctaLabel}
+          </Button>
         </div>
       </div>
     </div>

@@ -15,6 +15,7 @@ import { Menu, Eye, Info, LogOut, X } from 'lucide-react';
 import type { User } from '@/lib/api';
 import { canAccessWorkspaceRoute, getWorkspaceFallbackRoute, hasFeature } from '@/lib/permissions';
 import { isComercio } from '@/lib/business-modes';
+import { getBlockedFeatureCopy } from '@/lib/plan-utils';
 
 const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
 
@@ -90,6 +91,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
     pathname === '/forgot-password' ||
     pathname === '/reset-password' ||
     pathname === '/change-password' ||
+    pathname === '/landing' ||
     pathname === '/form' ||
     pathname === '/termos' ||
     pathname === '/privacidade' ||
@@ -195,14 +197,17 @@ function LayoutInner({ children }: { children: ReactNode }) {
         const fallback = getWorkspaceFallbackRoute(user, user.workspaceMode);
         const planFeature = resolveRoutePlanFeature(pathname);
         const blockedByPlan = planFeature ? !hasFeature(user, planFeature) : false;
+        const blockedCopy = blockedByPlan
+          ? getBlockedFeatureCopy({ featureName: pathname.startsWith('/relatorios') ? 'advancedReports' : planFeature, pathname })
+          : null;
 
         try {
           sessionStorage.setItem(
             ACCESS_NOTICE_STORAGE_KEY,
             JSON.stringify({
-              title: blockedByPlan ? 'Funcionalidade indisponível no seu plano' : 'Acesso restrito',
+              title: blockedByPlan ? blockedCopy?.title || 'Funcionalidade indisponível no seu plano' : 'Acesso restrito',
               message: blockedByPlan
-                ? `${resolveRouteLabel(pathname)} não está disponível no plano atual da sua conta.`
+                ? blockedCopy?.description || `${resolveRouteLabel(pathname)} não está disponível no plano atual da sua conta.`
                 : 'Não tem permissão para aceder a esta área com a configuração atual da sua conta.',
             } satisfies AccessNotice)
           );
