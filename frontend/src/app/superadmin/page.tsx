@@ -64,6 +64,7 @@ import {
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { useToast } from '@/components/ui/toast-provider';
+import { getPricingTierLabel } from '@/lib/plan-utils';
 
 const ADMIN_SECTIONS = [
   { id: 'users', label: 'Utilizadores', icon: Users },
@@ -144,6 +145,8 @@ export default function SuperAdminPage() {
     role: 'user',
     accountOwnerId: '',
   });
+
+  const formatPlanLabel = (plan?: PlanName | null) => getPricingTierLabel(plan || 'essencial');
 
   const { data: users = [], isLoading: usersLoading, isError: usersError, refetch: refetchUsers } = useQuery({
     queryKey: ['admin-users'],
@@ -628,9 +631,9 @@ export default function SuperAdminPage() {
                           }}
                           className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:border-[#0A2540]"
                         >
-                          <option value="essencial">Essencial</option>
-                          <option value="profissional">Profissional</option>
-                          <option value="enterprise">Enterprise</option>
+                          <option value="essencial">Inicial</option>
+                          <option value="profissional">Crescimento</option>
+                          <option value="enterprise">Estabilidade</option>
                         </select>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
@@ -748,7 +751,7 @@ export default function SuperAdminPage() {
                     <div className="space-y-3">
                       {Object.entries(dashboard.planDistribution).map(([plan, count]) => (
                         <div key={plan} className="flex items-center justify-between">
-                          <span className="text-sm capitalize text-slate-600">{plan}</span>
+                          <span className="text-sm text-slate-600">{formatPlanLabel(plan as PlanName)}</span>
                           <span className="text-sm font-bold text-[#2c2f31]">{count}</span>
                         </div>
                       ))}
@@ -857,9 +860,9 @@ export default function SuperAdminPage() {
                                     }
                                     className="appearance-none rounded-lg border border-[#dde3ec] bg-white py-1 pl-2 pr-6 text-xs font-medium text-[#0A2540] focus:outline-none focus:ring-2 focus:ring-blue-500"
                                   >
-                                    <option value="essencial">Essencial</option>
-                                    <option value="profissional">Profissional</option>
-                                    <option value="enterprise">Enterprise</option>
+                                    <option value="essencial">Inicial</option>
+                                    <option value="profissional">Crescimento</option>
+                                    <option value="enterprise">Estabilidade</option>
                                   </select>
                                   <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[#6b7e9a]" />
                                 </div>
@@ -1141,9 +1144,9 @@ export default function SuperAdminPage() {
                 onChange={(event) => setCreateAccountForm({ ...createAccountForm, plan: event.target.value as PlanName })}
                 className="w-full rounded-lg border border-[#dde3ec] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="essencial">Essencial</option>
-                <option value="profissional">Profissional</option>
-                <option value="enterprise">Enterprise</option>
+                <option value="essencial">Inicial</option>
+                <option value="profissional">Crescimento</option>
+                <option value="enterprise">Estabilidade</option>
               </select>
             </div>
             <div>

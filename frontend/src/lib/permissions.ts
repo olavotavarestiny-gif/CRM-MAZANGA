@@ -82,9 +82,20 @@ const COMERCIO_FALLBACK_ROUTES: CommerceRoute[] = [
   '/configuracoes',
 ];
 
+const PLAN_ORDER: Array<User['plan']> = ['essencial', 'profissional', 'enterprise'];
+
 function normalizePath(pathname: string): string {
   if (!pathname || pathname === '/') return '/';
   return pathname.replace(/\/+$/, '') || '/';
+}
+
+function isCommerceWorkspace(user?: Pick<User, 'workspaceMode'> | null) {
+  return user?.workspaceMode === 'comercio';
+}
+
+function isPlanAtLeast(user: Pick<User, 'plan'> | null | undefined, targetPlan: User['plan']) {
+  const currentPlan = user?.plan || 'essencial';
+  return PLAN_ORDER.indexOf(currentPlan) >= PLAN_ORDER.indexOf(targetPlan);
 }
 
 export function hasFeature(
@@ -174,6 +185,7 @@ export function canAccessBilling(user: User): boolean {
 
 export function canComercialDashboardBasic(user: User): boolean {
   if (!hasFeature(user, 'vendas')) return false;
+  if (isCommerceWorkspace(user) && !isPlanAtLeast(user, 'profissional')) return false;
   if (hasFullAccess(user)) return true;
   const perms = parsePermissions(user.permissions);
   if (perms === null) return true;
@@ -182,6 +194,7 @@ export function canComercialDashboardBasic(user: User): boolean {
 
 export function canComercialDashboardAnalysis(user: User): boolean {
   if (!hasFeature(user, 'vendas')) return false;
+  if (isCommerceWorkspace(user) && !isPlanAtLeast(user, 'enterprise')) return false;
   if (hasFullAccess(user)) return true;
   const perms = parsePermissions(user.permissions);
   if (perms === null) return true;
@@ -190,6 +203,7 @@ export function canComercialDashboardAnalysis(user: User): boolean {
 
 export function canCaixaView(user: User): boolean {
   if (!hasFeature(user, 'vendas')) return false;
+  if (isCommerceWorkspace(user) && !isPlanAtLeast(user, 'profissional')) return false;
   if (hasFullAccess(user)) return true;
   const perms = parsePermissions(user.permissions);
   if (perms === null) return true;
@@ -198,6 +212,7 @@ export function canCaixaView(user: User): boolean {
 
 export function canCaixaOpen(user: User): boolean {
   if (!hasFeature(user, 'vendas')) return false;
+  if (isCommerceWorkspace(user) && !isPlanAtLeast(user, 'profissional')) return false;
   if (hasFullAccess(user)) return true;
   const perms = parsePermissions(user.permissions);
   if (perms === null) return true;
@@ -206,6 +221,7 @@ export function canCaixaOpen(user: User): boolean {
 
 export function canCaixaClose(user: User): boolean {
   if (!hasFeature(user, 'vendas')) return false;
+  if (isCommerceWorkspace(user) && !isPlanAtLeast(user, 'profissional')) return false;
   if (hasFullAccess(user)) return true;
   const perms = parsePermissions(user.permissions);
   if (perms === null) return true;
@@ -214,6 +230,7 @@ export function canCaixaClose(user: User): boolean {
 
 export function canCaixaAudit(user: User): boolean {
   if (!hasFeature(user, 'vendas')) return false;
+  if (isCommerceWorkspace(user) && !isPlanAtLeast(user, 'profissional')) return false;
   if (hasFullAccess(user)) return true;
   const perms = parsePermissions(user.permissions);
   if (perms === null) return true;
@@ -256,6 +273,7 @@ export function canFinanceTransactionsEdit(user: User): boolean {
 
 export function canViewReports(user: User): boolean {
   if (!hasFeature(user, 'financas')) return false;
+  if (isCommerceWorkspace(user) && !isPlanAtLeast(user, 'enterprise')) return false;
   if (hasFullAccess(user)) return true;
   if (!user.permissions) return true;
   const finances = (parsePermissions(user.permissions) as UserPermissions).finances;

@@ -175,7 +175,7 @@ const WORKSPACE_PLAN_COMPARISON: Record<WorkspaceMode, PlanComparisonItem[]> = {
     { feature: 'Stock', availabilityLabel: 'Crescimento e Estabilidade', tone: 'growth' },
     { feature: 'Multi-estabelecimento', availabilityLabel: 'Estabilidade', tone: 'pro' },
     { feature: 'Relatórios avançados', availabilityLabel: 'Estabilidade', tone: 'pro' },
-    { feature: 'Gestão de equipa', availabilityLabel: 'Estabilidade', tone: 'pro' },
+    { feature: 'Gestão de equipa', availabilityLabel: 'Crescimento e Estabilidade', tone: 'growth' },
     { feature: 'Mensagens em massa', availabilityLabel: 'Estabilidade (Em breve)', tone: 'soon' },
   ],
 };
@@ -395,6 +395,14 @@ export function getBlockedFeatureCopy({
   featureName?: PlanFeatureName | 'advancedReports' | 'bulkMessages' | 'fullAutomations';
   pathname?: string;
 }) {
+  if (pathname?.startsWith('/caixa')) {
+    return {
+      title: 'Upgrade para o plano Crescimento',
+      description: 'A área de caixa está disponível no plano Crescimento.',
+      ctaLabel: 'Fazer upgrade',
+    };
+  }
+
   if (featureName === 'bulkMessages') {
     return {
       title: 'Disponível em breve no plano Estabilidade',

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission } = require('../lib/permissions');
+const { getPlanContext, isPlanAtLeast } = require('../lib/plan-limits');
 const {
   getServicesAdvancedOverview,
   getServicesAdvancedPipeline,
@@ -16,6 +17,24 @@ const {
 } = require('../services/reports/commercial-advanced-reports.service');
 
 router.use(requirePermission('finances', 'view_reports'));
+
+async function requireCommercialAdvancedReportsPlan(req, res, next) {
+  try {
+    const { plan, workspaceMode } = await getPlanContext(req.user.effectiveUserId);
+    if (workspaceMode !== 'comercio') {
+      return res.status(404).json({ error: 'Relatórios avançados de comércio indisponíveis neste workspace.' });
+    }
+    if (!isPlanAtLeast(plan, 'enterprise')) {
+      return res.status(403).json({
+        error: 'Os relatórios avançados de comércio estão disponíveis no plano Estabilidade.',
+      });
+    }
+    next();
+  } catch (error) {
+    console.error('Commercial reports plan gate error:', error);
+    res.status(500).json({ error: 'Erro ao validar o plano do workspace.' });
+  }
+}
 
 function buildFilters(req) {
   return {
@@ -57,23 +76,23 @@ router.get('/servicos/advanced/team', async (req, res) => {
   await handleReport(res, () => getServicesAdvancedTeam(buildFilters(req)));
 });
 
-router.get('/comercio/advanced/overview', async (req, res) => {
+router.get('/comercio/advanced/overview', requireCommercialAdvancedReportsPlan, async (req, res) => {
   await handleReport(res, () => getCommercialAdvancedOverview(buildFilters(req)));
 });
 
-router.get('/comercio/advanced/sales', async (req, res) => {
+router.get('/comercio/advanced/sales', requireCommercialAdvancedReportsPlan, async (req, res) => {
   await handleReport(res, () => getCommercialAdvancedSales(buildFilters(req)));
 });
 
-router.get('/comercio/advanced/products', async (req, res) => {
+router.get('/comercio/advanced/products', requireCommercialAdvancedReportsPlan, async (req, res) => {
   await handleReport(res, () => getCommercialAdvancedProducts(buildFilters(req)));
 });
 
-router.get('/comercio/advanced/locations', async (req, res) => {
+router.get('/comercio/advanced/locations', requireCommercialAdvancedReportsPlan, async (req, res) => {
   await handleReport(res, () => getCommercialAdvancedLocations(buildFilters(req)));
 });
 
-router.get('/comercio/advanced/team', async (req, res) => {
+router.get('/comercio/advanced/team', requireCommercialAdvancedReportsPlan, async (req, res) => {
   await handleReport(res, () => getCommercialAdvancedTeam(buildFilters(req)));
 });
 

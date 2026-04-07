@@ -103,7 +103,7 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
     }
   }
 
-  const currentPlanCatalog = getSerializedPlanCatalog(effectivePlan);
+  const currentPlanCatalog = getSerializedPlanCatalog(effectivePlan, effectiveWorkspaceMode);
 
   return {
     ...user,
@@ -115,7 +115,7 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
     },
     planLimits: currentPlanCatalog.limits,
     planFeatures: currentPlanCatalog.features,
-    availablePlans: getSerializedPlanCatalog(),
+    availablePlans: getSerializedPlanCatalog(undefined, effectiveWorkspaceMode),
     permissions: effectivePermissions,
     accountOwnerName,
     impersonatedBy,

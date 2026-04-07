@@ -17,7 +17,6 @@ import type { User } from '@/lib/api';
 import { getChatUnreadCount, getOnboarding } from '@/lib/api';
 import { canAccessCommerceRoute, canView, canViewReports } from '@/lib/permissions';
 import type { ModuleKey } from '@/lib/permissions';
-import { getPlanBadgeClasses } from '@/lib/plan-utils';
 
 const TOUR_ATTR: Record<string, string> = {
   '/':          'sidebar-painel',
@@ -304,16 +303,6 @@ export default function Sidebar({
 
       {/* Footer */}
       <div className="px-3 py-4 border-t border-slate-100 space-y-0.5">
-        {currentUser?.plan && (
-          <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/70">
-              Plano atual da sua conta
-            </p>
-            <div className={`mt-2 inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getPlanBadgeClasses(currentUser.plan)}`}>
-              {currentUser.plan.toUpperCase()}
-            </div>
-          </div>
-        )}
         {showOnboardingBadge && (
           <Link
             href="/"

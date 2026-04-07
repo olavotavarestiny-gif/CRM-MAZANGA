@@ -62,6 +62,7 @@ function ConfiguracoesContent() {
   const isComercioWorkspace = currentUser?.workspaceMode === 'comercio';
   const platformAdminHref = isSuperAdmin ? '/superadmin?section=organizations' : null;
   const currentPlan = (currentUser?.plan || 'essencial') as PlanName;
+  const canManageTeam = !!isOwner && (!isComercioWorkspace || currentPlan !== 'essencial');
   const currentTier = getPricingTierDetails(currentUser?.workspaceMode || 'servicos', currentPlan);
   const upgradeSummary = getUpgradeSummary(currentUser?.workspaceMode || 'servicos', currentPlan);
   const upgradePlan = getUpgradeTargetPlan(currentPlan);
@@ -72,12 +73,16 @@ function ConfiguracoesContent() {
       setActiveTab('empresa');
       return;
     }
+    if (requestedTab === 'equipa' && !canManageTeam) {
+      setActiveTab('plano');
+      return;
+    }
     if (isConfigTab(requestedTab)) {
       setActiveTab(requestedTab);
       return;
     }
     setActiveTab('perfil');
-  }, [requestedSection, requestedTab]);
+  }, [canManageTeam, requestedSection, requestedTab]);
 
   useEffect(() => {
     if (requestedTab === 'admin' && isSuperAdmin) {
@@ -292,7 +297,7 @@ function ConfiguracoesContent() {
   const { data: teamMembers = [], refetch: refetchTeam } = useQuery({
     queryKey: ['team-members'],
     queryFn: getTeamMembers,
-    enabled: activeTab === 'equipa' && !!isOwner,
+    enabled: activeTab === 'equipa' && canManageTeam,
   });
 
   const addMemberMutation = useMutation({
@@ -348,7 +353,7 @@ function ConfiguracoesContent() {
     { id: 'perfil' as TabId, label: 'Perfil', icon: UserIcon, show: true },
     { id: 'plano' as TabId, label: 'Plano', icon: Shield, show: true },
     { id: 'empresa' as TabId, label: 'Empresa', icon: Building2, show: !!isOwner },
-    { id: 'equipa' as TabId, label: 'Equipa', icon: Users, show: !!isOwner },
+    { id: 'equipa' as TabId, label: 'Equipa', icon: Users, show: canManageTeam },
   ].filter(t => t.show);
 
   const activeBtnBg = isComercioWorkspace ? 'bg-[#B84D0E]' : 'bg-[#0A2540]';

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { generateUniqueSeriesCode } = require('../lib/faturacao/series-code');
+const { getPlanContext, isPlanAtLeast } = require('../lib/plan-limits');
 
 // GET /api/faturacao/series
 router.get('/series', async (req, res) => {
@@ -112,14 +113,19 @@ router.post('/estabelecimentos', async (req, res) => {
     const { nome, nif, morada, telefone, email, isPrincipal } = req.body;
     if (!nome) return res.status(400).json({ error: 'Nome obrigatório' });
 
-    const ownerAccount = await prisma.user.findUnique({
-      where: { id: req.user.effectiveUserId },
-      select: { workspaceMode: true },
-    });
-    const workspaceMode = ownerAccount?.workspaceMode === 'comercio' ? 'comercio' : 'servicos';
+    const { plan, workspaceMode } = await getPlanContext(req.user.effectiveUserId);
 
     let resolvedNif = (nif || '').trim();
     if (workspaceMode === 'comercio') {
+      const totalEstabelecimentos = await prisma.estabelecimento.count({
+        where: { userId: req.user.effectiveUserId },
+      });
+      if (totalEstabelecimentos >= 1 && !isPlanAtLeast(plan, 'enterprise')) {
+        return res.status(403).json({
+          error: 'Multi-estabelecimento no comércio está disponível no plano Estabilidade.',
+        });
+      }
+
       const config = await prisma.configuracaoFaturacao.findUnique({
         where: { userId: req.user.effectiveUserId },
         select: { nifEmpresa: true },

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { requireComercialPermission } = require('../lib/permissions');
+const { getPlanContext, isPlanAtLeast } = require('../lib/plan-limits');
 
 function startOfDay(date) {
   const d = new Date(date);
@@ -41,8 +42,35 @@ function toNumber(value) {
   return Number(value || 0);
 }
 
+function createCommercePlanGate(minPlan, errorMessage) {
+  return async (req, res, next) => {
+    try {
+      const { plan, workspaceMode } = await getPlanContext(req.user.effectiveUserId);
+      if (workspaceMode !== 'comercio') {
+        return res.status(404).json({ error: 'Painel comercial indisponível neste workspace.' });
+      }
+      if (!isPlanAtLeast(plan, minPlan)) {
+        return res.status(403).json({ error: errorMessage });
+      }
+      next();
+    } catch (error) {
+      console.error('Commercial dashboard plan gate error:', error);
+      res.status(500).json({ error: 'Erro ao validar o plano da conta.' });
+    }
+  };
+}
+
+const requireCommercialBasicPlan = createCommercePlanGate(
+  'profissional',
+  'O resumo comercial está disponível a partir do plano Crescimento.'
+);
+const requireCommercialAdvancedPlan = createCommercePlanGate(
+  'enterprise',
+  'A análise avançada do painel comercial está disponível no plano Estabilidade.'
+);
+
 // GET /api/comercial/resumo
-router.get('/resumo', requireComercialPermission('dashboard_basic'), async (req, res) => {
+router.get('/resumo', requireCommercialBasicPlan, requireComercialPermission('dashboard_basic'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const hoje = startOfDay(new Date());
@@ -178,7 +206,7 @@ router.get('/resumo', requireComercialPermission('dashboard_basic'), async (req,
 });
 
 // GET /api/comercial/insights
-router.get('/insights', requireComercialPermission('dashboard_basic'), async (req, res) => {
+router.get('/insights', requireCommercialBasicPlan, requireComercialPermission('dashboard_basic'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const hoje = startOfDay(new Date());
@@ -246,7 +274,7 @@ router.get('/insights', requireComercialPermission('dashboard_basic'), async (re
 });
 
 // GET /api/comercial/analise
-router.get('/analise', requireComercialPermission('dashboard_analysis'), async (req, res) => {
+router.get('/analise', requireCommercialAdvancedPlan, requireComercialPermission('dashboard_analysis'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const { dias = '30', estabelecimentoId } = req.query;

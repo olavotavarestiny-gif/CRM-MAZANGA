@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { requireCaixaPermission } = require('../lib/permissions');
+const { getPlanContext, isPlanAtLeast } = require('../lib/plan-limits');
 const { reconcileCashSession } = require('../services/reconciliation.service');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -14,10 +15,25 @@ const SESSION_INCLUDE = {
   closedBy: { select: { id: true, name: true } },
 };
 
+async function requireCaixaPlan(req, res, next) {
+  try {
+    const { plan, workspaceMode } = await getPlanContext(req.user.effectiveUserId);
+    if (workspaceMode === 'comercio' && !isPlanAtLeast(plan, 'profissional')) {
+      return res.status(403).json({
+        error: 'A área de caixa está disponível a partir do plano Crescimento.',
+      });
+    }
+    next();
+  } catch (error) {
+    console.error('Caixa plan gate error:', error);
+    res.status(500).json({ error: 'Erro ao validar o plano da conta.' });
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/caixa/sessoes — Abrir sessão de caixa
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/sessoes', requireCaixaPermission('open'), async (req, res) => {
+router.post('/sessoes', requireCaixaPlan, requireCaixaPermission('open'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const { estabelecimentoId, openingBalance, notes } = req.body;
@@ -86,7 +102,7 @@ router.post('/sessoes', requireCaixaPermission('open'), async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/caixa/sessoes/atual — Sessão aberta do utilizador actual
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/sessoes/atual', requireCaixaPermission('view'), async (req, res) => {
+router.get('/sessoes/atual', requireCaixaPlan, requireCaixaPermission('view'), async (req, res) => {
   try {
     const { estabelecimentoId } = req.query;
     const where = {
@@ -110,7 +126,7 @@ router.get('/sessoes/atual', requireCaixaPermission('view'), async (req, res) =>
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /api/caixa/sessoes/:id/fechar — Fechar sessão
 // ─────────────────────────────────────────────────────────────────────────────
-router.patch('/sessoes/:id/fechar', requireCaixaPermission('close'), async (req, res) => {
+router.patch('/sessoes/:id/fechar', requireCaixaPlan, requireCaixaPermission('close'), async (req, res) => {
   try {
     const sessao = await prisma.caixaSessao.findUnique({
       where: { id: req.params.id },
@@ -191,7 +207,7 @@ router.patch('/sessoes/:id/fechar', requireCaixaPermission('close'), async (req,
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/caixa/sessoes — Listar sessões (admin/owner vê todas, user vê as suas)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/sessoes', requireCaixaPermission('audit'), async (req, res) => {
+router.get('/sessoes', requireCaixaPlan, requireCaixaPermission('audit'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const { status, estabelecimentoId, page = '1', limit = '20' } = req.query;

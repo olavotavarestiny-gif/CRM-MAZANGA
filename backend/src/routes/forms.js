@@ -4,7 +4,7 @@ const prisma = require('../lib/prisma');
 const automationRunner = require('../services/automationRunner');
 const requireAuth = require('../middleware/auth');
 const { requirePermission, requireDeletePermission } = require('../lib/permissions');
-const { requirePlanFeature, canCreateContact, getPlan, hasPlanFeature } = require('../lib/plan-limits');
+const { requirePlanFeature, canCreateContact, getPlanContext, hasPlanFeature } = require('../lib/plan-limits');
 const { getDefaultStageName } = require('../lib/pipeline-stages');
 
 const CONTACT_FIELD_KEYS = new Set(['name', 'phone', 'email', 'company', 'sector', 'revenue']);
@@ -153,8 +153,8 @@ router.get('/:id', async (req, res) => {
     if (!form.userId) {
       return res.status(404).json({ error: 'Form not found' });
     }
-    const plan = await getPlan(form.userId);
-    if (!hasPlanFeature(plan, 'formularios')) {
+    const { plan, workspaceMode } = await getPlanContext(form.userId);
+    if (!hasPlanFeature(plan, 'formularios', workspaceMode)) {
       return res.status(403).json({ error: 'Funcionalidade não disponível no seu plano' });
     }
     // Parse options JSON para campos de múltipla escolha
@@ -383,8 +383,8 @@ router.post('/:id/submit', async (req, res) => {
     if (!form.userId) {
       return res.status(404).json({ error: 'Form not found' });
     }
-    const plan = await getPlan(form.userId);
-    if (!hasPlanFeature(plan, 'formularios')) {
+    const { plan, workspaceMode } = await getPlanContext(form.userId);
+    if (!hasPlanFeature(plan, 'formularios', workspaceMode)) {
       return res.status(403).json({ error: 'Funcionalidade não disponível no seu plano' });
     }
 
