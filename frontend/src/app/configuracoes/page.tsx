@@ -795,7 +795,7 @@ function ConfiguracoesContent() {
               <p className="text-sm text-gray-500">
                 {isComercioWorkspace
                   ? 'Lojas, balcões e locais de operação. Todos assumem automaticamente o NIF da empresa.'
-                  : 'Locais de emissão associados à faturação da conta.'}
+                  : 'Locais de emissão associados à faturação da conta. Cada estabelecimento assume automaticamente o NIF da empresa.'}
               </p>
               <p className="text-xs text-slate-500">
                 Ao criar o estabelecimento, o sistema gera automaticamente a série padrão inicial.
@@ -1013,11 +1013,11 @@ function ConfiguracoesContent() {
               <Label className="text-sm">Nome *</Label>
               <Input value={estabForm.nome} onChange={e => setEstabForm(p => ({ ...p, nome: e.target.value }))} placeholder={isComercioWorkspace ? 'Loja Central' : 'Sede'} className="mt-1" />
             </div>
-            {isComercioWorkspace && (
-              <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                Este ponto de venda vai usar automaticamente o NIF da empresa definido na Configuração Fiscal.
-              </p>
-            )}
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              {isComercioWorkspace
+                ? 'Este ponto de venda vai usar automaticamente o NIF da empresa definido na Configuração Fiscal.'
+                : 'Este estabelecimento vai usar automaticamente o NIF da empresa definido na Configuração Fiscal.'}
+            </p>
             <p className="text-xs text-slate-500">
               A série padrão será criada automaticamente com base no nome e/ou localização deste estabelecimento.
             </p>

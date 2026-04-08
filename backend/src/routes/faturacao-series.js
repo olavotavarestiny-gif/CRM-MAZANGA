@@ -159,6 +159,10 @@ router.post('/estabelecimentos', async (req, res) => {
     if (!nome) return res.status(400).json({ error: 'Nome obrigatório' });
 
     const { plan, workspaceMode } = await getPlanContext(req.user.effectiveUserId);
+    const config = await prisma.configuracaoFaturacao.findUnique({
+      where: { userId: req.user.effectiveUserId },
+      select: { nifEmpresa: true },
+    });
 
     let resolvedNif = (nif || '').trim();
     if (workspaceMode === 'comercio') {
@@ -171,16 +175,15 @@ router.post('/estabelecimentos', async (req, res) => {
         });
       }
 
-      const config = await prisma.configuracaoFaturacao.findUnique({
-        where: { userId: req.user.effectiveUserId },
-        select: { nifEmpresa: true },
-      });
       resolvedNif = config?.nifEmpresa?.trim() || '';
       if (!resolvedNif) {
         return res.status(400).json({ error: 'Configure primeiro o NIF da empresa na Configuração Fiscal.' });
       }
     } else if (!resolvedNif) {
-      return res.status(400).json({ error: 'Nome e NIF obrigatórios' });
+      resolvedNif = config?.nifEmpresa?.trim() || '';
+      if (!resolvedNif) {
+        return res.status(400).json({ error: 'Configure primeiro o NIF da empresa na Configuração Fiscal.' });
+      }
     }
 
     const userId = req.user.effectiveUserId;
