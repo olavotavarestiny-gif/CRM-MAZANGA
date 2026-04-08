@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { PasswordRequirements } from '@/components/password-requirements';
+import { getPasswordValidationError } from '@/lib/password-policy';
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -24,8 +26,9 @@ export default function ChangePasswordPage() {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setError('A password deve ter pelo menos 6 caracteres');
+    const passwordError = getPasswordValidationError(newPassword);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 
@@ -48,7 +51,7 @@ export default function ChangePasswordPage() {
           <div className="mb-8">
             <h1 className="text-2xl font-bold mb-2">Mudar Password</h1>
             <p className="text-gray-500 text-sm">
-              Por favor, defina uma nova password para continuar
+              Por favor, defina uma nova password para continuar. A password deve ter maiúsculas, minúsculas, número e símbolo.
             </p>
           </div>
 
@@ -63,12 +66,13 @@ export default function ChangePasswordPage() {
               <Label className="text-gray-700">Nova Password</Label>
               <Input
                 type="password"
-                placeholder="••••••••"
+                placeholder="Ex: MinhaSenha@2026"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
                 className="mt-1"
               />
+              <PasswordRequirements password={newPassword} className="mt-2" />
             </div>
             <div>
               <Label className="text-gray-700">Confirmar Password</Label>

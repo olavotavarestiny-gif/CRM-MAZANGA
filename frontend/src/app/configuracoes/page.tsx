@@ -23,6 +23,7 @@ import { isComercio } from '@/lib/business-modes';
 import type { PlanName, User } from '@/lib/api';
 import type { IBANEntry } from '@/lib/types';
 import MemberPermissionsModal from '@/components/configuracoes/member-permissions-modal';
+import { PasswordRequirements } from '@/components/password-requirements';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { useToast } from '@/components/ui/toast-provider';
@@ -33,6 +34,7 @@ import {
   getUpgradeTargetPlan,
   getWorkspaceLabel,
 } from '@/lib/plan-utils';
+import { getPasswordValidationError } from '@/lib/password-policy';
 
 function ConfiguracoesContent() {
   const searchParams = useSearchParams();
@@ -139,7 +141,8 @@ function ConfiguracoesContent() {
     setPwError('');
     setPwSuccess('');
     if (pwForm.new !== pwForm.confirm) { setPwError('As passwords não correspondem'); return false; }
-    if (pwForm.new.length < 6) { setPwError('A password deve ter pelo menos 6 caracteres'); return false; }
+    const passwordError = getPasswordValidationError(pwForm.new);
+    if (passwordError) { setPwError(passwordError); return false; }
     setPwSubmitting(true);
     try {
       await changePassword(pwForm.new);
@@ -504,6 +507,7 @@ function ConfiguracoesContent() {
                 <div>
                   <Label className="text-gray-700">Nova Password</Label>
                   <Input type="password" placeholder="••••••••" value={pwForm.new} onChange={e => setPwForm(p => ({ ...p, new: e.target.value }))} required className="mt-1" />
+                  <PasswordRequirements password={pwForm.new} className="mt-2" />
                 </div>
                 <div>
                   <Label className="text-gray-700">Confirmar Password</Label>

@@ -11,6 +11,11 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
 import { Suspense } from 'react';
+import { PasswordRequirements } from '@/components/password-requirements';
+import {
+  formatPasswordProviderError,
+  getPasswordValidationError,
+} from '@/lib/password-policy';
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -76,8 +81,9 @@ function ResetPasswordForm() {
       setError('As passwords não correspondem');
       return;
     }
-    if (password.length < 6) {
-      setError('Password deve ter pelo menos 6 caracteres');
+    const passwordError = getPasswordValidationError(password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 
@@ -86,7 +92,7 @@ function ResetPasswordForm() {
       const supabase = createClient();
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) {
-        setError(updateError.message);
+        setError(formatPasswordProviderError(updateError.message));
         return;
       }
       // Clear mustChangePassword flag in our DB (avoids forced redirect after reset)
@@ -150,7 +156,9 @@ function ResetPasswordForm() {
           <h1 className="text-2xl font-bold text-[#0A2540]" style={{ fontFamily: "'Montserrat', sans-serif" }}>
             Nova Password
           </h1>
-          <p className="text-[#6b7e9a] text-sm mt-1">Escolhe uma password segura</p>
+          <p className="text-[#6b7e9a] text-sm mt-1">
+            Escolhe uma password segura com maiúsculas, minúsculas, número e símbolo.
+          </p>
         </div>
 
         {error && (
@@ -170,7 +178,7 @@ function ResetPasswordForm() {
               <Label className="text-[#0A2540]">Nova Password</Label>
               <Input
                 type="password"
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Ex: MinhaSenha@2026"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -178,6 +186,7 @@ function ResetPasswordForm() {
                 className="mt-1"
                 autoFocus
               />
+              <PasswordRequirements password={password} className="mt-2" />
             </div>
             <div>
               <Label className="text-[#0A2540]">Confirmar Password</Label>

@@ -55,6 +55,64 @@ function getRequestIp(req) {
   return req.ip || null;
 }
 
+function getPasswordValidationError(password) {
+  if (!password || password.length < 6) {
+    return 'A password deve ter pelo menos 6 caracteres.';
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    return 'A password deve conter pelo menos uma letra maiúscula.';
+  }
+
+  if (!/[a-z]/.test(password)) {
+    return 'A password deve conter pelo menos uma letra minúscula.';
+  }
+
+  if (!/\d/.test(password)) {
+    return 'A password deve conter pelo menos um número.';
+  }
+
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    return 'A password deve conter pelo menos um símbolo especial (ex: @, #, !).';
+  }
+
+  return null;
+}
+
+function mapPasswordProviderError(rawMessage) {
+  const raw = (rawMessage || '').toLowerCase();
+
+  if (raw.includes('at least') || raw.includes('characters') || raw.includes('length')) {
+    return 'A password deve ter pelo menos 6 caracteres.';
+  }
+
+  if (raw.includes('weak') || raw.includes('strong') || raw.includes('strength')) {
+    return 'A password é demasiado fraca. Use letras maiúsculas, minúsculas, números e símbolos.';
+  }
+
+  if (raw.includes('number') || raw.includes('digit')) {
+    return 'A password deve conter pelo menos um número.';
+  }
+
+  if (raw.includes('uppercase')) {
+    return 'A password deve conter pelo menos uma letra maiúscula.';
+  }
+
+  if (raw.includes('lower')) {
+    return 'A password deve conter pelo menos uma letra minúscula.';
+  }
+
+  if (raw.includes('special') || raw.includes('symbol')) {
+    return 'A password deve conter pelo menos um símbolo especial (ex: @, #, !).';
+  }
+
+  if (raw.includes('same') || raw.includes('different') || raw.includes('previous')) {
+    return 'A nova password não pode ser igual à anterior.';
+  }
+
+  return 'Não foi possível alterar a password. Tente novamente.';
+}
+
 async function getCurrentUserPayload(userId, impersonatedBy = null) {
   let user;
   try {
@@ -271,8 +329,9 @@ router.post('/change-password', requireAuth, async (req, res) => {
   try {
     const { newPassword } = req.body;
 
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: 'Nova password deve ter pelo menos 6 caracteres' });
+    const passwordValidationError = getPasswordValidationError(newPassword);
+    if (passwordValidationError) {
+      return res.status(400).json({ error: passwordValidationError });
     }
 
     // Resolve supabaseUid — may be null for impersonated users whose UID wasn't in req.user
@@ -291,22 +350,7 @@ router.post('/change-password', requireAuth, async (req, res) => {
     });
 
     if (error) {
-      const raw = (error.message || '').toLowerCase();
-      let msg = 'Não foi possível alterar a password. Tente novamente.';
-      if (raw.includes('at least') || raw.includes('characters') || raw.includes('length')) {
-        msg = 'A password deve ter pelo menos 6 caracteres.';
-      } else if (raw.includes('weak') || raw.includes('strong') || raw.includes('strength')) {
-        msg = 'A password é demasiado fraca. Use letras maiúsculas, minúsculas, números e símbolos.';
-      } else if (raw.includes('number') || raw.includes('digit')) {
-        msg = 'A password deve conter pelo menos um número.';
-      } else if (raw.includes('uppercase') || raw.includes('lower')) {
-        msg = 'A password deve conter letras maiúsculas e minúsculas.';
-      } else if (raw.includes('special') || raw.includes('symbol')) {
-        msg = 'A password deve conter pelo menos um símbolo especial (ex: @, #, !).';
-      } else if (raw.includes('same') || raw.includes('different') || raw.includes('previous')) {
-        msg = 'A nova password não pode ser igual à anterior.';
-      }
-      return res.status(400).json({ error: msg });
+      return res.status(400).json({ error: mapPasswordProviderError(error.message) });
     }
 
     // Clear mustChangePassword flag
