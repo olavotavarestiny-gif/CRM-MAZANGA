@@ -46,9 +46,14 @@ export default function PreviewSidebar({ currentUser }: { currentUser: User }) {
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0049e6] to-[#829bff] flex items-center justify-center flex-shrink-0">
             <BarChart3 className="w-5 h-5 text-white" />
           </div>
-          <span className="text-[#2c2f31] font-bold text-base leading-none">
-            Kuku<span className="font-medium text-[#595c5e]">Gest</span>
-          </span>
+          <div className="flex items-start gap-2">
+            <span className="text-[#2c2f31] font-bold text-base leading-none">
+              Kuku<span className="font-medium text-[#595c5e]">Gest</span>
+            </span>
+            <span className="rounded-full border border-[#fac775] bg-[#fdf2ea] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#b84d0e]">
+              Beta
+            </span>
+          </div>
         </div>
       </div>
 

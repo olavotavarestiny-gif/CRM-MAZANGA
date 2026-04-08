@@ -91,6 +91,7 @@ export function KukuGestIconComercio({
 interface KukuGestLogoProps {
   height?: number;
   showTagline?: boolean;
+  showBetaBadge?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -98,65 +99,100 @@ interface KukuGestLogoProps {
 export function KukuGestLogo({
   height = 56,
   showTagline = false,
+  showBetaBadge = false,
   className,
   style,
 }: KukuGestLogoProps) {
   const viewBoxHeight = 110;
   const viewBoxWidth = showTagline ? 440 : 360;
+  const badgeFontSize = Math.max(8, Math.round(height * 0.18));
+  const badgePaddingY = Math.max(3, Math.round(height * 0.08));
+  const badgePaddingX = Math.max(7, Math.round(height * 0.16));
 
   return (
-    <svg
-      width={(viewBoxWidth / viewBoxHeight) * height}
-      height={height}
-      viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-label="KukuGest"
+    <div
       className={className}
-      style={style}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'flex-start',
+        gap: Math.max(4, Math.round(height * 0.12)),
+        ...style,
+      }}
     >
-      <g transform="translate(0 10)">
-        <KukuGestMark />
-      </g>
-
-      <text
-        x="118"
-        y="47"
-        fontFamily="'Montserrat', sans-serif"
-        fontSize="38"
-        fontWeight="800"
-        fill={BLUE}
-        letterSpacing="-0.5"
+      <svg
+        width={(viewBoxWidth / viewBoxHeight) * height}
+        height={height}
+        viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-label="KukuGest"
+        style={{ display: 'block', flexShrink: 0 }}
       >
-        KUKU
-      </text>
-      <text
-        x="118"
-        y="87"
-        fontFamily="'Montserrat', sans-serif"
-        fontSize="38"
-        fontWeight="800"
-        fill={ORANGE}
-        letterSpacing="-0.5"
-      >
-        GEST
-      </text>
+        <g transform="translate(0 10)">
+          <KukuGestMark />
+        </g>
 
-      {showTagline && (
         <text
-          x="320"
-          y="84"
+          x="118"
+          y="47"
           fontFamily="'Montserrat', sans-serif"
-          fontSize="9"
-          fontWeight="600"
-          fill={TAGLINE}
-          letterSpacing="0.15em"
-          textAnchor="middle"
+          fontSize="38"
+          fontWeight="800"
+          fill={BLUE}
+          letterSpacing="-0.5"
         >
-          GESTÃO INTELIGENTE
+          KUKU
         </text>
+        <text
+          x="118"
+          y="87"
+          fontFamily="'Montserrat', sans-serif"
+          fontSize="38"
+          fontWeight="800"
+          fill={ORANGE}
+          letterSpacing="-0.5"
+        >
+          GEST
+        </text>
+
+        {showTagline && (
+          <text
+            x="320"
+            y="84"
+            fontFamily="'Montserrat', sans-serif"
+            fontSize="9"
+            fontWeight="600"
+            fill={TAGLINE}
+            letterSpacing="0.15em"
+            textAnchor="middle"
+          >
+            GESTÃO INTELIGENTE
+          </text>
+        )}
+      </svg>
+      {showBetaBadge && (
+        <span
+          style={{
+            marginTop: Math.max(2, Math.round(height * 0.08)),
+            padding: `${badgePaddingY}px ${badgePaddingX}px`,
+            borderRadius: 999,
+            background: COMMERCE_BG,
+            border: `1px solid ${COMMERCE_BORDER}`,
+            color: COMMERCE_DARK,
+            fontFamily: "'Montserrat', sans-serif",
+            fontSize: badgeFontSize,
+            fontWeight: 800,
+            letterSpacing: '0.08em',
+            lineHeight: 1,
+            textTransform: 'uppercase',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}
+        >
+          Beta
+        </span>
       )}
-    </svg>
+    </div>
   );
 }
 
