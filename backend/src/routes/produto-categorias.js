@@ -1,6 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const {
+  logFieldChangesActivity,
+  logProductCategoryCreatedActivity,
+  logProductCategoryDeletedActivity,
+} = require('../lib/activity-log');
 
 // GET /api/produto-categorias
 router.get('/', async (req, res) => {
@@ -34,6 +39,8 @@ router.post('/', async (req, res) => {
       },
     });
 
+    await logProductCategoryCreatedActivity(categoria, req);
+
     res.status(201).json(categoria);
   } catch (err) {
     if (err.code === 'P2002') {
@@ -49,7 +56,7 @@ router.patch('/:id', async (req, res) => {
     const userId = req.user.effectiveUserId;
     const categoria = await prisma.produtoCategoria.findFirst({
       where: { id: req.params.id, userId },
-      select: { id: true },
+      select: { id: true, userId: true, nome: true, cor: true },
     });
 
     if (!categoria) {
@@ -63,6 +70,26 @@ router.patch('/:id', async (req, res) => {
         ...(nome !== undefined && { nome: nome.trim() }),
         ...(cor !== undefined && { cor: cor || null }),
       },
+    });
+
+    await logFieldChangesActivity({
+      organizationId: updated.userId,
+      actor: req,
+      entityType: 'product_category',
+      entityId: updated.id,
+      entityLabel: updated.nome,
+      changes: [
+        {
+          fieldChanged: 'nome',
+          oldValue: categoria.nome,
+          newValue: updated.nome,
+        },
+        {
+          fieldChanged: 'cor',
+          oldValue: categoria.cor || 'Sem cor',
+          newValue: updated.cor || 'Sem cor',
+        },
+      ],
     });
 
     res.json(updated);
@@ -94,6 +121,7 @@ router.delete('/:id', async (req, res) => {
     }
 
     await prisma.produtoCategoria.delete({ where: { id: req.params.id } });
+    await logProductCategoryDeletedActivity(categoria, req);
     res.status(204).end();
   } catch (err) {
     res.status(500).json({ error: err.message });

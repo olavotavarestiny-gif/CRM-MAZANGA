@@ -3,6 +3,12 @@ const router = express.Router();
 const prisma = require('../lib/prisma');
 const { generateUniqueSeriesCode } = require('../lib/faturacao/series-code');
 const { getPlanContext, isPlanAtLeast } = require('../lib/plan-limits');
+const {
+  logFieldChangesActivity,
+  logSerieCreatedActivity,
+  logSerieDeletedActivity,
+  logStoreCreatedActivity,
+} = require('../lib/activity-log');
 
 // GET /api/faturacao/series
 router.get('/series', async (req, res) => {
@@ -36,6 +42,9 @@ router.post('/series', async (req, res) => {
         seriesStatus: 'A',
       },
     });
+
+    await logSerieCreatedActivity(serie, req);
+
     res.status(201).json(serie);
   } catch (err) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'Série já existe para este tipo e ano' });
@@ -46,15 +55,40 @@ router.post('/series', async (req, res) => {
 // PUT /api/faturacao/series/:id
 router.put('/series/:id', async (req, res) => {
   try {
-    const serie = await prisma.serie.findUnique({ where: { id: req.params.id }, select: { userId: true, seriesStatus: true } });
+    const serie = await prisma.serie.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        userId: true,
+        seriesCode: true,
+        seriesYear: true,
+        seriesStatus: true,
+      },
+    });
     if (!serie || serie.userId !== req.user.effectiveUserId) return res.status(404).json({ error: 'Série não encontrada' });
     if (serie.seriesStatus === 'F') return res.status(400).json({ error: 'Série fechada não pode ser editada' });
 
     const { seriesStatus } = req.body;
     const updated = await prisma.serie.update({
       where: { id: req.params.id },
-      data: { ...(seriesStatus !== undefined && { seriesStatus }) },
+        data: { ...(seriesStatus !== undefined && { seriesStatus }) },
     });
+
+    await logFieldChangesActivity({
+      organizationId: updated.userId,
+      actor: req,
+      entityType: 'serie',
+      entityId: updated.id,
+      entityLabel: `${updated.seriesCode}/${updated.seriesYear}`,
+      changes: [
+        {
+          fieldChanged: 'seriesStatus',
+          oldValue: serie.seriesStatus,
+          newValue: updated.seriesStatus,
+        },
+      ],
+    });
+
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -64,11 +98,22 @@ router.put('/series/:id', async (req, res) => {
 // DELETE /api/faturacao/series/:id — só fecha (não apaga)
 router.delete('/series/:id', async (req, res) => {
   try {
-    const serie = await prisma.serie.findUnique({ where: { id: req.params.id }, select: { userId: true } });
+    const serie = await prisma.serie.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        userId: true,
+        seriesCode: true,
+        seriesYear: true,
+        documentType: true,
+        estabelecimentoId: true,
+      },
+    });
     if (!serie || serie.userId !== req.user.effectiveUserId) return res.status(404).json({ error: 'Série não encontrada' });
     const facturaCount = await prisma.factura.count({ where: { serieId: req.params.id } });
     if (facturaCount > 0) return res.status(400).json({ error: 'Série com facturas não pode ser eliminada — feche-a em vez disso' });
     await prisma.serie.delete({ where: { id: req.params.id } });
+    await logSerieDeletedActivity(serie, req);
     res.json({ message: 'Série eliminada' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -217,6 +262,9 @@ router.post('/estabelecimentos', async (req, res) => {
 
       return { estab: updatedEstab, defaultSerie: createdSerie };
     });
+
+    await logStoreCreatedActivity(estab, req);
+    await logSerieCreatedActivity(defaultSerie, req);
 
     res.status(201).json({ ...estab, defaultSerie });
   } catch (err) {

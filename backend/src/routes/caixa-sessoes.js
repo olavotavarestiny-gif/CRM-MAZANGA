@@ -4,6 +4,10 @@ const prisma = require('../lib/prisma');
 const { requireCaixaPermission } = require('../lib/permissions');
 const { getPlanContext, isPlanAtLeast } = require('../lib/plan-limits');
 const { reconcileCashSession } = require('../services/reconciliation.service');
+const {
+  logCashSessionOpenedActivity,
+  logCashSessionClosedActivity,
+} = require('../lib/activity-log');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -92,6 +96,8 @@ router.post('/sessoes', requireCaixaPlan, requireCaixaPermission('open'), async 
       },
       include: SESSION_INCLUDE,
     });
+
+    await logCashSessionOpenedActivity(sessao, req);
 
     res.status(201).json(sessao);
   } catch (err) {
@@ -197,6 +203,8 @@ router.patch('/sessoes/:id/fechar', requireCaixaPlan, requireCaixaPermission('cl
     } catch (reconciliationError) {
       console.error('Cash session reconciliation error:', reconciliationError);
     }
+
+    await logCashSessionClosedActivity(updated, req);
 
     res.json(updated);
   } catch (err) {

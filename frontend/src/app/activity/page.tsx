@@ -20,6 +20,32 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+const ACTIVITY_TYPE_OPTIONS = [
+  { value: 'contact', label: 'Contactos' },
+  { value: 'task', label: 'Tarefas' },
+  { value: 'invoice', label: 'Faturas' },
+  { value: 'cash_session', label: 'Caixa' },
+  { value: 'billing_customer', label: 'Clientes de faturação' },
+  { value: 'product', label: 'Produtos' },
+  { value: 'product_category', label: 'Categorias' },
+  { value: 'serie', label: 'Séries' },
+  { value: 'store', label: 'Pontos de venda' },
+  { value: 'billing_config', label: 'Configuração fiscal' },
+];
+
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+  contact: 'Contacto',
+  task: 'Tarefa',
+  invoice: 'Fatura',
+  cash_session: 'Caixa',
+  billing_customer: 'Cliente de faturação',
+  product: 'Produto',
+  product_category: 'Categoria',
+  serie: 'Série',
+  store: 'Ponto de venda',
+  billing_config: 'Configuração fiscal',
+};
+
 function isPrivilegedUser(user: Awaited<ReturnType<typeof getCurrentUser>> | null) {
   return !!(user?.isSuperAdmin || user?.role === 'admin' || !user?.accountOwnerId);
 }
@@ -158,18 +184,20 @@ export default function ActivityPage() {
               <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.12em] text-[#6b7e9a]">
                 Tipo
               </label>
-              <Select value={entityType} onValueChange={setEntityType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos os tipos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os tipos</SelectItem>
-                  <SelectItem value="contact">Contactos</SelectItem>
-                  <SelectItem value="task">Tarefas</SelectItem>
-                  <SelectItem value="invoice">Faturas</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                <Select value={entityType} onValueChange={setEntityType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos os tipos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os tipos</SelectItem>
+                    {ACTIVITY_TYPE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
             <div className="min-w-[160px]">
               <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.12em] text-[#6b7e9a]">
@@ -209,7 +237,7 @@ export default function ActivityPage() {
                       <p className="text-sm font-medium text-[#0A2540]">{formatActivityMessage(entry)}</p>
                       <p className="mt-1 text-sm text-[#6b7e9a]">{formatActivityDetail(entry)}</p>
                       <p className="mt-2 text-xs uppercase tracking-[0.12em] text-[#94a3b8]">
-                        {entry.entity_type === 'contact' ? 'Contacto' : entry.entity_type === 'task' ? 'Tarefa' : 'Fatura'}
+                        {ENTITY_TYPE_LABELS[entry.entity_type] || entry.entity_type}
                       </p>
                     </div>
                     <div className="text-xs text-[#8a94a6] md:text-right">

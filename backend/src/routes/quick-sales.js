@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { createFactura } = require('../lib/faturacao/create-factura');
+const { logStockAdjustedActivity } = require('../lib/activity-log');
 
 // GET /api/quick-sales/defaults
 // Returns the account's default serieId and estabelecimentoId for quick sale.
@@ -177,11 +178,13 @@ router.post('/emit', async (req, res) => {
       return acc;
     }, new Map());
 
+    const stockAdjustments = [];
+
     for (const [productCode, quantity] of quantidadesPorProduto.entries()) {
       const produto = produtosMap.get(productCode);
       if (!produto || produto.stock == null || produto.productType !== 'P') continue;
 
-      await prisma.$transaction(async (tx) => {
+      const adjustment = await prisma.$transaction(async (tx) => {
         const produtoAtual = await tx.produto.findUnique({
           where: { id: produto.id },
           select: { stock: true, productType: true },
@@ -210,7 +213,21 @@ router.post('/emit', async (req, res) => {
             createdByUserId: req.user.id,
           },
         });
+
+        return {
+          previousStock: produtoAtual.stock,
+          newStock,
+        };
       });
+
+      if (adjustment) {
+        stockAdjustments.push({
+          product: produto,
+          quantity,
+          previousStock: adjustment.previousStock,
+          newStock: adjustment.newStock,
+        });
+      }
     }
 
     // Actualizar totais da sessão após emissão bem-sucedida
@@ -237,6 +254,23 @@ router.post('/emit', async (req, res) => {
         data: { caixaSessaoId: sessaoAberta.id },
       });
     }
+
+    await Promise.all(
+      stockAdjustments.map((adjustment) =>
+        logStockAdjustedActivity({
+          organizationId: userId,
+          actor: req,
+          product: adjustment.product,
+          previousStock: adjustment.previousStock,
+          newStock: adjustment.newStock,
+          quantity: adjustment.quantity,
+          direction: 'exit',
+          reason: 'Venda rápida',
+          referenceType: 'quick_sale',
+          referenceId: factura.id,
+        })
+      )
+    );
 
     res.status(201).json({ ...factura, caixaSessaoId: sessaoAberta?.id || null });
   } catch (err) {

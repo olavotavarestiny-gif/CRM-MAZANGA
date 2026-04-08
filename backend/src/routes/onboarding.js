@@ -1,5 +1,6 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
+const { getPlanContext, hasPlanFeature, isPlanAtLeast } = require('../lib/plan-limits');
 const requireAuth = require('../middleware/auth');
 
 const router = express.Router();
@@ -7,22 +8,91 @@ const router = express.Router();
 // ─── Step definitions ─────────────────────────────────────────────────────────
 
 const SERVICOS_STEPS = [
-  { id: 'add_contact',    label: 'Adiciona o teu primeiro contacto',      href: '/contacts' },
-  { id: 'setup_pipeline', label: 'Cria uma etapa em Processos de Venda',   href: '/pipeline' },
-  { id: 'create_task',    label: 'Cria a tua primeira tarefa',             href: '/tasks' },
-  { id: 'create_form',    label: 'Cria um formulário de captura de leads', href: '/forms' },
-  { id: 'setup_billing',  label: 'Configura os dados da empresa',          href: '/faturacao/configuracao' },
-  { id: 'create_invoice', label: 'Emite a tua primeira fatura',            href: '/faturacao/nova' },
+  {
+    id: 'add_contact',
+    label: 'Adiciona o teu primeiro contacto',
+    href: '/contacts',
+    isPlanVisible: ({ plan, workspaceMode }) => hasPlanFeature(plan, 'clientes', workspaceMode),
+  },
+  {
+    id: 'setup_pipeline',
+    label: 'Cria uma etapa em Processos de Venda',
+    href: '/pipeline',
+    isPlanVisible: ({ plan, workspaceMode }) => hasPlanFeature(plan, 'processos', workspaceMode),
+  },
+  {
+    id: 'create_task',
+    label: 'Cria a tua primeira tarefa',
+    href: '/tasks',
+    isPlanVisible: ({ plan, workspaceMode }) => hasPlanFeature(plan, 'tarefas', workspaceMode),
+  },
+  {
+    id: 'create_form',
+    label: 'Cria um formulário de captura de leads',
+    href: '/forms',
+    isPlanVisible: ({ plan, workspaceMode }) => hasPlanFeature(plan, 'formularios', workspaceMode),
+  },
+  {
+    id: 'setup_billing',
+    label: 'Configura os dados da empresa',
+    href: '/faturacao/configuracao',
+    isPlanVisible: ({ plan, workspaceMode }) => hasPlanFeature(plan, 'vendas', workspaceMode),
+    isViewerVisible: ({ canManageCompanySettings }) => canManageCompanySettings,
+  },
+  {
+    id: 'create_invoice',
+    label: 'Emite a tua primeira fatura',
+    href: '/faturacao/nova',
+    isPlanVisible: ({ plan, workspaceMode }) => hasPlanFeature(plan, 'vendas', workspaceMode),
+  },
 ];
 
 const COMERCIO_STEPS = [
-  { id: 'setup_store',    label: 'Configura empresa e ponto de venda',     href: '/faturacao/configuracao' },
-  { id: 'add_product',    label: 'Adiciona os teus primeiros produtos',    href: '/produtos' },
-  { id: 'add_contact',    label: 'Adiciona o teu primeiro cliente',        href: '/contacts' },
-  { id: 'create_task',    label: 'Cria a tua primeira tarefa',             href: '/tasks' },
-  { id: 'open_cash',      label: 'Abre a primeira sessão de caixa',        href: '/caixa' },
-  { id: 'first_sale',     label: 'Faz a tua primeira venda',               href: '/vendas-rapidas' },
-  { id: 'invite_member',  label: 'Convida um membro da equipa',            href: '/configuracoes' },
+  {
+    id: 'setup_store',
+    label: 'Configura empresa e ponto de venda',
+    href: '/faturacao/configuracao',
+    isPlanVisible: ({ plan, workspaceMode }) => hasPlanFeature(plan, 'vendas', workspaceMode),
+    isViewerVisible: ({ canManageCompanySettings }) => canManageCompanySettings,
+  },
+  {
+    id: 'add_product',
+    label: 'Adiciona os teus primeiros produtos',
+    href: '/produtos',
+    isPlanVisible: ({ plan, workspaceMode }) => hasPlanFeature(plan, 'vendas', workspaceMode),
+  },
+  {
+    id: 'add_contact',
+    label: 'Adiciona o teu primeiro cliente',
+    href: '/contacts',
+    isPlanVisible: ({ plan, workspaceMode }) => hasPlanFeature(plan, 'clientes', workspaceMode),
+  },
+  {
+    id: 'create_task',
+    label: 'Cria a tua primeira tarefa',
+    href: '/tasks',
+    isPlanVisible: ({ plan, workspaceMode }) => hasPlanFeature(plan, 'tarefas', workspaceMode),
+  },
+  {
+    id: 'open_cash',
+    label: 'Abre a primeira sessão de caixa',
+    href: '/caixa',
+    isPlanVisible: ({ plan }) => isPlanAtLeast(plan, 'profissional'),
+  },
+  {
+    id: 'first_sale',
+    label: 'Faz a tua primeira venda',
+    href: '/vendas-rapidas',
+    isPlanVisible: ({ plan, workspaceMode }) =>
+      hasPlanFeature(plan, 'vendas', workspaceMode) && isPlanAtLeast(plan, 'profissional'),
+  },
+  {
+    id: 'invite_member',
+    label: 'Convida um membro da equipa',
+    href: '/configuracoes?tab=equipa',
+    isPlanVisible: ({ plan }) => isPlanAtLeast(plan, 'profissional'),
+    isViewerVisible: ({ canManageTeam }) => canManageTeam,
+  },
 ];
 
 // ─── Detection checks ─────────────────────────────────────────────────────────
@@ -90,47 +160,81 @@ const CHECKS = {
 
 // ─── 60s in-memory cache ──────────────────────────────────────────────────────
 
-const cache = new Map(); // orgId → { data, expiresAt }
+const cache = new Map();
 const CACHE_TTL = 60_000;
 
-function getCacheKey(orgId, workspaceMode) {
-  return `${orgId}:${workspaceMode}`;
+function getViewerScope(user) {
+  if (user?.isSuperAdmin) return 'superadmin';
+  if (user?.isAccountOwner) return 'owner';
+  if (user?.role === 'admin') return 'admin';
+  return 'member';
 }
 
-function getCached(orgId, workspaceMode) {
-  const entry = cache.get(getCacheKey(orgId, workspaceMode));
+function getCacheKey(orgId, workspaceMode, plan, viewerScope) {
+  return `${orgId}:${workspaceMode}:${plan}:${viewerScope}`;
+}
+
+function getCached(orgId, workspaceMode, plan, viewerScope) {
+  const entry = cache.get(getCacheKey(orgId, workspaceMode, plan, viewerScope));
   if (entry && entry.expiresAt > Date.now()) return entry.data;
   return null;
 }
 
-function setCache(orgId, workspaceMode, data) {
-  cache.set(getCacheKey(orgId, workspaceMode), { data, expiresAt: Date.now() + CACHE_TTL });
+function setCache(orgId, workspaceMode, plan, viewerScope, data) {
+  cache.set(getCacheKey(orgId, workspaceMode, plan, viewerScope), {
+    data,
+    expiresAt: Date.now() + CACHE_TTL,
+  });
 }
 
-async function getWorkspaceMode(user) {
-  const ownerUserId = user?.effectiveUserId || user?.id;
-  const owner = await prisma.user.findUnique({
-    where: { id: ownerUserId },
-    select: { workspaceMode: true },
-  });
+function buildOnboardingContext(user, planContext) {
+  const workspaceMode = planContext.workspaceMode === 'comercio' ? 'comercio' : 'servicos';
 
-  return owner?.workspaceMode === 'comercio' ? 'comercio' : 'servicos';
+  return {
+    ...planContext,
+    workspaceMode,
+    viewerScope: getViewerScope(user),
+    canManageCompanySettings: !!(user?.isSuperAdmin || user?.isAccountOwner),
+    canManageTeam: !!(
+      user?.isSuperAdmin ||
+      (
+        user?.isAccountOwner &&
+        (workspaceMode !== 'comercio' || planContext.plan !== 'essencial')
+      )
+    ),
+  };
+}
+
+function getStepDefinitions(workspaceMode) {
+  return workspaceMode === 'comercio' ? COMERCIO_STEPS : SERVICOS_STEPS;
+}
+
+function isPlanVisible(step, context) {
+  return typeof step.isPlanVisible === 'function' ? step.isPlanVisible(context) : true;
+}
+
+function isViewerVisible(step, context) {
+  return typeof step.isViewerVisible === 'function' ? step.isViewerVisible(context) : true;
 }
 
 // ─── Core logic ───────────────────────────────────────────────────────────────
 
-async function computeOnboarding(orgId, workspaceMode) {
-  const steps = workspaceMode === 'comercio' ? COMERCIO_STEPS : SERVICOS_STEPS;
+async function computeOnboarding(orgId, context) {
+  const workspaceMode = context.workspaceMode;
+  const planScopedSteps = getStepDefinitions(workspaceMode).filter((step) => isPlanVisible(step, context));
 
   const results = await Promise.all(
-    steps.map(async (step) => {
+    planScopedSteps.map(async (step) => {
       const check = CHECKS[step.id];
       const completed = check ? await check(parseInt(orgId, 10), workspaceMode).catch(() => false) : false;
       return { ...step, completed };
     })
   );
 
-  return results;
+  return {
+    allSteps: results,
+    steps: results.filter((step) => isViewerVisible(step, context)),
+  };
 }
 
 // ─── GET /api/onboarding ──────────────────────────────────────────────────────
@@ -138,9 +242,10 @@ async function computeOnboarding(orgId, workspaceMode) {
 router.get('/', requireAuth, async (req, res) => {
   try {
     const orgId = String(req.user.effectiveUserId);
-    const workspaceMode = await getWorkspaceMode(req.user);
+    const planContext = await getPlanContext(req.user.effectiveUserId);
+    const context = buildOnboardingContext(req.user, planContext);
+    const { workspaceMode, plan, viewerScope } = context;
 
-    // Ensure OnboardingProgress record exists
     let record = await prisma.onboardingProgress.findUnique({
       where: {
         organization_id_workspace_mode: {
@@ -159,32 +264,26 @@ router.get('/', requireAuth, async (req, res) => {
       });
     }
 
+    const cached = getCached(orgId, workspaceMode, plan, viewerScope);
+
     if (record.dismissed) {
-      const steps = workspaceMode === 'comercio' ? COMERCIO_STEPS : SERVICOS_STEPS;
-      const cached = getCached(orgId, workspaceMode);
-      const completedCount = cached
-        ? cached.steps.filter((s) => s.completed).length
-        : record.completed_steps.length;
+      const { steps } = cached || await computeOnboarding(orgId, context);
       return res.json({
         show: false,
         dismissed: true,
-        completedCount,
+        completedCount: steps.filter((step) => step.completed).length,
         totalCount: steps.length,
       });
     }
 
-    // Use cache if fresh
-    const cached = getCached(orgId, workspaceMode);
     if (cached) return res.json(cached);
 
-    // Compute step states
-    const steps = await computeOnboarding(orgId, record.workspace_mode);
-    const completedCount = steps.filter((s) => s.completed).length;
+    const { allSteps, steps } = await computeOnboarding(orgId, context);
+    const completedCount = steps.filter((step) => step.completed).length;
     const totalCount = steps.length;
-    const allDone = completedCount === totalCount;
-
-    // Persist completed_at when first fully complete
-    const completedSteps = steps.filter((s) => s.completed).map((s) => s.id);
+    const allDone = totalCount > 0 && completedCount === totalCount;
+    const completedPlanSteps = allSteps.filter((step) => step.completed).map((step) => step.id);
+    const allPlanStepsDone = allSteps.length > 0 && completedPlanSteps.length === allSteps.length;
 
     await prisma.onboardingProgress.update({
       where: {
@@ -194,13 +293,13 @@ router.get('/', requireAuth, async (req, res) => {
         },
       },
       data: {
-        completed_steps: completedSteps,
-        completed_at: allDone ? record.completed_at ?? new Date() : null,
+        completed_steps: completedPlanSteps,
+        completed_at: allPlanStepsDone ? record.completed_at ?? new Date() : null,
       },
     });
 
     const payload = {
-      show: !allDone,
+      show: totalCount > 0 && !allDone,
       dismissed: false,
       completedCount,
       totalCount,
@@ -208,7 +307,7 @@ router.get('/', requireAuth, async (req, res) => {
       steps,
     };
 
-    setCache(orgId, workspaceMode, payload);
+    setCache(orgId, workspaceMode, plan, viewerScope, payload);
     return res.json(payload);
   } catch (err) {
     console.error('[onboarding] GET error:', err);
@@ -221,18 +320,19 @@ router.get('/', requireAuth, async (req, res) => {
 router.post('/dismiss', requireAuth, async (req, res) => {
   try {
     const orgId = String(req.user.effectiveUserId);
-    const workspaceMode = await getWorkspaceMode(req.user);
+    const planContext = await getPlanContext(req.user.effectiveUserId);
+    const context = buildOnboardingContext(req.user, planContext);
 
     await prisma.onboardingProgress.upsert({
       where: {
         organization_id_workspace_mode: {
           organization_id: orgId,
-          workspace_mode: workspaceMode,
+          workspace_mode: context.workspaceMode,
         },
       },
       create: {
         organization_id: orgId,
-        workspace_mode: workspaceMode,
+        workspace_mode: context.workspaceMode,
         dismissed: true,
         dismissed_at: new Date(),
       },
@@ -242,8 +342,7 @@ router.post('/dismiss', requireAuth, async (req, res) => {
       },
     });
 
-    // Invalidate cache so next GET reflects dismissed state
-    cache.delete(getCacheKey(orgId, workspaceMode));
+    cache.delete(getCacheKey(orgId, context.workspaceMode, context.plan, context.viewerScope));
 
     return res.json({ success: true });
   } catch (err) {

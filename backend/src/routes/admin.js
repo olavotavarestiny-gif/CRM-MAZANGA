@@ -116,9 +116,9 @@ router.patch('/accounts/:id', async (req, res) => {
     const data = {};
     if (plan !== undefined) {
       if (!isSupportedPlan(plan)) {
-        return res.status(400).json({ error: 'Plano inválido. Use essencial, profissional ou enterprise.' });
+        return res.status(400).json({ error: 'Plano inválido. Use inicial, crescimento ou estabilidade.' });
       }
-      data.plan = plan;
+      data.plan = normalizePlan(plan);
     }
     if (permissions !== undefined) {
       data.permissions = permissions ? JSON.stringify(permissions) : null;
@@ -159,7 +159,7 @@ router.post('/users', async (req, res) => {
     }
 
     if (plan !== undefined && !isSupportedPlan(plan)) {
-      return res.status(400).json({ error: 'Plano inválido. Use essencial, profissional ou enterprise.' });
+      return res.status(400).json({ error: 'Plano inválido. Use inicial, crescimento ou estabilidade.' });
     }
 
     // Verificar se email já existe no PostgreSQL
@@ -217,7 +217,7 @@ router.post('/users', async (req, res) => {
         role: role === 'admin' ? 'admin' : 'user',
         active: true,
         mustChangePassword: true,
-        plan: plan || DEFAULT_PLAN,
+        plan: plan ? normalizePlan(plan) : DEFAULT_PLAN,
         permissions: permissions ? JSON.stringify(permissions) : null,
         accountOwnerId: targetAccountOwnerId,
       },
@@ -255,9 +255,9 @@ router.patch('/users/:id', async (req, res) => {
     }
     if (plan !== undefined) {
       if (!isSupportedPlan(plan)) {
-        return res.status(400).json({ error: 'Plano inválido. Use essencial, profissional ou enterprise.' });
+        return res.status(400).json({ error: 'Plano inválido. Use inicial, crescimento ou estabilidade.' });
       }
-      updateData.plan = plan;
+      updateData.plan = normalizePlan(plan);
     }
     if (permissions !== undefined) {
       updateData.permissions = permissions ? JSON.stringify(permissions) : null;

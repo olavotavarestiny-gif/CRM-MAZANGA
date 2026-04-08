@@ -3,6 +3,12 @@ const router = express.Router();
 const prisma = require('../lib/prisma');
 const { getTaxCode, isValidRate } = require('../lib/fiscal/iva-rates');
 const { requireStockPermission } = require('../lib/permissions');
+const {
+  logFieldChangesActivity,
+  logProductCreatedActivity,
+  logProductDeactivatedActivity,
+  logStockAdjustedActivity,
+} = require('../lib/activity-log');
 
 /**
  * Calcula margem a partir de custo e preço de venda.
@@ -97,6 +103,9 @@ router.post('/produtos', async (req, res) => {
         },
       },
     });
+
+    await logProductCreatedActivity(produto, req);
+
     res.status(201).json({ ...produto, margin: calcMargin(costVal, salePrice) });
   } catch (err) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'Código de produto já existe' });
@@ -107,7 +116,27 @@ router.post('/produtos', async (req, res) => {
 // PUT /api/faturacao/produtos/:id
 router.put('/produtos/:id', async (req, res) => {
   try {
-    const existing = await prisma.produto.findUnique({ where: { id: req.params.id }, select: { userId: true, unitPrice: true, cost: true } });
+    const existing = await prisma.produto.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        userId: true,
+        productCode: true,
+        productDescription: true,
+        unitPrice: true,
+        cost: true,
+        productType: true,
+        sku: true,
+        unitOfMeasure: true,
+        taxPercentage: true,
+        active: true,
+        stockMinimo: true,
+        categoriaId: true,
+        categoria: {
+          select: { nome: true },
+        },
+      },
+    });
     if (!existing || existing.userId !== req.user.effectiveUserId) return res.status(404).json({ error: 'Produto não encontrado' });
     const { productDescription, unitPrice, cost, productType, sku, unitOfMeasure, taxPercentage, active, stockMinimo, categoriaId } = req.body;
     const pct = taxPercentage !== undefined ? Number(taxPercentage) : undefined;
@@ -141,6 +170,67 @@ router.put('/produtos/:id', async (req, res) => {
         },
       },
     });
+
+    await logFieldChangesActivity({
+      organizationId: updated.userId,
+      actor: req,
+      entityType: 'product',
+      entityId: updated.id,
+      entityLabel: `${updated.productDescription} (${updated.productCode})`,
+      changes: [
+        {
+          fieldChanged: 'productDescription',
+          oldValue: existing.productDescription,
+          newValue: updated.productDescription,
+        },
+        {
+          fieldChanged: 'unitPrice',
+          oldValue: existing.unitPrice,
+          newValue: updated.unitPrice,
+        },
+        {
+          fieldChanged: 'cost',
+          oldValue: existing.cost ?? 'Sem custo',
+          newValue: updated.cost ?? 'Sem custo',
+        },
+        {
+          fieldChanged: 'productType',
+          oldValue: existing.productType,
+          newValue: updated.productType,
+        },
+        {
+          fieldChanged: 'sku',
+          oldValue: existing.sku || 'Sem SKU',
+          newValue: updated.sku || 'Sem SKU',
+        },
+        {
+          fieldChanged: 'unitOfMeasure',
+          oldValue: existing.unitOfMeasure,
+          newValue: updated.unitOfMeasure,
+        },
+        {
+          fieldChanged: 'taxPercentage',
+          oldValue: existing.taxPercentage,
+          newValue: updated.taxPercentage,
+        },
+        {
+          fieldChanged: 'stockMinimo',
+          oldValue: existing.stockMinimo ?? 'Sem stock mínimo',
+          newValue: updated.stockMinimo ?? 'Sem stock mínimo',
+        },
+        {
+          fieldChanged: 'categoriaId',
+          oldValue: existing.categoria?.nome || 'Sem categoria',
+          newValue: updated.categoria?.nome || 'Sem categoria',
+        },
+        {
+          fieldChanged: 'active',
+          oldValue: existing.active,
+          newValue: updated.active,
+        },
+      ],
+    });
+
     const salePrice = unitPrice !== undefined ? Number(unitPrice) : existing.unitPrice;
     const costFinal = cost !== undefined ? (cost === null ? null : Number(cost)) : existing.cost;
     res.json({ ...updated, margin: calcMargin(costFinal, salePrice) });
@@ -152,9 +242,15 @@ router.put('/produtos/:id', async (req, res) => {
 // DELETE /api/faturacao/produtos/:id — soft delete
 router.delete('/produtos/:id', async (req, res) => {
   try {
-    const existing = await prisma.produto.findUnique({ where: { id: req.params.id }, select: { userId: true } });
+    const existing = await prisma.produto.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, userId: true, productCode: true, productDescription: true },
+    });
     if (!existing || existing.userId !== req.user.effectiveUserId) return res.status(404).json({ error: 'Produto não encontrado' });
     await prisma.produto.update({ where: { id: req.params.id }, data: { active: false } });
+
+    await logProductDeactivatedActivity(existing, req);
+
     res.json({ message: 'Produto desativado' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -224,6 +320,23 @@ router.post('/produtos/:id/stock', requireStockPermission('edit'), async (req, r
       }
 
       return { movement: mov, updatedProduto: updated };
+    });
+
+    await logStockAdjustedActivity({
+      organizationId: req.user.effectiveUserId,
+      actor: req,
+      product: {
+        id: req.params.id,
+        productCode: produto.productCode,
+        productDescription: produto.productDescription,
+      },
+      previousStock,
+      newStock,
+      quantity: qty,
+      direction: 'entry',
+      reason: reason || 'Entrada manual de stock',
+      referenceType: 'manual',
+      referenceId: movement.id,
     });
 
     res.status(201).json({

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BarChart3, Users, Kanban, CheckSquare, ShoppingBag, DollarSign, Settings, HelpCircle, LogOut } from 'lucide-react';
+import { buildWhatsAppSupportLink } from '@/lib/plan-utils';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
 
@@ -20,6 +21,10 @@ const ADMIN_LINKS = [
 
 export default function PreviewSidebar({ currentUser }: { currentUser: User }) {
   const pathname = usePathname();
+  const helpHref = buildWhatsAppSupportLink({
+    name: currentUser?.name || null,
+    company: currentUser?.accountOwnerName || null,
+  });
 
   const isActive = (path: string) => {
     if (path === '/preview') return pathname === '/preview' || pathname === '/preview/';
@@ -77,7 +82,7 @@ export default function PreviewSidebar({ currentUser }: { currentUser: User }) {
           <Settings className="w-[18px] h-[18px] flex-shrink-0" />
           <span>Configurações</span>
         </a>
-        <a href="#" className={navItemClass(false)}>
+        <a href={helpHref} target="_blank" rel="noopener noreferrer" className={navItemClass(false)}>
           <HelpCircle className="w-[18px] h-[18px] flex-shrink-0" />
           <span>Ajuda</span>
         </a>

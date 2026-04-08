@@ -274,10 +274,32 @@ export interface AutomationLogsResponse {
 export interface ActivityLogEntry {
   id: string;
   organization_id: number;
-  entity_type: 'contact' | 'invoice' | 'task' | 'pipeline_stage' | string;
+  entity_type:
+    | 'contact'
+    | 'invoice'
+    | 'task'
+    | 'pipeline_stage'
+    | 'cash_session'
+    | 'billing_customer'
+    | 'product'
+    | 'product_category'
+    | 'serie'
+    | 'store'
+    | 'billing_config'
+    | string;
   entity_id: string;
   entity_label: string;
-  action: 'created' | 'updated' | 'deleted' | 'stage_changed' | 'status_changed' | string;
+  action:
+    | 'created'
+    | 'updated'
+    | 'deleted'
+    | 'deactivated'
+    | 'opened'
+    | 'closed'
+    | 'stage_changed'
+    | 'status_changed'
+    | 'stock_adjusted'
+    | string;
   field_changed?: string | null;
   old_value?: string | null;
   new_value?: string | null;

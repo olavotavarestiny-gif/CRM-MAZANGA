@@ -19,6 +19,10 @@ const PAGE_W = 595.28;
 const PAGE_H = 841.89;
 const MARGIN = 42;
 const CONTENT_W = PAGE_W - (MARGIN * 2);
+const PAGE_FOOTER_RULE_Y = PAGE_H - MARGIN - 20;
+const PAGE_FOOTER_TEXT_Y = PAGE_FOOTER_RULE_Y + 6;
+const LEGAL_FOOTER_RULE_Y = PAGE_H - MARGIN - 44;
+const LEGAL_FOOTER_TEXT_Y = LEGAL_FOOTER_RULE_Y + 6;
 
 const COLORS = {
   ink: '#0F172A',
@@ -292,12 +296,12 @@ function drawPageFrame(state) {
     doc.restore().opacity(1);
   }
 
-  doc.moveTo(MARGIN, PAGE_H - 32).lineTo(PAGE_W - MARGIN, PAGE_H - 32)
+  doc.moveTo(MARGIN, PAGE_FOOTER_RULE_Y).lineTo(PAGE_W - MARGIN, PAGE_FOOTER_RULE_Y)
     .lineWidth(0.5).strokeColor(COLORS.line).stroke();
   doc.font('M').fontSize(7).fillColor(COLORS.muted)
-    .text(`Documento gerado no KukuGest`, MARGIN, PAGE_H - 25, { width: 180, lineBreak: false });
+    .text(`Documento gerado no KukuGest`, MARGIN, PAGE_FOOTER_TEXT_Y, { width: 180, lineBreak: false });
   doc.font('M').fontSize(7).fillColor(COLORS.muted)
-    .text(`Página ${pageNumber}`, PAGE_W - MARGIN - 60, PAGE_H - 25, { width: 60, align: 'right', lineBreak: false });
+    .text(`Página ${pageNumber}`, PAGE_W - MARGIN - 60, PAGE_FOOTER_TEXT_Y, { width: 60, align: 'right', lineBreak: false });
 }
 
 function addPage(state) {
@@ -763,10 +767,10 @@ function drawComplianceFooter(state) {
     ? `Documento proforma emitido por ${model.issuer.name} · NIF ${model.issuer.taxId} · Sem efeito fiscal.`
     : `Documento processado por programa informático certificado · Nº Cert.: ${model.invoice.agtValidationStatus === 'NA' ? 'N/A' : (state.config.agtCertNumber || 'PENDENTE')} · ${model.issuer.name} · NIF ${model.issuer.taxId}.`;
 
-  doc.moveTo(MARGIN, PAGE_H - 52).lineTo(PAGE_W - MARGIN, PAGE_H - 52)
+  doc.moveTo(MARGIN, LEGAL_FOOTER_RULE_Y).lineTo(PAGE_W - MARGIN, LEGAL_FOOTER_RULE_Y)
     .lineWidth(0.5).strokeColor(COLORS.line).stroke();
   doc.font('R').fontSize(6.8).fillColor(COLORS.muted)
-    .text(legalText, MARGIN, PAGE_H - 46, { width: CONTENT_W, align: 'center' });
+    .text(legalText, MARGIN, LEGAL_FOOTER_TEXT_Y, { width: CONTENT_W, align: 'center' });
 }
 
 async function generateFacturaPDF(factura, config = {}) {

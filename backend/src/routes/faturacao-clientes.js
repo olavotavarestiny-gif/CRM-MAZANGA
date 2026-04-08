@@ -3,6 +3,10 @@ const router = express.Router();
 const prisma = require('../lib/prisma');
 const { isValidNIF } = require('../lib/fiscal/nif-validator');
 const { resolveContactNif } = require('../lib/contact-nif');
+const {
+  logBillingCustomerCreatedActivity,
+  logFieldChangesActivity,
+} = require('../lib/activity-log');
 
 function normaliseBillingCustomerName(contact) {
   return contact.company?.trim() || contact.name;
@@ -43,6 +47,9 @@ router.post('/clientes', async (req, res) => {
     const cliente = await prisma.clienteFaturacao.create({
       data: { userId: req.user.effectiveUserId, customerTaxID, customerName, customerAddress, customerPhone, customerEmail, contactId: contactId || null },
     });
+
+    await logBillingCustomerCreatedActivity(cliente, req);
+
     res.status(201).json(cliente);
   } catch (err) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'Já existe um cliente com este NIF. Selecione-o na lista de clientes em vez de criar um novo.' });
@@ -53,7 +60,17 @@ router.post('/clientes', async (req, res) => {
 // PUT /api/faturacao/clientes/:id
 router.put('/clientes/:id', async (req, res) => {
   try {
-    const existing = await prisma.clienteFaturacao.findUnique({ where: { id: req.params.id }, select: { userId: true } });
+    const existing = await prisma.clienteFaturacao.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        userId: true,
+        customerName: true,
+        customerAddress: true,
+        customerPhone: true,
+        customerEmail: true,
+      },
+    });
     if (!existing || existing.userId !== req.user.effectiveUserId) return res.status(404).json({ error: 'Cliente não encontrado' });
     const { customerName, customerAddress, customerPhone, customerEmail } = req.body;
     const updated = await prisma.clienteFaturacao.update({
@@ -65,6 +82,37 @@ router.put('/clientes/:id', async (req, res) => {
         ...(customerEmail !== undefined && { customerEmail }),
       },
     });
+
+    await logFieldChangesActivity({
+      organizationId: updated.userId,
+      actor: req,
+      entityType: 'billing_customer',
+      entityId: updated.id,
+      entityLabel: updated.customerName || existing.customerName || 'Cliente de faturação',
+      changes: [
+        {
+          fieldChanged: 'customerName',
+          oldValue: existing.customerName || 'Sem nome',
+          newValue: updated.customerName || 'Sem nome',
+        },
+        {
+          fieldChanged: 'customerAddress',
+          oldValue: existing.customerAddress || 'Sem morada',
+          newValue: updated.customerAddress || 'Sem morada',
+        },
+        {
+          fieldChanged: 'customerPhone',
+          oldValue: existing.customerPhone || 'Sem telefone',
+          newValue: updated.customerPhone || 'Sem telefone',
+        },
+        {
+          fieldChanged: 'customerEmail',
+          oldValue: existing.customerEmail || 'Sem email',
+          newValue: updated.customerEmail || 'Sem email',
+        },
+      ],
+    });
+
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: "Erro de servidor. Tente novamente." });
@@ -94,6 +142,18 @@ router.post('/clientes/from-contact', async (req, res) => {
       });
     }
 
+    const existing = await prisma.clienteFaturacao.findUnique({
+      where: { userId_customerTaxID: { userId: req.user.effectiveUserId, customerTaxID: nif } },
+      select: {
+        id: true,
+        userId: true,
+        customerName: true,
+        customerPhone: true,
+        customerEmail: true,
+        contactId: true,
+      },
+    });
+
     const cliente = await prisma.clienteFaturacao.upsert({
       where: { userId_customerTaxID: { userId: req.user.effectiveUserId, customerTaxID: nif } },
       create: {
@@ -112,6 +172,41 @@ router.post('/clientes/from-contact', async (req, res) => {
         contactId: Number(contactId),
       },
     });
+
+    if (!existing) {
+      await logBillingCustomerCreatedActivity(cliente, req);
+    } else {
+      await logFieldChangesActivity({
+        organizationId: cliente.userId,
+        actor: req,
+        entityType: 'billing_customer',
+        entityId: cliente.id,
+        entityLabel: cliente.customerName || existing.customerName || 'Cliente de faturação',
+        changes: [
+          {
+            fieldChanged: 'customerName',
+            oldValue: existing.customerName || 'Sem nome',
+            newValue: cliente.customerName || 'Sem nome',
+          },
+          {
+            fieldChanged: 'customerPhone',
+            oldValue: existing.customerPhone || 'Sem telefone',
+            newValue: cliente.customerPhone || 'Sem telefone',
+          },
+          {
+            fieldChanged: 'customerEmail',
+            oldValue: existing.customerEmail || 'Sem email',
+            newValue: cliente.customerEmail || 'Sem email',
+          },
+          {
+            fieldChanged: 'contactId',
+            oldValue: existing.contactId || 'Sem contacto ligado',
+            newValue: cliente.contactId || 'Sem contacto ligado',
+          },
+        ],
+      });
+    }
+
     res.json(cliente);
   } catch (err) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'Já existe um cliente com este NIF.' });

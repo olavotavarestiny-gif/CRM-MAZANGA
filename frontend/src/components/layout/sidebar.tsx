@@ -17,7 +17,7 @@ import type { User } from '@/lib/api';
 import { getChatUnreadCount, getOnboarding } from '@/lib/api';
 import { canAccessCommerceRoute, canView, canViewReports } from '@/lib/permissions';
 import type { ModuleKey } from '@/lib/permissions';
-import { getPlanBadgeClasses, getPricingTierLabel } from '@/lib/plan-utils';
+import { buildWhatsAppSupportLink, getPlanBadgeClasses, getPricingTierLabel } from '@/lib/plan-utils';
 
 const TOUR_ATTR: Record<string, string> = {
   '/':          'sidebar-painel',
@@ -50,6 +50,10 @@ export default function Sidebar({
   };
 
   const hasPlatformAdminAccess = !!currentUser?.isSuperAdmin;
+  const helpHref = buildWhatsAppSupportLink({
+    name: currentUser?.name || null,
+    company: currentUser?.accountOwnerName || null,
+  });
 
   const { data: chatUnread = 0 } = useQuery({
     queryKey: ['chat-unread'],
@@ -342,16 +346,16 @@ export default function Sidebar({
             <span>Configurações</span>
           </Link>
         )}
-        <button
-          onClick={() => {
-            window.location.href = '/';
-            onClose();
-          }}
+        <a
+          href={helpHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={onClose}
           className={navItemClass(false)}
         >
           <HelpCircle className="w-[18px] h-[18px] flex-shrink-0" />
           <span>Ajuda</span>
-        </button>
+        </a>
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2 text-[#6b7e9a] hover:text-[#b31b25] hover:bg-[#b31b25]/5 transition-all text-left text-sm font-medium rounded-xl"

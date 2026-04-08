@@ -2,7 +2,18 @@ import type { PlanCatalogEntry, PlanFeatureName, PlanName } from './api';
 import type { WorkspaceMode } from './business-modes';
 
 export type PricingTierKey = 'starter' | 'growth' | 'pro';
-export type PricingSource = 'landing' | 'crm' | 'settings' | 'blocked-feature';
+export type PricingSource =
+  | 'landing'
+  | 'crm'
+  | 'settings'
+  | 'blocked-feature'
+  | 'hero'
+  | 'workspace'
+  | 'video'
+  | 'workspace-services'
+  | 'workspace-commerce'
+  | 'pricing'
+  | 'final-cta';
 
 export interface PricingTier {
   key: PricingTierKey;
@@ -47,6 +58,24 @@ const TIER_TO_PLAN: Record<PricingTierKey, PlanName> = {
   growth: 'profissional',
   pro: 'enterprise',
 };
+
+const PLAN_ALIASES: Record<string, PlanName> = {
+  inicial: 'essencial',
+  crescimento: 'profissional',
+  estabilidade: 'enterprise',
+};
+
+function normalizePlanInput(plan?: PlanName | string | null): PlanName | null {
+  if (!plan) return null;
+  const normalized = String(plan).trim().toLowerCase();
+  if (normalized in PLAN_ALIASES) {
+    return PLAN_ALIASES[normalized];
+  }
+  if (normalized === 'essencial' || normalized === 'profissional' || normalized === 'enterprise') {
+    return normalized;
+  }
+  return null;
+}
 
 const WORKSPACE_PRICING_CATALOG: Record<WorkspaceMode, PricingTier[]> = {
   servicos: [
@@ -234,9 +263,10 @@ export function getPricingCatalog(mode: WorkspaceMode = 'servicos') {
   return WORKSPACE_PRICING_CATALOG[mode];
 }
 
-export function mapPlanNameToPricingTier(plan?: PlanName | null): PricingTierKey {
-  if (!plan) return 'starter';
-  return PLAN_TO_TIER[plan] || 'starter';
+export function mapPlanNameToPricingTier(plan?: PlanName | string | null): PricingTierKey {
+  const normalizedPlan = normalizePlanInput(plan);
+  if (!normalizedPlan) return 'starter';
+  return PLAN_TO_TIER[normalizedPlan] || 'starter';
 }
 
 export function getPlanFromPricingTier(tier: PricingTierKey): PlanName {
@@ -282,17 +312,22 @@ export function getPricingTierStatusLabel(
   return undefined;
 }
 
-export function getUpgradeTargetPlan(plan?: PlanName | null): PlanName {
-  if (plan === 'profissional') return 'enterprise';
-  if (plan === 'enterprise') return 'enterprise';
+export function getUpgradeTargetPlan(plan?: PlanName | string | null): PlanName {
+  const normalizedPlan = normalizePlanInput(plan);
+  if (normalizedPlan === 'profissional') return 'enterprise';
+  if (normalizedPlan === 'enterprise') return 'enterprise';
   return 'profissional';
 }
 
 export function getPricingButtonText(
   tier: PricingTier,
-  _source: PricingSource = 'landing',
+  source: PricingSource = 'landing',
   currentPlan?: PlanName | null
 ) {
+  if (!currentPlan && (source === 'landing' || source === 'pricing')) {
+    return 'Escolher plano no WhatsApp';
+  }
+
   if (!currentPlan) return tier.buttonText;
 
   const currentTier = mapPlanNameToPricingTier(currentPlan);
@@ -305,7 +340,7 @@ export function getPricingButtonText(
   }
 
   if (tierIndex > currentIndex) {
-    return tier.buttonText;
+    return source === 'crm' || source === 'settings' ? tier.buttonText : 'Escolher plano no WhatsApp';
   }
 
   return 'Falar com a equipa';
@@ -352,18 +387,37 @@ export function buildWhatsAppPlanLink({
           ? `Olá, falo da empresa ${company}.`
           : 'Olá,';
 
-  const normalizedPlan = typeof plan === 'string' ? plan : undefined;
+  const normalizedPlan = normalizePlanInput(plan);
   const planLabel =
     visualPlanLabel ||
-    (normalizedPlan === 'essencial' || normalizedPlan === 'profissional' || normalizedPlan === 'enterprise'
-      ? getPricingTierLabel(normalizedPlan)
-      : normalizedPlan || 'Crescimento');
+    (normalizedPlan ? getPricingTierLabel(normalizedPlan) : (typeof plan === 'string' ? plan : 'Crescimento'));
   const workspaceLabel = workspaceMode ? ` para o workspace ${getWorkspaceLabel(workspaceMode)}` : '';
   const billingLabel = billing ? ` (${billing})` : '';
   const sourceLabel = source ? ` Origem: ${source}.` : '';
   const noteLabel = note ? ` ${note}` : '';
 
   const message = `${intro} Quero aderir ao plano ${planLabel}${workspaceLabel}${billingLabel} da KukuGest.${sourceLabel}${noteLabel}`.trim();
+  return `${base}?text=${encodeURIComponent(message)}`;
+}
+
+export function buildWhatsAppSupportLink({
+  name,
+  company,
+}: {
+  name?: string | null;
+  company?: string | null;
+} = {}) {
+  const base = 'https://wa.me/244942277576';
+  const intro =
+    name && company
+      ? `Olá, sou ${name} da empresa ${company}.`
+      : name
+        ? `Olá, sou ${name}.`
+        : company
+          ? `Olá, falo da empresa ${company}.`
+          : 'Olá,';
+
+  const message = `${intro} Preciso de ajuda com a KukuGest.`.trim();
   return `${base}?text=${encodeURIComponent(message)}`;
 }
 

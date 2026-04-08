@@ -56,9 +56,9 @@ router.patch('/orgs/:id', async (req, res) => {
     const data = {};
     if (plan !== undefined) {
       if (!isSupportedPlan(plan)) {
-        return res.status(400).json({ error: 'Plano inválido. Use essencial, profissional ou enterprise.' });
+        return res.status(400).json({ error: 'Plano inválido. Use inicial, crescimento ou estabilidade.' });
       }
-      data.plan = plan;
+      data.plan = normalizePlan(plan);
     }
     if (active !== undefined) data.active = active;
     if (permissions !== undefined) {
@@ -180,7 +180,7 @@ router.post('/users', async (req, res) => {
     }
 
     if (plan !== undefined && !isSupportedPlan(plan)) {
-      return res.status(400).json({ error: 'Plano inválido. Use essencial, profissional ou enterprise.' });
+      return res.status(400).json({ error: 'Plano inválido. Use inicial, crescimento ou estabilidade.' });
     }
     if (workspaceMode !== undefined && !['servicos', 'comercio'].includes(workspaceMode)) {
       return res.status(400).json({ error: 'Workspace inválido. Use servicos ou comercio.' });
@@ -204,7 +204,7 @@ router.post('/users', async (req, res) => {
         role: 'user',
         active: true,
         mustChangePassword: true,
-        plan: plan || DEFAULT_PLAN,
+        plan: plan ? normalizePlan(plan) : DEFAULT_PLAN,
         workspaceMode: workspaceMode || 'servicos',
         permissions: permissions ? JSON.stringify(permissions) : null,
       },
