@@ -359,6 +359,14 @@ function drawCompanyIdentity(doc, model, x, y, width) {
   return Math.max(markSize, cursor - y);
 }
 
+function measureDocumentMetaRows(doc, rows, labelWidth, valueWidth) {
+  return rows.reduce((total, row) => {
+    const labelHeight = measureTextHeight(doc, row.label.toUpperCase(), labelWidth - 8, 'M', 7);
+    const valueHeight = measureTextHeight(doc, row.value || '—', valueWidth, 'SB', 8);
+    return total + Math.max(labelHeight, valueHeight) + 6;
+  }, 0);
+}
+
 function drawDocumentHeader(state) {
   const { doc, model } = state;
   const leftX = MARGIN;
@@ -369,23 +377,11 @@ function drawDocumentHeader(state) {
   const topY = MARGIN + 6;
 
   const leftHeight = drawCompanyIdentity(doc, model, leftX, topY + 6, leftW);
-
-  doc.roundedRect(rightX, topY, rightW, 148, 18).fillAndStroke(COLORS.panel, COLORS.line);
-  doc.roundedRect(rightX, topY, 6, 148, 18).fill(COLORS.accent);
-  doc.font('M').fontSize(8).fillColor(COLORS.muted)
-    .text('Documento Fiscal', rightX + 18, topY + 14, { width: rightW - 32 });
-  doc.font('B').fontSize(21).fillColor(COLORS.primary)
-    .text(docTypeLabel(model.invoice.documentType).toUpperCase(), rightX + 18, topY + 28, { width: rightW - 32 });
-  doc.font('SB').fontSize(11).fillColor(COLORS.accent)
-    .text(model.invoice.documentNo, rightX + 18, topY + 56, { width: rightW - 32 });
-
-  let pillX = rightX + 18;
-  const statusWidth = drawPill(doc, pillX, topY + 76, statusLabel(model.invoice.documentStatus), statusTone(model.invoice.documentStatus));
-  pillX += statusWidth + 8;
-  drawPill(doc, pillX, topY + 76, agtStatusLabel(model.invoice.agtValidationStatus), {
-    fill: model.invoice.agtValidationStatus === 'V' ? COLORS.greenSoft : COLORS.accentSoft,
-    text: model.invoice.agtValidationStatus === 'V' ? COLORS.green : COLORS.accent,
-  });
+  const cardPaddingX = 18;
+  const cardInnerW = rightW - (cardPaddingX * 2);
+  const metaLabelW = 70;
+  const metaValueW = rightW - 112;
+  const documentTitle = docTypeLabel(model.invoice.documentType).toUpperCase();
 
   const metaRows = [
     { label: 'Emissão', value: fmtDate(model.invoice.documentDate) },
@@ -395,17 +391,51 @@ function drawDocumentHeader(state) {
     { label: 'Pagamento', value: model.invoice.paymentMethod || '—' },
     { label: 'Vencimento', value: model.invoice.paymentDue ? fmtDate(model.invoice.paymentDue) : '—' },
   ];
+  const headingHeight = measureTextHeight(doc, 'Documento Fiscal', cardInnerW, 'M', 8);
+  const docTypeHeight = measureTextHeight(doc, documentTitle, cardInnerW, 'B', 21);
+  const docNoHeight = measureTextHeight(doc, model.invoice.documentNo, cardInnerW, 'SB', 11);
+  const metaRowsHeight = measureDocumentMetaRows(doc, metaRows, metaLabelW, metaValueW);
+  const cardHeight = Math.max(148, 14 + headingHeight + 6 + docTypeHeight + 6 + docNoHeight + 10 + 18 + 12 + metaRowsHeight + 16);
 
-  let metaY = topY + 103;
+  doc.roundedRect(rightX, topY, rightW, cardHeight, 18).fillAndStroke(COLORS.panel, COLORS.line);
+  doc.roundedRect(rightX, topY, 6, cardHeight, 18).fill(COLORS.accent);
+
+  let rightCursor = topY + 14;
+  doc.font('M').fontSize(8).fillColor(COLORS.muted)
+    .text('Documento Fiscal', rightX + cardPaddingX, rightCursor, { width: cardInnerW });
+  rightCursor += headingHeight + 6;
+
+  doc.font('B').fontSize(21).fillColor(COLORS.primary)
+    .text(documentTitle, rightX + cardPaddingX, rightCursor, { width: cardInnerW });
+  rightCursor += docTypeHeight + 6;
+
+  doc.font('SB').fontSize(11).fillColor(COLORS.accent)
+    .text(model.invoice.documentNo, rightX + cardPaddingX, rightCursor, { width: cardInnerW });
+  rightCursor += docNoHeight + 10;
+
+  let pillX = rightX + cardPaddingX;
+  const pillY = rightCursor;
+  const statusWidth = drawPill(doc, pillX, pillY, statusLabel(model.invoice.documentStatus), statusTone(model.invoice.documentStatus));
+  pillX += statusWidth + 8;
+  drawPill(doc, pillX, pillY, agtStatusLabel(model.invoice.agtValidationStatus), {
+    fill: model.invoice.agtValidationStatus === 'V' ? COLORS.greenSoft : COLORS.accentSoft,
+    text: model.invoice.agtValidationStatus === 'V' ? COLORS.green : COLORS.accent,
+  });
+  rightCursor += 30;
+
+  let metaY = rightCursor;
   metaRows.forEach((row) => {
+    const labelHeight = measureTextHeight(doc, row.label.toUpperCase(), metaLabelW - 8, 'M', 7);
+    const valueHeight = measureTextHeight(doc, row.value || '—', metaValueW, 'SB', 8);
+    const rowHeight = Math.max(labelHeight, valueHeight);
     doc.font('M').fontSize(7).fillColor(COLORS.mutedLight)
-      .text(row.label.toUpperCase(), rightX + 18, metaY, { width: 70, lineBreak: false });
+      .text(row.label.toUpperCase(), rightX + cardPaddingX, metaY + 1, { width: metaLabelW - 8 });
     doc.font('SB').fontSize(8).fillColor(COLORS.ink)
-      .text(row.value, rightX + 94, metaY - 1, { width: rightW - 112, align: 'right', lineBreak: false });
-    metaY += 13;
+      .text(row.value || '—', rightX + 94, metaY, { width: metaValueW, align: 'right' });
+    metaY += rowHeight + 6;
   });
 
-  const headerBottom = Math.max(topY + leftHeight + 6, topY + 148) + 18;
+  const headerBottom = Math.max(topY + leftHeight + 6, topY + cardHeight) + 18;
   doc.moveTo(MARGIN, headerBottom).lineTo(PAGE_W - MARGIN, headerBottom)
     .lineWidth(0.8).strokeColor(COLORS.line).stroke();
   state.cursorY = headerBottom + 18;
@@ -449,7 +479,7 @@ function drawInfoCard(doc, x, y, width, title, lines) {
 
 function drawParties(state) {
   const { doc, model } = state;
-  ensureSpace(state, 160);
+  const boxW = (CONTENT_W - 18) / 2;
 
   const leftLines = [
     { text: model.issuer.name, emphasis: true, size: 11 },
@@ -468,7 +498,12 @@ function drawParties(state) {
     ...(model.customer.email ? [{ text: `Email: ${model.customer.email}` }] : []),
   ];
 
-  const boxW = (CONTENT_W - 18) / 2;
+  const partiesHeight = Math.max(
+    measureCardHeight(doc, boxW, leftLines),
+    measureCardHeight(doc, boxW, rightLines)
+  );
+  ensureSpace(state, partiesHeight + 18);
+
   const leftH = drawInfoCard(doc, MARGIN, state.cursorY, boxW, 'Emitente', leftLines);
   const rightH = drawInfoCard(doc, MARGIN + boxW + 18, state.cursorY, boxW, 'Cliente / Faturado a', rightLines);
   state.cursorY += Math.max(leftH, rightH) + 18;
@@ -689,9 +724,8 @@ function drawSummary(state) {
   const rightW = CONTENT_W - leftW - gap;
   const supportHeight = estimateSupportHeight(doc, model.supportRows, leftW);
   const totalsHeight = model.showBaseReference ? 164 : 132;
-  const footerHeight = 130;
 
-  ensureSpace(state, Math.max(supportHeight, totalsHeight) + footerHeight + 18);
+  ensureSpace(state, Math.max(supportHeight, totalsHeight) + 18);
 
   const y = state.cursorY;
   drawSupportCard(doc, model, MARGIN, y, leftW, supportHeight);
@@ -700,8 +734,44 @@ function drawSummary(state) {
   state.cursorY += Math.max(supportHeight, totalsHeight) + 18;
 }
 
+function estimateComplianceFooterMainHeight(doc, model) {
+  const qrSize = 78;
+  const infoWidth = CONTENT_W - qrSize - 20;
+  const issuerWidth = 214;
+  const agtWidth = infoWidth - 236;
+
+  const issuerFooterLines = [
+    [model.issuer.website, model.issuer.email].filter(Boolean).join(' · '),
+    model.issuer.phone ? `Contacto: ${model.issuer.phone}` : '',
+    'Obrigado pela sua preferência.',
+  ].filter(Boolean);
+  const technicalLines = [
+    model.invoice.serie ? `Série: ${model.invoice.serie.seriesCode}/${model.invoice.serie.seriesYear}` : '',
+    `Estado AGT: ${agtStatusLabel(model.invoice.agtValidationStatus)}${model.isProforma ? ' · Proforma' : ''}`,
+    model.invoice.agtRequestId ? `Request ID: ${model.invoice.agtRequestId}` : '',
+    model.invoice.jwsSignature && model.invoice.jwsSignature !== 'PLACEHOLDER'
+      ? `Assinatura: ${String(model.invoice.jwsSignature).slice(0, 34)}...`
+      : '',
+  ].filter(Boolean);
+
+  const issuerHeight = issuerFooterLines.reduce((total, line) => (
+    total + measureTextHeight(doc, line, issuerWidth, 'R', 8.5) + 4
+  ), 0);
+  const technicalHeight = 14 + technicalLines.reduce((total, line) => (
+    total + measureTextHeight(doc, line, agtWidth, 'R', 7.5) + 4
+  ), 0);
+  const qrHeight = model.isProforma || !model.invoice.qrCodeImage ? 0 : qrSize + 30;
+
+  return Math.max(32 + issuerHeight, 32 + technicalHeight, 18 + qrHeight) + 8;
+}
+
 function drawComplianceFooter(state) {
   const { doc, model } = state;
+  const footerMainHeight = estimateComplianceFooterMainHeight(doc, model);
+  if (state.cursorY + footerMainHeight > LEGAL_FOOTER_RULE_Y - 10) {
+    addPage(state);
+  }
+
   const footerTop = state.cursorY;
   const qrSize = 78;
   const qrX = PAGE_W - MARGIN - qrSize;
