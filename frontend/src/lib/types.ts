@@ -286,6 +286,8 @@ export interface ActivityLogEntry {
     | 'serie'
     | 'store'
     | 'billing_config'
+    | 'messaging_campaign'
+    | 'messaging_message'
     | string;
   entity_id: string;
   entity_label: string;
@@ -299,6 +301,8 @@ export interface ActivityLogEntry {
     | 'stage_changed'
     | 'status_changed'
     | 'stock_adjusted'
+    | 'sent'
+    | 'sync_requested'
     | string;
   field_changed?: string | null;
   old_value?: string | null;

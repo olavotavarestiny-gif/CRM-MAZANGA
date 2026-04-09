@@ -42,6 +42,7 @@ import {
   HardDrive,
   History,
   LayoutDashboard,
+  MessageSquareText,
   Plus,
   RefreshCw,
   Search,
@@ -65,6 +66,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { useToast } from '@/components/ui/toast-provider';
 import { getPricingTierLabel } from '@/lib/plan-utils';
+import { SuperAdminMessagingSection } from '@/components/superadmin/messaging-section';
 
 const ADMIN_SECTIONS = [
   { id: 'users', label: 'Utilizadores', icon: Users },
@@ -75,6 +77,7 @@ const ADMIN_SECTIONS = [
 const SUPERADMIN_SECTIONS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'clientes', label: 'Clientes', icon: ShieldCheck },
+  { id: 'messaging', label: 'Messaging', icon: MessageSquareText },
   { id: 'usage', label: 'Utilização', icon: BarChart3 },
   { id: 'storage', label: 'Armazenamento', icon: HardDrive },
 ] as const;
@@ -352,6 +355,7 @@ export default function SuperAdminPage() {
     currentSection === 'logins' ? loginLogsError :
     currentSection === 'dashboard' ? dashboardError :
     currentSection === 'clientes' ? orgsError :
+    currentSection === 'messaging' ? false :
     currentSection === 'usage' ? usageError :
     currentSection === 'storage' ? storageError :
     false;
@@ -362,6 +366,7 @@ export default function SuperAdminPage() {
     if (currentSection === 'logins') { refetchLoginLogs(); return; }
     if (currentSection === 'dashboard') { refetchDashboard(); return; }
     if (currentSection === 'clientes') { refetchOrgs(); return; }
+    if (currentSection === 'messaging') { return; }
     if (currentSection === 'usage') { refetchUsage(); return; }
     if (currentSection === 'storage') { refetchStorage(); }
   };
@@ -976,6 +981,10 @@ export default function SuperAdminPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {currentSection === 'messaging' && isSuperAdmin && !currentSectionError && (
+          <SuperAdminMessagingSection />
         )}
 
         {currentSection === 'usage' && isSuperAdmin && !currentSectionError && (

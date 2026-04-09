@@ -735,3 +735,121 @@ model DailyTipDelivery {
   @@index([deliveryDate])
   @@map("daily_tip_delivery")
 }
+
+model MessagingCampaign {
+  id                         String                      @id @default(cuid())
+  provider                   String                      @default("ZIETT")
+  providerCampaignId         String?
+  name                       String
+  content                    String
+  channelType                String                      @default("SMS")
+  remitterId                 String
+  countryAlpha2              String                      @default("AO")
+  requestedRecipientsCount   Int                         @default(0)
+  acceptedRecipientsCount    Int                         @default(0)
+  invalidRecipientsCount     Int                         @default(0)
+  duplicateRecipientsCount   Int                         @default(0)
+  optedOutRecipientsCount    Int                         @default(0)
+  notAllowedRecipientsCount  Int                         @default(0)
+  status                     String                      @default("pending")
+  providerStatus             String?
+  triggerSource              String                      @default("SUPERADMIN_PANEL")
+  createdByUserId            Int
+  createdByEmail             String
+  accountOwnerId             Int?
+  workspaceMode              String?
+  isTest                     Boolean                     @default(true)
+  statusNote                 String?
+  providerErrorCode          String?
+  providerErrorMessage       String?
+  providerTraceId            String?
+  rawRequestJson             Json?
+  rawResponseJson            Json?
+  sentAt                     DateTime?
+  processedAt                DateTime?
+  completedAt                DateTime?
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  recipients                 MessagingCampaignRecipient[]
+  messages                   MessagingMessageLog[]
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([providerCampaignId])
+  @@index([createdByUserId])
+}
+
+model MessagingCampaignRecipient {
+  id                 String                @id @default(cuid())
+  campaignId         String
+  phoneOriginal      String
+  phoneNormalized    String?
+  contactId          Int?
+  contactName        String?
+  contactEmail       String?
+  status             String                @default("pending")
+  providerMessageId  String?
+  providerStatus     String?
+  channelDestination String?
+  cost               Float?
+  errorCode          String?
+  errorMessage       String?
+  rawProviderJson    Json?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  campaign           MessagingCampaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  messageLogs        MessagingMessageLog[]
+
+  @@index([campaignId, createdAt])
+  @@index([phoneNormalized])
+  @@index([providerMessageId])
+}
+
+model MessagingMessageLog {
+  id                   String                     @id @default(cuid())
+  provider             String                     @default("ZIETT")
+  providerMessageId    String?
+  campaignId           String?
+  campaignRecipientId  String?
+  content              String
+  phoneOriginal        String
+  phoneNormalized      String
+  contactId            Int?
+  channelType          String                     @default("SMS")
+  remitterId           String
+  status               String                     @default("pending")
+  providerStatus       String?
+  channelDestination   String?
+  cost                 Float?
+  triggerSource        String                     @default("SUPERADMIN_PANEL")
+  createdByUserId      Int
+  createdByEmail       String
+  isTest               Boolean                    @default(true)
+  providerErrorCode    String?
+  providerErrorMessage String?
+  providerTraceId      String?
+  rawRequestJson       Json?
+  rawResponseJson      Json?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  campaign             MessagingCampaign?         @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignRecipient    MessagingCampaignRecipient? @relation(fields: [campaignRecipientId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([providerMessageId])
+  @@index([campaignId])
+  @@index([campaignRecipientId])
+}
+
+model MessagingOptOut {
+  id              String   @id @default(cuid())
+  phoneNormalized String   @unique
+  reason          String?
+  source          String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([isActive])
+}

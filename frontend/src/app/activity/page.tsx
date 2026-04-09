@@ -31,6 +31,8 @@ const ACTIVITY_TYPE_OPTIONS = [
   { value: 'serie', label: 'Séries' },
   { value: 'store', label: 'Pontos de venda' },
   { value: 'billing_config', label: 'Configuração fiscal' },
+  { value: 'messaging_campaign', label: 'Campanhas de messaging' },
+  { value: 'messaging_message', label: 'Mensagens de messaging' },
 ];
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
@@ -44,6 +46,8 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
   serie: 'Série',
   store: 'Ponto de venda',
   billing_config: 'Configuração fiscal',
+  messaging_campaign: 'Campanha de messaging',
+  messaging_message: 'Mensagem de messaging',
 };
 
 function isPrivilegedUser(user: Awaited<ReturnType<typeof getCurrentUser>> | null) {

@@ -1333,6 +1333,262 @@ export async function getSuperAdminDashboard(): Promise<SuperAdminDashboard> {
   return res.data;
 }
 
+export interface SuperAdminMessagingSummary {
+  submitted: number;
+  accepted: number;
+  invalid: number;
+  duplicate: number;
+  optedOut: number;
+  notAllowed: number;
+}
+
+export interface SuperAdminMessagingRecipientInput {
+  phone: string;
+  contactId?: number | null;
+  name?: string | null;
+  email?: string | null;
+}
+
+export interface SuperAdminMessagingCampaignPreview {
+  provider: string;
+  name: string;
+  content: string;
+  channelType: string;
+  remitterId: string;
+  countryAlpha2: string;
+  requestedRecipientsCount: number;
+  acceptedRecipientsCount: number;
+  invalidRecipientsCount: number;
+  duplicateRecipientsCount: number;
+  optedOutRecipientsCount: number;
+  notAllowedRecipientsCount: number;
+  isTest: boolean;
+  status: string;
+}
+
+export interface SuperAdminMessagingCampaign {
+  id: string;
+  provider: string;
+  providerCampaignId?: string | null;
+  name: string;
+  content: string;
+  channelType: string;
+  remitterId: string;
+  countryAlpha2: string;
+  requestedRecipientsCount: number;
+  acceptedRecipientsCount: number;
+  invalidRecipientsCount: number;
+  duplicateRecipientsCount: number;
+  optedOutRecipientsCount: number;
+  notAllowedRecipientsCount: number;
+  status: string;
+  providerStatus?: string | null;
+  triggerSource: string;
+  createdByUserId: number;
+  createdByEmail: string;
+  accountOwnerId?: number | null;
+  workspaceMode?: string | null;
+  isTest: boolean;
+  statusNote?: string | null;
+  providerErrorCode?: string | null;
+  providerErrorMessage?: string | null;
+  providerTraceId?: string | null;
+  rawRequestJson?: Record<string, unknown> | null;
+  rawResponseJson?: Record<string, unknown> | null;
+  sentAt?: string | null;
+  processedAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  _count?: {
+    recipients: number;
+    messages: number;
+  };
+}
+
+export interface SuperAdminMessagingCampaignRecipient {
+  id: string;
+  campaignId: string;
+  phoneOriginal: string;
+  phoneNormalized?: string | null;
+  contactId?: number | null;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  status: string;
+  providerMessageId?: string | null;
+  providerStatus?: string | null;
+  channelDestination?: string | null;
+  cost?: number | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  rawProviderJson?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SuperAdminMessagingMessage {
+  id: string;
+  provider: string;
+  providerMessageId?: string | null;
+  campaignId?: string | null;
+  campaignRecipientId?: string | null;
+  content: string;
+  phoneOriginal: string;
+  phoneNormalized: string;
+  contactId?: number | null;
+  channelType: string;
+  remitterId: string;
+  status: string;
+  providerStatus?: string | null;
+  channelDestination?: string | null;
+  cost?: number | null;
+  triggerSource: string;
+  createdByUserId: number;
+  createdByEmail: string;
+  isTest: boolean;
+  providerErrorCode?: string | null;
+  providerErrorMessage?: string | null;
+  providerTraceId?: string | null;
+  rawRequestJson?: Record<string, unknown> | null;
+  rawResponseJson?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+  campaign?: {
+    id: string;
+    name: string;
+    providerCampaignId?: string | null;
+    status: string;
+    isTest: boolean;
+  } | null;
+  campaignRecipient?: {
+    id: string;
+    status: string;
+    providerStatus?: string | null;
+    errorCode?: string | null;
+    errorMessage?: string | null;
+  } | null;
+}
+
+export interface SuperAdminMessagingPaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface SuperAdminMessagingCampaignDetail {
+  campaign: SuperAdminMessagingCampaign;
+  recipients: SuperAdminMessagingPaginatedResponse<SuperAdminMessagingCampaignRecipient>;
+  summary?: SuperAdminMessagingSummary;
+}
+
+export interface SuperAdminMessagingCampaignValidationResponse {
+  campaign: SuperAdminMessagingCampaignPreview;
+  summary: SuperAdminMessagingSummary;
+  acceptedRecipients: Array<{
+    phoneOriginal: string;
+    phoneNormalized: string;
+    contactId?: number | null;
+    contactName?: string | null;
+    contactEmail?: string | null;
+  }>;
+  rejectedRecipients: Array<{
+    phoneOriginal: string;
+    phoneNormalized?: string | null;
+    contactId?: number | null;
+    contactName?: string | null;
+    contactEmail?: string | null;
+    status: string;
+    errorCode?: string | null;
+    errorMessage?: string | null;
+  }>;
+}
+
+export async function validateSuperadminBatchCampaign(payload: {
+  name: string;
+  content: string;
+  remitterId: string;
+  countryAlpha2?: string;
+  recipients: SuperAdminMessagingRecipientInput[];
+  isTest?: boolean;
+}): Promise<SuperAdminMessagingCampaignValidationResponse> {
+  const res = await api.post('/api/superadmin/messaging/campaigns/validate', payload);
+  return res.data;
+}
+
+export async function sendSuperadminBatchCampaign(payload: {
+  name: string;
+  content: string;
+  remitterId: string;
+  countryAlpha2?: string;
+  recipients: SuperAdminMessagingRecipientInput[];
+  isTest?: boolean;
+}): Promise<SuperAdminMessagingCampaignDetail> {
+  const res = await api.post('/api/superadmin/messaging/campaigns/send', payload);
+  return res.data;
+}
+
+export async function listSuperadminMessagingCampaigns(params?: {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+  isTest?: boolean;
+}): Promise<SuperAdminMessagingPaginatedResponse<SuperAdminMessagingCampaign>> {
+  const res = await api.get('/api/superadmin/messaging/campaigns', { params });
+  return res.data;
+}
+
+export async function getSuperadminMessagingCampaign(
+  id: string,
+  params?: { recipientPage?: number; recipientPageSize?: number }
+): Promise<SuperAdminMessagingCampaignDetail> {
+  const res = await api.get(`/api/superadmin/messaging/campaigns/${id}`, { params });
+  return res.data;
+}
+
+export async function syncSuperadminMessagingCampaign(id: string): Promise<SuperAdminMessagingCampaignDetail> {
+  const res = await api.post(`/api/superadmin/messaging/campaigns/${id}/sync`);
+  return res.data;
+}
+
+export async function sendSuperadminSingleMessage(payload: {
+  phone: string;
+  content: string;
+  remitterId: string;
+  countryAlpha2?: string;
+  isTest?: boolean;
+  saveContact?: boolean;
+  contactId?: number | null;
+}): Promise<SuperAdminMessagingMessage> {
+  const res = await api.post('/api/superadmin/messaging/test/send-single', payload);
+  return res.data;
+}
+
+export async function listSuperadminMessages(params?: {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+  isTest?: boolean;
+}): Promise<SuperAdminMessagingPaginatedResponse<SuperAdminMessagingMessage>> {
+  const res = await api.get('/api/superadmin/messaging/messages', { params });
+  return res.data;
+}
+
+export async function getSuperadminMessage(id: string): Promise<SuperAdminMessagingMessage> {
+  const res = await api.get(`/api/superadmin/messaging/messages/${id}`);
+  return res.data;
+}
+
+export async function syncSuperadminMessage(id: string): Promise<SuperAdminMessagingMessage> {
+  const res = await api.post(`/api/superadmin/messaging/messages/${id}/sync`);
+  return res.data;
+}
+
 // Admin: list all client accounts
 export async function getClientAccounts(): Promise<import('./types').ClientAccount[]> {
   const res = await api.get('/api/admin/accounts');
