@@ -149,9 +149,7 @@ function ResetPasswordForm() {
     return (
       <div className="p-8">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#0A2540] mb-4">
-            <span className="text-white font-black text-lg" style={{ fontFamily: "'Montserrat', sans-serif" }}>U</span>
-          </div>
+          <KukuGestIcon size={28} />
           <h1 className="text-2xl font-bold text-[#0A2540]" style={{ fontFamily: "'Montserrat', sans-serif" }}>
             Nova Password
           </h1>

@@ -24,10 +24,9 @@ export default function ForgotPasswordPage() {
     try {
       const supabase = createClient();
 
-      // Password recovery should land directly on /reset-password.
-      // Supabase may return recovery credentials in the URL fragment,
-      // which server routes cannot read.
-      const redirectTo = `${window.location.origin}/reset-password`;
+      // Route recovery through /auth/callback so the PKCE code is exchanged
+      // server-side and the session is set in cookies before landing on /reset-password.
+      const redirectTo = `${window.location.origin}/auth/callback?next=/reset-password`;
 
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo,
