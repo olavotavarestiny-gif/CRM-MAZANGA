@@ -43,6 +43,10 @@ const FIELD_LABELS: Record<string, string> = {
   agtCertNumber: 'certificado AGT',
   defaultSerieId: 'série padrão',
   defaultEstabelecimentoId: 'ponto de venda padrão',
+  providerCampaignId: 'ID da campanha no provider',
+  providerMessageId: 'ID da mensagem no provider',
+  providerStatus: 'estado no provider',
+  statusNote: 'nota de estado',
 };
 
 const FIELD_CHANGE_PHRASES: Record<string, string> = {
@@ -85,6 +89,10 @@ const FIELD_CHANGE_PHRASES: Record<string, string> = {
   agtCertNumber: 'alterou o certificado AGT',
   defaultSerieId: 'alterou a série padrão',
   defaultEstabelecimentoId: 'alterou o ponto de venda padrão',
+  providerCampaignId: 'alterou o ID da campanha no provider',
+  providerMessageId: 'alterou o ID da mensagem no provider',
+  providerStatus: 'alterou o estado no provider',
+  statusNote: 'alterou a nota de estado',
 };
 
 const SERIES_STATUS_LABELS: Record<string, string> = {
@@ -244,6 +252,24 @@ export function formatActivityMessage(entry: ActivityLogEntry) {
     }
   }
 
+  if (entry.entity_type === 'messaging_campaign') {
+    if (entry.action === 'created') return `${actor} criou a campanha de messaging`;
+    if (entry.action === 'sync_requested') return `${actor} sincronizou a campanha de messaging`;
+    if (entry.action === 'updated') {
+      const phrase = FIELD_CHANGE_PHRASES[entry.field_changed || ''] || 'alterou a campanha de messaging';
+      return `${actor} ${phrase}`;
+    }
+  }
+
+  if (entry.entity_type === 'messaging_message') {
+    if (entry.action === 'sent') return `${actor} enviou uma mensagem de teste`;
+    if (entry.action === 'sync_requested') return `${actor} sincronizou uma mensagem de teste`;
+    if (entry.action === 'updated') {
+      const phrase = FIELD_CHANGE_PHRASES[entry.field_changed || ''] || 'alterou a mensagem de messaging';
+      return `${actor} ${phrase}`;
+    }
+  }
+
   if (entry.action === 'created') return `${actor} criou um registo`;
   if (entry.action === 'deleted') return `${actor} eliminou um registo`;
   if (entry.action === 'deactivated') return `${actor} desativou um registo`;
@@ -294,6 +320,19 @@ export function formatActivityDetail(entry: ActivityLogEntry) {
 
   if (entry.entity_type === 'invoice' && entry.metadata?.document_no) {
     return String(entry.metadata.document_no);
+  }
+
+  if (entry.entity_type === 'messaging_campaign') {
+    const providerCampaignId = entry.metadata?.provider_campaign_id ? String(entry.metadata.provider_campaign_id) : null;
+    const accepted = typeof entry.metadata?.accepted_recipients === 'number'
+      ? `${entry.metadata.accepted_recipients} aceites`
+      : null;
+    return [entry.entity_label, providerCampaignId, accepted].filter(Boolean).join(' • ');
+  }
+
+  if (entry.entity_type === 'messaging_message') {
+    const providerMessageId = entry.metadata?.provider_message_id ? String(entry.metadata.provider_message_id) : null;
+    return [entry.entity_label, providerMessageId].filter(Boolean).join(' • ');
   }
 
   return entry.entity_label;

@@ -91,7 +91,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
     pathname === '/forgot-password' ||
     pathname === '/reset-password' ||
     pathname === '/change-password' ||
-    pathname === '/landing' ||
     pathname === '/form' ||
     pathname === '/termos' ||
     pathname === '/privacidade' ||
@@ -324,7 +323,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
               <span className="text-sm font-medium text-[#2c2f31]">Menu</span>
             </button>
             <div className="min-w-0 overflow-hidden">
-              <KukuGestLogo height={24} className="max-w-full" />
+              <KukuGestLogo height={24} showBetaBadge className="max-w-full" />
             </div>
           </div>
           <UserWidget user={currentUser} compact />

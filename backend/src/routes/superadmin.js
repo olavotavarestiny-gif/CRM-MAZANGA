@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
 const { DEFAULT_PLAN, isSupportedPlan, normalizePlan } = require('../lib/plans');
+const superadminMessagingRouter = require('./superadmin-messaging');
 
 let _supabaseAdmin = null;
 function getSupabaseAdmin() {
@@ -15,6 +16,8 @@ function getSupabaseAdmin() {
   }
   return _supabaseAdmin;
 }
+
+router.use('/messaging', superadminMessagingRouter);
 
 // GET /api/superadmin/orgs — list all client account owners
 router.get('/orgs', async (req, res) => {
