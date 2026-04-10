@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
+import { KukuGestIcon } from '@/components/KukuGestLogo';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -51,9 +52,7 @@ export default function ForgotPasswordPage() {
         <Card className="w-full max-w-md shadow-xl bg-white/90 backdrop-blur-sm">
           <div className="p-8">
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#0A2540] mb-4">
-                <span className="text-white font-black text-lg" style={{ fontFamily: "'Montserrat', sans-serif" }}>U</span>
-              </div>
+              <KukuGestIcon size={28} />
               <h1 className="text-2xl font-bold text-[#0A2540]" style={{ fontFamily: "'Montserrat', sans-serif" }}>
                 Recuperar Password
               </h1>
