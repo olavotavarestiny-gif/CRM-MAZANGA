@@ -5,6 +5,7 @@ import type {
   Automation,
   AutomationLogsResponse,
   AutomationStatsResponse,
+  CalendarConnectionStatus,
   CalendarEvent,
   CaixaSessao,
   ChatChannel,
@@ -768,7 +769,7 @@ export async function downloadActivityCsv(params?: {
 }
 
 // Google Calendar
-export async function getCalendarStatus(): Promise<{ connected: boolean; email: string | null }> {
+export async function getCalendarStatus(): Promise<CalendarConnectionStatus> {
   const response = await api.get('/api/calendar/status');
   return response.data;
 }
@@ -778,15 +779,53 @@ export async function getCalendarEvents(start: string, end: string): Promise<Cal
   return response.data;
 }
 
+export async function connectCalendar(): Promise<{ authUrl: string }> {
+  const response = await api.post('/api/calendar/connect');
+  return response.data;
+}
+
+export async function syncCalendar(): Promise<{
+  syncedCount: number;
+  removedCount: number;
+  lastSyncAt: string;
+  reauthRequired: boolean;
+}> {
+  const response = await api.post('/api/calendar/sync');
+  return response.data;
+}
+
 export async function disconnectCalendar(): Promise<void> {
   await api.delete('/api/calendar/disconnect');
 }
 
-export async function getCalendarAuthUrl(): Promise<string> {
-  const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token ?? '';
-  return `${API_URL}/api/calendar/auth?token=${encodeURIComponent(token)}`;
+export async function pushCalendarEvent(event: {
+  title: string;
+  description?: string;
+  startTime: string;
+  endTime: string;
+  attendees?: string[];
+  googleEventId?: string;
+}): Promise<{ googleEventId: string; htmlLink: string | null }> {
+  const response = await api.post('/api/calendar/events/push', event);
+  return response.data;
+}
+
+export async function deleteCalendarEvent(googleEventId: string): Promise<void> {
+  await api.delete(`/api/calendar/events/${encodeURIComponent(googleEventId)}`);
+}
+
+export async function startCalendarWatch(): Promise<{ channelId: string; watchExpiry: string }> {
+  const response = await api.post('/api/calendar/watch/start');
+  return response.data;
+}
+
+export async function stopCalendarWatch(): Promise<void> {
+  await api.post('/api/calendar/watch/stop');
+}
+
+export async function getCalendarWatchStatus(): Promise<{ active: boolean; watchExpiry: string | null }> {
+  const response = await api.get('/api/calendar/watch/status');
+  return response.data;
 }
 
 // ============================================
