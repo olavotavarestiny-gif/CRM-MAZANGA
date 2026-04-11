@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { getSupabaseEnv } from '@/lib/supabase/env';
 
 const PUBLIC_PATHS = [
   '/login',
@@ -28,10 +29,23 @@ function buildRedirectUrl(request: NextRequest, pathname: string) {
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const pathname = request.nextUrl.pathname;
+  const isPublic =
+    PUBLIC_PATHS.includes(pathname) ||
+    pathname.startsWith('/f/');
+  const env = getSupabaseEnv();
+
+  if (!env) {
+    if (isPublic) {
+      return response;
+    }
+
+    return NextResponse.redirect(buildRedirectUrl(request, '/login'));
+  }
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(),
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!.trim(),
+    env.url,
+    env.anonKey,
     {
       cookies: {
         get(name: string) {
@@ -49,11 +63,6 @@ export async function middleware(request: NextRequest) {
 
   // Refresh session — keeps cookies up to date
   const { data: { session } } = await supabase.auth.getSession();
-
-  const pathname = request.nextUrl.pathname;
-  const isPublic =
-    PUBLIC_PATHS.includes(pathname) ||
-    pathname.startsWith('/f/');
 
   // Redirect unauthenticated users to /login
   if (!session && !isPublic) {
