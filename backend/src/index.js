@@ -165,6 +165,21 @@ try {
   console.warn('[Scheduler] node-cron não disponível:', err.message);
 }
 
+// Scheduler: renew expiring Google Calendar watch channels daily at 06:00 UTC
+try {
+  const cron = require('node-cron');
+  const { renewExpiringWatchChannels } = require('./lib/google-calendar');
+  cron.schedule('0 6 * * *', () => {
+    console.log('[Scheduler] A renovar canais de watch do Google Calendar...');
+    renewExpiringWatchChannels().catch(err =>
+      console.error('[Scheduler/calendar-watch] Erro na renovação:', err.message)
+    );
+  });
+  console.log('[Scheduler] Cron de renovação de watch Google Calendar iniciado (06:00 UTC diário)');
+} catch (err) {
+  console.warn('[Scheduler] Cron de watch Google Calendar não iniciado:', err.message);
+}
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Backend server running on http://localhost:${PORT}`);
