@@ -1,6 +1,0 @@
-{
-  "buildCommand": "npm --prefix frontend install && npm --prefix frontend run build",
-  "installCommand": "echo 'install handled in buildCommand'",
-  "outputDirectory": "frontend/.next",
-  "framework": "nextjs"
-}

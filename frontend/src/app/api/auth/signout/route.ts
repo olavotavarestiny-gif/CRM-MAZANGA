@@ -1,14 +1,22 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseEnv } from '@/lib/supabase/env';
 
 // Server-side signout: clears all Supabase SSR cookies via Set-Cookie headers.
 // Using client-side signOut() alone doesn't reliably clear chunked SSR cookies.
 export async function GET(request: NextRequest) {
-  const response = NextResponse.redirect(new URL('/login', request.url));
+  const next = request.nextUrl.searchParams.get('next');
+  const nextPath = next && next.startsWith('/') ? next : '/login';
+  const response = NextResponse.redirect(new URL(nextPath, request.url));
+  const env = getSupabaseEnv();
+
+  if (!env) {
+    return response;
+  }
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(),
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!.trim(),
+    env.url,
+    env.anonKey,
     {
       cookies: {
         get(name: string) {
