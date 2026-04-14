@@ -200,9 +200,12 @@ router.post('/webhook', async (req, res) => {
   }
 });
 
-router.use(requireAuth, requirePlanFeature('calendario'), requirePermission('calendario', 'view'));
+// ---------------------------------------------------------------------------
+// Connect / Disconnect: só requerem auth + plano (sem permissão — qualquer
+// utilizador autenticado deve poder ligar/desligar a sua conta Google)
+// ---------------------------------------------------------------------------
 
-router.post('/connect', async (req, res) => {
+router.post('/connect', requireAuth, requirePlanFeature('calendario'), async (req, res) => {
   try {
     ensureGoogleCalendarConfigured();
 
@@ -229,6 +232,48 @@ router.post('/connect', async (req, res) => {
     return handleCalendarError(res, error, 'Não foi possível iniciar a ligação Google Calendar');
   }
 });
+
+router.delete('/disconnect', requireAuth, requirePlanFeature('calendario'), async (req, res) => {
+  try {
+    if (isImpersonating(req)) {
+      return res.status(403).json({
+        error: 'Não é permitido desligar Google Calendar durante impersonation',
+        code: 'impersonation_not_allowed',
+      });
+    }
+
+    await prisma.$transaction([
+      prisma.googleCalendarEvent.deleteMany({
+        where: { userId: req.user.id },
+      }),
+      prisma.googleCalendarToken.deleteMany({
+        where: { userId: req.user.id },
+      }),
+    ]);
+
+    await logActivity({
+      organization_id: req.user.effectiveUserId,
+      user_id: req.user.id,
+      user_name: req.user.name,
+      entity_type: 'calendar_connection',
+      entity_id: `google:${req.user.id}`,
+      entity_label: 'Google Calendar',
+      action: 'disconnected',
+      metadata: {
+        provider: 'google',
+      },
+    });
+
+    return res.json({ message: 'Google Calendar desligado com sucesso' });
+  } catch (error) {
+    return handleCalendarError(res, error, 'Não foi possível desligar o Google Calendar');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Restantes rotas: requerem auth + plano + permissão de vista
+// ---------------------------------------------------------------------------
+router.use(requireAuth, requirePlanFeature('calendario'), requirePermission('calendario', 'view'));
 
 router.get('/status', async (req, res) => {
   try {
@@ -336,43 +381,6 @@ router.get('/events', async (req, res) => {
     return res.json(events.map(mapStoredEventToCalendarEvent));
   } catch (error) {
     return handleCalendarError(res, error, 'Não foi possível carregar eventos sincronizados');
-  }
-});
-
-router.delete('/disconnect', async (req, res) => {
-  try {
-    if (isImpersonating(req)) {
-      return res.status(403).json({
-        error: 'Não é permitido desligar Google Calendar durante impersonation',
-        code: 'impersonation_not_allowed',
-      });
-    }
-
-    await prisma.$transaction([
-      prisma.googleCalendarEvent.deleteMany({
-        where: { userId: req.user.id },
-      }),
-      prisma.googleCalendarToken.deleteMany({
-        where: { userId: req.user.id },
-      }),
-    ]);
-
-    await logActivity({
-      organization_id: req.user.effectiveUserId,
-      user_id: req.user.id,
-      user_name: req.user.name,
-      entity_type: 'calendar_connection',
-      entity_id: `google:${req.user.id}`,
-      entity_label: 'Google Calendar',
-      action: 'disconnected',
-      metadata: {
-        provider: 'google',
-      },
-    });
-
-    return res.json({ message: 'Google Calendar desligado com sucesso' });
-  } catch (error) {
-    return handleCalendarError(res, error, 'Não foi possível desligar o Google Calendar');
   }
 });
 
