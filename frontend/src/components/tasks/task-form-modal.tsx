@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createTask, updateTask, getContacts, getChatUsers, getCurrentUser } from '@/lib/api';
 import { Task } from '@/lib/types';
@@ -25,6 +25,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { useToast } from '@/components/ui/toast-provider';
+import {
+  canAssignTasksToAdminOwner,
+  canAssignTasksToAnyOrgMember,
+  isPrivilegedTaskAssignee,
+} from '@/lib/permissions';
 import { Search, X } from 'lucide-react';
 
 interface TaskFormModalProps {
@@ -60,10 +65,22 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
     enabled: open,
   });
 
-  const canAssignOthers = !!(currentUser?.isSuperAdmin || currentUser?.role === 'admin' || !currentUser?.accountOwnerId);
-  const assignableUsers = canAssignOthers
-    ? teamUsers
-    : teamUsers.filter((user) => user.id === currentUser?.id);
+  const canAssignAnyOrgMember = currentUser ? canAssignTasksToAnyOrgMember(currentUser) : false;
+  const canAssignAdminOwnerTargets = currentUser ? canAssignTasksToAdminOwner(currentUser) : false;
+  const assignableUsers = useMemo(() => {
+    if (!currentUser) return [];
+    if (canAssignAnyOrgMember) return teamUsers;
+    if (canAssignAdminOwnerTargets) {
+      return teamUsers.filter((user) => user.id === currentUser.id || isPrivilegedTaskAssignee(user));
+    }
+    return teamUsers.filter((user) => user.id === currentUser.id);
+  }, [canAssignAdminOwnerTargets, canAssignAnyOrgMember, currentUser, teamUsers]);
+
+  const assigneeHelperText = canAssignAnyOrgMember
+    ? 'Podes atribuir tarefas a qualquer utilizador ativo da organização.'
+    : canAssignAdminOwnerTargets
+      ? 'Podes atribuir tarefas a ti mesmo, a administradores e ao dono da conta.'
+      : 'Nesta conta, só podes atribuir tarefas a ti mesmo.';
 
   // Populate form when editing
   useEffect(() => {
@@ -224,11 +241,9 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
                 ))}
               </SelectContent>
             </Select>
-            {!canAssignOthers && (
-              <p className="mt-1 text-xs text-[#6b7e9a]">
-                Nesta conta, só podes atribuir tarefas a ti mesmo.
-              </p>
-            )}
+            <p className="mt-1 text-xs text-[#6b7e9a]">
+              {assigneeHelperText}
+            </p>
           </div>
 
           {/* Notas */}

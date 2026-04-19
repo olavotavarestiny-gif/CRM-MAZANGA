@@ -528,6 +528,9 @@ export interface UserPermissions {
     view?: boolean;
     edit?: boolean;
   };
+  taskAssignment?: {
+    assign_admin_owner?: boolean;
+  };
 }
 
 export type PlanName = 'essencial' | 'profissional' | 'enterprise';
@@ -1265,7 +1268,16 @@ export async function getChatUnreadCount(): Promise<number> {
   return res.data.unread;
 }
 
-export async function getChatUsers(): Promise<{ id: number; name: string; email: string }[]> {
+export interface ChatUser {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  accountOwnerId?: number | null;
+  isSuperAdmin?: boolean;
+}
+
+export async function getChatUsers(): Promise<ChatUser[]> {
   const res = await api.get('/api/chat/users');
   return res.data;
 }

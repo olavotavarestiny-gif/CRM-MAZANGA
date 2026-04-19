@@ -33,6 +33,9 @@
  *   stock: {
  *     view: true | false,
  *     edit: true | false,
+ *   },
+ *   taskAssignment: {
+ *     assign_admin_owner: true | false,
  *   }
  * }
  *
@@ -56,6 +59,9 @@ const BOOLEAN_SCOPE_RULES = {
   stock: {
     view: 'allow_unless_false',
     edit: 'allow_only_true',
+  },
+  taskAssignment: {
+    assign_admin_owner: 'allow_only_true',
   },
 };
 
@@ -185,6 +191,10 @@ function canStock(permissionsJson, key) {
   return canScopedBooleanPermission(permissionsJson, 'stock', key);
 }
 
+function canTaskAssignment(permissionsJson, key) {
+  return canScopedBooleanPermission(permissionsJson, 'taskAssignment', key);
+}
+
 function hasFullAccess(req) {
   return req.user.isSuperAdmin || req.user.isAccountOwner || req.user.role === 'admin';
 }
@@ -249,6 +259,7 @@ module.exports = {
   canComercial,
   canCaixa,
   canStock,
+  canTaskAssignment,
   requirePermission,
   requireComercialPermission,
   requireCaixaPermission,
