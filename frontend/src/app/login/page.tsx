@@ -9,6 +9,26 @@ import { Mail, Lock } from 'lucide-react';
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
 import { KukuGestLoginLogo } from '@/components/KukuGestLogo';
 
+function getLoginBackendErrorMessage(error: any) {
+  if (error?.response?.data?.error) {
+    return error.response.data.error;
+  }
+
+  if (error?.response?.status === 401) {
+    return 'Sessão Supabase criada, mas o backend rejeitou a autenticação. Confirma se frontend e backend apontam para o mesmo projeto Supabase.';
+  }
+
+  if (error?.response?.status === 403) {
+    return 'Sessão Supabase criada, mas o utilizador não está autorizado no backend. Confirma se a conta existe no CRM e se está ativa.';
+  }
+
+  if (!error?.response) {
+    return 'Sessão criada no Supabase, mas o frontend não conseguiu contactar o backend. Verifica NEXT_PUBLIC_API_URL, o /health do backend e CORS (FRONTEND_URL ou ALLOWED_VERCEL_URL).';
+  }
+
+  return error?.message || 'Erro ao ligar ao servidor. Tente novamente.';
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -43,6 +63,12 @@ export default function LoginPage() {
         return;
       }
 
+      if (!process.env.NEXT_PUBLIC_API_URL) {
+        await supabase.auth.signOut();
+        setError('A beta está sem NEXT_PUBLIC_API_URL configurado. O login autenticou no Supabase, mas não consegue contactar o backend.');
+        return;
+      }
+
       // 2. Load user from our backend using the fresh token returned by Supabase
       const user = await getCurrentUserWithToken(accessToken);
       try {
@@ -57,7 +83,7 @@ export default function LoginPage() {
         router.push('/');
       }
     } catch (err: any) {
-      setError(err?.response?.data?.error || err?.message || 'Erro ao ligar ao servidor. Tente novamente.');
+      setError(getLoginBackendErrorMessage(err));
     } finally {
       setLoading(false);
     }
