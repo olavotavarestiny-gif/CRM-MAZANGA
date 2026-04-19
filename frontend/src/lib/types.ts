@@ -432,6 +432,16 @@ export interface FormSubmission {
 }
 
 // Calendar types
+export interface CalendarConnectionStatus {
+  connected: boolean;
+  email: string | null;
+  lastSyncAt: string | null;
+  lastSyncError: string | null;
+  lastSyncErrorAt: string | null;
+  primaryCalendarId: string | null;
+  reauthRequired: boolean;
+}
+
 export interface CalendarEvent {
   id: string;
   title: string;

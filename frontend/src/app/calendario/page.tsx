@@ -1,15 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { getTasks, getCalendarStatus, getCalendarEvents, disconnectCalendar, getCalendarAuthUrl } from '@/lib/api';
+import { getTasks, getCalendarStatus, getCalendarEvents, disconnectCalendar, connectCalendar } from '@/lib/api';
 import type { CalendarEvent } from '@/lib/types';
 import CalendarGrid from '@/components/calendar/calendar-grid';
 import DayEventsPanel from '@/components/calendar/day-events-panel';
 import TaskFormModal from '@/components/tasks/task-form-modal';
 import { ErrorState } from '@/components/ui/error-state';
 import { useToast } from '@/components/ui/toast-provider';
+
+function getOAuthErrorMessage(code: string | null): string {
+  switch (code) {
+    case 'access_denied':
+      return 'A autorização Google foi cancelada.';
+    case 'calendar_not_configured':
+      return 'A integração Google Calendar ainda não está configurada no servidor.';
+    case 'invalid_state':
+      return 'A validação de segurança do OAuth falhou. Tenta novamente.';
+    case 'oauth_failed':
+      return 'Não foi possível concluir a autorização com a Google.';
+    default:
+      return 'Falha ao conectar o Google Calendar.';
+  }
+}
 
 const MONTH_NAMES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -30,11 +45,29 @@ export default function CalendarioPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('connected') === 'true' || params.get('error')) {
-      queryClient.invalidateQueries({ queryKey: ['calendarStatus'] });
-      window.history.replaceState({}, '', '/calendario');
+    const connected = params.get('connected') === 'true';
+    const errorCode = params.get('error');
+
+    if (!connected && !errorCode) return;
+
+    queryClient.invalidateQueries({ queryKey: ['calendarStatus'] });
+
+    if (connected) {
+      toast({
+        variant: 'success',
+        title: 'Google Calendar conectado',
+        description: 'Conta ligada com sucesso. Podes agora sincronizar os teus eventos.',
+      });
+    } else {
+      toast({
+        variant: 'error',
+        title: 'Falha na ligação Google Calendar',
+        description: getOAuthErrorMessage(errorCode),
+      });
     }
-  }, [queryClient]);
+
+    window.history.replaceState({}, '', '/calendario');
+  }, [queryClient, toast]);
 
   // Google Calendar status
   const {
@@ -91,6 +124,20 @@ export default function CalendarioPage() {
       toast({
         variant: 'error',
         title: 'Falha ao desligar a agenda',
+        description: error?.response?.data?.error || error?.message || 'Tenta novamente.',
+      });
+    },
+  });
+
+  const connectMutation = useMutation({
+    mutationFn: connectCalendar,
+    onSuccess: ({ authUrl }) => {
+      window.location.assign(authUrl);
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'error',
+        title: 'Falha ao iniciar ligação Google',
         description: error?.response?.data?.error || error?.message || 'Tenta novamente.',
       });
     },
@@ -228,11 +275,16 @@ export default function CalendarioPage() {
                 </div>
               ) : (
                 <button
-                  onClick={async () => { window.location.href = await getCalendarAuthUrl(); }}
+                  onClick={() => connectMutation.mutate()}
+                  disabled={connectMutation.isPending}
                   className="flex items-center gap-2 rounded-2xl border border-[#E2E8F0] px-4 py-2 text-sm font-medium text-[#0A2540] transition-colors hover:bg-[#F8FAFC]"
                 >
-                  <CalendarDays className="w-4 h-4 text-[#635BFF]" />
-                  <span>Conectar Google Agenda</span>
+                  {connectMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-[#635BFF]" />
+                  ) : (
+                    <CalendarDays className="w-4 h-4 text-[#635BFF]" />
+                  )}
+                  <span>{connectMutation.isPending ? 'A ligar...' : 'Conectar Google Agenda'}</span>
                 </button>
               )}
             </div>
