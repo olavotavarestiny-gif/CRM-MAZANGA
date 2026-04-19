@@ -55,7 +55,37 @@ import type {
 } from './types';
 import { createClient } from './supabase/client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const DEFAULT_API_URL = 'http://localhost:3001';
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL?.trim() || '';
+
+function isAbsoluteHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function getApiUrlConfigErrorMessage(value: string): string | null {
+  if (!value) {
+    return 'A beta está sem NEXT_PUBLIC_API_URL configurado. Define a URL pública do backend Render antes de usar a aplicação.';
+  }
+
+  if (isAbsoluteHttpUrl(value)) {
+    return null;
+  }
+
+  if (value.startsWith('sb_publishable_')) {
+    return 'NEXT_PUBLIC_API_URL está inválido: recebemos uma chave publishable do Supabase em vez da URL do backend Render.';
+  }
+
+  return 'NEXT_PUBLIC_API_URL está inválido. Usa uma URL absoluta do backend Render, por exemplo https://seu-backend.onrender.com.';
+}
+
+export const API_URL_CONFIG_ERROR = getApiUrlConfigErrorMessage(RAW_API_URL);
+
+const API_URL = API_URL_CONFIG_ERROR ? DEFAULT_API_URL : RAW_API_URL || DEFAULT_API_URL;
 
 const api = axios.create({
   baseURL: API_URL,
@@ -63,6 +93,10 @@ const api = axios.create({
 
 // Request interceptor: prefer impersonation token, fall back to Supabase session token
 api.interceptors.request.use(async (config) => {
+  if (API_URL_CONFIG_ERROR) {
+    throw new Error(API_URL_CONFIG_ERROR);
+  }
+
   if (typeof window !== 'undefined') {
     const impersonationToken = localStorage.getItem('impersonation_token');
     if (impersonationToken) {

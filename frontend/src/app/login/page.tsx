@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { getCurrentUserWithToken, logLoginWithToken } from '@/lib/api';
+import { API_URL_CONFIG_ERROR, getCurrentUserWithToken, logLoginWithToken } from '@/lib/api';
 import Link from 'next/link';
 import { Mail, Lock } from 'lucide-react';
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
@@ -20,6 +20,10 @@ function getLoginBackendErrorMessage(error: any) {
 
   if (error?.response?.status === 403) {
     return 'Sessão Supabase criada, mas o utilizador não está autorizado no backend. Confirma se a conta existe no CRM e se está ativa.';
+  }
+
+  if (error?.response?.status === 404) {
+    return 'O backend devolveu 404. Confirma se NEXT_PUBLIC_API_URL aponta para o backend Render e não para o domínio do frontend nem para uma chave do Supabase.';
   }
 
   if (!error?.response) {
@@ -42,6 +46,11 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      if (API_URL_CONFIG_ERROR) {
+        setError(API_URL_CONFIG_ERROR);
+        return;
+      }
+
       if (typeof window !== 'undefined') {
         localStorage.removeItem('impersonation_token');
       }
@@ -60,12 +69,6 @@ export default function LoginPage() {
       const accessToken = data.session?.access_token;
       if (!accessToken) {
         setError('Sessão criada sem access token. Tente novamente.');
-        return;
-      }
-
-      if (!process.env.NEXT_PUBLIC_API_URL) {
-        await supabase.auth.signOut();
-        setError('A beta está sem NEXT_PUBLIC_API_URL configurado. O login autenticou no Supabase, mas não consegue contactar o backend.');
         return;
       }
 

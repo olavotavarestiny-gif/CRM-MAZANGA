@@ -1,6 +1,17 @@
 /** @type {import('next').NextConfig} */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL?.trim() || '';
+
+function isAbsoluteHttpUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+const CONNECT_SRC_API_URL = isAbsoluteHttpUrl(RAW_API_URL) ? ` ${RAW_API_URL}` : '';
 
 // Security headers — fixes ZAP alerts: CSP, X-Frame-Options, X-Content-Type-Options,
 // Anti-clickjacking, MIME-sniffing, Cache-Control
@@ -29,7 +40,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",
-      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://va.vercel-scripts.com ${API_URL} https://www.facebook.com https://connect.facebook.net https://www.googletagmanager.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com https://region1.analytics.google.com`,
+      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://va.vercel-scripts.com${CONNECT_SRC_API_URL} https://www.facebook.com https://connect.facebook.net https://www.googletagmanager.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com https://region1.analytics.google.com`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
