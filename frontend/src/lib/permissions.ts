@@ -155,6 +155,27 @@ export function canEdit(user: User, module: ModuleKey): boolean {
   return perm === 'edit';
 }
 
+export function isPrivilegedTaskAssignee(user: Pick<User, 'role' | 'accountOwnerId' | 'isSuperAdmin'>): boolean {
+  return !!(user.isSuperAdmin || user.role === 'admin' || !user.accountOwnerId);
+}
+
+export function canAssignTasksToAnyOrgMember(user: User): boolean {
+  if (!hasFeature(user, 'tarefas')) return false;
+  return hasFullAccess(user);
+}
+
+export function canAssignTasksToAdminOwner(user: User): boolean {
+  if (!hasFeature(user, 'tarefas')) return false;
+  if (hasFullAccess(user)) return true;
+  if (!canEdit(user, 'tasks')) return false;
+  if (!user.permissions) return true;
+
+  const perms = parsePermissions(user.permissions);
+  if (perms === null) return true;
+
+  return perms?.taskAssignment?.assign_admin_owner === true;
+}
+
 /** Returns true if user can delete records (only owners/admins) */
 export function canDelete(user: User): boolean {
   return hasFullAccess(user);

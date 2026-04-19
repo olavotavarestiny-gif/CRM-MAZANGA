@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/error-state';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { getEstabelecimentos, setMemberPermissions } from '@/lib/api';
 import type { User, UserPermissions } from '@/lib/api';
 
@@ -20,6 +21,7 @@ type SimpleLevel = 'none' | 'view' | 'edit';
 type CommercialPermissionKey = 'dashboard_basic' | 'dashboard_analysis';
 type CaixaPermissionKey = 'view' | 'open' | 'close' | 'audit';
 type StockPermissionKey = 'view' | 'edit';
+type TaskAssignmentPermissionKey = 'assign_admin_owner';
 
 const SERVICOS_SIMPLE_MODULES: { key: keyof Omit<UserPermissions, 'finances'>; label: string }[] = [
   { key: 'contacts', label: 'Clientes' },
@@ -70,6 +72,9 @@ function initPerms(user: User): UserPermissions {
       view: true,
       edit: true,
     };
+    perms.taskAssignment = {
+      assign_admin_owner: true,
+    };
     return perms;
   }
 
@@ -90,6 +95,9 @@ function initPerms(user: User): UserPermissions {
     stock: {
       view: user.permissions.stock?.view !== false,
       edit: user.permissions.stock?.edit === true,
+    },
+    taskAssignment: {
+      assign_admin_owner: user.permissions.taskAssignment?.assign_admin_owner === true,
     },
   };
 }
@@ -210,14 +218,38 @@ export default function MemberPermissionsModal({
     });
   };
 
+  const setTaskAssignment = (key: TaskAssignmentPermissionKey, value: boolean) => {
+    setPerms((prev) => ({
+      ...prev,
+      taskAssignment: {
+        ...prev.taskAssignment,
+        [key]: value,
+      },
+    }));
+  };
+
+  const canManageTaskAssignment = (perms.tasks ?? 'none') === 'edit';
+
   const mutation = useMutation({
-    mutationFn: () => setMemberPermissions(
-      member.id,
-      perms,
-      isComercioWorkspace
-        ? (assignedEstabelecimentoId === 'unassigned' ? null : assignedEstabelecimentoId)
-        : member.assignedEstabelecimentoId
-    ),
+    mutationFn: () => {
+      const sanitizedPerms: UserPermissions = {
+        ...perms,
+        taskAssignment: {
+          ...perms.taskAssignment,
+          assign_admin_owner: canManageTaskAssignment
+            ? perms.taskAssignment?.assign_admin_owner === true
+            : false,
+        },
+      };
+
+      return setMemberPermissions(
+        member.id,
+        sanitizedPerms,
+        isComercioWorkspace
+          ? (assignedEstabelecimentoId === 'unassigned' ? null : assignedEstabelecimentoId)
+          : member.assignedEstabelecimentoId
+      );
+    },
     onSuccess: () => { onSaved(); onClose(); },
   });
 
@@ -316,6 +348,32 @@ export default function MemberPermissionsModal({
               ) : null}
             </div>
           </div>
+
+          {visibleSimpleModules.some((module) => module.key === 'tasks') ? (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">Atribuição de Tarefas</p>
+              <div className={`space-y-2 rounded-xl border border-[#dde3ec] bg-[#f8fafc] p-3 ${canManageTaskAssignment ? '' : 'opacity-70'}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-[#0A2540]">Pode atribuir tarefas para admin/owner</p>
+                    <p className="text-xs text-[#6b7e9a]">
+                      Mantém a criação para si próprio e, quando ativo, permite também enviar tarefas para administradores e dono da conta.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={!!perms.taskAssignment?.assign_admin_owner && canManageTaskAssignment}
+                    onCheckedChange={(checked) => setTaskAssignment('assign_admin_owner', checked)}
+                    disabled={!canManageTaskAssignment}
+                  />
+                </div>
+                {!canManageTaskAssignment ? (
+                  <p className="text-xs text-[#6b7e9a]">
+                    Esta opção só fica disponível quando o módulo de tarefas está em `Editar`.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           {!isComercioWorkspace ? (
             <div>

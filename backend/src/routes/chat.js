@@ -375,7 +375,6 @@ router.get('/unread', requirePermission('chat', 'view'), async (req, res) => {
 router.get('/users', async (req, res) => {
   try {
     const orgId = getOrgId(req);
-    const userId = req.user.id;
 
     // The org consists of: the account owner + all members with accountOwnerId = orgId
     const users = await prisma.user.findMany({
@@ -386,7 +385,14 @@ router.get('/users', async (req, res) => {
         ],
         active: true,
       },
-      select: { id: true, name: true, email: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        accountOwnerId: true,
+        isSuperAdmin: true,
+      },
       orderBy: { name: 'asc' },
     });
 
