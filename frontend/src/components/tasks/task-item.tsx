@@ -23,7 +23,7 @@ const PRIORITY_STYLES: Record<Priority, { dot: string; badge: string }> = {
   Baixa: { dot: 'bg-green-500', badge: 'text-green-600 bg-green-50 border border-green-100' },
 };
 
-function formatDueDate(dueDate?: string): { label: string; cls: string } {
+function formatDueDate(dueDate?: string | null): { label: string; cls: string } {
   if (!dueDate) return { label: 'Sem data', cls: 'text-[#6b7e9a]' };
   try {
     const date = parseISO(dueDate);
@@ -40,6 +40,19 @@ function formatDueDate(dueDate?: string): { label: string; cls: string } {
   }
 }
 
+function formatDueTime(dueDate?: string | null): string {
+  if (!dueDate || !dueDate.includes('T')) return '';
+  if (/T00:00(:00(?:\.000)?)?Z?$/.test(dueDate)) return '';
+
+  try {
+    const parsed = parseISO(dueDate);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return format(parsed, 'HH:mm');
+  } catch {
+    return '';
+  }
+}
+
 export default function TaskItem({
   task,
   onToggleDone,
@@ -50,6 +63,7 @@ export default function TaskItem({
   isSettlingDone = false,
 }: TaskItemProps) {
   const { label: dueLabel, cls: dueCls } = formatDueDate(task.dueDate);
+  const dueTimeLabel = formatDueTime(task.dueDate);
   const pStyle = PRIORITY_STYLES[task.priority] ?? PRIORITY_STYLES.Media;
 
   return (
@@ -122,6 +136,11 @@ export default function TaskItem({
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${dueCls}`}>
           {dueLabel}
         </span>
+        {dueTimeLabel && (
+          <span className="rounded-full border border-[#D6E4FF] bg-[#EEF4FF] px-2 py-0.5 text-xs font-medium text-[#3159C4]">
+            {dueTimeLabel}
+          </span>
+        )}
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${pStyle.badge}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${pStyle.dot}`} />
           {task.priority}

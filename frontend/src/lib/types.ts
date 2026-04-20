@@ -98,7 +98,7 @@ export interface Task {
   assignedToUserId?: number | null;
   title: string;
   notes?: string;
-  dueDate?: string;
+  dueDate?: string | null;
   priority: Priority;
   done: boolean;
   createdAt: string;

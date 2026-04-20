@@ -383,7 +383,7 @@ export async function createTask(data: {
   assignedToUserId?: number | null;
   title: string;
   notes?: string;
-  dueDate?: string;
+  dueDate?: string | null;
   priority?: string;
 }) {
   const response = await api.post<Task>('/api/tasks', data);
