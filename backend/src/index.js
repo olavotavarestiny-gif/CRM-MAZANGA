@@ -1,6 +1,11 @@
-require('dotenv').config();
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
 const express = require('express');
 const cors = require('cors');
+const { registerPrismaShutdown, startPrismaWarmup } = require('./lib/prisma-startup');
+const { renewExpiringWatchChannels } = require('./lib/google-calendar');
 
 const contactsRouter = require('./routes/contacts');
 const messagesRouter = require('./routes/messages');
@@ -45,6 +50,21 @@ const { requirePlanFeature } = require('./lib/plan-limits');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const essentialEnvPresence = {
+  DATABASE_URL: Boolean(process.env.DATABASE_URL),
+  FRONTEND_URL: Boolean(process.env.FRONTEND_URL),
+  SUPABASE_URL: Boolean(process.env.SUPABASE_URL),
+  SUPABASE_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+  JWT_SECRET: Boolean(process.env.JWT_SECRET),
+};
+
+console.info('[Startup] Backend boot starting', {
+  nodeEnv: NODE_ENV,
+  port: PORT,
+  essentialEnvPresence,
+});
+
 const normalizeAllowedOrigin = (value) => {
   if (!value) return null;
   return value.startsWith('http://') || value.startsWith('https://')
@@ -161,26 +181,24 @@ try {
     processRecorrentes().catch(err => console.error('[Scheduler] Erro:', err.message));
   });
   console.log('[Scheduler] Cron de faturas recorrentes iniciado (00:05 diário)');
+
+  cron.schedule('0 6 * * *', () => {
+    renewExpiringWatchChannels().catch((err) => {
+      console.error('[Scheduler] Erro ao renovar watch Google Calendar:', err.message);
+    });
+  });
+  console.log('[Scheduler] Cron de renovação de watch Google Calendar iniciado (06:00 UTC diário)');
 } catch (err) {
   console.warn('[Scheduler] node-cron não disponível:', err.message);
 }
 
-// Scheduler: renew expiring Google Calendar watch channels daily at 06:00 UTC
-try {
-  const cron = require('node-cron');
-  const { renewExpiringWatchChannels } = require('./lib/google-calendar');
-  cron.schedule('0 6 * * *', () => {
-    console.log('[Scheduler] A renovar canais de watch do Google Calendar...');
-    renewExpiringWatchChannels().catch(err =>
-      console.error('[Scheduler/calendar-watch] Erro na renovação:', err.message)
-    );
-  });
-  console.log('[Scheduler] Cron de renovação de watch Google Calendar iniciado (06:00 UTC diário)');
-} catch (err) {
-  console.warn('[Scheduler] Cron de watch Google Calendar não iniciado:', err.message);
-}
-
 // Start server
+registerPrismaShutdown();
+startPrismaWarmup();
+
 app.listen(PORT, () => {
-  console.log(`Backend server running on http://localhost:${PORT}`);
+  console.info('[Startup] Backend started', {
+    nodeEnv: NODE_ENV,
+    port: PORT,
+  });
 });
