@@ -3,6 +3,12 @@ const prisma = require('../lib/prisma');
 const { requirePermission, requireDeletePermission, canPerform } = require('../lib/permissions');
 const { log: logActivity } = require('../services/activity-log.service.js');
 const { canCreateTask, buildLimitErrorPayload } = require('../lib/plan-limits');
+const {
+  CalendarIntegrationError,
+  pushEventToGoogle,
+  deleteEventFromGoogle,
+  getGoogleErrorDetails,
+} = require('../lib/google-calendar');
 
 const router = express.Router();
 const VALID_PRIORITIES = ['Baixa', 'Media', 'Alta'];
@@ -139,6 +145,211 @@ async function logTaskActivity(req, data) {
   });
 }
 
+function trimTaskSyncError(message) {
+  if (!message) return null;
+  return String(message).slice(0, 1000);
+}
+
+function isAllDayDueDate(value) {
+  if (!value) return false;
+
+  const serialized = value instanceof Date
+    ? value.toISOString()
+    : String(value);
+
+  return !serialized.includes('T')
+    || /T00:00(:00(?:\.000)?)?(Z|[+-]\d{2}:\d{2})?$/.test(serialized);
+}
+
+function buildTaskGoogleDescription(task) {
+  const parts = [];
+
+  if (task.notes?.trim()) {
+    parts.push(task.notes.trim());
+  }
+
+  if (task.contact?.name) {
+    parts.push(`Contacto CRM: ${task.contact.name}`);
+  }
+
+  parts.push(`Tarefa CRM #${task.id}`);
+
+  return parts.filter(Boolean).join('\n\n');
+}
+
+function addOneUtcDay(date) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next;
+}
+
+function buildTaskGooglePayload(task, rawDueDate) {
+  if (!task?.dueDate) return null;
+
+  const dueAt = new Date(task.dueDate);
+  if (Number.isNaN(dueAt.getTime())) return null;
+
+  const allDay = rawDueDate !== undefined
+    ? isAllDayDueDate(rawDueDate)
+    : isAllDayDueDate(dueAt);
+
+  const description = buildTaskGoogleDescription(task);
+
+  if (allDay) {
+    return {
+      title: task.title,
+      description,
+      allDay: true,
+      startDate: dueAt.toISOString().slice(0, 10),
+      endDate: addOneUtcDay(dueAt).toISOString().slice(0, 10),
+      googleEventId: task.googleCalendarEventId || undefined,
+    };
+  }
+
+  return {
+    title: task.title,
+    description,
+    startTime: dueAt.toISOString(),
+    endTime: new Date(dueAt.getTime() + 60 * 60 * 1000).toISOString(),
+    googleEventId: task.googleCalendarEventId || undefined,
+  };
+}
+
+async function getCalendarConnectionStatus(userId) {
+  if (!userId) return null;
+
+  return prisma.googleCalendarToken.findUnique({
+    where: { userId },
+    select: { status: true },
+  });
+}
+
+async function clearTaskGoogleState(taskId) {
+  return prisma.task.update({
+    where: { id: taskId },
+    data: {
+      googleCalendarEventId: null,
+      googleCalendarHtmlLink: null,
+      googleCalendarSyncedAt: null,
+      googleCalendarSyncError: null,
+    },
+    include: TASK_INCLUDE,
+  });
+}
+
+async function setTaskGoogleSyncError(taskId, error) {
+  return prisma.task.update({
+    where: { id: taskId },
+    data: {
+      googleCalendarSyncError: trimTaskSyncError(error),
+    },
+    include: TASK_INCLUDE,
+  });
+}
+
+async function markTaskGoogleSynced(taskId, result) {
+  return prisma.task.update({
+    where: { id: taskId },
+    data: {
+      googleCalendarEventId: result.googleEventId,
+      googleCalendarHtmlLink: result.htmlLink,
+      googleCalendarSyncedAt: new Date(),
+      googleCalendarSyncError: null,
+    },
+    include: TASK_INCLUDE,
+  });
+}
+
+async function tryDeleteTaskGoogleEvent(calendarUserId, googleEventId, contextLabel) {
+  if (!calendarUserId || !googleEventId) return;
+
+  const connection = await getCalendarConnectionStatus(calendarUserId);
+  if (!connection) return;
+
+  try {
+    await deleteEventFromGoogle(calendarUserId, googleEventId);
+  } catch (error) {
+    const details = getGoogleErrorDetails(error);
+    console.warn(`[tasks/google] failed to delete Google event during ${contextLabel}:`, details.message);
+  }
+}
+
+async function syncTaskGoogleEvent({
+  task,
+  rawDueDate,
+  previousAssignedToUserId = null,
+  previousGoogleCalendarEventId = null,
+}) {
+  const assigneeUserId = task.assignedToUserId || null;
+  const assigneeChanged = previousAssignedToUserId
+    && assigneeUserId
+    && previousAssignedToUserId !== assigneeUserId;
+
+  if (assigneeChanged && previousGoogleCalendarEventId) {
+    await tryDeleteTaskGoogleEvent(
+      previousAssignedToUserId,
+      previousGoogleCalendarEventId,
+      `task reassignment #${task.id}`
+    );
+
+    await prisma.task.update({
+      where: { id: task.id },
+      data: {
+        googleCalendarEventId: null,
+        googleCalendarHtmlLink: null,
+        googleCalendarSyncedAt: null,
+        googleCalendarSyncError: null,
+      },
+    });
+
+    task.googleCalendarEventId = null;
+    task.googleCalendarHtmlLink = null;
+  }
+
+  if (!task.dueDate) {
+    if (!task.googleCalendarEventId) {
+      return clearTaskGoogleState(task.id);
+    }
+
+    const connection = await getCalendarConnectionStatus(assigneeUserId);
+    if (!connection) {
+      return clearTaskGoogleState(task.id);
+    }
+
+    try {
+      await deleteEventFromGoogle(assigneeUserId, task.googleCalendarEventId);
+      return clearTaskGoogleState(task.id);
+    } catch (error) {
+      const details = getGoogleErrorDetails(error);
+      return setTaskGoogleSyncError(task.id, details.message);
+    }
+  }
+
+  const connection = await getCalendarConnectionStatus(assigneeUserId);
+  if (!connection) {
+    return clearTaskGoogleState(task.id);
+  }
+
+  const payload = buildTaskGooglePayload(task, rawDueDate);
+  if (!payload) {
+    return setTaskGoogleSyncError(task.id, 'Data inválida para sincronização com Google Calendar');
+  }
+
+  if (assigneeChanged) {
+    payload.googleEventId = undefined;
+  }
+
+  try {
+    const result = await pushEventToGoogle(assigneeUserId, payload);
+    return markTaskGoogleSynced(task.id, result);
+  } catch (error) {
+    const details = error instanceof CalendarIntegrationError
+      ? { message: error.message }
+      : getGoogleErrorDetails(error);
+    return setTaskGoogleSyncError(task.id, details.message);
+  }
+}
+
 // GET all tasks
 router.get('/', requirePermission('tasks', 'view'), async (req, res) => {
   try {
@@ -197,7 +408,7 @@ router.post('/', requirePermission('tasks', 'edit'), async (req, res) => {
       return res.status(400).json({ error: 'Responsável é obrigatório' });
     }
 
-    const task = await prisma.task.create({
+    const createdTask = await prisma.task.create({
       data: {
         contactId: contactId ? parseInt(contactId) : null,
         assignedToUserId: assigneeResult.assignedToUserId,
@@ -213,20 +424,25 @@ router.post('/', requirePermission('tasks', 'edit'), async (req, res) => {
     await notifyTaskAssignment({
       req,
       assignedToUserId: assigneeResult.assignedToUserId,
-      taskTitle: task.title,
-      taskId: task.id,
+      taskTitle: createdTask.title,
+      taskId: createdTask.id,
       previousAssignedToUserId: null,
     });
 
     await logTaskActivity(req, {
       entity_type: 'task',
-      entity_id: task.id,
-      entity_label: task.title,
+      entity_id: createdTask.id,
+      entity_label: createdTask.title,
       action: 'created',
       metadata: {
-        task_id: task.id,
-        assigned_to_name: task.assignedTo?.name || null,
+        task_id: createdTask.id,
+        assigned_to_name: createdTask.assignedTo?.name || null,
       },
+    });
+
+    const task = await syncTaskGoogleEvent({
+      task: createdTask,
+      rawDueDate: dueDate,
     });
 
     res.status(201).json(task);
@@ -247,7 +463,15 @@ router.put('/:id', requirePermission('tasks', 'edit'), async (req, res) => {
 
     const task = await prisma.task.findFirst({
       where: { id: parseInt(id), userId: req.user.effectiveUserId },
-      select: { userId: true, assignedToUserId: true, title: true, done: true },
+      select: {
+        id: true,
+        userId: true,
+        assignedToUserId: true,
+        title: true,
+        done: true,
+        dueDate: true,
+        googleCalendarEventId: true,
+      },
     });
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
@@ -281,7 +505,7 @@ router.put('/:id', requirePermission('tasks', 'edit'), async (req, res) => {
     if (contactId !== undefined) updateData.contactId = contactId ? parseInt(contactId) : null;
     if (assigneeResult.mode !== 'unchanged') updateData.assignedToUserId = assigneeResult.assignedToUserId;
 
-    const updatedTask = await prisma.task.update({
+    const persistedTask = await prisma.task.update({
       where: { id: parseInt(id) },
       data: updateData,
       include: TASK_INCLUDE,
@@ -289,47 +513,54 @@ router.put('/:id', requirePermission('tasks', 'edit'), async (req, res) => {
 
     await notifyTaskAssignment({
       req,
-      assignedToUserId: updatedTask.assignedToUserId,
-      taskTitle: updatedTask.title,
-      taskId: updatedTask.id,
+      assignedToUserId: persistedTask.assignedToUserId,
+      taskTitle: persistedTask.title,
+      taskId: persistedTask.id,
       previousAssignedToUserId: task.assignedToUserId,
     });
 
-    if (task.done !== updatedTask.done) {
+    if (task.done !== persistedTask.done) {
       await logTaskActivity(req, {
         entity_type: 'task',
-        entity_id: updatedTask.id,
-        entity_label: updatedTask.title,
+        entity_id: persistedTask.id,
+        entity_label: persistedTask.title,
         action: 'status_changed',
         field_changed: 'done',
         old_value: task.done ? 'Concluída' : 'Por fazer',
-        new_value: updatedTask.done ? 'Concluída' : 'Por fazer',
+        new_value: persistedTask.done ? 'Concluída' : 'Por fazer',
         metadata: {
-          task_id: updatedTask.id,
+          task_id: persistedTask.id,
         },
       });
     }
 
-    if (task.assignedToUserId !== updatedTask.assignedToUserId) {
+    if (task.assignedToUserId !== persistedTask.assignedToUserId) {
       const previousAssignee = task.assignedToUserId
         ? await getOrgMember(req.user.effectiveUserId, task.assignedToUserId)
         : null;
 
       await logTaskActivity(req, {
         entity_type: 'task',
-        entity_id: updatedTask.id,
-        entity_label: updatedTask.title,
+        entity_id: persistedTask.id,
+        entity_label: persistedTask.title,
         action: 'updated',
         field_changed: 'assigned_to',
         old_value: previousAssignee?.name || 'Sem responsável',
-        new_value: updatedTask.assignedTo?.name || 'Sem responsável',
+        new_value: persistedTask.assignedTo?.name || 'Sem responsável',
         metadata: {
-          task_id: updatedTask.id,
+          task_id: persistedTask.id,
           previous_assigned_to_name: previousAssignee?.name || null,
-          new_assigned_to_name: updatedTask.assignedTo?.name || null,
+          new_assigned_to_name: persistedTask.assignedTo?.name || null,
         },
       });
     }
+
+    const updatedTask = await syncTaskGoogleEvent({
+      task: persistedTask,
+      rawDueDate: dueDate,
+      previousAssignedToUserId: task.assignedToUserId,
+      previousGoogleCalendarEventId: task.googleCalendarEventId,
+    });
 
     res.json(updatedTask);
   } catch (error) {
@@ -344,10 +575,24 @@ router.delete('/:id', requireDeletePermission, async (req, res) => {
 
     const task = await prisma.task.findFirst({
       where: { id: parseInt(id), userId: req.user.effectiveUserId },
-      select: { id: true, userId: true, title: true },
+      select: {
+        id: true,
+        userId: true,
+        title: true,
+        assignedToUserId: true,
+        googleCalendarEventId: true,
+      },
     });
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
+    }
+
+    if (task.googleCalendarEventId) {
+      await tryDeleteTaskGoogleEvent(
+        task.assignedToUserId,
+        task.googleCalendarEventId,
+        `task deletion #${task.id}`
+      );
     }
 
     await prisma.task.delete({ where: { id: parseInt(id) } });

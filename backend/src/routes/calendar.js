@@ -10,6 +10,7 @@ const {
   CalendarIntegrationError,
   ensureGoogleCalendarConfigured,
   getFrontendCalendarUrl,
+  resolveFrontendCalendarReturnTo,
   getOAuth2Client,
   signOAuthState,
   verifyOAuthState,
@@ -18,18 +19,13 @@ const {
   mapStoredEventToCalendarEvent,
   parseSyncWindow,
   getGoogleErrorDetails,
-  generateChannelToken,
-  pushEventToGoogle,
-  deleteEventFromGoogle,
-  startCalendarWatch,
   stopCalendarWatch,
-  handleWebhookNotification,
 } = require('../lib/google-calendar');
 
 const router = express.Router();
 
-function buildFrontendRedirect(params = {}) {
-  const url = new URL(getFrontendCalendarUrl());
+function buildFrontendRedirect(returnTo, params = {}) {
+  const url = new URL(resolveFrontendCalendarReturnTo(returnTo || getFrontendCalendarUrl()));
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
       url.searchParams.set(key, String(value));
@@ -93,29 +89,41 @@ function handleCalendarError(res, error, fallbackMessage) {
 
 // Callback público do Google OAuth
 router.get('/callback', async (req, res) => {
+  let frontendReturnTo = null;
+
   try {
     ensureGoogleCalendarConfigured();
 
     const { code, state, error } = req.query;
+
+    if (state) {
+      try {
+        frontendReturnTo = verifyOAuthState(String(state)).returnTo || null;
+      } catch {
+        frontendReturnTo = null;
+      }
+    }
+
     if (error) {
-      return res.redirect(buildFrontendRedirect({ error: 'access_denied' }));
+      return res.redirect(buildFrontendRedirect(frontendReturnTo, { error: 'access_denied' }));
     }
 
     if (!code || !state) {
-      return res.redirect(buildFrontendRedirect({ error: 'missing_params' }));
+      return res.redirect(buildFrontendRedirect(frontendReturnTo, { error: 'missing_params' }));
     }
 
     const statePayload = verifyOAuthState(String(state));
+    frontendReturnTo = statePayload.returnTo || null;
     const userId = Number.parseInt(String(statePayload.userId), 10);
     if (!Number.isInteger(userId)) {
-      return res.redirect(buildFrontendRedirect({ error: 'invalid_state' }));
+      return res.redirect(buildFrontendRedirect(frontendReturnTo, { error: 'invalid_state' }));
     }
 
     const oauth2Client = getOAuth2Client();
     const { tokens } = await oauth2Client.getToken(String(code));
 
     if (!tokens?.access_token) {
-      return res.redirect(buildFrontendRedirect({ error: 'oauth_failed' }));
+      return res.redirect(buildFrontendRedirect(frontendReturnTo, { error: 'oauth_failed' }));
     }
 
     oauth2Client.setCredentials(tokens);
@@ -154,49 +162,13 @@ router.get('/callback', async (req, res) => {
       },
     });
 
-    return res.redirect(buildFrontendRedirect({ connected: 'true' }));
+    return res.redirect(buildFrontendRedirect(frontendReturnTo, { connected: 'true' }));
   } catch (error) {
     const details = getGoogleErrorDetails(error);
     console.error('[calendar] OAuth callback error:', details.message);
-    return res.redirect(buildFrontendRedirect({
+    return res.redirect(buildFrontendRedirect(frontendReturnTo, {
       error: error instanceof CalendarIntegrationError ? error.code : 'oauth_failed',
     }));
-  }
-});
-
-// ---------------------------------------------------------------------------
-// Public: Google Calendar push-notification webhook
-// ---------------------------------------------------------------------------
-router.post('/webhook', async (req, res) => {
-  // Acknowledge immediately — Google expects a 2xx within 30 s
-  res.status(200).end();
-
-  const channelId = req.headers['x-goog-channel-id'];
-  const channelToken = req.headers['x-goog-channel-token'];
-  const resourceState = req.headers['x-goog-resource-state'];
-
-  if (!channelId) return;
-
-  // Initial sync handshake — nothing to do
-  if (resourceState === 'sync') return;
-
-  try {
-    const record = await prisma.calendarSync.findUnique({ where: { channelId } });
-    if (!record) return;
-
-    // Validate token to reject forged requests
-    const expected = generateChannelToken(record.userId);
-    if (channelToken !== expected) {
-      console.warn('[calendar/webhook] invalid channel token — ignoring notification');
-      return;
-    }
-
-    // Process asynchronously (response already sent)
-    handleWebhookNotification(channelId).catch((err) => {
-      console.error('[calendar/webhook] background sync error:', err?.message);
-    });
-  } catch (err) {
-    console.error('[calendar/webhook] error processing notification:', err?.message);
   }
 });
 
@@ -217,7 +189,10 @@ router.post('/connect', requireAuth, requirePlanFeature('calendario'), async (re
     }
 
     const oauth2Client = getOAuth2Client();
-    const state = signOAuthState({ userId: req.user.id });
+    const state = signOAuthState({
+      userId: req.user.id,
+      returnTo: req.body?.returnTo,
+    });
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: 'offline',
       prompt: 'consent',
@@ -242,8 +217,27 @@ router.delete('/disconnect', requireAuth, requirePlanFeature('calendario'), asyn
       });
     }
 
+    try {
+      await stopCalendarWatch(req.user.id);
+    } catch (error) {
+      const details = getGoogleErrorDetails(error);
+      console.warn('[calendar] disconnect watch cleanup failed:', details.message);
+    }
+
     await prisma.$transaction([
+      prisma.task.updateMany({
+        where: { assignedToUserId: req.user.id },
+        data: {
+          googleCalendarEventId: null,
+          googleCalendarHtmlLink: null,
+          googleCalendarSyncedAt: null,
+          googleCalendarSyncError: null,
+        },
+      }),
       prisma.googleCalendarEvent.deleteMany({
+        where: { userId: req.user.id },
+      }),
+      prisma.calendarSync.deleteMany({
         where: { userId: req.user.id },
       }),
       prisma.googleCalendarToken.deleteMany({
@@ -363,10 +357,26 @@ router.post('/sync', async (req, res) => {
 router.get('/events', async (req, res) => {
   try {
     const { start, end } = parseSyncWindow(req.query);
+    const linkedTaskEvents = await prisma.task.findMany({
+      where: {
+        assignedToUserId: req.user.id,
+        googleCalendarEventId: { not: null },
+      },
+      select: {
+        googleCalendarEventId: true,
+      },
+    });
+
+    const linkedGoogleEventIds = linkedTaskEvents
+      .map((task) => task.googleCalendarEventId)
+      .filter(Boolean);
 
     const events = await prisma.googleCalendarEvent.findMany({
       where: {
         userId: req.user.id,
+        ...(linkedGoogleEventIds.length > 0
+          ? { googleEventId: { notIn: linkedGoogleEventIds } }
+          : {}),
         startAt: {
           gte: start,
           lte: end,
@@ -381,141 +391,6 @@ router.get('/events', async (req, res) => {
     return res.json(events.map(mapStoredEventToCalendarEvent));
   } catch (error) {
     return handleCalendarError(res, error, 'Não foi possível carregar eventos sincronizados');
-  }
-});
-
-// ---------------------------------------------------------------------------
-// Bidirectional sync: CRM → Google Calendar
-// ---------------------------------------------------------------------------
-
-router.post('/events/push', async (req, res) => {
-  try {
-    if (isImpersonating(req)) {
-      return res.status(403).json({
-        error: 'Não é permitido criar eventos no Google Calendar durante impersonation',
-        code: 'impersonation_not_allowed',
-      });
-    }
-
-    const token = await prisma.googleCalendarToken.findUnique({
-      where: { userId: req.user.id },
-      select: { id: true },
-    });
-
-    if (!token) {
-      return res.status(409).json({ error: 'Google Calendar não conectado', code: 'not_connected' });
-    }
-
-    const { title, description, startTime, endTime, attendees, googleEventId } = req.body || {};
-
-    if (!title || !startTime || !endTime) {
-      return res.status(400).json({
-        error: 'Campos obrigatórios em falta: title, startTime, endTime',
-        code: 'missing_fields',
-      });
-    }
-
-    const result = await pushEventToGoogle(req.user.id, {
-      title,
-      description,
-      startTime,
-      endTime,
-      attendees,
-      googleEventId,
-    });
-
-    return res.json(result);
-  } catch (error) {
-    return handleCalendarError(res, error, 'Não foi possível criar/actualizar evento no Google Calendar');
-  }
-});
-
-router.delete('/events/:googleEventId', async (req, res) => {
-  try {
-    const { googleEventId } = req.params;
-
-    if (!googleEventId) {
-      return res.status(400).json({ error: 'googleEventId em falta', code: 'missing_fields' });
-    }
-
-    await deleteEventFromGoogle(req.user.id, googleEventId);
-
-    // Also remove the local cached copy if it exists
-    await prisma.googleCalendarEvent.deleteMany({
-      where: { userId: req.user.id, googleEventId },
-    });
-
-    return res.json({ success: true });
-  } catch (error) {
-    return handleCalendarError(res, error, 'Não foi possível apagar evento no Google Calendar');
-  }
-});
-
-// ---------------------------------------------------------------------------
-// Watch (push notifications) management
-// ---------------------------------------------------------------------------
-
-router.post('/watch/start', async (req, res) => {
-  try {
-    if (isImpersonating(req)) {
-      return res.status(403).json({
-        error: 'Não é permitido gerir notificações durante impersonation',
-        code: 'impersonation_not_allowed',
-      });
-    }
-
-    const token = await prisma.googleCalendarToken.findUnique({
-      where: { userId: req.user.id },
-      select: { id: true },
-    });
-
-    if (!token) {
-      return res.status(409).json({ error: 'Google Calendar não conectado', code: 'not_connected' });
-    }
-
-    const result = await startCalendarWatch(req.user.id);
-
-    return res.json({
-      channelId: result.channelId,
-      watchExpiry: result.watchExpiry.toISOString(),
-    });
-  } catch (error) {
-    return handleCalendarError(res, error, 'Não foi possível activar notificações do Google Calendar');
-  }
-});
-
-router.post('/watch/stop', async (req, res) => {
-  try {
-    if (isImpersonating(req)) {
-      return res.status(403).json({
-        error: 'Não é permitido gerir notificações durante impersonation',
-        code: 'impersonation_not_allowed',
-      });
-    }
-
-    await stopCalendarWatch(req.user.id);
-
-    return res.json({ success: true });
-  } catch (error) {
-    return handleCalendarError(res, error, 'Não foi possível desactivar notificações do Google Calendar');
-  }
-});
-
-router.get('/watch/status', async (req, res) => {
-  try {
-    const record = await prisma.calendarSync.findUnique({
-      where: { userId: req.user.id },
-      select: { watchExpiry: true },
-    });
-
-    const active = !!record && record.watchExpiry > new Date();
-
-    return res.json({
-      active,
-      watchExpiry: record ? record.watchExpiry.toISOString() : null,
-    });
-  } catch (error) {
-    return handleCalendarError(res, error, 'Não foi possível obter estado das notificações');
   }
 });
 
