@@ -35,6 +35,42 @@ interface TaskFormModalProps {
   defaultDate?: string; // pre-fill date "YYYY-MM-DD"
 }
 
+function pad(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function splitDueDate(dueDate?: string | null): { date: string; time: string } {
+  if (!dueDate) return { date: '', time: '' };
+  if (!dueDate.includes('T') || /T00:00(:00(?:\.000)?)?Z?$/.test(dueDate)) {
+    return { date: dueDate.slice(0, 10), time: '' };
+  }
+
+  const parsed = new Date(dueDate);
+  if (Number.isNaN(parsed.getTime())) {
+    return { date: dueDate.slice(0, 10), time: '' };
+  }
+
+  return {
+    date: `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`,
+    time: `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`,
+  };
+}
+
+function buildDueDateValue(date: string, time: string): string | null {
+  if (!date) return null;
+  if (!time) return date;
+
+  const [year, month, day] = date.split('-').map(Number);
+  const [hours, minutes] = time.split(':').map(Number);
+  const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  const offsetMinutes = -localDate.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const offsetHours = pad(Math.floor(Math.abs(offsetMinutes) / 60));
+  const offsetRemainder = pad(Math.abs(offsetMinutes) % 60);
+
+  return `${date}T${time}:00${sign}${offsetHours}:${offsetRemainder}`;
+}
+
 export default function TaskFormModal({ open, onClose, task, defaultContactId, defaultDate }: TaskFormModalProps) {
   const queryClient = useQueryClient();
   const isEdit = !!task;
@@ -43,6 +79,7 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [dueTime, setDueTime] = useState('');
   const [priority, setPriority] = useState<'Alta' | 'Media' | 'Baixa'>('Media');
   const [assignedToUserId, setAssignedToUserId] = useState<string>('');
   const [contactSearch, setContactSearch] = useState('');
@@ -69,9 +106,11 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
   useEffect(() => {
     if (open) {
       if (task) {
+        const { date, time } = splitDueDate(task.dueDate);
         setTitle(task.title);
         setNotes(task.notes ?? '');
-        setDueDate(task.dueDate ? task.dueDate.slice(0, 10) : '');
+        setDueDate(date);
+        setDueTime(time);
         setPriority(task.priority as 'Alta' | 'Media' | 'Baixa');
         setAssignedToUserId(task.assignedToUserId ? String(task.assignedToUserId) : currentUser?.id ? String(currentUser.id) : '');
         setSelectedContact(task.contact ?? null);
@@ -80,6 +119,7 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
         setTitle('');
         setNotes('');
         setDueDate(defaultDate || '');
+        setDueTime('');
         setPriority('Media');
         setAssignedToUserId(currentUser?.id ? String(currentUser.id) : '');
         setContactSearch('');
@@ -104,10 +144,11 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
 
   const mutation = useMutation({
     mutationFn: () => {
+      const serializedDueDate = buildDueDateValue(dueDate, dueTime);
       const data = {
         title,
         notes: notes || undefined,
-        dueDate: dueDate || undefined,
+        dueDate: serializedDueDate,
         priority,
         contactId: selectedContact?.id ?? defaultContactId ?? null,
         assignedToUserId: assignedToUserId ? Number(assignedToUserId) : null,
@@ -179,14 +220,28 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
           </div>
 
           {/* Data + Prioridade em linha */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <Label className="text-[#2c2f31]">Data limite</Label>
               <Input
                 type="date"
                 className="mt-1"
                 value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                onChange={(e) => {
+                  const nextDate = e.target.value;
+                  setDueDate(nextDate);
+                  if (!nextDate) setDueTime('');
+                }}
+              />
+            </div>
+            <div>
+              <Label className="text-[#2c2f31]">Hora <span className="text-[#6b7e9a] font-normal">(opcional)</span></Label>
+              <Input
+                type="time"
+                className="mt-1"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                disabled={!dueDate}
               />
             </div>
             <div>
