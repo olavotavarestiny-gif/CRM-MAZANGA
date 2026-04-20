@@ -181,6 +181,10 @@ model Task {
   title            String
   notes            String?
   dueDate          DateTime?
+  googleCalendarEventId   String?
+  googleCalendarHtmlLink  String?
+  googleCalendarSyncedAt  DateTime?
+  googleCalendarSyncError String?
   priority         String    @default("Media")
   done             Boolean   @default(false)
   createdAt        DateTime  @default(now())

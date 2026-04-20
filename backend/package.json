@@ -4,10 +4,11 @@
   "description": "CRM backend",
   "main": "src/index.js",
   "scripts": {
-    "build": "npx prisma generate && npx prisma db push",
+    "build": "prisma generate",
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "db:push": "prisma db push",
+    "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
     "db:studio": "prisma studio",
     "db:backfill-contact-nif": "node scripts/backfill-contact-nif.js"

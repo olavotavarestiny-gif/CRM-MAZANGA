@@ -55,6 +55,59 @@ function getFrontendCalendarUrl() {
   return `${frontendOrigin.replace(/\/+$/, '')}/calendario`;
 }
 
+function getKnownFrontendOrigins() {
+  const candidates = [
+    process.env.FRONTEND_URL,
+    process.env.FRONTEND_CALENDAR_URL,
+    process.env.ALLOWED_VERCEL_URL,
+  ].filter(Boolean);
+
+  const origins = new Set();
+
+  candidates.forEach((value) => {
+    try {
+      origins.add(new URL(normalizeOrigin(value)).origin);
+    } catch {
+      // Ignora entradas inválidas e usa apenas as conhecidas
+    }
+  });
+
+  return origins;
+}
+
+function isAllowedFrontendReturnTo(value) {
+  if (!value || typeof value !== 'string') return false;
+
+  try {
+    const url = new URL(value);
+    const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+
+    if (isLocalhost) {
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    }
+
+    if (url.protocol !== 'https:') {
+      return false;
+    }
+
+    if (url.hostname === 'app.kukugest.ao' || url.hostname.endsWith('.app.kukugest.ao')) {
+      return true;
+    }
+
+    return getKnownFrontendOrigins().has(url.origin);
+  } catch {
+    return false;
+  }
+}
+
+function resolveFrontendCalendarReturnTo(value) {
+  if (isAllowedFrontendReturnTo(value)) {
+    return value;
+  }
+
+  return getFrontendCalendarUrl();
+}
+
 function getOAuth2Client() {
   ensureGoogleCalendarConfigured();
 
@@ -123,12 +176,15 @@ function decryptToken(storedValue) {
   return { value: decrypted, legacy: false };
 }
 
-function signOAuthState({ userId }) {
+function signOAuthState({ userId, returnTo }) {
+  const safeReturnTo = isAllowedFrontendReturnTo(returnTo) ? returnTo : undefined;
+
   return jwt.sign(
     {
       purpose: GOOGLE_STATE_PURPOSE,
       userId,
       nonce: crypto.randomUUID(),
+      ...(safeReturnTo ? { returnTo: safeReturnTo } : {}),
     },
     process.env.JWT_SECRET || 'fallback-secret',
     { expiresIn: '10m' }
@@ -141,7 +197,11 @@ function verifyOAuthState(state) {
     if (payload.purpose !== GOOGLE_STATE_PURPOSE || !payload.userId) {
       throw new Error('state payload inválido');
     }
-    return payload;
+
+    return {
+      ...payload,
+      returnTo: isAllowedFrontendReturnTo(payload.returnTo) ? payload.returnTo : null,
+    };
   } catch {
     throw new CalendarIntegrationError('State OAuth inválido ou expirado', 'invalid_state', 400);
   }
@@ -580,14 +640,30 @@ function generateChannelToken(userId) {
 }
 
 async function pushEventToGoogle(userId, eventData) {
-  const { title, description, startTime, endTime, attendees, googleEventId } = eventData;
+  const {
+    title,
+    description,
+    startTime,
+    endTime,
+    attendees,
+    googleEventId,
+    allDay,
+    startDate,
+    endDate,
+  } = eventData;
 
   const resource = {
     summary: title,
     description: description || undefined,
-    start: { dateTime: new Date(startTime).toISOString(), timeZone: 'Africa/Luanda' },
-    end: { dateTime: new Date(endTime).toISOString(), timeZone: 'Africa/Luanda' },
   };
+
+  if (allDay) {
+    resource.start = { date: startDate };
+    resource.end = { date: endDate };
+  } else {
+    resource.start = { dateTime: new Date(startTime).toISOString(), timeZone: 'Africa/Luanda' };
+    resource.end = { dateTime: new Date(endTime).toISOString(), timeZone: 'Africa/Luanda' };
+  }
 
   if (Array.isArray(attendees) && attendees.length > 0) {
     resource.attendees = attendees.map((email) => ({ email }));
@@ -884,6 +960,7 @@ module.exports = {
   CalendarIntegrationError,
   ensureGoogleCalendarConfigured,
   getFrontendCalendarUrl,
+  resolveFrontendCalendarReturnTo,
   getOAuth2Client,
   signOAuthState,
   verifyOAuthState,
