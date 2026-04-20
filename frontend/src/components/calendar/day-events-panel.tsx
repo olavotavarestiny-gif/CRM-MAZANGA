@@ -13,6 +13,7 @@ interface DayEventsPanelProps {
 
 function formatTime(isoStr: string): string {
   if (!isoStr.includes('T')) return ''; // all-day
+  if (/T00:00(:00(?:\.000)?)?Z?$/.test(isoStr)) return '';
   try {
     return new Date(isoStr).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
   } catch {
@@ -75,6 +76,11 @@ export default function DayEventsPanel({ dateStr, events, onClose, onNewTask }: 
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[#0A2540] truncate">{ev.title}</p>
+                    {!ev.allDay && ev.start && (
+                      <p className="text-xs text-[#64748B]">
+                        {formatTime(ev.start)}
+                      </p>
+                    )}
                     {ev.contactName && (
                       <p className="text-xs text-[#64748B] truncate">{ev.contactName}</p>
                     )}

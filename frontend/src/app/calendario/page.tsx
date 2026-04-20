@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { format, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { getTasks, getCalendarStatus, getCalendarEvents, disconnectCalendar, getCalendarAuthUrl } from '@/lib/api';
 import type { CalendarEvent } from '@/lib/types';
@@ -15,6 +16,19 @@ const MONTH_NAMES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
+
+function hasExplicitTaskTime(dueDate?: string | null): boolean {
+  return !!dueDate && dueDate.includes('T') && !/T00:00(:00(?:\.000)?)?Z?$/.test(dueDate);
+}
+
+function formatTaskEventStart(dueDate: string): string {
+  if (!hasExplicitTaskTime(dueDate)) return dueDate.slice(0, 10);
+
+  const parsed = parseISO(dueDate);
+  if (Number.isNaN(parsed.getTime())) return dueDate;
+
+  return format(parsed, "yyyy-MM-dd'T'HH:mm:ss");
+}
 
 export default function CalendarioPage() {
   const queryClient = useQueryClient();
@@ -102,8 +116,8 @@ export default function CalendarioPage() {
     .map((t) => ({
       id: `crm_${t.id}`,
       title: t.title,
-      start: t.dueDate!.slice(0, 10),
-      allDay: true,
+      start: formatTaskEventStart(t.dueDate!),
+      allDay: !hasExplicitTaskTime(t.dueDate),
       source: 'crm' as const,
       color: '#635BFF',
       taskId: t.id,
