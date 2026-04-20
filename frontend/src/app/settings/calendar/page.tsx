@@ -1,14 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CalendarDays,
   CheckCircle2,
   AlertCircle,
-  Bell,
-  BellOff,
   Loader2,
   RefreshCw,
   Unlink,
@@ -19,9 +17,6 @@ import {
   connectCalendar,
   disconnectCalendar,
   syncCalendar,
-  getCalendarWatchStatus,
-  startCalendarWatch,
-  stopCalendarWatch,
 } from '@/lib/api';
 import { useToast } from '@/components/ui/toast-provider';
 
@@ -57,7 +52,10 @@ export default function CalendarSettingsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const getCalendarReturnTo = () => {
+    if (typeof window === 'undefined') return undefined;
+    return new URL('/settings/calendar', window.location.origin).toString();
+  };
 
   // ── OAuth redirect handling ──────────────────────────────────────────────
   useEffect(() => {
@@ -69,13 +67,13 @@ export default function CalendarSettingsPage() {
     if (!connected && !errorCode) return;
 
     queryClient.invalidateQueries({ queryKey: ['calendarStatus'] });
-    queryClient.invalidateQueries({ queryKey: ['calendarWatchStatus'] });
+    queryClient.invalidateQueries({ queryKey: ['calendarEvents'] });
 
     if (connected) {
       toast({
         variant: 'success',
         title: 'Google Calendar conectado',
-        description: 'Conta ligada com sucesso. Podes agora sincronizar os teus eventos.',
+        description: 'Conta ligada com sucesso. A sincronização inicial foi iniciada automaticamente.',
       });
     } else if (errorCode) {
       toast({
@@ -96,16 +94,9 @@ export default function CalendarSettingsPage() {
     retry: false,
   });
 
-  const { data: watchStatus, isLoading: watchLoading } = useQuery({
-    queryKey: ['calendarWatchStatus'],
-    queryFn: getCalendarWatchStatus,
-    enabled: !!status?.connected,
-    retry: false,
-  });
-
   // ── Mutations ────────────────────────────────────────────────────────────
   const connectMutation = useMutation({
-    mutationFn: connectCalendar,
+    mutationFn: () => connectCalendar(getCalendarReturnTo()),
     onSuccess: ({ authUrl }) => {
       window.location.assign(authUrl);
     },
@@ -122,7 +113,7 @@ export default function CalendarSettingsPage() {
     mutationFn: disconnectCalendar,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['calendarStatus'] });
-      queryClient.invalidateQueries({ queryKey: ['calendarWatchStatus'] });
+      queryClient.invalidateQueries({ queryKey: ['calendarEvents'] });
       toast({
         variant: 'success',
         title: 'Google Calendar desligado',
@@ -161,42 +152,13 @@ export default function CalendarSettingsPage() {
     },
   });
 
-  // ── Watch toggle ─────────────────────────────────────────────────────────
-  async function handleNotificationsToggle() {
-    if (notificationsLoading) return;
-    setNotificationsLoading(true);
-    try {
-      if (watchStatus?.active) {
-        await stopCalendarWatch();
-        toast({ variant: 'success', title: 'Notificações desactivadas' });
-      } else {
-        await startCalendarWatch();
-        toast({
-          variant: 'success',
-          title: 'Notificações activadas',
-          description: 'Vais receber actualizações em tempo real quando eventos mudarem no Google Calendar.',
-        });
-      }
-      queryClient.invalidateQueries({ queryKey: ['calendarWatchStatus'] });
-    } catch (error: any) {
-      toast({
-        variant: 'error',
-        title: 'Falha ao alterar notificações',
-        description: error?.response?.data?.error || error?.message || 'Tenta novamente.',
-      });
-    } finally {
-      setNotificationsLoading(false);
-    }
-  }
-
   // ── Derived state ────────────────────────────────────────────────────────
   const isConnected = !!status?.connected;
   const isLoading = statusLoading;
   const anyMutating =
     connectMutation.isPending ||
     disconnectMutation.isPending ||
-    syncMutation.isPending ||
-    notificationsLoading;
+    syncMutation.isPending;
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -209,7 +171,7 @@ export default function CalendarSettingsPage() {
           <div>
             <h1 className="text-xl font-semibold text-white">Google Calendar</h1>
             <p className="text-sm text-zinc-400">
-              Liga a tua conta Google para sincronizar eventos bidirecionalmente.
+              Liga a tua conta Google para sincronizar os teus eventos para o calendário do CRM.
             </p>
           </div>
         </div>
@@ -311,57 +273,13 @@ export default function CalendarSettingsPage() {
           )}
         </div>
 
-        {/* Notifications card */}
-        {isConnected && (
-          <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {watchLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
-                ) : watchStatus?.active ? (
-                  <Bell className="h-5 w-5 text-purple-400" />
-                ) : (
-                  <BellOff className="h-5 w-5 text-zinc-500" />
-                )}
-                <div>
-                  <p className="text-sm font-medium text-white">
-                    Notificações em tempo real
-                  </p>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    {watchStatus?.active
-                      ? `Activas até ${formatDate(watchStatus.watchExpiry) ?? '—'}`
-                      : 'Recebe actualizações instantâneas quando eventos mudarem no Google Calendar.'}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={handleNotificationsToggle}
-                disabled={anyMutating || watchLoading}
-                aria-pressed={watchStatus?.active}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 transition-colors focus:outline-none disabled:opacity-50 ${
-                  watchStatus?.active
-                    ? 'border-purple-500 bg-purple-500'
-                    : 'border-zinc-600 bg-zinc-700'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform mt-0.5 ${
-                    watchStatus?.active ? 'translate-x-5' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Info callout */}
         <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3 space-y-1">
           <p className="text-xs font-medium text-zinc-300">Como funciona</p>
           <ul className="text-xs text-zinc-500 space-y-1 list-disc list-inside">
-            <li>Eventos do Google Calendar aparecem automaticamente na vista de Calendário.</li>
-            <li>Com notificações activas, as mudanças chegam em segundos sem necessidade de sync manual.</li>
-            <li>Os tokens OAuth são armazenados de forma encriptada (AES-256-GCM).</li>
+            <li>A ligação é individual por utilizador e os tokens OAuth ficam cifrados no backend.</li>
+            <li>Depois de conectar, a sincronização inicial arranca automaticamente e podes forçar nova sync manual quando precisares.</li>
+            <li>Os eventos sincronizados aparecem na vista Calendário sem converter dados em tarefas internas.</li>
           </ul>
         </div>
 

@@ -1,31 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { getTasks, getCalendarStatus, getCalendarEvents, disconnectCalendar, connectCalendar } from '@/lib/api';
+import { getTasks, getCalendarStatus, getCalendarEvents, disconnectCalendar, connectCalendar, syncCalendar } from '@/lib/api';
 import type { CalendarEvent } from '@/lib/types';
 import CalendarGrid from '@/components/calendar/calendar-grid';
 import DayEventsPanel from '@/components/calendar/day-events-panel';
 import TaskFormModal from '@/components/tasks/task-form-modal';
 import { ErrorState } from '@/components/ui/error-state';
 import { useToast } from '@/components/ui/toast-provider';
-
-function getOAuthErrorMessage(code: string | null): string {
-  switch (code) {
-    case 'access_denied':
-      return 'A autorização Google foi cancelada.';
-    case 'calendar_not_configured':
-      return 'A integração Google Calendar ainda não está configurada no servidor.';
-    case 'invalid_state':
-      return 'A validação de segurança do OAuth falhou. Tenta novamente.';
-    case 'oauth_failed':
-      return 'Não foi possível concluir a autorização com a Google.';
-    default:
-      return 'Falha ao conectar o Google Calendar.';
-  }
-}
 
 const MONTH_NAMES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -55,6 +40,39 @@ export default function CalendarioPage() {
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [taskModalDate, setTaskModalDate] = useState('');
 
+  const getCalendarReturnTo = () => {
+    if (typeof window === 'undefined') return undefined;
+    return new URL('/calendario', window.location.origin).toString();
+  };
+
+  const formatLastSync = (value: string | null | undefined) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toLocaleString('pt-PT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getCallbackErrorMessage = (code: string | null) => {
+    switch (code) {
+      case 'access_denied':
+        return 'A autorização Google foi cancelada.';
+      case 'calendar_not_configured':
+        return 'A integração Google Calendar ainda não está configurada no servidor.';
+      case 'invalid_state':
+        return 'A validação de segurança do OAuth falhou. Tenta novamente.';
+      case 'oauth_failed':
+        return 'Não foi possível concluir a autorização com a Google.';
+      default:
+        return 'Falha ao conectar o Google Calendar.';
+    }
+  };
+
   // Handle ?connected=true or ?error=... from OAuth redirect
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -62,25 +80,28 @@ export default function CalendarioPage() {
     const connected = params.get('connected') === 'true';
     const errorCode = params.get('error');
 
-    if (!connected && !errorCode) return;
+    if (connected || errorCode) {
+      queryClient.invalidateQueries({ queryKey: ['calendarStatus'] });
+      queryClient.invalidateQueries({ queryKey: ['calendarEvents'] });
 
-    queryClient.invalidateQueries({ queryKey: ['calendarStatus'] });
+      if (connected) {
+        toast({
+          variant: 'success',
+          title: 'Google Calendar conectado',
+          description: 'A conta foi ligada com sucesso. A sincronização inicial foi iniciada automaticamente.',
+        });
+      }
 
-    if (connected) {
-      toast({
-        variant: 'success',
-        title: 'Google Calendar conectado',
-        description: 'Conta ligada com sucesso. Podes agora sincronizar os teus eventos.',
-      });
-    } else {
-      toast({
-        variant: 'error',
-        title: 'Falha na ligação Google Calendar',
-        description: getOAuthErrorMessage(errorCode),
-      });
+      if (errorCode) {
+        toast({
+          variant: 'error',
+          title: 'Falha na ligação Google Calendar',
+          description: getCallbackErrorMessage(errorCode),
+        });
+      }
+
+      window.history.replaceState({}, '', '/calendario');
     }
-
-    window.history.replaceState({}, '', '/calendario');
   }, [queryClient, toast]);
 
   // Google Calendar status
@@ -128,6 +149,7 @@ export default function CalendarioPage() {
     mutationFn: disconnectCalendar,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['calendarStatus'] });
+      queryClient.invalidateQueries({ queryKey: ['calendarEvents'] });
       toast({
         variant: 'success',
         title: 'Google Agenda desligada',
@@ -144,7 +166,7 @@ export default function CalendarioPage() {
   });
 
   const connectMutation = useMutation({
-    mutationFn: connectCalendar,
+    mutationFn: () => connectCalendar(getCalendarReturnTo()),
     onSuccess: ({ authUrl }) => {
       window.location.assign(authUrl);
     },
@@ -154,6 +176,28 @@ export default function CalendarioPage() {
         title: 'Falha ao iniciar ligação Google',
         description: error?.response?.data?.error || error?.message || 'Tenta novamente.',
       });
+    },
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: syncCalendar,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['calendarStatus'] });
+      queryClient.invalidateQueries({ queryKey: ['calendarEvents'] });
+      toast({
+        variant: 'success',
+        title: 'Google Calendar sincronizado',
+        description: `${result.syncedCount} evento(s) sincronizado(s) e ${result.removedCount} removido(s).`,
+      });
+    },
+    onError: (error: any) => {
+      const reauthRequired = !!error?.response?.data?.reauthRequired;
+      toast({
+        variant: 'error',
+        title: reauthRequired ? 'Reconexão necessária' : 'Falha na sincronização',
+        description: error?.response?.data?.error || error?.message || 'Tenta novamente.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['calendarStatus'] });
     },
   });
 
@@ -170,6 +214,9 @@ export default function CalendarioPage() {
       taskId: t.id,
       contactName: t.contact?.name,
       priority: t.priority,
+      externalUrl: t.googleCalendarHtmlLink || undefined,
+      googleLinked: !!t.googleCalendarEventId,
+      googleSyncError: t.googleCalendarSyncError || null,
     }));
 
   const allEvents: CalendarEvent[] = [...crmEvents, ...googleEvents];
@@ -261,9 +308,13 @@ export default function CalendarioPage() {
                     Tarefas CRM
                   </span>
                   {calendarStatus?.connected && (
-                    <span className="flex items-center gap-1.5 rounded-full bg-[#ECFDF5] px-3 py-2 text-[#059669]">
-                      <span className="w-2 h-2 rounded-full bg-[#10B981]" />
-                      Google Agenda
+                    <span className={`flex items-center gap-1.5 rounded-full px-3 py-2 ${
+                      calendarStatus.reauthRequired ? 'bg-amber-50 text-amber-700' : 'bg-[#ECFDF5] text-[#059669]'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${
+                        calendarStatus.reauthRequired ? 'bg-amber-500' : 'bg-[#10B981]'
+                      }`} />
+                      {calendarStatus.reauthRequired ? 'Google requer reconexão' : 'Google Agenda'}
                     </span>
                   )}
                 </div>
@@ -272,13 +323,43 @@ export default function CalendarioPage() {
 
             <div className="flex flex-wrap items-center gap-3">
               {calendarStatus?.connected ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 rounded-2xl bg-[#10B981]/10 px-4 py-2">
-                    <CheckCircle className="w-3.5 h-3.5 text-[#10B981]" />
-                    <span className="text-xs font-medium text-[#059669]">
-                      {calendarStatus.email || 'Google Agenda'}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className={`flex items-center gap-1.5 rounded-2xl px-4 py-2 ${
+                    calendarStatus.reauthRequired ? 'bg-amber-50' : 'bg-[#10B981]/10'
+                  }`}>
+                    {calendarStatus.reauthRequired ? (
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                    ) : (
+                      <CheckCircle className="w-3.5 h-3.5 text-[#10B981]" />
+                    )}
+                    <span className={`text-xs font-medium ${
+                      calendarStatus.reauthRequired ? 'text-amber-700' : 'text-[#059669]'
+                    }`}>
+                      {calendarStatus.reauthRequired
+                        ? `Reconectar ${calendarStatus.email || 'Google Agenda'}`
+                        : (calendarStatus.email || 'Google Agenda')}
                     </span>
                   </div>
+                  {!calendarStatus.reauthRequired && (
+                    <button
+                      onClick={() => syncMutation.mutate()}
+                      disabled={syncMutation.isPending}
+                      className="flex items-center gap-2 rounded-2xl bg-[#0A2540] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#0A2540]/92 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {syncMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CalendarDays className="w-3.5 h-3.5" />}
+                      <span>Sincronizar agora</span>
+                    </button>
+                  )}
+                  {calendarStatus.reauthRequired && (
+                    <button
+                      onClick={() => connectMutation.mutate()}
+                      disabled={connectMutation.isPending}
+                      className="flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {connectMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CalendarDays className="w-3.5 h-3.5" />}
+                      <span>Reconectar</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => disconnectMutation.mutate()}
                     disabled={disconnectMutation.isPending}
@@ -291,14 +372,14 @@ export default function CalendarioPage() {
                 <button
                   onClick={() => connectMutation.mutate()}
                   disabled={connectMutation.isPending}
-                  className="flex items-center gap-2 rounded-2xl border border-[#E2E8F0] px-4 py-2 text-sm font-medium text-[#0A2540] transition-colors hover:bg-[#F8FAFC]"
+                  className="flex items-center gap-2 rounded-2xl border border-[#E2E8F0] px-4 py-2 text-sm font-medium text-[#0A2540] transition-colors hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {connectMutation.isPending ? (
                     <Loader2 className="w-4 h-4 animate-spin text-[#635BFF]" />
                   ) : (
                     <CalendarDays className="w-4 h-4 text-[#635BFF]" />
                   )}
-                  <span>{connectMutation.isPending ? 'A ligar...' : 'Conectar Google Agenda'}</span>
+                  <span>Conectar Google Agenda</span>
                 </button>
               )}
             </div>
@@ -309,6 +390,34 @@ export default function CalendarioPage() {
           <div className="mx-6 mt-4 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
             <span>A carregar estado do Google Calendar...</span>
+          </div>
+        )}
+
+        {calendarStatus?.connected && (
+          <div className={`mx-6 mt-4 flex flex-col gap-1 rounded-2xl border p-3 text-sm ${
+            calendarStatus.reauthRequired
+              ? 'border-amber-200 bg-amber-50 text-amber-800'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          }`}>
+            <div className="flex items-center gap-2">
+              {calendarStatus.reauthRequired ? (
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              ) : (
+                <CheckCircle className="h-4 w-4 flex-shrink-0" />
+              )}
+              <span className="font-medium">
+                {calendarStatus.reauthRequired
+                  ? 'A ligação Google precisa de nova autorização.'
+                  : 'Google Calendar ligado ao teu utilizador.'}
+              </span>
+            </div>
+            <span className="text-xs opacity-90">
+              {calendarStatus.reauthRequired
+                ? (calendarStatus.lastSyncError || 'Reconecta a conta para continuar a sincronizar.')
+                : (calendarStatus.lastSyncAt
+                  ? `Última sincronização: ${formatLastSync(calendarStatus.lastSyncAt)}`
+                  : 'A sincronização inicial ainda está pendente. Podes forçar manualmente em "Sincronizar agora".')}
+            </span>
           </div>
         )}
 

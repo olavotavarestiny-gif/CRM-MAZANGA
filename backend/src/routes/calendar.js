@@ -19,6 +19,8 @@ const {
   mapStoredEventToCalendarEvent,
   parseSyncWindow,
   getGoogleErrorDetails,
+  ensureCalendarWatch,
+  handleWebhookNotification,
   stopCalendarWatch,
 } = require('../lib/google-calendar');
 
@@ -162,6 +164,20 @@ router.get('/callback', async (req, res) => {
       },
     });
 
+    try {
+      await syncGoogleCalendarEvents({ userId });
+    } catch (error) {
+      const details = getGoogleErrorDetails(error);
+      console.warn(`[calendar] initial sync failed for userId ${userId}:`, details.message);
+    }
+
+    try {
+      await ensureCalendarWatch(userId);
+    } catch (error) {
+      const details = getGoogleErrorDetails(error);
+      console.warn(`[calendar] watch setup failed for userId ${userId}:`, details.message);
+    }
+
     return res.redirect(buildFrontendRedirect(frontendReturnTo, { connected: 'true' }));
   } catch (error) {
     const details = getGoogleErrorDetails(error);
@@ -170,6 +186,43 @@ router.get('/callback', async (req, res) => {
       error: error instanceof CalendarIntegrationError ? error.code : 'oauth_failed',
     }));
   }
+});
+
+router.post('/webhook', async (req, res) => {
+  const channelId = req.get('X-Goog-Channel-Id');
+  const channelToken = req.get('X-Goog-Channel-Token');
+
+  res.sendStatus(200);
+
+  if (!channelId) {
+    return;
+  }
+
+  void (async () => {
+    try {
+      const syncRecord = await prisma.calendarSync.findUnique({
+        where: { channelId },
+        select: {
+          channelToken: true,
+        },
+      });
+
+      if (!syncRecord) {
+        console.warn(`[calendar/webhook] unknown channel ${channelId}`);
+        return;
+      }
+
+      if (!channelToken || syncRecord.channelToken !== channelToken) {
+        console.warn(`[calendar/webhook] invalid token for channel ${channelId}`);
+        return;
+      }
+
+      await handleWebhookNotification(channelId);
+    } catch (error) {
+      const details = getGoogleErrorDetails(error);
+      console.error(`[calendar/webhook] processing failed for channel ${channelId}:`, details.message);
+    }
+  })();
 });
 
 // ---------------------------------------------------------------------------
@@ -324,6 +377,13 @@ router.post('/sync', async (req, res) => {
       start,
       end,
     });
+
+    try {
+      await ensureCalendarWatch(req.user.id);
+    } catch (error) {
+      const details = getGoogleErrorDetails(error);
+      console.warn(`[calendar] watch ensure failed for userId ${req.user.id}:`, details.message);
+    }
 
     await logActivity({
       organization_id: req.user.effectiveUserId,

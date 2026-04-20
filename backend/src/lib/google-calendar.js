@@ -108,6 +108,19 @@ function resolveFrontendCalendarReturnTo(value) {
   return getFrontendCalendarUrl();
 }
 
+function getCalendarWebhookAddress() {
+  if (process.env.GOOGLE_WEBHOOK_ADDRESS) {
+    return process.env.GOOGLE_WEBHOOK_ADDRESS;
+  }
+
+  try {
+    const redirectUrl = new URL(process.env.GOOGLE_REDIRECT_URI);
+    return `${redirectUrl.origin}/api/calendar/webhook`;
+  } catch {
+    return 'https://crm-mazanga.onrender.com/api/calendar/webhook';
+  }
+}
+
 function getOAuth2Client() {
   ensureGoogleCalendarConfigured();
 
@@ -744,8 +757,7 @@ async function deleteEventFromGoogle(userId, googleEventId) {
 // Watch (push notifications)
 // ---------------------------------------------------------------------------
 
-const WATCH_ADDRESS = process.env.GOOGLE_WEBHOOK_ADDRESS
-  || 'https://crm-mazanga.onrender.com/api/calendar/webhook';
+const WATCH_ADDRESS = getCalendarWebhookAddress();
 
 async function startCalendarWatch(userId) {
   const { oauth2Client } = await getAuthorizedGoogleClient(userId);
@@ -804,6 +816,26 @@ async function startCalendarWatch(userId) {
   return { channelId, watchExpiry };
 }
 
+async function ensureCalendarWatch(userId) {
+  const existing = await prisma.calendarSync.findUnique({
+    where: { userId },
+    select: {
+      watchExpiry: true,
+    },
+  });
+
+  const renewalThreshold = new Date(Date.now() + 60 * 60 * 1000);
+  if (existing?.watchExpiry && existing.watchExpiry > renewalThreshold) {
+    return existing;
+  }
+
+  if (existing) {
+    await stopCalendarWatch(userId);
+  }
+
+  return startCalendarWatch(userId);
+}
+
 async function stopCalendarWatch(userId) {
   const record = await prisma.calendarSync.findUnique({ where: { userId } });
   if (!record) return;
@@ -826,6 +858,15 @@ async function handleWebhookNotification(channelId) {
   if (!record) return;
 
   const { userId, syncToken } = record;
+  const tokenRecord = await prisma.googleCalendarToken.findUnique({
+    where: { userId },
+    select: {
+      primaryCalendarId: true,
+    },
+  });
+  if (!tokenRecord) return;
+
+  const primaryCalendarId = tokenRecord.primaryCalendarId || 'primary';
 
   try {
     const { oauth2Client } = await getAuthorizedGoogleClient(userId);
@@ -863,7 +904,7 @@ async function handleWebhookNotification(channelId) {
       const toDelete = items.filter((e) => e.status === 'cancelled').map((e) => e.id);
       const toUpsert = items
         .filter((e) => e.status !== 'cancelled')
-        .map((e) => normalizeGoogleEvent(e, { userId, calendarId: 'primary' }))
+        .map((e) => normalizeGoogleEvent(e, { userId, calendarId: primaryCalendarId }))
         .filter(Boolean);
 
       const ops = [];
@@ -871,7 +912,11 @@ async function handleWebhookNotification(channelId) {
       if (toDelete.length > 0) {
         ops.push(
           prisma.googleCalendarEvent.deleteMany({
-            where: { userId, googleEventId: { in: toDelete } },
+            where: {
+              userId,
+              calendarId: primaryCalendarId,
+              googleEventId: { in: toDelete },
+            },
           })
         );
       }
@@ -975,6 +1020,7 @@ module.exports = {
   pushEventToGoogle,
   deleteEventFromGoogle,
   startCalendarWatch,
+  ensureCalendarWatch,
   stopCalendarWatch,
   handleWebhookNotification,
   renewExpiringWatchChannels,
