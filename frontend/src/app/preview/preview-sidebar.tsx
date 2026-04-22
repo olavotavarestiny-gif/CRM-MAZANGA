@@ -9,7 +9,7 @@ import type { User } from '@/lib/api';
 
 const PREVIEW_LINKS = [
   { href: '/preview', label: 'Painel', icon: BarChart3 },
-  { href: '/preview/contacts', label: 'Clientes', icon: Users },
+  { href: '/preview/contacts', label: 'Contactos', icon: Users },
   { href: '/preview/pipeline', label: 'Processos', icon: Kanban },
   { href: '/preview/tasks', label: 'Tarefas', icon: CheckSquare },
   { href: '/preview/vendas', label: 'Vendas', icon: ShoppingBag },

@@ -21,6 +21,7 @@ import type {
   CommercialAdvancedSalesResponse,
   CommercialAdvancedTeamResponse,
   Contact,
+  ContactGroup,
   ContactFieldConfig,
   ContactFieldDef,
   CRMForm,
@@ -101,8 +102,28 @@ api.interceptors.response.use(
 );
 
 // Contacts
-export async function getContacts(params?: { stage?: string; search?: string; revenue?: string; inPipeline?: string; contactType?: string }) {
+export async function getContacts(params?: { stage?: string; search?: string; revenue?: string; inPipeline?: string; contactType?: string; groupId?: string }) {
   const response = await api.get<Contact[]>('/api/contacts', { params });
+  return response.data;
+}
+
+export async function getContactGroups() {
+  const response = await api.get<ContactGroup[]>('/api/contacts/groups');
+  return response.data;
+}
+
+export async function createContactGroup(data: Pick<ContactGroup, 'name'>) {
+  const response = await api.post<ContactGroup>('/api/contacts/groups', data);
+  return response.data;
+}
+
+export async function updateContactGroup(id: string, data: Pick<ContactGroup, 'name'>) {
+  const response = await api.put<ContactGroup>(`/api/contacts/groups/${id}`, data);
+  return response.data;
+}
+
+export async function deleteContactGroup(id: string) {
+  const response = await api.delete<{ message: string; detachedContactsCount: number }>(`/api/contacts/groups/${id}`);
   return response.data;
 }
 

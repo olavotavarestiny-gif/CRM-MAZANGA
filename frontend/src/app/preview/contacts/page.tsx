@@ -5,7 +5,7 @@ import { Search } from 'lucide-react';
 export default function PreviewContacts() {
   return (
     <div className="max-w-7xl">
-      <h1 className="text-3xl font-extrabold text-[#2c2f31] tracking-tight mb-8">Clientes</h1>
+      <h1 className="text-3xl font-extrabold text-[#2c2f31] tracking-tight mb-8">Contactos</h1>
 
       {/* Search & Filters */}
       <div className="bg-white rounded-xl p-6 border border-slate-100 mb-6 ambient-shadow">

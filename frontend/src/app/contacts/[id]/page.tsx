@@ -6,7 +6,7 @@ import {
   getContact, updateTask, deleteTask, updateContact,
   getContactFieldConfigs, getContactFieldDefs, getPipelineStages,
   getContactNotes, createContactNote, updateContactNote, deleteContactNote,
-  getContactSummary,
+  getContactSummary, getContactGroups,
 } from '@/lib/api';
 import { ContactFieldConfig, ContactFieldDef, ContactNote, Task } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +19,7 @@ import TaskItem from '@/components/tasks/task-item';
 import TaskFormModal from '@/components/tasks/task-form-modal';
 import { Badge } from '@/components/ui/badge';
 import { ContactHistoryTimeline } from '@/components/contacts/contact-history-timeline';
+import ContactGroupsManager from '@/components/contacts/contact-groups-manager';
 import {
   Pencil, Check, X, ExternalLink, Phone, Download, Trash2,
   Upload, Loader2, Send, FileText, TrendingUp, Clock,
@@ -33,6 +34,7 @@ const REVENUE_OPTIONS = [
   '- 50 Milhões De Kwanzas','Entre 50 - 100 Milhões',
   'Entre 100 Milhões - 500 Milhões','+ 500 M',
 ];
+const NO_GROUP_VALUE = '__NONE__';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -419,6 +421,7 @@ function NoteItem({
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function ContactDetailPage({ params }: { params: { id: string } }) {
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
+  const [isGroupsOpen, setIsGroupsOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [noteInput, setNoteInput] = useState('');
   const [notesSkip, setNotesSkip] = useState(0);
@@ -445,6 +448,11 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const { data: pipelineStages = [] } = useQuery({
     queryKey: ['pipeline-stages'],
     queryFn: getPipelineStages,
+  });
+
+  const { data: contactGroups = [] } = useQuery({
+    queryKey: ['contactGroups'],
+    queryFn: getContactGroups,
   });
 
   const { data: summary } = useQuery({
@@ -648,6 +656,8 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
         )}
       </div>
 
+      <ContactGroupsManager open={isGroupsOpen} onOpenChange={setIsGroupsOpen} />
+
       {/* ── Layout grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -668,6 +678,34 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
                 value={contact.nif ?? ''}
                 onSave={v => save('nif', v)}
               />
+              <div>
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <p className="text-xs text-[#6b7e9a]">Grupo</p>
+                  <button
+                    type="button"
+                    onClick={() => setIsGroupsOpen(true)}
+                    className="text-xs font-medium text-[#0A2540] hover:underline"
+                  >
+                    Gerir grupos
+                  </button>
+                </div>
+                <Select
+                  value={contact.contactGroupId ?? NO_GROUP_VALUE}
+                  onValueChange={(value) => save('contactGroupId', value === NO_GROUP_VALUE ? null : value)}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Sem grupo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_GROUP_VALUE}>Sem grupo</SelectItem>
+                    {contactGroups.map((group) => (
+                      <SelectItem key={group.id} value={group.id}>
+                        {group.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               {/* Force company + sector for Empresa regardless of visibility config */}
               {isEmpresa && companyConfig && (
                 <InlineField label={companyConfig.label} value={contact.company ?? ''} onSave={v => save('company', v)} />

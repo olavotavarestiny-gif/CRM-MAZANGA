@@ -9,6 +9,7 @@ const { validateNIF } = require('../lib/fiscal/nif-validator');
 const { cleanNifValue, parseCustomFields, resolveContactNif, stripNifKeysFromCustomFields } = require('../lib/contact-nif');
 const { getDefaultStageName, isValidStageName } = require('../lib/pipeline-stages');
 const VALID_FIELD_TYPES = ['text', 'number', 'date', 'select', 'url'];
+const UNGROUPED_GROUP_ID = 'UNGROUPED';
 
 function parseTags(value) {
   if (Array.isArray(value)) return value.filter(Boolean);
@@ -267,6 +268,12 @@ function serialiseContact(contact) {
     tags: parseTags(contact.tags),
     customFields,
     documents: parseDocuments(contact.documents),
+    contactGroup: contact.contactGroup
+      ? {
+          id: contact.contactGroup.id,
+          name: contact.contactGroup.name,
+        }
+      : null,
   };
 }
 
@@ -313,6 +320,46 @@ function parseDealValueInput(rawValue) {
   };
 }
 
+function cleanContactGroupName(value) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ');
+}
+
+function normaliseContactGroupName(value) {
+  return cleanContactGroupName(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+async function resolveContactGroupId(rawValue, userId) {
+  if (rawValue === undefined) {
+    return undefined;
+  }
+
+  if (rawValue === null || rawValue === '' || rawValue === UNGROUPED_GROUP_ID) {
+    return null;
+  }
+
+  if (typeof rawValue !== 'string') {
+    const error = new Error('Grupo inválido.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const group = await prisma.contactGroup.findFirst({
+    where: { id: rawValue, userId },
+    select: { id: true },
+  });
+
+  if (!group) {
+    const error = new Error('Grupo não encontrado.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return group.id;
+}
+
 async function getWorkspaceModeForUser(userId) {
   const ownerAccount = await prisma.user.findUnique({
     where: { id: userId },
@@ -330,10 +377,156 @@ async function getValidatedStageName(userId, requestedStage) {
   return getDefaultStageName(userId);
 }
 
+router.get('/groups', requirePermission('contacts', 'view'), async (req, res) => {
+  try {
+    const groups = await prisma.contactGroup.findMany({
+      where: { userId: req.user.effectiveUserId },
+      orderBy: [{ normalizedName: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    res.json(groups);
+  } catch (error) {
+    console.error('Error fetching contact groups:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/groups', requirePermission('contacts', 'edit'), async (req, res) => {
+  try {
+    const userId = req.user.effectiveUserId;
+    const name = cleanContactGroupName(req.body?.name);
+    const normalizedName = normaliseContactGroupName(name);
+
+    if (!name || !normalizedName) {
+      return res.status(400).json({ error: 'Nome do grupo é obrigatório.' });
+    }
+
+    const existing = await prisma.contactGroup.findFirst({
+      where: { userId, normalizedName },
+      select: { id: true },
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: 'Já existe um grupo com este nome.' });
+    }
+
+    const group = await prisma.contactGroup.create({
+      data: { userId, name, normalizedName },
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    res.status(201).json(group);
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'Já existe um grupo com este nome.' });
+    }
+    console.error('Error creating contact group:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.put('/groups/:id', requirePermission('contacts', 'edit'), async (req, res) => {
+  try {
+    const userId = req.user.effectiveUserId;
+    const name = cleanContactGroupName(req.body?.name);
+    const normalizedName = normaliseContactGroupName(name);
+
+    if (!name || !normalizedName) {
+      return res.status(400).json({ error: 'Nome do grupo é obrigatório.' });
+    }
+
+    const existing = await prisma.contactGroup.findFirst({
+      where: { id: req.params.id, userId },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Grupo não encontrado.' });
+    }
+
+    const duplicate = await prisma.contactGroup.findFirst({
+      where: {
+        userId,
+        normalizedName,
+        id: { not: req.params.id },
+      },
+      select: { id: true },
+    });
+
+    if (duplicate) {
+      return res.status(400).json({ error: 'Já existe um grupo com este nome.' });
+    }
+
+    const group = await prisma.contactGroup.update({
+      where: { id: req.params.id },
+      data: { name, normalizedName },
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    res.json(group);
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'Já existe um grupo com este nome.' });
+    }
+    console.error('Error updating contact group:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/groups/:id', requirePermission('contacts', 'edit'), async (req, res) => {
+  try {
+    const userId = req.user.effectiveUserId;
+
+    const existing = await prisma.contactGroup.findFirst({
+      where: { id: req.params.id, userId },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Grupo não encontrado.' });
+    }
+
+    const detachedContactsCount = await prisma.contact.count({
+      where: {
+        userId,
+        contactGroupId: req.params.id,
+      },
+    });
+
+    await prisma.contactGroup.delete({
+      where: { id: req.params.id },
+    });
+
+    res.json({
+      message: 'Grupo removido.',
+      detachedContactsCount,
+    });
+  } catch (error) {
+    console.error('Error deleting contact group:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET all contacts with optional filters
 router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
   try {
-    const { stage, search, inPipeline, revenue, contactType } = req.query;
+    const { stage, search, inPipeline, revenue, contactType, groupId } = req.query;
     const userId = req.user.effectiveUserId;
     const where = { userId };
     const workspaceMode = await getWorkspaceModeForUser(userId);
@@ -358,6 +551,12 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
       where.contactType = contactType;
     }
 
+    if (groupId === UNGROUPED_GROUP_ID) {
+      where.contactGroupId = null;
+    } else if (typeof groupId === 'string' && groupId.trim()) {
+      where.contactGroupId = groupId.trim();
+    }
+
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -370,6 +569,14 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
 
     const contacts = await prisma.contact.findMany({
       where,
+      include: {
+        contactGroup: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -383,7 +590,7 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
 // POST create new contact
 router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
-    const { name, email, phone, company, dealValueKz, revenue, sector, stage, tags, customFields, contactType, status, clienteType, nif } = req.body;
+    const { name, email, phone, company, dealValueKz, revenue, sector, stage, tags, customFields, contactType, status, clienteType, nif, contactGroupId } = req.body;
     const userId = req.user.effectiveUserId;
 
     if (!name || !phone) {
@@ -418,6 +625,7 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
         ? cleanNifValue(nif)
         : resolveContactNif({ customFields });
     const parsedDealValue = parseDealValueInput(dealValueKz);
+    const resolvedContactGroupId = await resolveContactGroupId(contactGroupId, userId);
     const nifError = validateContactNif({ nif: resolvedNif, clienteType: finalClienteType });
     if (nifError) {
       return res.status(400).json({ error: nifError });
@@ -426,6 +634,7 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
     const contact = await prisma.contact.create({
       data: {
         userId,
+        contactGroupId: resolvedContactGroupId ?? null,
         name,
         email: email || '',
         phone,
@@ -441,6 +650,14 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
         contactType: finalContactType,
         status: ['ativo', 'inativo'].includes(status) ? status : 'ativo',
         clienteType: finalClienteType,
+      },
+      include: {
+        contactGroup: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
 
@@ -634,6 +851,12 @@ router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
     const contact = await prisma.contact.findUnique({
       where: { id: parseInt(req.params.id) },
       include: {
+        contactGroup: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         messages: {
           orderBy: { timestamp: 'asc' },
         },
@@ -665,7 +888,7 @@ router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
 // PUT update contact
 router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
-    const { name, email, phone, company, dealValueKz, revenue, sector, stage, inPipeline, tags, customFields, contactType, status, documents, clienteType, nif } = req.body;
+    const { name, email, phone, company, dealValueKz, revenue, sector, stage, inPipeline, tags, customFields, contactType, status, documents, clienteType, nif, contactGroupId } = req.body;
     const updateData = {};
     const contactId = parseInt(req.params.id);
     const userId = req.user.effectiveUserId;
@@ -709,6 +932,7 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
     if (revenue !== undefined) updateData.revenue = revenue;
     if (sector !== undefined) updateData.sector = sector;
     if (inPipeline !== undefined) updateData.inPipeline = inPipeline;
+    if (contactGroupId !== undefined) updateData.contactGroupId = await resolveContactGroupId(contactGroupId, userId);
     if (Array.isArray(tags)) updateData.tags = JSON.stringify(tags);
     if (stage && await isValidStageName(userId, stage)) {
       updateData.stage = stage;
@@ -739,6 +963,14 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
     const contact = await prisma.contact.update({
       where: { id: contactId },
       data: updateData,
+      include: {
+        contactGroup: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
 
     if (existing.name !== contact.name) {

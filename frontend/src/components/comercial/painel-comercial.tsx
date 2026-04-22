@@ -328,7 +328,7 @@ function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
     podeVerVendas ? { href: '/vendas-rapidas', label: 'Ir para Venda Rápida', icon: ShoppingCart } : null,
     podeVerFinancas ? { href: '/finances', label: 'Abrir finanças', icon: DollarSign } : null,
     podeVerProdutos ? { href: '/produtos', label: 'Rever inventário', icon: PackageX } : null,
-    podeVerContactos ? { href: '/contacts', label: 'Ver clientes', icon: Store } : null,
+    podeVerContactos ? { href: '/contacts', label: 'Ver contactos', icon: Store } : null,
   ].filter(Boolean) as { href: string; label: string; icon: typeof CreditCard }[];
 
   return (

@@ -4,12 +4,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getContacts,
-  createContact,
   updateContact,
   deleteContact,
   getCurrentUser,
   getPipelineStages,
   getContactFieldConfigs,
+  getContactGroups,
 } from '@/lib/api';
 import { Contact } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -37,8 +37,9 @@ import { Modal } from '@/components/ui/modal';
 import ContactForm from '@/components/contacts/contact-form';
 import ImportCSVModal from '@/components/contacts/import-csv-modal';
 import ContactFieldsManager from '@/components/contacts/contact-fields-manager';
+import ContactGroupsManager from '@/components/contacts/contact-groups-manager';
 import Link from 'next/link';
-import { Trash2, MessageCircle, Upload, Settings2, Phone } from 'lucide-react';
+import { Trash2, MessageCircle, Upload, Settings2, Phone, FolderTree } from 'lucide-react';
 import { getContactFieldDefs } from '@/lib/api';
 
 function formatWA(phone: string): string | null {
@@ -48,14 +49,19 @@ function formatWA(phone: string): string | null {
   return n.length >= 9 ? n : null;
 }
 
+const ALL_GROUPS_VALUE = 'ALL';
+const UNGROUPED_GROUP_VALUE = 'UNGROUPED';
+
 export default function ContactsPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('ALL');
   const [revenueFilter, setRevenueFilter] = useState<string>('ALL');
+  const [groupFilter, setGroupFilter] = useState<string>(ALL_GROUPS_VALUE);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isFieldsOpen, setIsFieldsOpen] = useState(false);
+  const [isGroupsOpen, setIsGroupsOpen] = useState(false);
   const [contactTypeTab, setContactTypeTab] = useState<'interessado' | 'cliente'>('interessado');
 
   const { data: currentUser, isLoading: currentUserLoading } = useQuery({
@@ -78,6 +84,12 @@ export default function ContactsPage() {
     queryKey: ['contactFieldConfigs'],
     queryFn: getContactFieldConfigs,
     staleTime: 0,
+  });
+
+  const { data: contactGroups = [] } = useQuery({
+    queryKey: ['contactGroups'],
+    queryFn: getContactGroups,
+    enabled: workspaceResolved,
   });
 
   // System columns to show (excluding fields already rendered in dedicated columns/UI)
@@ -107,13 +119,24 @@ export default function ContactsPage() {
     return () => window.clearTimeout(timeout);
   }, [search]);
 
+  useEffect(() => {
+    if (
+      groupFilter !== ALL_GROUPS_VALUE &&
+      groupFilter !== UNGROUPED_GROUP_VALUE &&
+      !contactGroups.some((group) => group.id === groupFilter)
+    ) {
+      setGroupFilter(ALL_GROUPS_VALUE);
+    }
+  }, [contactGroups, groupFilter]);
+
   const contactsQuery = useQuery({
-    queryKey: ['contacts', debouncedSearch, canShowPipelineUi ? stageFilter : 'ALL', revenueFilter, effectiveContactType],
+    queryKey: ['contacts', debouncedSearch, canShowPipelineUi ? stageFilter : 'ALL', revenueFilter, groupFilter, effectiveContactType],
     queryFn: () =>
       getContacts({
         search: debouncedSearch || undefined,
         stage: canShowPipelineUi && stageFilter !== 'ALL' ? stageFilter : undefined,
         revenue: revenueFilter === 'ALL' ? undefined : revenueFilter,
+        groupId: groupFilter === ALL_GROUPS_VALUE ? undefined : groupFilter,
         contactType: effectiveContactType,
       }),
     placeholderData: (previousData) => previousData,
@@ -124,14 +147,17 @@ export default function ContactsPage() {
   const isContactsLoading = !workspaceResolved || contactsQuery.isLoading;
   const pageDescription = useMemo(() => {
     if (!workspaceResolved) {
-      return 'Clientes, históricos e campos personalizados num espaço único.';
+      return 'Contactos, históricos e campos personalizados num espaço único.';
     }
     return isComercioWorkspace
-      ? 'Clientes e campos personalizados num fluxo alinhado com o comércio.'
+      ? 'Contactos e campos personalizados num fluxo alinhado com o comércio.'
       : 'Interessados, clientes e campos personalizados num fluxo único.';
   }, [isComercioWorkspace, workspaceResolved]);
   const hasActiveFilters =
-    debouncedSearch.length > 0 || revenueFilter !== 'ALL' || (canShowPipelineUi && stageFilter !== 'ALL');
+    debouncedSearch.length > 0 ||
+    revenueFilter !== 'ALL' ||
+    groupFilter !== ALL_GROUPS_VALUE ||
+    (canShowPipelineUi && stageFilter !== 'ALL');
   const isSearching = workspaceResolved && contactsQuery.isFetching && !contactsQuery.isLoading;
 
   const deleteMutation = useMutation({
@@ -149,6 +175,14 @@ export default function ContactsPage() {
           <p className="mt-1 text-sm text-[#6b7e9a]">{pageDescription}</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            onClick={() => setIsGroupsOpen(true)}
+            className="w-full sm:w-auto"
+          >
+            <FolderTree className="w-4 h-4 mr-2" />
+            Grupos
+          </Button>
           <Button
             variant="outline"
             onClick={() => setIsFieldsOpen(true)}
@@ -170,6 +204,7 @@ export default function ContactsPage() {
           </Button>
           <Modal open={isFormOpen} onClose={() => setIsFormOpen(false)} title="Novo Contacto">
             <ContactForm
+              onManageGroups={() => setIsGroupsOpen(true)}
               onSuccess={() => {
                 setIsFormOpen(false);
                 queryClient.invalidateQueries({ queryKey: ['contacts'] });
@@ -181,6 +216,7 @@ export default function ContactsPage() {
 
       <ImportCSVModal open={isImportOpen} onOpenChange={setIsImportOpen} />
       <ContactFieldsManager open={isFieldsOpen} onOpenChange={setIsFieldsOpen} />
+      <ContactGroupsManager open={isGroupsOpen} onOpenChange={setIsGroupsOpen} />
 
       {canShowPipelineUi && (
         <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
@@ -207,7 +243,13 @@ export default function ContactsPage() {
         placeholder="Pesquisar por nome, telefone, empresa ou NIF..."
         isLoading={isSearching}
         hasActiveFilters={hasActiveFilters}
-        onClearFilters={() => { setSearch(''); setDebouncedSearch(''); setStageFilter('ALL'); setRevenueFilter('ALL'); }}
+        onClearFilters={() => {
+          setSearch('');
+          setDebouncedSearch('');
+          setStageFilter('ALL');
+          setRevenueFilter('ALL');
+          setGroupFilter(ALL_GROUPS_VALUE);
+        }}
       >
         {canShowPipelineUi ? (
           <Select value={stageFilter} onValueChange={setStageFilter}>
@@ -232,6 +274,20 @@ export default function ContactsPage() {
             <SelectItem value="Entre 50 - 100 Milhões">50M - 100M Milhões</SelectItem>
             <SelectItem value="Entre 100 Milhões - 500 Milhões">100M - 500M Milhões</SelectItem>
             <SelectItem value="+ 500 M">+500M Milhões</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={groupFilter} onValueChange={setGroupFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Grupo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_GROUPS_VALUE}>Todos os grupos</SelectItem>
+            <SelectItem value={UNGROUPED_GROUP_VALUE}>Sem grupo</SelectItem>
+            {contactGroups.map((group) => (
+              <SelectItem key={group.id} value={group.id}>
+                {group.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </FilterBar>
@@ -261,19 +317,20 @@ export default function ContactsPage() {
                 ? 'Experimenta outro termo ou remove os filtros activos.'
                 : 'Começa por criar o primeiro contacto ou importa a tua base via CSV.'
             }
-            action={{ label: hasActiveFilters ? 'Limpar filtros' : 'Criar primeiro contacto', onClick: hasActiveFilters ? () => { setSearch(''); setDebouncedSearch(''); setStageFilter('ALL'); setRevenueFilter('ALL'); } : () => setIsFormOpen(true) }}
+            action={{ label: hasActiveFilters ? 'Limpar filtros' : 'Criar primeiro contacto', onClick: hasActiveFilters ? () => { setSearch(''); setDebouncedSearch(''); setStageFilter('ALL'); setRevenueFilter('ALL'); setGroupFilter(ALL_GROUPS_VALUE); } : () => setIsFormOpen(true) }}
             secondaryAction={!hasActiveFilters ? { label: 'Importar CSV', onClick: () => setIsImportOpen(true) } : undefined}
           />
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead className="hidden sm:table-cell">Telefone</TableHead>
-                  {visibleSystemCols.map(cfg => (
-                    <TableHead key={cfg.fieldKey} className="hidden md:table-cell">{cfg.label}</TableHead>
-                  ))}
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead className="hidden sm:table-cell">Telefone</TableHead>
+                    <TableHead className="hidden md:table-cell">Grupo</TableHead>
+                    {visibleSystemCols.map(cfg => (
+                      <TableHead key={cfg.fieldKey} className="hidden md:table-cell">{cfg.label}</TableHead>
+                    ))}
                   {fieldDefs.map((f) => (
                     <TableHead key={f.id} className="hidden lg:table-cell">{f.label}</TableHead>
                   ))}
@@ -282,13 +339,16 @@ export default function ContactsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {contacts.map((contact) => (
-                  <TableRow key={contact.id}>
-                    <TableCell className="font-medium">{contact.name}</TableCell>
-                    <TableCell className="hidden sm:table-cell">{contact.phone || '-'}</TableCell>
-                    {visibleSystemCols.map(cfg => (
-                      <TableCell key={cfg.fieldKey} className="hidden md:table-cell text-sm">
-                        {cfg.fieldKey === 'tags'
+                  {contacts.map((contact) => (
+                    <TableRow key={contact.id}>
+                      <TableCell className="font-medium">{contact.name}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{contact.phone || '-'}</TableCell>
+                      <TableCell className="hidden md:table-cell text-sm">
+                        {contact.contactGroup?.name || 'Sem grupo'}
+                      </TableCell>
+                      {visibleSystemCols.map(cfg => (
+                        <TableCell key={cfg.fieldKey} className="hidden md:table-cell text-sm">
+                          {cfg.fieldKey === 'tags'
                           ? ((contact.tags ?? []).join(', ') || '-')
                           : ((contact as any)[cfg.fieldKey] || '-')}
                       </TableCell>
