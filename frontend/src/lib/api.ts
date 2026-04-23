@@ -21,6 +21,8 @@ import type {
   CommercialAdvancedSalesResponse,
   CommercialAdvancedTeamResponse,
   Contact,
+  BulkUpdateContactsInput,
+  BulkUpdateContactsResponse,
   ContactGroup,
   ContactFieldConfig,
   ContactFieldDef,
@@ -175,6 +177,11 @@ export async function getContact(id: string) {
 
 export async function updateContact(id: string, data: Partial<Contact>) {
   const response = await api.put<Contact>(`/api/contacts/${id}`, data);
+  return response.data;
+}
+
+export async function bulkUpdateContacts(data: BulkUpdateContactsInput) {
+  const response = await api.post<BulkUpdateContactsResponse>('/api/contacts/bulk-update', data);
   return response.data;
 }
 

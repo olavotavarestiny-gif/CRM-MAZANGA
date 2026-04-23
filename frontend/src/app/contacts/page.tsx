@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getContacts,
+  bulkUpdateContacts,
   updateContact,
   deleteContact,
   getCurrentUser,
@@ -17,6 +18,7 @@ import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FilterBar } from '@/components/ui/filter-bar';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -35,12 +37,14 @@ import {
 } from '@/components/ui/select';
 import { Modal } from '@/components/ui/modal';
 import ContactForm from '@/components/contacts/contact-form';
+import ContactBulkActionsModal from '@/components/contacts/contact-bulk-actions-modal';
 import ImportCSVModal from '@/components/contacts/import-csv-modal';
 import ContactFieldsManager from '@/components/contacts/contact-fields-manager';
 import ContactGroupsManager from '@/components/contacts/contact-groups-manager';
 import Link from 'next/link';
-import { Trash2, MessageCircle, Upload, Settings2, Phone, FolderTree } from 'lucide-react';
+import { Trash2, MessageCircle, Upload, Settings2, Phone, FolderTree, ListChecks, X } from 'lucide-react';
 import { getContactFieldDefs } from '@/lib/api';
+import { useToast } from '@/components/ui/toast-provider';
 
 function formatWA(phone: string): string | null {
   if (!phone) return null;
@@ -62,7 +66,10 @@ export default function ContactsPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isFieldsOpen, setIsFieldsOpen] = useState(false);
   const [isGroupsOpen, setIsGroupsOpen] = useState(false);
+  const [isBulkActionsOpen, setIsBulkActionsOpen] = useState(false);
+  const [selectedContactIds, setSelectedContactIds] = useState<number[]>([]);
   const [contactTypeTab, setContactTypeTab] = useState<'interessado' | 'cliente'>('interessado');
+  const { toast } = useToast();
 
   const { data: currentUser, isLoading: currentUserLoading } = useQuery({
     queryKey: ['currentUser'],
@@ -144,6 +151,13 @@ export default function ContactsPage() {
     enabled: workspaceResolved,
   });
   const contacts = contactsQuery.data || [];
+  const visibleContactIds = useMemo(() => contacts.map((contact) => contact.id), [contacts]);
+  const selectedVisibleCount = useMemo(
+    () => visibleContactIds.filter((id) => selectedContactIds.includes(id)).length,
+    [selectedContactIds, visibleContactIds]
+  );
+  const allVisibleSelected = contacts.length > 0 && selectedVisibleCount === contacts.length;
+  const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
   const isContactsLoading = !workspaceResolved || contactsQuery.isLoading;
   const pageDescription = useMemo(() => {
     if (!workspaceResolved) {
@@ -160,12 +174,58 @@ export default function ContactsPage() {
     (canShowPipelineUi && stageFilter !== 'ALL');
   const isSearching = workspaceResolved && contactsQuery.isFetching && !contactsQuery.isLoading;
 
+  useEffect(() => {
+    setSelectedContactIds((currentIds) => currentIds.filter((id) => visibleContactIds.includes(id)));
+  }, [visibleContactIds]);
+
   const deleteMutation = useMutation({
     mutationFn: deleteContact,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
     },
   });
+
+  const bulkUpdateMutation = useMutation({
+    mutationFn: bulkUpdateContacts,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['contact'] });
+      setSelectedContactIds([]);
+      setIsBulkActionsOpen(false);
+      toast({
+        variant: 'success',
+        title: 'Ações em massa aplicadas',
+        description:
+          result.matchedCount === result.requestedCount
+            ? `${result.updatedCount} contacto(s) atualizados com sucesso.`
+            : `${result.updatedCount} contacto(s) atualizados. ${result.requestedCount - result.matchedCount} ficaram fora da seleção atual.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: 'error',
+        title: 'Falha ao aplicar ações em massa',
+        description: error.message || 'Tenta novamente.',
+      });
+    },
+  });
+
+  const toggleContactSelection = (contactId: number) => {
+    setSelectedContactIds((currentIds) => (
+      currentIds.includes(contactId)
+        ? currentIds.filter((id) => id !== contactId)
+        : [...currentIds, contactId]
+    ));
+  };
+
+  const toggleAllVisibleContacts = () => {
+    if (allVisibleSelected) {
+      setSelectedContactIds((currentIds) => currentIds.filter((id) => !visibleContactIds.includes(id)));
+      return;
+    }
+
+    setSelectedContactIds((currentIds) => Array.from(new Set([...currentIds, ...visibleContactIds])));
+  };
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
@@ -217,6 +277,22 @@ export default function ContactsPage() {
       <ImportCSVModal open={isImportOpen} onOpenChange={setIsImportOpen} />
       <ContactFieldsManager open={isFieldsOpen} onOpenChange={setIsFieldsOpen} />
       <ContactGroupsManager open={isGroupsOpen} onOpenChange={setIsGroupsOpen} />
+      <ContactBulkActionsModal
+        open={isBulkActionsOpen}
+        onOpenChange={setIsBulkActionsOpen}
+        selectedCount={selectedContactIds.length}
+        contactGroups={contactGroups}
+        pipelineStages={pipelineStages}
+        canEditStage={canShowPipelineUi}
+        canEditContactType={!isComercioWorkspace}
+        loading={bulkUpdateMutation.isPending}
+        onSubmit={async (changes) => {
+          await bulkUpdateMutation.mutateAsync({
+            contactIds: selectedContactIds,
+            changes,
+          });
+        }}
+      />
 
       {canShowPipelineUi && (
         <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
@@ -293,6 +369,28 @@ export default function ContactsPage() {
       </FilterBar>
 
       <Card data-tour="contacts-table" className="border-slate-200 shadow-sm">
+        {selectedContactIds.length > 0 ? (
+          <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[#0A2540]">
+                {selectedContactIds.length} contacto(s) selecionado(s)
+              </p>
+              <p className="text-xs text-[#6b7e9a]">
+                A seleção vale para os resultados visíveis com os filtros atuais.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsBulkActionsOpen(true)}>
+                <ListChecks className="mr-1.5 h-4 w-4" />
+                Ações em massa
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedContactIds([])}>
+                <X className="mr-1.5 h-4 w-4" />
+                Limpar seleção
+              </Button>
+            </div>
+          </div>
+        ) : null}
         {isContactsLoading ? (
           <div className="space-y-3 p-6">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -325,6 +423,13 @@ export default function ContactsPage() {
             <Table>
               <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={allVisibleSelected ? true : (someVisibleSelected ? 'indeterminate' : false)}
+                        onCheckedChange={toggleAllVisibleContacts}
+                        aria-label="Selecionar todos os contactos visíveis"
+                      />
+                    </TableHead>
                     <TableHead>Nome</TableHead>
                     <TableHead className="hidden sm:table-cell">Telefone</TableHead>
                     <TableHead className="hidden md:table-cell">Grupo</TableHead>
@@ -340,7 +445,14 @@ export default function ContactsPage() {
               </TableHeader>
               <TableBody>
                   {contacts.map((contact) => (
-                    <TableRow key={contact.id}>
+                    <TableRow key={contact.id} data-state={selectedContactIds.includes(contact.id) ? 'selected' : undefined}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedContactIds.includes(contact.id)}
+                          onCheckedChange={() => toggleContactSelection(contact.id)}
+                          aria-label={`Selecionar ${contact.name}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">{contact.name}</TableCell>
                       <TableCell className="hidden sm:table-cell">{contact.phone || '-'}</TableCell>
                       <TableCell className="hidden md:table-cell text-sm">
