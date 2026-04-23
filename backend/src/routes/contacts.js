@@ -710,6 +710,122 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
 });
 
 // POST import contacts (bulk) - MUST be before /:id routes
+router.post('/bulk-update', requirePermission('contacts', 'edit'), async (req, res) => {
+  try {
+    const userId = req.user.effectiveUserId;
+    const workspaceMode = await getWorkspaceModeForUser(userId);
+    const rawContactIds = Array.isArray(req.body?.contactIds) ? req.body.contactIds : [];
+    const changes = req.body?.changes && typeof req.body.changes === 'object' ? req.body.changes : null;
+
+    const contactIds = [...new Set(
+      rawContactIds
+        .map((value) => Number.parseInt(String(value), 10))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    )];
+
+    if (!contactIds.length) {
+      return res.status(400).json({ error: 'Selecione pelo menos um contacto.' });
+    }
+
+    if (!changes) {
+      return res.status(400).json({ error: 'Nenhuma alteração em massa foi enviada.' });
+    }
+
+    const updateData = {};
+    const changeSummary = {};
+
+    if (changes.contactGroupId !== undefined) {
+      const resolvedContactGroupId = await resolveContactGroupId(changes.contactGroupId, userId);
+      updateData.contactGroupId = resolvedContactGroupId ?? null;
+      changeSummary.contactGroupId = resolvedContactGroupId ?? null;
+    }
+
+    if (changes.status !== undefined) {
+      if (!['ativo', 'inativo'].includes(changes.status)) {
+        return res.status(400).json({ error: 'Estado inválido.' });
+      }
+      updateData.status = changes.status;
+      changeSummary.status = changes.status;
+    }
+
+    if (changes.stage !== undefined) {
+      if (typeof changes.stage !== 'string' || !(await isValidStageName(userId, changes.stage))) {
+        return res.status(400).json({ error: 'Etapa inválida.' });
+      }
+      updateData.stage = changes.stage;
+      changeSummary.stage = changes.stage;
+    }
+
+    if (changes.contactType !== undefined) {
+      if (workspaceMode === 'comercio') {
+        updateData.contactType = 'cliente';
+        changeSummary.contactType = 'cliente';
+      } else if (['interessado', 'cliente'].includes(changes.contactType)) {
+        updateData.contactType = changes.contactType;
+        changeSummary.contactType = changes.contactType;
+      } else {
+        return res.status(400).json({ error: 'Tipo de contacto inválido.' });
+      }
+    }
+
+    if (!Object.keys(updateData).length) {
+      return res.status(400).json({ error: 'Selecione pelo menos uma alteração para aplicar.' });
+    }
+
+    const targetContacts = await prisma.contact.findMany({
+      where: {
+        userId,
+        id: { in: contactIds },
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    if (!targetContacts.length) {
+      return res.status(404).json({ error: 'Nenhum contacto encontrado para a seleção atual.' });
+    }
+
+    const targetContactIds = targetContacts.map((contact) => contact.id);
+    const updateResult = await prisma.contact.updateMany({
+      where: {
+        userId,
+        id: { in: targetContactIds },
+      },
+      data: updateData,
+    });
+
+    await Promise.all(
+      targetContacts.map((contact) =>
+        logContactActivity(req, {
+          entity_type: 'contact',
+          entity_id: contact.id,
+          entity_label: contact.name,
+          action: 'bulk_updated',
+          metadata: {
+            source: 'bulk_update',
+            changes: changeSummary,
+          },
+        })
+      )
+    );
+
+    res.json({
+      requestedCount: contactIds.length,
+      matchedCount: targetContacts.length,
+      updatedCount: updateResult.count,
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error('Error bulk-updating contacts:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST import contacts (bulk) - MUST be before /:id routes
 router.post('/import', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const { contacts } = req.body;
