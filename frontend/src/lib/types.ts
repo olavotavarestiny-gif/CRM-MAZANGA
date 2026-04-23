@@ -151,6 +151,22 @@ export interface ContactGroup {
   updatedAt: string;
 }
 
+export interface BulkUpdateContactsInput {
+  contactIds: number[];
+  changes: {
+    contactGroupId?: string | null;
+    status?: 'ativo' | 'inativo';
+    stage?: string;
+    contactType?: 'interessado' | 'cliente';
+  };
+}
+
+export interface BulkUpdateContactsResponse {
+  requestedCount: number;
+  matchedCount: number;
+  updatedCount: number;
+}
+
 export type ContactFieldType = 'text' | 'number' | 'date' | 'select' | 'url';
 
 export interface ContactFieldDef {
