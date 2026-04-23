@@ -101,6 +101,10 @@ export interface Task {
   dueDate?: string | null;
   priority: Priority;
   done: boolean;
+  googleCalendarEventId?: string | null;
+  googleCalendarHtmlLink?: string | null;
+  googleCalendarSyncedAt?: string | null;
+  googleCalendarSyncError?: string | null;
   createdAt: string;
   updatedAt: string;
   contact?: {
@@ -441,6 +445,16 @@ export interface FormSubmission {
 }
 
 // Calendar types
+export interface CalendarConnectionStatus {
+  connected: boolean;
+  email?: string | null;
+  lastSyncAt?: string | null;
+  lastSyncError?: string | null;
+  lastSyncErrorAt?: string | null;
+  primaryCalendarId?: string | null;
+  reauthRequired?: boolean;
+}
+
 export interface CalendarEvent {
   id: string;
   title: string;
@@ -452,6 +466,9 @@ export interface CalendarEvent {
   taskId?: number;
   contactName?: string;
   priority?: string;
+  externalUrl?: string;
+  googleLinked?: boolean;
+  googleSyncError?: string | null;
 }
 
 // Finance types
