@@ -121,6 +121,7 @@ export interface Contact {
   email: string;
   phone: string;
   company: string;
+  contactGroupId?: string | null;
   nif?: string | null;
   dealValueKz?: number | null;
   revenue?: string;
@@ -132,10 +133,18 @@ export interface Contact {
   contactType: 'interessado' | 'cliente';
   status: 'ativo' | 'inativo';
   clienteType?: 'empresa' | 'particular';
+  contactGroup?: ContactGroup | null;
   documents: { name: string; url: string; size?: number; uploadedAt: string }[];
   createdAt: string;
   updatedAt: string;
   tasks?: Task[];
+}
+
+export interface ContactGroup {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type ContactFieldType = 'text' | 'number' | 'date' | 'select' | 'url';
