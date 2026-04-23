@@ -20,7 +20,7 @@ import { getBlockedFeatureCopy } from '@/lib/plan-utils';
 const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
 
 const ROUTE_LABELS: Record<string, string> = {
-  '/contacts':       'Clientes',
+  '/contacts':       'Contactos',
   '/pipeline':       'Processos de Venda',
   '/tasks':          'Tarefas',
   '/relatorios':     'Relatórios',

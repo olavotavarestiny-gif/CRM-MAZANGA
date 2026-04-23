@@ -24,7 +24,7 @@ type StockPermissionKey = 'view' | 'edit';
 type TaskAssignmentPermissionKey = 'assign_admin_owner';
 
 const SERVICOS_SIMPLE_MODULES: { key: keyof Omit<UserPermissions, 'finances'>; label: string }[] = [
-  { key: 'contacts', label: 'Clientes' },
+  { key: 'contacts', label: 'Contactos' },
   { key: 'pipeline', label: 'Processos' },
   { key: 'tasks', label: 'Tarefas' },
   { key: 'vendas', label: 'Vendas' },
@@ -34,7 +34,7 @@ const SERVICOS_SIMPLE_MODULES: { key: keyof Omit<UserPermissions, 'finances'>; l
 ];
 
 const COMERCIO_SIMPLE_MODULES: { key: keyof Omit<UserPermissions, 'finances'>; label: string }[] = [
-  { key: 'contacts', label: 'Clientes' },
+  { key: 'contacts', label: 'Contactos' },
   { key: 'vendas', label: 'Venda Rápida' },
 ];
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { createContact, updateContact, getContactFieldDefs, getContactFieldConfigs, getPipelineStages, getCurrentUser } from '@/lib/api';
+import { createContact, updateContact, getContactFieldDefs, getContactFieldConfigs, getPipelineStages, getCurrentUser, getContactGroups } from '@/lib/api';
 import { Contact, ContactFieldDef, ContactFieldConfig, ContactFieldType } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,8 @@ import { X } from 'lucide-react';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { useToast } from '@/components/ui/toast-provider';
+
+const NO_GROUP_VALUE = '__NONE__';
 
 // Renders a single field based on its type
 function FieldInput({
@@ -116,10 +118,12 @@ export default function ContactForm({
   contact,
   contactId,
   onSuccess,
+  onManageGroups,
 }: {
   contact?: Contact;
   contactId?: number;
   onSuccess?: () => void;
+  onManageGroups?: () => void;
 }) {
   const isEditMode = !!contactId;
   const { toast } = useToast();
@@ -133,6 +137,7 @@ export default function ContactForm({
   const [tipoCliente, setTipoCliente] = useState<'empresa' | 'particular'>(
     contact?.clienteType || 'particular'
   );
+  const [contactGroupId, setContactGroupId] = useState<string | null>(contact?.contactGroupId ?? null);
 
   // Dynamic values keyed by field.key
   const [values, setValues] = useState<Record<string, string | string[]>>(() => {
@@ -157,6 +162,7 @@ export default function ContactForm({
         contact.dealValueKz !== null && contact.dealValueKz !== undefined ? String(contact.dealValueKz) : ''
       );
       setTipoCliente(contact.clienteType || 'particular');
+      setContactGroupId(contact.contactGroupId ?? null);
       setValues({
         email: contact.email ?? '',
         phone: contact.phone ?? '',
@@ -196,6 +202,17 @@ export default function ContactForm({
     enabled: showStageField,
   });
 
+  const { data: contactGroups = [] } = useQuery({
+    queryKey: ['contactGroups'],
+    queryFn: getContactGroups,
+  });
+
+  useEffect(() => {
+    if (contactGroupId && !contactGroups.some((group) => group.id === contactGroupId)) {
+      setContactGroupId(null);
+    }
+  }, [contactGroupId, contactGroups]);
+
   const nameConfig = systemConfigs.find(c => c.fieldKey === 'name');
   const phoneConfig = systemConfigs.find(c => c.fieldKey === 'phone');
   const nifConfig = systemConfigs.find(c => c.fieldKey === 'nif');
@@ -226,6 +243,7 @@ export default function ContactForm({
       const payload = {
         name,
         clienteType: tipoCliente,
+        contactGroupId,
         email: (values.email as string) || '',
         phone: (values.phone as string) || '',
         nif: (values.nif as string) || '',
@@ -250,6 +268,7 @@ export default function ContactForm({
         setName('');
         setStage('Novo');
         setDealValueKz('');
+        setContactGroupId(null);
         setValues({ email: '', phone: '', nif: '', company: '', revenue: '', sector: '', tags: [] });
       }
       toast({
@@ -334,6 +353,37 @@ export default function ContactForm({
           required={tipoCliente === 'empresa'}
           className="mt-1"
         />
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between gap-3">
+          <Label>Grupo</Label>
+          {onManageGroups ? (
+            <button
+              type="button"
+              onClick={onManageGroups}
+              className="text-xs font-medium text-[#0A2540] hover:underline"
+            >
+              Gerir grupos
+            </button>
+          ) : null}
+        </div>
+        <Select
+          value={contactGroupId ?? NO_GROUP_VALUE}
+          onValueChange={(value) => setContactGroupId(value === NO_GROUP_VALUE ? null : value)}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder="Sem grupo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_GROUP_VALUE}>Sem grupo</SelectItem>
+            {contactGroups.map((group) => (
+              <SelectItem key={group.id} value={group.id}>
+                {group.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Company — shown for company-type contacts */}

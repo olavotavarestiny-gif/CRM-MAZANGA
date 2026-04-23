@@ -40,7 +40,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: 'contactos',
     icon: Users,
     title: 'Contactos',
-    description: 'Base de dados de clientes e leads. Filtre por sector, etiqueta ou fase. Veja o histórico completo de interacções de cada contacto.',
+    description: 'Base de dados de contactos e leads. Filtre por sector, etiqueta ou fase. Veja o histórico completo de interacções de cada contacto.',
     highlight: true,
     category: 'main',
   },

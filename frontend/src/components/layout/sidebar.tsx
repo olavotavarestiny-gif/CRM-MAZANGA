@@ -120,7 +120,7 @@ export default function Sidebar({
   // SERVICOS: standard CRM nav
   const allMainLinks = [
     { href: '/', label: 'Painel', icon: BarChart3 },
-    { href: '/contacts', label: 'Clientes', icon: Users, module: 'contacts' as const },
+    { href: '/contacts', label: 'Contactos', icon: Users, module: 'contacts' as const },
     { href: '/pipeline', label: 'Processos de Venda', icon: Kanban, module: 'pipeline' as const },
     { href: '/tasks', label: 'Tarefas', icon: CheckSquare, module: 'tasks' as const },
     { href: '/vendas', label: 'Vendas', icon: ShoppingBag, module: 'vendas' as const },
@@ -135,7 +135,7 @@ export default function Sidebar({
     { href: '/', label: 'Painel', icon: BarChart3 },
     { href: '/caixa', label: 'Caixa', icon: CreditCard, module: 'vendas' as const },
     { href: '/vendas-rapidas', label: 'Venda Rápida', icon: ShoppingCart, module: 'vendas' as const },
-    { href: '/contacts', label: 'Clientes', icon: Users, module: 'contacts' as const },
+    { href: '/contacts', label: 'Contactos', icon: Users, module: 'contacts' as const },
     { href: '/tasks', label: 'Tarefas', icon: CheckSquare, module: 'tasks' as const },
     { href: '/produtos', label: 'Produtos', icon: Package, module: 'vendas' as const },
   ].filter(l => isVisible(l.href)) : [];

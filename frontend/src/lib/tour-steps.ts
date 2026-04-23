@@ -48,7 +48,7 @@ export const TOUR_GROUPS: TourGroup[] = [
         element: '[data-tour="sidebar-contactos"]',
         popover: {
           title: 'Contactos',
-          description: 'Base de dados de clientes e leads. Acede ao histórico completo de cada um.',
+          description: 'Base de dados de contactos e leads. Acede ao histórico completo de cada um.',
           side: 'right',
         },
       },
@@ -127,7 +127,7 @@ export const TOUR_GROUPS: TourGroup[] = [
       {
         element: '[data-tour="contacts-table"]',
         popover: {
-          title: 'Base de dados de clientes',
+          title: 'Base de dados de contactos',
           description: 'Todos os teus contactos aqui. Clica no ícone de mensagem para ver o perfil completo e o histórico de interacções.',
           side: 'top',
           align: 'start',

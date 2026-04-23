@@ -101,6 +101,10 @@ export interface Task {
   dueDate?: string | null;
   priority: Priority;
   done: boolean;
+  googleCalendarEventId?: string | null;
+  googleCalendarHtmlLink?: string | null;
+  googleCalendarSyncedAt?: string | null;
+  googleCalendarSyncError?: string | null;
   createdAt: string;
   updatedAt: string;
   contact?: {
@@ -121,6 +125,7 @@ export interface Contact {
   email: string;
   phone: string;
   company: string;
+  contactGroupId?: string | null;
   nif?: string | null;
   dealValueKz?: number | null;
   revenue?: string;
@@ -132,10 +137,18 @@ export interface Contact {
   contactType: 'interessado' | 'cliente';
   status: 'ativo' | 'inativo';
   clienteType?: 'empresa' | 'particular';
+  contactGroup?: ContactGroup | null;
   documents: { name: string; url: string; size?: number; uploadedAt: string }[];
   createdAt: string;
   updatedAt: string;
   tasks?: Task[];
+}
+
+export interface ContactGroup {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type ContactFieldType = 'text' | 'number' | 'date' | 'select' | 'url';
@@ -453,6 +466,9 @@ export interface CalendarEvent {
   taskId?: number;
   contactName?: string;
   priority?: string;
+  externalUrl?: string;
+  googleLinked?: boolean;
+  googleSyncError?: string | null;
 }
 
 // Finance types
