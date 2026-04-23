@@ -72,6 +72,40 @@ const normalizeAllowedOrigin = (value) => {
     : `https://${value}`;
 };
 
+const parseAllowedOrigins = (...values) => {
+  const origins = values
+    .flatMap((value) => String(value || '').split(/[,\s]+/))
+    .map((value) => normalizeAllowedOrigin(value.trim()))
+    .filter(Boolean);
+
+  return [...new Set(origins)];
+};
+
+const isManagedFrontendOrigin = (origin) => {
+  try {
+    const { hostname, protocol } = new URL(origin);
+    if (protocol !== 'https:' && protocol !== 'http:') return false;
+
+    // Production app + official subdomains under app.kukugest.ao.
+    if (hostname === 'app.kukugest.ao' || hostname.endsWith('.app.kukugest.ao')) {
+      return true;
+    }
+
+    // Official beta/staging custom domain.
+    if (hostname === 'beta.kukugest.ao') {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+const explicitlyAllowedOrigins = new Set(
+  parseAllowedOrigins(process.env.FRONTEND_URL, process.env.ALLOWED_VERCEL_URL)
+);
+
 // Middleware
 // Allow CORS from localhost (development) and production domains
 app.use(cors({
@@ -81,20 +115,14 @@ app.use(cors({
       return callback(null, true);
     }
 
-    // Allow only the specific Vercel deployment URL (avoids wildcard *.vercel.app)
-    const allowedVercel = normalizeAllowedOrigin(process.env.ALLOWED_VERCEL_URL); // e.g. 'preview-kukugest.vercel.app'
-    if (allowedVercel && origin === allowedVercel) {
+    // Allow managed custom domains used by production/staging.
+    if (isManagedFrontendOrigin(origin)) {
       return callback(null, true);
     }
 
-    // Allow app.kukugest.ao and any subdomain under it
-    if (origin === 'https://app.kukugest.ao' || origin.endsWith('.app.kukugest.ao')) {
-      return callback(null, true);
-    }
-
-    // Allow exact FRONTEND_URL if set (e.g. https://app.kukugest.ao)
-    const frontendOrigin = normalizeAllowedOrigin(process.env.FRONTEND_URL);
-    if (frontendOrigin && origin === frontendOrigin) {
+    // Allow exact frontend origins from env. Supports comma-separated values for
+    // multiple previews/custom domains without opening wildcard CORS.
+    if (explicitlyAllowedOrigins.has(origin)) {
       return callback(null, true);
     }
 
