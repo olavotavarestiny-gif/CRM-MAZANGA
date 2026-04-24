@@ -782,8 +782,8 @@ export async function getCalendarEvents(start: string, end: string): Promise<Cal
   return response.data;
 }
 
-export async function connectCalendar(): Promise<{ authUrl: string }> {
-  const response = await api.post('/api/calendar/connect');
+export async function connectCalendar(returnTo?: string): Promise<{ authUrl: string }> {
+  const response = await api.post('/api/calendar/connect', returnTo ? { returnTo } : {});
   return response.data;
 }
 

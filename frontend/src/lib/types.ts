@@ -101,6 +101,9 @@ export interface Task {
   dueDate?: string | null;
   priority: Priority;
   done: boolean;
+  googleCalendarEventId?: string | null;
+  googleCalendarHtmlLink?: string | null;
+  googleCalendarSyncError?: string | null;
   createdAt: string;
   updatedAt: string;
   contact?: {
