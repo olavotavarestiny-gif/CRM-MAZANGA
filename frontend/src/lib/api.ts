@@ -21,8 +21,12 @@ import type {
   CommercialAdvancedSalesResponse,
   CommercialAdvancedTeamResponse,
   Contact,
+  ContactGroup,
+  ContactFacetsResponse,
   ContactFieldConfig,
   ContactFieldDef,
+  ContactStatsResponse,
+  ContactsPageResponse,
   CRMForm,
   DashboardStats,
   Estabelecimento,
@@ -61,6 +65,12 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
+let _supabaseClient: ReturnType<typeof createClient> | null = null;
+function getSupabaseClient() {
+  if (!_supabaseClient) _supabaseClient = createClient();
+  return _supabaseClient;
+}
+
 // Request interceptor: prefer impersonation token, fall back to Supabase session token
 api.interceptors.request.use(async (config) => {
   if (typeof window !== 'undefined') {
@@ -70,7 +80,7 @@ api.interceptors.request.use(async (config) => {
       return config;
     }
   }
-  const supabase = createClient();
+  const supabase = getSupabaseClient();
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.access_token) {
     config.headers.Authorization = `Bearer ${session.access_token}`;
@@ -101,9 +111,76 @@ api.interceptors.response.use(
 );
 
 // Contacts
-export async function getContacts(params?: { stage?: string; search?: string; revenue?: string; inPipeline?: string; contactType?: string }) {
-  const response = await api.get<Contact[]>('/api/contacts', { params });
+export interface ContactsQueryParams {
+  page?: number;
+  limit?: number;
+  stage?: string;
+  search?: string;
+  revenue?: string;
+  inPipeline?: string;
+  contactType?: string;
+  groupId?: string;
+}
+
+export async function getContactsPage(params?: ContactsQueryParams) {
+  const response = await api.get<ContactsPageResponse>('/api/contacts', { params });
   return response.data;
+}
+
+export async function searchContacts(params?: Omit<ContactsQueryParams, 'page' | 'limit'> & { limit?: number }) {
+  const response = await getContactsPage({
+    ...params,
+    page: 1,
+    limit: params?.limit ?? 20,
+  });
+  return response.data;
+}
+
+export async function getContactStats() {
+  const response = await api.get<ContactStatsResponse>('/api/contacts/stats');
+  return response.data;
+}
+
+export async function getContactGroups() {
+  const response = await api.get<ContactGroup[]>('/api/contacts/groups');
+  return response.data;
+}
+
+export async function createContactGroup(data: Pick<ContactGroup, 'name'>) {
+  const response = await api.post<ContactGroup>('/api/contacts/groups', data);
+  return response.data;
+}
+
+export async function updateContactGroup(id: string, data: Pick<ContactGroup, 'name'>) {
+  const response = await api.put<ContactGroup>(`/api/contacts/groups/${id}`, data);
+  return response.data;
+}
+
+export async function deleteContactGroup(id: string) {
+  const response = await api.delete<{ message: string; detachedContactsCount: number }>(`/api/contacts/groups/${id}`);
+  return response.data;
+}
+
+export async function getContactFacets() {
+  const response = await api.get<ContactFacetsResponse>('/api/contacts/facets');
+  return response.data;
+}
+
+export async function getAllContactsTemporary(params?: Omit<ContactsQueryParams, 'page' | 'limit'>) {
+  // TEMPORARY: loops through paginated `/api/contacts` responses for legacy full-dataset consumers.
+  // Do not use this in the main `/contacts` screen; replace remaining call sites with dedicated endpoints.
+  const results: Contact[] = [];
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const response = await getContactsPage({ ...params, page, limit: 100 });
+    results.push(...response.data);
+    totalPages = response.pagination.totalPages;
+    page += 1;
+  } while (page <= totalPages);
+
+  return results;
 }
 
 export async function createContact(data: Partial<Contact>) {
@@ -528,6 +605,9 @@ export interface UserPermissions {
     view?: boolean;
     edit?: boolean;
   };
+  taskAssignment?: {
+    assign_admin_owner?: boolean;
+  };
 }
 
 export type PlanName = 'essencial' | 'profissional' | 'enterprise';
@@ -779,8 +859,8 @@ export async function getCalendarEvents(start: string, end: string): Promise<Cal
   return response.data;
 }
 
-export async function connectCalendar(): Promise<{ authUrl: string }> {
-  const response = await api.post('/api/calendar/connect');
+export async function connectCalendar(returnTo?: string): Promise<{ authUrl: string }> {
+  const response = await api.post('/api/calendar/connect', returnTo ? { returnTo } : {});
   return response.data;
 }
 
@@ -796,36 +876,6 @@ export async function syncCalendar(): Promise<{
 
 export async function disconnectCalendar(): Promise<void> {
   await api.delete('/api/calendar/disconnect');
-}
-
-export async function pushCalendarEvent(event: {
-  title: string;
-  description?: string;
-  startTime: string;
-  endTime: string;
-  attendees?: string[];
-  googleEventId?: string;
-}): Promise<{ googleEventId: string; htmlLink: string | null }> {
-  const response = await api.post('/api/calendar/events/push', event);
-  return response.data;
-}
-
-export async function deleteCalendarEvent(googleEventId: string): Promise<void> {
-  await api.delete(`/api/calendar/events/${encodeURIComponent(googleEventId)}`);
-}
-
-export async function startCalendarWatch(): Promise<{ channelId: string; watchExpiry: string }> {
-  const response = await api.post('/api/calendar/watch/start');
-  return response.data;
-}
-
-export async function stopCalendarWatch(): Promise<void> {
-  await api.post('/api/calendar/watch/stop');
-}
-
-export async function getCalendarWatchStatus(): Promise<{ active: boolean; watchExpiry: string | null }> {
-  const response = await api.get('/api/calendar/watch/status');
-  return response.data;
 }
 
 // ============================================
@@ -1265,7 +1315,16 @@ export async function getChatUnreadCount(): Promise<number> {
   return res.data.unread;
 }
 
-export async function getChatUsers(): Promise<{ id: number; name: string; email: string }[]> {
+export interface ChatUser {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  accountOwnerId?: number | null;
+  isSuperAdmin?: boolean;
+}
+
+export async function getChatUsers(): Promise<ChatUser[]> {
   const res = await api.get('/api/chat/users');
   return res.data;
 }

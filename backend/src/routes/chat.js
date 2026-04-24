@@ -100,7 +100,48 @@ router.get('/channels', requirePermission('chat', 'view'), async (req, res) => {
       orderBy: { createdAt: 'asc' },
     });
 
-    const result = await Promise.all(channels.map((c) => buildChannelResponse(c, userId)));
+    if (channels.length === 0) {
+      return res.json([]);
+    }
+
+    const channelIds = channels.map((c) => c.id);
+
+    // Fetch last message per channel in one query
+    const lastMessages = await prisma.chatMessage.findMany({
+      where: { channelId: { in: channelIds } },
+      orderBy: { createdAt: 'desc' },
+      distinct: ['channelId'],
+      include: { sender: { select: { name: true } } },
+    });
+    const lastMessageMap = Object.fromEntries(lastMessages.map((m) => [m.channelId, m]));
+
+    // Fetch unread counts for all channels in parallel
+    const unreadCounts = await Promise.all(
+      channels.map((c) => {
+        const membership = c.members.find((m) => m.userId === userId);
+        const lastReadAt = membership?.lastReadAt || new Date(0);
+        return prisma.chatMessage.count({
+          where: { channelId: c.id, senderId: { not: userId }, createdAt: { gt: lastReadAt } },
+        });
+      })
+    );
+
+    const result = channels.map((c, i) => {
+      const lm = lastMessageMap[c.id];
+      return {
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        type: c.type,
+        orgId: c.orgId,
+        createdById: c.createdById,
+        createdAt: c.createdAt,
+        members: c.members.map((m) => ({ userId: m.userId, name: m.user?.name || '', email: m.user?.email || '' })),
+        unreadCount: unreadCounts[i],
+        lastMessage: lm ? { text: lm.text, createdAt: lm.createdAt, senderName: lm.sender?.name || '' } : null,
+      };
+    });
+
     res.json(result);
   } catch (err) {
     console.error('GET /chat/channels error:', err);
@@ -352,17 +393,18 @@ router.get('/unread', requirePermission('chat', 'view'), async (req, res) => {
       select: { channelId: true, lastReadAt: true },
     });
 
-    let total = 0;
-    for (const m of memberships) {
-      const count = await prisma.chatMessage.count({
-        where: {
-          channelId: m.channelId,
-          senderId: { not: userId },
-          createdAt: { gt: m.lastReadAt || new Date(0) },
-        },
-      });
-      total += count;
-    }
+    const counts = await Promise.all(
+      memberships.map((m) =>
+        prisma.chatMessage.count({
+          where: {
+            channelId: m.channelId,
+            senderId: { not: userId },
+            createdAt: { gt: m.lastReadAt || new Date(0) },
+          },
+        })
+      )
+    );
+    const total = counts.reduce((sum, c) => sum + c, 0);
 
     res.json({ unread: total });
   } catch (err) {
@@ -375,7 +417,6 @@ router.get('/unread', requirePermission('chat', 'view'), async (req, res) => {
 router.get('/users', async (req, res) => {
   try {
     const orgId = getOrgId(req);
-    const userId = req.user.id;
 
     // The org consists of: the account owner + all members with accountOwnerId = orgId
     const users = await prisma.user.findMany({
@@ -386,7 +427,14 @@ router.get('/users', async (req, res) => {
         ],
         active: true,
       },
-      select: { id: true, name: true, email: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        accountOwnerId: true,
+        isSuperAdmin: true,
+      },
       orderBy: { name: 'asc' },
     });
 

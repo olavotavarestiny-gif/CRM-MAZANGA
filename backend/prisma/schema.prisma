@@ -30,6 +30,7 @@ model User {
   createdAt                 DateTime               @default(now())
   loginLogs                 LoginLog[]
   contacts                  Contact[]              @relation("ContactUser")
+  contactGroups             ContactGroup[]         @relation("ContactGroupUser")
   contactFieldDefs          ContactFieldDef[]      @relation("ContactFieldDefUser")
   contactFieldConfigs       ContactFieldConfig[]   @relation("ContactFieldConfigUser")
   pipelineStages            PipelineStage[]        @relation("PipelineStageUser")
@@ -79,6 +80,7 @@ model LoginLog {
 model Contact {
   id              Int              @id @default(autoincrement())
   userId          Int?
+  contactGroupId  String?
   name            String
   email           String
   phone           String
@@ -100,12 +102,31 @@ model Contact {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   user            User?            @relation("ContactUser", fields: [userId], references: [id], onDelete: SetNull)
+  contactGroup    ContactGroup?    @relation(fields: [contactGroupId], references: [id], onDelete: SetNull)
   messages        Message[]
   tasks           Task[]
   transactions    Transaction[]
   automationLogs  AutomationLog[]
 
   @@unique([userId, phone], name: "user_phone_unique")
+  @@index([contactGroupId])
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([userId, inPipeline])
+  @@index([userId, stage])
+}
+
+model ContactGroup {
+  id             String    @id @default(cuid())
+  userId         Int
+  name           String
+  normalizedName String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation("ContactGroupUser", fields: [userId], references: [id], onDelete: Cascade)
+  contacts       Contact[]
+
+  @@unique([userId, normalizedName])
 }
 
 model ContactNote {
@@ -171,6 +192,8 @@ model Message {
   subject   String?
   timestamp DateTime @default(now())
   contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
 }
 
 model Task {
@@ -194,6 +217,8 @@ model Task {
   contact          Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
   @@index([assignedToUserId])
+  @@index([userId, dueDate])
+  @@index([contactId])
 }
 
 model Automation {

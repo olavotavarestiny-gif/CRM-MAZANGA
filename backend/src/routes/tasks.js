@@ -1,6 +1,11 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
-const { requirePermission, requireDeletePermission, canPerform } = require('../lib/permissions');
+const {
+  requirePermission,
+  requireDeletePermission,
+  canPerform,
+  canTaskAssignment,
+} = require('../lib/permissions');
 const { log: logActivity } = require('../services/activity-log.service.js');
 const { canCreateTask, buildLimitErrorPayload } = require('../lib/plan-limits');
 const {
@@ -70,11 +75,21 @@ async function resolveAssigneeId(req, rawAssigneeId) {
     return { error: 'Responsável não encontrado nesta conta' };
   }
 
-  if (!isPrivilegedTaskManager(req) && assignee.id !== req.user.id) {
-    return { error: 'Só pode atribuir tarefas a si mesmo' };
+  if (!canAssignTaskToUser(req, assignee)) {
+    return { error: 'Só pode atribuir tarefas a si mesmo ou a admin/owner autorizado' };
   }
 
   return { assignedToUserId, assignee };
+}
+
+function canAssignTaskToUser(req, assignee) {
+  if (isPrivilegedTaskManager(req)) return true;
+  if (assignee.id === req.user.id) return true;
+
+  const canAssignAdminOwner = canTaskAssignment(req.user.permissionsJson, 'assign_admin_owner');
+  const isAdminOrOwner = assignee.role === 'admin' || !assignee.accountOwnerId;
+
+  return canAssignAdminOwner && isAdminOrOwner;
 }
 
 async function ensureDirectChannel(orgId, userAId, userBId) {
@@ -363,6 +378,7 @@ router.get('/', requirePermission('tasks', 'view'), async (req, res) => {
       where,
       include: TASK_INCLUDE,
       orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+      take: 500,
     });
 
     res.json(tasks);
