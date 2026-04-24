@@ -1,36 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import { getCurrentUserWithToken, logLoginWithToken } from '@/lib/api';
 import Link from 'next/link';
 import { Mail, Lock } from 'lucide-react';
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
 import { KukuGestLoginLogo } from '@/components/KukuGestLogo';
 
-function getLoginBackendErrorMessage(error: any) {
-  if (error?.response?.data?.error) {
-    return error.response.data.error;
-  }
-
-  if (error?.response?.status === 401) {
-    return 'Sessão Supabase criada, mas o backend rejeitou a autenticação. Confirma se frontend e backend apontam para o mesmo projeto Supabase.';
-  }
-
-  if (error?.response?.status === 403) {
-    return 'Sessão Supabase criada, mas o utilizador não está autorizado no backend. Confirma se a conta existe no CRM e se está ativa.';
-  }
-
-  if (!error?.response) {
-    return 'Sessão criada no Supabase, mas o frontend não conseguiu contactar o backend. Verifica NEXT_PUBLIC_API_URL, o /health do backend e CORS (FRONTEND_URL ou ALLOWED_VERCEL_URL).';
-  }
-
-  return error?.message || 'Erro ao ligar ao servidor. Tente novamente.';
-}
-
 export default function LoginPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [email, setEmail] = useState('');
@@ -46,44 +22,29 @@ export default function LoginPage() {
         localStorage.removeItem('impersonation_token');
       }
 
-      const supabase = createClient();
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
 
-      // 1. Authenticate with Supabase
-      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError) {
-        setError(authError.message === 'Invalid login credentials'
-          ? 'Email ou password incorretos'
-          : authError.message);
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setError(result?.error || 'Erro ao ligar ao servidor. Tente novamente.');
         return;
       }
 
-      const accessToken = data.session?.access_token;
-      if (!accessToken) {
-        setError('Sessão criada sem access token. Tente novamente.');
-        return;
+      if (typeof window !== 'undefined') {
+        window.location.assign(result?.mustChangePassword ? '/change-password' : '/');
       }
-
-      if (!process.env.NEXT_PUBLIC_API_URL) {
-        await supabase.auth.signOut();
-        setError('A beta está sem NEXT_PUBLIC_API_URL configurado. O login autenticou no Supabase, mas não consegue contactar o backend.');
-        return;
-      }
-
-      // 2. Load user from our backend using the fresh token returned by Supabase
-      const user = await getCurrentUserWithToken(accessToken);
-      try {
-        await logLoginWithToken(accessToken);
-      } catch (loginLogError) {
-        console.error('Não foi possível registar o login:', loginLogError);
-      }
-
-      if (user.mustChangePassword) {
-        router.push('/change-password');
-      } else {
-        router.push('/');
-      }
-    } catch (err: any) {
-      setError(getLoginBackendErrorMessage(err));
+    } catch {
+      setError('Erro ao ligar ao servidor. Tente novamente.');
     } finally {
       setLoading(false);
     }
