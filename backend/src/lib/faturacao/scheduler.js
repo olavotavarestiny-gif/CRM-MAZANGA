@@ -1,14 +1,12 @@
 'use strict';
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../prisma');
 const { getNextDocumentNumber } = require('./numeracao');
 const { generateQRCode } = require('./qrcode');
 const { registarFatura } = require('./agt-api');
 const { registerFacturaFinanceEntry } = require('./register-finance-entry');
 const { logInvoiceCreatedActivity, buildActivityActor } = require('../activity-log');
 const { normalizeInvoiceCurrencyInput } = require('./currency');
-
-const prisma = new PrismaClient();
 
 /**
  * Calculates the next run date based on frequency.

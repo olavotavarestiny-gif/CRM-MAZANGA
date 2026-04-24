@@ -378,6 +378,7 @@ router.get('/', requirePermission('tasks', 'view'), async (req, res) => {
       where,
       include: TASK_INCLUDE,
       orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+      take: 500,
     });
 
     res.json(tasks);

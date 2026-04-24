@@ -110,6 +110,10 @@ model Contact {
 
   @@unique([userId, phone], name: "user_phone_unique")
   @@index([contactGroupId])
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([userId, inPipeline])
+  @@index([userId, stage])
 }
 
 model ContactGroup {
@@ -188,6 +192,8 @@ model Message {
   subject   String?
   timestamp DateTime @default(now())
   contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
 }
 
 model Task {
@@ -211,6 +217,8 @@ model Task {
   contact          Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
   @@index([assignedToUserId])
+  @@index([userId, dueDate])
+  @@index([contactId])
 }
 
 model Automation {

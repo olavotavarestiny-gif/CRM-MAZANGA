@@ -90,7 +90,7 @@ export default function ContactsPage() {
   const { data: systemConfigs = [] } = useQuery({
     queryKey: ['contactFieldConfigs'],
     queryFn: getContactFieldConfigs,
-    staleTime: 0,
+    staleTime: 5 * 60_000,
   });
 
   const { data: contactGroups = [] } = useQuery({

@@ -94,6 +94,12 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
+let _supabaseClient: ReturnType<typeof createClient> | null = null;
+function getSupabaseClient() {
+  if (!_supabaseClient) _supabaseClient = createClient();
+  return _supabaseClient;
+}
+
 // Request interceptor: prefer impersonation token, fall back to Supabase session token
 api.interceptors.request.use(async (config) => {
   if (API_URL_CONFIG_ERROR) {
@@ -107,7 +113,7 @@ api.interceptors.request.use(async (config) => {
       return config;
     }
   }
-  const supabase = createClient();
+  const supabase = getSupabaseClient();
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.access_token) {
     config.headers.Authorization = `Bearer ${session.access_token}`;
@@ -861,36 +867,6 @@ export async function syncCalendar(): Promise<{
 
 export async function disconnectCalendar(): Promise<void> {
   await api.delete('/api/calendar/disconnect');
-}
-
-export async function pushCalendarEvent(event: {
-  title: string;
-  description?: string;
-  startTime: string;
-  endTime: string;
-  attendees?: string[];
-  googleEventId?: string;
-}): Promise<{ googleEventId: string; htmlLink: string | null }> {
-  const response = await api.post('/api/calendar/events/push', event);
-  return response.data;
-}
-
-export async function deleteCalendarEvent(googleEventId: string): Promise<void> {
-  await api.delete(`/api/calendar/events/${encodeURIComponent(googleEventId)}`);
-}
-
-export async function startCalendarWatch(): Promise<{ channelId: string; watchExpiry: string }> {
-  const response = await api.post('/api/calendar/watch/start');
-  return response.data;
-}
-
-export async function stopCalendarWatch(): Promise<void> {
-  await api.post('/api/calendar/watch/stop');
-}
-
-export async function getCalendarWatchStatus(): Promise<{ active: boolean; watchExpiry: string | null }> {
-  const response = await api.get('/api/calendar/watch/status');
-  return response.data;
 }
 
 // ============================================
