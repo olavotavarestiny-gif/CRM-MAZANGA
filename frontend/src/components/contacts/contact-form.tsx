@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { createContact, updateContact, getContactFieldDefs, getContactFieldConfigs, getPipelineStages, getCurrentUser, getContactGroups } from '@/lib/api';
 import type { Contact, ContactFieldType } from '@/lib/types';
@@ -20,6 +20,15 @@ import { LoadingButton } from '@/components/ui/loading-button';
 import { useToast } from '@/components/ui/toast-provider';
 
 const NO_GROUP_VALUE = '__NONE__';
+
+function FormSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4">
+      <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-[#6b7e9a]">{title}</p>
+      {children}
+    </section>
+  );
+}
 
 // Renders a single field based on its type
 function FieldInput({
@@ -234,10 +243,11 @@ export default function ContactForm({
   const phoneConfig = systemConfigs.find(c => c.fieldKey === 'phone');
   const nifConfig = systemConfigs.find(c => c.fieldKey === 'nif');
   const companyConfig = systemConfigs.find(c => c.fieldKey === 'company');
+  const sectorConfig = systemConfigs.find(c => c.fieldKey === 'sector');
   const clienteTypeConfig = systemConfigs.find(c => c.fieldKey === 'clienteType');
 
   // Core fields are rendered with dedicated UI, so they should not repeat below.
-  const ALWAYS_SHOWN = new Set(['name', 'phone', 'nif', 'company', 'clienteType']);
+  const ALWAYS_SHOWN = new Set(['name', 'phone', 'nif', 'company', 'sector', 'clienteType']);
   const allSystemFieldsSorted = systemConfigs.sort((a, b) => a.order - b.order);
   const visibleSystemFields = allSystemFieldsSorted.filter(c => {
     if (ALWAYS_SHOWN.has(c.fieldKey)) return false; // rendered separately
@@ -307,197 +317,224 @@ export default function ContactForm({
   const customFieldDefs = fieldDefs;
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4">
+    <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-5 pb-2">
+      <FormSection title="Dados principais">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <Label>{clienteTypeConfig?.label || 'Tipo de Cliente'}{clienteTypeConfig?.required && <span className="text-red-500 ml-0.5">*</span>}</Label>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setTipoCliente('particular')}
+                className={`rounded-lg border py-2 text-sm font-medium transition ${
+                  tipoCliente === 'particular'
+                    ? 'bg-[#0A2540] text-white border-[#0A2540]'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                Particular
+              </button>
+              <button
+                type="button"
+                onClick={() => setTipoCliente('empresa')}
+                className={`rounded-lg border py-2 text-sm font-medium transition ${
+                  tipoCliente === 'empresa'
+                    ? 'bg-[#0A2540] text-white border-[#0A2540]'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                Empresa
+              </button>
+            </div>
+          </div>
 
-      {/* Tipo de Cliente */}
-      <div>
-        <Label>{clienteTypeConfig?.label || 'Tipo de Cliente'}{clienteTypeConfig?.required && <span className="text-red-500 ml-0.5">*</span>}</Label>
-        <div className="flex gap-2 mt-1">
-          <button
-            type="button"
-            onClick={() => setTipoCliente('particular')}
-            className={`flex-1 py-2 rounded-lg border text-sm font-medium transition ${
-              tipoCliente === 'particular'
-                ? 'bg-[#0A2540] text-white border-[#0A2540]'
-                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-            }`}
-          >
-            Particular
-          </button>
-          <button
-            type="button"
-            onClick={() => setTipoCliente('empresa')}
-            className={`flex-1 py-2 rounded-lg border text-sm font-medium transition ${
-              tipoCliente === 'empresa'
-                ? 'bg-[#0A2540] text-white border-[#0A2540]'
-                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-            }`}
-          >
-            Empresa
-          </button>
-        </div>
-      </div>
-
-      {/* Name — always shown */}
-      <div>
-        <Label>{nameConfig?.label || 'Nome'}{(nameConfig?.required ?? true) && <span className="text-red-500 ml-0.5">*</span>}</Label>
-        <Input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required={nameConfig?.required ?? true}
-          className="mt-1"
-        />
-      </div>
-
-      {/* Phone — always shown */}
-      <div>
-        <Label>{phoneConfig?.label || 'Número'}{phoneConfig?.required && <span className="text-red-500 ml-0.5">*</span>}</Label>
-        <Input
-          value={values['phone'] as string}
-          onChange={(e) => setValue('phone', e.target.value)}
-          placeholder="+244 9xx xxx xxx"
-          required={phoneConfig?.required}
-          className="mt-1"
-        />
-      </div>
-
-      <div>
-        <Label>{nifConfig?.label || 'NIF'}{tipoCliente === 'empresa' && <span className="text-red-500 ml-0.5">*</span>}</Label>
-        <Input
-          value={values['nif'] as string}
-          onChange={(e) => setValue('nif', e.target.value)}
-          placeholder={tipoCliente === 'empresa' ? 'NIF obrigatório para empresas' : 'Opcional para particulares'}
-          required={tipoCliente === 'empresa'}
-          className="mt-1"
-        />
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between gap-3">
-          <Label>Grupo</Label>
-          {onManageGroups ? (
-            <button
-              type="button"
-              onClick={onManageGroups}
-              className="text-xs font-medium text-[#0A2540] hover:underline"
-            >
-              Gerir grupos
-            </button>
-          ) : null}
-        </div>
-        <Select
-          value={contactGroupId ?? NO_GROUP_VALUE}
-          onValueChange={(value) => setContactGroupId(value === NO_GROUP_VALUE ? null : value)}
-        >
-          <SelectTrigger className="mt-1">
-            <SelectValue placeholder="Sem grupo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NO_GROUP_VALUE}>Sem grupo</SelectItem>
-            {contactGroups.map((group) => (
-              <SelectItem key={group.id} value={group.id}>
-                {group.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Company — shown for company-type contacts */}
-      {tipoCliente === 'empresa' && companyConfig && companyConfig.visible !== false && (
-        <div key="company-forced">
-          <Label>{companyConfig.label}{companyConfig.required && <span className="text-red-500 ml-0.5">*</span>}</Label>
-          <div className="mt-1">
-            <FieldInput
-              fieldKey="company"
-              type="text"
-              value={values['company'] ?? ''}
-              onChange={(v) => setValue('company', v)}
-              required={companyConfig.required}
+          <div>
+            <Label>{nameConfig?.label || 'Nome'}{(nameConfig?.required ?? true) && <span className="text-red-500 ml-0.5">*</span>}</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required={nameConfig?.required ?? true}
+              className="mt-1"
             />
           </div>
-        </div>
-      )}
 
-      {/* Other system fields — driven by ContactFieldConfig visibility */}
-      {visibleSystemFields
-        .map((cfg) => (
-          <div key={cfg.fieldKey}>
-            <Label>
-              {cfg.label}
-              {cfg.required && <span className="text-red-500 ml-0.5">*</span>}
-            </Label>
-            <div className="mt-1">
-              <FieldInput
-                fieldKey={cfg.fieldKey}
-                type="text"
-                value={values[cfg.fieldKey] ?? ''}
-                onChange={(v) => setValue(cfg.fieldKey, v)}
-                required={cfg.required}
-              />
-            </div>
+          <div>
+            <Label>{phoneConfig?.label || 'Número'}{phoneConfig?.required && <span className="text-red-500 ml-0.5">*</span>}</Label>
+            <Input
+              value={values['phone'] as string}
+              onChange={(e) => setValue('phone', e.target.value)}
+              placeholder="+244 9xx xxx xxx"
+              required={phoneConfig?.required}
+              className="mt-1"
+            />
           </div>
-        ))}
 
-      {showStageField ? (
-        <div>
-          <Label>Etapa *</Label>
-          <Select value={stage} onValueChange={(v) => setStage(v)}>
-            <SelectTrigger className="mt-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {pipelineStages.map((s) => (
-                <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div>
+            <Label>{nifConfig?.label || 'NIF'}{tipoCliente === 'empresa' && <span className="text-red-500 ml-0.5">*</span>}</Label>
+            <Input
+              value={values['nif'] as string}
+              onChange={(e) => setValue('nif', e.target.value)}
+              placeholder={tipoCliente === 'empresa' ? 'NIF obrigatório para empresas' : 'Opcional para particulares'}
+              required={tipoCliente === 'empresa'}
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <Label>Grupo</Label>
+              {onManageGroups ? (
+                <button
+                  type="button"
+                  onClick={onManageGroups}
+                  className="text-xs font-medium text-[#0A2540] hover:underline"
+                >
+                  Gerir grupos
+                </button>
+              ) : null}
+            </div>
+            <Select
+              value={contactGroupId ?? NO_GROUP_VALUE}
+              onValueChange={(value) => setContactGroupId(value === NO_GROUP_VALUE ? null : value)}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Sem grupo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_GROUP_VALUE}>Sem grupo</SelectItem>
+                {contactGroups.map((group) => (
+                  <SelectItem key={group.id} value={group.id}>
+                    {group.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      ) : (
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          No modo Comércio, cada contacto é criado automaticamente como cliente e fica fora de Processos. Usa Processos apenas quando a compra precisar de acompanhamento e negociação.
-        </div>
+      </FormSection>
+
+      {tipoCliente === 'empresa' && (
+        <FormSection title="Empresa">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {companyConfig && companyConfig.visible !== false && (
+              <div>
+                <Label>{companyConfig.label}{companyConfig.required && <span className="text-red-500 ml-0.5">*</span>}</Label>
+                <div className="mt-1">
+                  <FieldInput
+                    fieldKey="company"
+                    type="text"
+                    value={values['company'] ?? ''}
+                    onChange={(v) => setValue('company', v)}
+                    required={companyConfig.required}
+                  />
+                </div>
+              </div>
+            )}
+            {sectorConfig && sectorConfig.visible !== false && (
+              <div>
+                <Label>{sectorConfig.label}{sectorConfig.required && <span className="text-red-500 ml-0.5">*</span>}</Label>
+                <div className="mt-1">
+                  <FieldInput
+                    fieldKey="sector"
+                    type="text"
+                    value={values['sector'] ?? ''}
+                    onChange={(v) => setValue('sector', v)}
+                    required={sectorConfig.required}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </FormSection>
       )}
 
-      <div>
-        <Label>Valor da Negociação (Kz)</Label>
-        <Input
-          type="number"
-          min="0"
-          step="0.01"
-          value={dealValueKz}
-          onChange={(e) => setDealValueKz(e.target.value)}
-          placeholder="Opcional. Se vazio, o analytics usa ticket médio."
-          className="mt-1"
-        />
-        <p className="mt-1 text-xs text-[#6b7e9a]">
-          Este valor é usado em Processos e no forecast do pipeline.
-        </p>
-      </div>
-
-      {/* Custom fields */}
-      {customFieldDefs.length > 0 && (
-        <div className="border-t border-[#dde3ec] pt-4 space-y-4">
-          <p className="text-xs font-semibold text-[#6b7e9a] uppercase tracking-wide">Campos personalizados</p>
-          {customFieldDefs.map((field) => (
-            <div key={field.key}>
-              <Label>
-                {field.label}
-                {field.required && <span className="text-red-500 ml-0.5">*</span>}
-              </Label>
-              <div className="mt-1">
-                <FieldInput
-                  fieldKey={field.key}
-                  type={field.type}
-                  options={field.options}
-                  value={values[field.key] ?? ''}
-                  onChange={(v) => setValue(field.key, v)}
-                  required={field.required}
-                />
-              </div>
+      <FormSection title="Processo">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {showStageField ? (
+            <div>
+              <Label>Etapa *</Label>
+              <Select value={stage} onValueChange={(v) => setStage(v)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {pipelineStages.map((s) => (
+                    <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          ))}
+          ) : (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 md:col-span-2">
+              No modo Comércio, cada contacto é criado automaticamente como cliente e fica fora de Processos. Usa Processos apenas quando a compra precisar de acompanhamento e negociação.
+            </div>
+          )}
+
+          <div>
+            <Label>Valor da Negociação (Kz)</Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={dealValueKz}
+              onChange={(e) => setDealValueKz(e.target.value)}
+              placeholder="Opcional. Se vazio, o analytics usa ticket médio."
+              className="mt-1"
+            />
+            <p className="mt-1 text-xs text-[#6b7e9a]">
+              Usado em Processos e no forecast.
+            </p>
+          </div>
         </div>
+      </FormSection>
+
+      {visibleSystemFields.length > 0 && (
+        <FormSection title="Informação adicional">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {visibleSystemFields.map((cfg) => (
+              <div key={cfg.fieldKey}>
+                <Label>
+                  {cfg.label}
+                  {cfg.required && <span className="text-red-500 ml-0.5">*</span>}
+                </Label>
+                <div className="mt-1">
+                  <FieldInput
+                    fieldKey={cfg.fieldKey}
+                    type="text"
+                    value={values[cfg.fieldKey] ?? ''}
+                    onChange={(v) => setValue(cfg.fieldKey, v)}
+                    required={cfg.required}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </FormSection>
+      )}
+
+      {customFieldDefs.length > 0 && (
+        <FormSection title="Campos personalizados">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {customFieldDefs.map((field) => (
+              <div key={field.key}>
+                <Label>
+                  {field.label}
+                  {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                </Label>
+                <div className="mt-1">
+                  <FieldInput
+                    fieldKey={field.key}
+                    type={field.type}
+                    options={field.options}
+                    value={values[field.key] ?? ''}
+                    onChange={(v) => setValue(field.key, v)}
+                    required={field.required}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </FormSection>
       )}
 
       {mutation.isError && (

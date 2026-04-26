@@ -9,7 +9,6 @@ import {
   deleteContact,
   getCurrentUser,
   getPipelineStages,
-  getContactFieldConfigs,
   getContactGroups,
 } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -42,7 +41,6 @@ import ContactFieldsManager from '@/components/contacts/contact-fields-manager';
 import ContactGroupsManager from '@/components/contacts/contact-groups-manager';
 import Link from 'next/link';
 import { Trash2, MessageCircle, Upload, Settings2, Phone, FolderTree, ListChecks, X } from 'lucide-react';
-import { getContactFieldDefs } from '@/lib/api';
 import { useToast } from '@/components/ui/toast-provider';
 import type { Contact } from '@/lib/types';
 
@@ -58,45 +56,6 @@ const UNGROUPED_GROUP_VALUE = 'UNGROUPED';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object';
-}
-
-function normalizeStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
-  }
-
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      return normalizeStringArray(parsed);
-    } catch {
-      return value.trim() ? [value] : [];
-    }
-  }
-
-  return [];
-}
-
-function normalizeCustomFields(value: unknown): Record<string, unknown> {
-  if (isRecord(value)) return value;
-
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      return isRecord(parsed) ? parsed : {};
-    } catch {
-      return {};
-    }
-  }
-
-  return {};
-}
-
-function formatCustomFieldValue(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '-';
-  if (Array.isArray(value)) return value.join(', ') || '-';
-  if (typeof value === 'object') return '-';
-  return String(value);
 }
 
 function sameNumberArray(left: number[], right: number[]): boolean {
@@ -135,25 +94,6 @@ export default function ContactsPage() {
   const effectiveContactType = isComercioWorkspace ? 'cliente' : contactTypeTab;
   const canShowPipelineUi = workspaceResolved && !isComercioWorkspace;
 
-  const { data: fieldDefsData } = useQuery({
-    queryKey: ['contactFieldDefs'],
-    queryFn: getContactFieldDefs,
-    enabled: canLoadContactData,
-  });
-  const fieldDefs = Array.isArray(fieldDefsData)
-    ? fieldDefsData.filter((field) => field && typeof field.id === 'string' && typeof field.key === 'string')
-    : [];
-
-  const { data: systemConfigsData } = useQuery({
-    queryKey: ['contactFieldConfigs'],
-    queryFn: getContactFieldConfigs,
-    staleTime: 5 * 60_000,
-    enabled: canLoadContactData,
-  });
-  const systemConfigs = Array.isArray(systemConfigsData)
-    ? systemConfigsData.filter((config) => config && typeof config.fieldKey === 'string')
-    : [];
-
   const { data: contactGroupsData } = useQuery({
     queryKey: ['contactGroups'],
     queryFn: getContactGroups,
@@ -162,11 +102,6 @@ export default function ContactsPage() {
   const contactGroups = Array.isArray(contactGroupsData)
     ? contactGroupsData.filter((group) => group && typeof group.id === 'string' && group.id.trim().length > 0)
     : [];
-
-  // System columns to show (excluding fields already rendered in dedicated columns/UI)
-  const visibleSystemCols = systemConfigs
-    .filter(c => c.visible && !['name', 'phone'].includes(c.fieldKey))
-    .sort((a, b) => a.order - b.order);
 
   const { data: pipelineStagesData } = useQuery({
     queryKey: ['pipeline-stages'],
@@ -289,6 +224,26 @@ export default function ContactsPage() {
     },
   });
 
+  const contactTypeMutation = useMutation({
+    mutationFn: ({ contactId, contactType }: { contactId: number; contactType: 'interessado' | 'cliente' }) =>
+      updateContact(String(contactId), { contactType } as any),
+    onSuccess: (_contact, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      toast({
+        variant: 'success',
+        title: variables.contactType === 'cliente' ? 'Convertido para cliente' : 'Movido para interessados',
+        description: 'A lista foi atualizada com o novo tipo do contacto.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: 'error',
+        title: 'Falha ao atualizar contacto',
+        description: error.message || 'Tenta novamente.',
+      });
+    },
+  });
+
   const toggleContactSelection = (contactId: number) => {
     setSelectedContactIds((currentIds) => (
       currentIds.includes(contactId)
@@ -354,7 +309,7 @@ export default function ContactsPage() {
           <Button data-tour="contacts-new" className="w-full sm:w-auto" onClick={() => setIsFormOpen(true)}>
             Novo Contacto
           </Button>
-          <Modal open={isFormOpen} onClose={() => setIsFormOpen(false)} title="Novo Contacto">
+          <Modal open={isFormOpen} onClose={() => setIsFormOpen(false)} title="Novo Contacto" size="xl" scrollable>
             <ContactForm
               onManageGroups={() => setIsGroupsOpen(true)}
               onSuccess={() => {
@@ -511,7 +466,7 @@ export default function ContactsPage() {
             secondaryAction={!hasActiveFilters ? { label: 'Importar CSV', onClick: () => setIsImportOpen(true) } : undefined}
           />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-hidden">
             <Table>
               <TableHeader>
                   <TableRow>
@@ -525,14 +480,8 @@ export default function ContactsPage() {
                     <TableHead>Nome</TableHead>
                     <TableHead className="hidden sm:table-cell">Telefone</TableHead>
                     <TableHead className="hidden md:table-cell">Grupo</TableHead>
-                    {visibleSystemCols.map(cfg => (
-                      <TableHead key={cfg.fieldKey} className="hidden md:table-cell">{cfg.label}</TableHead>
-                    ))}
-                  {fieldDefs.map((f) => (
-                    <TableHead key={f.id} className="hidden lg:table-cell">{f.label}</TableHead>
-                  ))}
                   {canShowPipelineUi ? <TableHead>Etapa</TableHead> : null}
-                  <TableHead>Ações</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -550,18 +499,6 @@ export default function ContactsPage() {
                       <TableCell className="hidden md:table-cell text-sm">
                         {contact.contactGroup?.name || 'Sem grupo'}
                       </TableCell>
-                      {visibleSystemCols.map(cfg => (
-                        <TableCell key={cfg.fieldKey} className="hidden md:table-cell text-sm">
-                          {cfg.fieldKey === 'tags'
-                          ? (normalizeStringArray(contact.tags).join(', ') || '-')
-                          : ((contact as any)[cfg.fieldKey] || '-')}
-                      </TableCell>
-                    ))}
-                    {fieldDefs.map((f) => (
-                      <TableCell key={f.id} className="hidden lg:table-cell text-sm">
-                        {formatCustomFieldValue(normalizeCustomFields(contact.customFields)[f.key])}
-                      </TableCell>
-                    ))}
                     {canShowPipelineUi ? (
                       <TableCell>
                         <Badge
@@ -575,8 +512,8 @@ export default function ContactsPage() {
                         </Badge>
                       </TableCell>
                     ) : null}
-                    <TableCell>
-                      <div className="flex gap-2">
+                    <TableCell className="text-right">
+                      <div className="flex flex-wrap justify-end gap-2">
                         <Link href={`/contacts/${contact.id}`}>
                           <Button variant="outline" size="sm">
                             <MessageCircle className="w-4 h-4" />
@@ -596,15 +533,19 @@ export default function ContactsPage() {
                             </Button>
                           );
                         })()}
-                        {!isComercioWorkspace && contactTypeTab === 'interessado' && (
+                        {!isComercioWorkspace && (
                           <Button
                             variant="outline"
                             size="sm"
                             className="border-[var(--workspace-primary-border)] text-xs text-[var(--workspace-primary)] hover:bg-[var(--workspace-primary-soft)]"
-                            title="Converter para Cliente"
-                            onClick={() => updateContact(String(contact.id), { contactType: 'cliente' } as any).then(() => queryClient.invalidateQueries({ queryKey: ['contacts'] }))}
+                            title={contactTypeTab === 'interessado' ? 'Converter para Cliente' : 'Voltar para Interessado'}
+                            disabled={contactTypeMutation.isPending}
+                            onClick={() => contactTypeMutation.mutate({
+                              contactId: contact.id,
+                              contactType: contactTypeTab === 'interessado' ? 'cliente' : 'interessado',
+                            })}
                           >
-                            → Cliente
+                            {contactTypeTab === 'interessado' ? '→ Cliente' : '→ Interessado'}
                           </Button>
                         )}
                         {currentUser && !currentUser.accountOwnerId && (
