@@ -123,8 +123,32 @@ export interface ContactsQueryParams {
 }
 
 export async function getContactsPage(params?: ContactsQueryParams) {
-  const response = await api.get<ContactsPageResponse>('/api/contacts', { params });
-  return response.data;
+  const response = await api.get<ContactsPageResponse | Contact[]>('/api/contacts', { params });
+  const payload = response.data;
+
+  if (Array.isArray(payload)) {
+    const page = Math.max(1, params?.page ?? 1);
+    const limit = Math.max(1, params?.limit ?? (payload.length || 1));
+    const total = payload.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const start = (page - 1) * limit;
+
+    return {
+      data: payload.slice(start, start + limit),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
+  }
+
+  return payload;
+}
+
+export async function getContacts(params?: Omit<ContactsQueryParams, 'page' | 'limit'>) {
+  return getAllContactsTemporary(params);
 }
 
 export async function searchContacts(params?: Omit<ContactsQueryParams, 'page' | 'limit'> & { limit?: number }) {

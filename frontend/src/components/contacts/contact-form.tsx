@@ -116,10 +116,12 @@ export default function ContactForm({
   contact,
   contactId,
   onSuccess,
+  onManageGroups: _onManageGroups,
 }: {
   contact?: Contact;
   contactId?: number;
   onSuccess?: () => void;
+  onManageGroups?: () => void;
 }) {
   const isEditMode = !!contactId;
   const { toast } = useToast();

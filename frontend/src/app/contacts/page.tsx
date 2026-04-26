@@ -40,6 +40,7 @@ import ContactGroupsManager from '@/components/contacts/contact-groups-manager';
 import Link from 'next/link';
 import { Trash2, MessageCircle, Upload, Settings2, Phone, FolderTree } from 'lucide-react';
 import { getContactFieldDefs } from '@/lib/api';
+import type { Contact } from '@/lib/types';
 
 function formatWA(phone: string): string | null {
   if (!phone) return null;
@@ -150,7 +151,7 @@ export default function ContactsPage() {
     retry: false,
     enabled: workspaceResolved,
   });
-  const contacts = contactsQuery.data?.data || [];
+  const contacts: Contact[] = contactsQuery.data?.data ?? [];
   const contactsPagination = contactsQuery.data?.pagination;
   const isContactsLoading = !workspaceResolved || contactsQuery.isLoading;
   const pageDescription = useMemo(() => {

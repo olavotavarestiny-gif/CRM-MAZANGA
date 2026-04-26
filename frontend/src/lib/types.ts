@@ -101,6 +101,9 @@ export interface Task {
   dueDate?: string | null;
   priority: Priority;
   done: boolean;
+  googleCalendarEventId?: string | null;
+  googleCalendarHtmlLink?: string | null;
+  googleCalendarSyncError?: string | null;
   createdAt: string;
   updatedAt: string;
   contact?: {
@@ -121,6 +124,7 @@ export interface Contact {
   email: string;
   phone: string;
   company: string;
+  contactGroupId?: string | null;
   nif?: string | null;
   dealValueKz?: number | null;
   revenue?: string;
@@ -135,7 +139,40 @@ export interface Contact {
   documents: { name: string; url: string; size?: number; uploadedAt: string }[];
   createdAt: string;
   updatedAt: string;
+  contactGroup?: ContactGroup | null;
   tasks?: Task[];
+}
+
+export interface ContactGroup {
+  id: string;
+  userId: number;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContactsPageResponse {
+  data: Contact[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface ContactStatsResponse {
+  total: number;
+  interessados?: number;
+  clientes?: number;
+  emPipeline?: number;
+  [key: string]: number | undefined;
+}
+
+export interface ContactFacetsResponse {
+  stages?: string[];
+  revenues?: string[];
+  groups?: ContactGroup[];
 }
 
 export type ContactFieldType = 'text' | 'number' | 'date' | 'select' | 'url';
@@ -443,6 +480,19 @@ export interface CalendarEvent {
   taskId?: number;
   contactName?: string;
   priority?: string;
+  externalUrl?: string;
+  googleLinked?: boolean;
+  googleSyncError?: string | null;
+}
+
+export interface CalendarConnectionStatus {
+  connected: boolean;
+  email: string | null;
+  lastSyncAt: string | null;
+  lastSyncError: string | null;
+  lastSyncErrorAt: string | null;
+  primaryCalendarId: string | null;
+  reauthRequired: boolean;
 }
 
 // Finance types
