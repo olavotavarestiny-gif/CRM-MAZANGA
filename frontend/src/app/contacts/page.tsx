@@ -150,7 +150,7 @@ export default function ContactsPage() {
     retry: false,
     enabled: workspaceResolved,
   });
-  const contacts = contactsQuery.data || [];
+  const contacts: Contact[] = contactsQuery.data ?? [];
   const visibleContactIds = useMemo(() => contacts.map((contact) => contact.id), [contacts]);
   const selectedVisibleCount = useMemo(
     () => visibleContactIds.filter((id) => selectedContactIds.includes(id)).length,

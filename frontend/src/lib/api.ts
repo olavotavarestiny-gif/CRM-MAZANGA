@@ -23,6 +23,8 @@ import type {
   Contact,
   BulkUpdateContactsInput,
   BulkUpdateContactsResponse,
+  ContactStatsResponse,
+  ContactsPageResponse,
   ContactGroup,
   ContactFieldConfig,
   ContactFieldDef,
@@ -143,9 +145,58 @@ api.interceptors.response.use(
   }
 );
 
-// Contacts
-export async function getContacts(params?: { stage?: string; search?: string; revenue?: string; inPipeline?: string; contactType?: string; groupId?: string }) {
+export interface ContactsQueryParams {
+  page?: number;
+  limit?: number;
+  stage?: string;
+  search?: string;
+  revenue?: string;
+  inPipeline?: string;
+  contactType?: string;
+  groupId?: string;
+}
+
+export async function getContactsPage(params?: ContactsQueryParams) {
+  const response = await api.get<ContactsPageResponse | Contact[]>('/api/contacts', { params });
+  const payload = response.data;
+
+  if (Array.isArray(payload)) {
+    const page = Math.max(1, params?.page ?? 1);
+    const limit = Math.max(1, params?.limit ?? (payload.length || 1));
+    const total = payload.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const start = (page - 1) * limit;
+
+    return {
+      data: payload.slice(start, start + limit),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
+  }
+
+  return payload;
+}
+
+export async function getContacts(params?: Omit<ContactsQueryParams, 'page' | 'limit'>) {
   const response = await api.get<Contact[]>('/api/contacts', { params });
+  return response.data;
+}
+
+export async function searchContacts(params?: Omit<ContactsQueryParams, 'page' | 'limit'> & { limit?: number }) {
+  const response = await getContactsPage({
+    ...params,
+    page: 1,
+    limit: params?.limit ?? 20,
+  });
+  return response.data;
+}
+
+export async function getContactStats() {
+  const response = await api.get<ContactStatsResponse>('/api/contacts/stats');
   return response.data;
 }
 

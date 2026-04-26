@@ -137,15 +137,16 @@ export interface Contact {
   contactType: 'interessado' | 'cliente';
   status: 'ativo' | 'inativo';
   clienteType?: 'empresa' | 'particular';
-  contactGroup?: ContactGroup | null;
   documents: { name: string; url: string; size?: number; uploadedAt: string }[];
   createdAt: string;
   updatedAt: string;
+  contactGroup?: ContactGroup | null;
   tasks?: Task[];
 }
 
 export interface ContactGroup {
   id: string;
+  userId?: number;
   name: string;
   createdAt: string;
   updatedAt: string;
@@ -165,6 +166,30 @@ export interface BulkUpdateContactsResponse {
   requestedCount: number;
   matchedCount: number;
   updatedCount: number;
+}
+
+export interface ContactsPageResponse {
+  data: Contact[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface ContactStatsResponse {
+  total: number;
+  interessados?: number;
+  clientes?: number;
+  emPipeline?: number;
+  [key: string]: number | undefined;
+}
+
+export interface ContactFacetsResponse {
+  stages?: string[];
+  revenues?: string[];
+  groups?: ContactGroup[];
 }
 
 export type ContactFieldType = 'text' | 'number' | 'date' | 'select' | 'url';
