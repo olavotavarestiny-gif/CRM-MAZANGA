@@ -89,12 +89,13 @@ export default function ContactGroupsManager({
     mutationFn: deleteContactGroup,
     onSuccess: async (result) => {
       await invalidateGroups();
+      const detachedContactsCount = Number(result?.detachedContactsCount ?? 0);
       toast({
         variant: 'success',
         title: 'Grupo removido',
         description:
-          result.detachedContactsCount > 0
-            ? `${result.detachedContactsCount} contacto(s) ficaram sem grupo.`
+          detachedContactsCount > 0
+            ? `${detachedContactsCount} contacto(s) ficaram sem grupo.`
             : 'O grupo foi removido sem contactos associados.',
       });
     },
@@ -107,7 +108,7 @@ export default function ContactGroupsManager({
     },
   });
 
-  const groups = groupsQuery.data ?? [];
+  const groups = Array.isArray(groupsQuery.data) ? groupsQuery.data : [];
   const isBusy = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   return (

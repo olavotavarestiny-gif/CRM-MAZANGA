@@ -8,7 +8,7 @@ import {
   getContactNotes, createContactNote, updateContactNote, deleteContactNote,
   getContactSummary, getContactGroups,
 } from '@/lib/api';
-import { ContactFieldConfig, ContactFieldDef, ContactNote, Task } from '@/lib/types';
+import type { ContactFieldConfig, ContactFieldDef, ContactNote, Task } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -434,26 +434,30 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
     queryFn: () => getContact(params.id),
   });
 
-  const { data: systemConfigs = [] } = useQuery({
+  const { data: systemConfigsData } = useQuery({
     queryKey: ['contactFieldConfigs'],
     queryFn: getContactFieldConfigs,
     staleTime: 0,
   });
+  const systemConfigs = Array.isArray(systemConfigsData) ? systemConfigsData : [];
 
-  const { data: customFieldDefs = [] } = useQuery({
+  const { data: customFieldDefsData } = useQuery({
     queryKey: ['contactFieldDefs'],
     queryFn: getContactFieldDefs,
   });
+  const customFieldDefs = Array.isArray(customFieldDefsData) ? customFieldDefsData : [];
 
-  const { data: pipelineStages = [] } = useQuery({
+  const { data: pipelineStagesData } = useQuery({
     queryKey: ['pipeline-stages'],
     queryFn: getPipelineStages,
   });
+  const pipelineStages = Array.isArray(pipelineStagesData) ? pipelineStagesData : [];
 
-  const { data: contactGroups = [] } = useQuery({
+  const { data: contactGroupsData } = useQuery({
     queryKey: ['contactGroups'],
     queryFn: getContactGroups,
   });
+  const contactGroups = Array.isArray(contactGroupsData) ? contactGroupsData : [];
 
   const { data: summary } = useQuery({
     queryKey: ['contact-summary', params.id],
@@ -461,11 +465,12 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
     enabled: !!contact,
   });
 
-  const { data: notes = [] } = useQuery({
+  const { data: notesData } = useQuery({
     queryKey: ['contact-notes', params.id, notesSkip],
     queryFn: () => getContactNotes(parseInt(params.id), notesSkip),
     enabled: !!contact,
   });
+  const notes = Array.isArray(notesData) ? notesData : [];
 
   const patchContact = useMutation({
     mutationFn: (data: Record<string, any>) => updateContact(params.id, data as any),
@@ -499,7 +504,7 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
       await queryClient.cancelQueries({ queryKey: ['contact', params.id] });
       const previous = queryClient.getQueryData(['contact', params.id]);
       queryClient.setQueryData<any>(['contact', params.id], (old: any) =>
-        old ? { ...old, tasks: old.tasks.map((t: any) => t.id === id ? { ...t, done } : t) } : old
+        old ? { ...old, tasks: (Array.isArray(old.tasks) ? old.tasks : []).map((t: any) => t.id === id ? { ...t, done } : t) } : old
       );
       return { previous };
     },
@@ -513,7 +518,7 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
       await queryClient.cancelQueries({ queryKey: ['contact', params.id] });
       const previous = queryClient.getQueryData(['contact', params.id]);
       queryClient.setQueryData<any>(['contact', params.id], (old: any) =>
-        old ? { ...old, tasks: old.tasks.filter((t: any) => t.id !== id) } : old
+        old ? { ...old, tasks: (Array.isArray(old.tasks) ? old.tasks : []).filter((t: any) => t.id !== id) } : old
       );
       return { previous };
     },
@@ -566,6 +571,8 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const isAtivo = (contact as any).status !== 'inativo';
   const documents: { name: string; url: string; size?: number; uploadedAt: string }[] =
     normalizeDocuments((contact as any).documents);
+  const contactTasks: Task[] = Array.isArray(contact.tasks) ? contact.tasks : [];
+  const summaryTransactions = Array.isArray(summary?.transacoes) ? summary.transacoes : [];
 
   const renderSystemField = (cfg: ContactFieldConfig) => {
     const key = cfg.fieldKey;
@@ -782,11 +789,11 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
                 </div>
               )}
 
-              {summary && summary.transacoes.length > 0 && (
+              {summaryTransactions.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-[#6b7e9a] uppercase tracking-wide mb-2">Últimas transações</p>
                   <div className="space-y-2">
-                    {summary.transacoes.map((t: any) => (
+                    {summaryTransactions.map((t: any) => (
                       <div key={t.id} className="flex justify-between items-center text-sm">
                         <span className="text-[#0A2540] truncate flex-1 mr-2">{t.description || t.descricao || '—'}</span>
                         <span className="text-green-600 font-medium flex-shrink-0">{formatKz(t.amountKz ?? t.amount ?? 0)}</span>
@@ -796,7 +803,7 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
                 </div>
               )}
 
-              {(!summary || (summary.transacoes.length === 0 && !summary.ultimoServico)) && (
+              {(!summary || (summaryTransactions.length === 0 && !summary.ultimoServico)) && (
                 <p className="text-sm text-[#6b7e9a] text-center py-2">Sem histórico de compras</p>
               )}
             </CardContent>
@@ -943,9 +950,9 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
               <Button size="sm" onClick={() => { setEditingTask(null); setIsAddTaskOpen(true); }}>+ Nova Tarefa</Button>
             </CardHeader>
             <CardContent>
-              {contact.tasks && contact.tasks.length > 0 ? (
+              {contactTasks.length > 0 ? (
                 <div className="space-y-2">
-                  {contact.tasks.map(task => (
+                  {contactTasks.map(task => (
                     <TaskItem
                       key={task.id}
                       task={task}

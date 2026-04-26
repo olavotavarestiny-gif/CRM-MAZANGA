@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { createContact, updateContact, getContactFieldDefs, getContactFieldConfigs, getPipelineStages, getCurrentUser, getContactGroups } from '@/lib/api';
-import { Contact, ContactFieldDef, ContactFieldConfig, ContactFieldType } from '@/lib/types';
+import type { Contact, ContactFieldType } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -176,36 +176,45 @@ export default function ContactForm({
     }
   }, [contact]);
 
-  const { data: fieldDefs = [] } = useQuery({
-    queryKey: ['contactFieldDefs'],
-    queryFn: getContactFieldDefs,
-  });
-
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
     staleTime: 30_000,
   });
 
-  const { data: systemConfigs = [] } = useQuery({
+  const hasCurrentUser = !!currentUser;
+
+  const { data: fieldDefsData } = useQuery({
+    queryKey: ['contactFieldDefs'],
+    queryFn: getContactFieldDefs,
+    enabled: hasCurrentUser,
+  });
+  const fieldDefs = Array.isArray(fieldDefsData) ? fieldDefsData : [];
+
+  const { data: systemConfigsData } = useQuery({
     queryKey: ['contactFieldConfigs'],
     queryFn: getContactFieldConfigs,
     staleTime: 0,
+    enabled: hasCurrentUser,
   });
+  const systemConfigs = Array.isArray(systemConfigsData) ? systemConfigsData : [];
 
   const isComercioWorkspace = currentUser?.workspaceMode === 'comercio';
   const showStageField = isEditMode || !isComercioWorkspace;
 
-  const { data: pipelineStages = [] } = useQuery({
+  const { data: pipelineStagesData } = useQuery({
     queryKey: ['pipeline-stages'],
     queryFn: getPipelineStages,
-    enabled: showStageField,
+    enabled: hasCurrentUser && showStageField,
   });
+  const pipelineStages = Array.isArray(pipelineStagesData) ? pipelineStagesData : [];
 
-  const { data: contactGroups = [] } = useQuery({
+  const { data: contactGroupsData } = useQuery({
     queryKey: ['contactGroups'],
     queryFn: getContactGroups,
+    enabled: hasCurrentUser,
   });
+  const contactGroups = Array.isArray(contactGroupsData) ? contactGroupsData : [];
 
   useEffect(() => {
     if (contactGroupId && !contactGroups.some((group) => group.id === contactGroupId)) {

@@ -96,6 +96,24 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
+function asArray<T>(payload: unknown): T[] {
+  return Array.isArray(payload) ? payload : [];
+}
+
+function getArrayPayload<T>(payload: unknown, label: string): T[] {
+  if (Array.isArray(payload)) return payload;
+
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    Array.isArray((payload as { data?: unknown }).data)
+  ) {
+    return (payload as { data: T[] }).data;
+  }
+
+  throw new Error(`Resposta inválida ao carregar ${label}.`);
+}
+
 let _supabaseClient: ReturnType<typeof createClient> | null = null;
 function getSupabaseClient() {
   if (!_supabaseClient) _supabaseClient = createClient();
@@ -178,12 +196,20 @@ export async function getContactsPage(params?: ContactsQueryParams) {
     };
   }
 
-  return payload;
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    Array.isArray((payload as ContactsPageResponse).data)
+  ) {
+    return payload as ContactsPageResponse;
+  }
+
+  throw new Error('Resposta inválida ao carregar contactos.');
 }
 
 export async function getContacts(params?: Omit<ContactsQueryParams, 'page' | 'limit'>) {
-  const response = await api.get<Contact[]>('/api/contacts', { params });
-  return response.data;
+  const response = await api.get<Contact[] | ContactsPageResponse>('/api/contacts', { params });
+  return getArrayPayload<Contact>(response.data, 'contactos');
 }
 
 export async function searchContacts(params?: Omit<ContactsQueryParams, 'page' | 'limit'> & { limit?: number }) {
@@ -202,7 +228,7 @@ export async function getContactStats() {
 
 export async function getContactGroups() {
   const response = await api.get<ContactGroup[]>('/api/contacts/groups');
-  return response.data;
+  return asArray<ContactGroup>(response.data);
 }
 
 export async function createContactGroup(data: Pick<ContactGroup, 'name'>) {
@@ -320,7 +346,7 @@ export async function importContacts(contacts: ImportContactData[]) {
 // Contact Field Definitions
 export async function getContactFieldDefs() {
   const response = await api.get<ContactFieldDef[]>('/api/contacts/fields');
-  return response.data;
+  return asArray<ContactFieldDef>(response.data);
 }
 
 export async function createContactFieldDef(data: {
@@ -349,7 +375,7 @@ export async function reorderContactFieldDefs(order: { id: string; order: number
 // Pipeline Stages
 export async function getPipelineStages() {
   const response = await api.get<PipelineStage[]>('/api/pipeline-stages');
-  return response.data;
+  return asArray<PipelineStage>(response.data);
 }
 
 export async function createPipelineStage(data: { name: string; color: string }) {
@@ -369,7 +395,7 @@ export async function deletePipelineStage(id: string) {
 
 export async function reorderPipelineStages(order: { id: string; order: number }[]) {
   const response = await api.put<PipelineStage[]>('/api/pipeline-stages/reorder', { order });
-  return response.data;
+  return asArray<PipelineStage>(response.data);
 }
 
 export async function getPipelineAnalyticsConversion(params: {
@@ -407,7 +433,7 @@ export async function getPipelineAnalyticsTeam(params: {
 // System field config for contact built-ins shown in customization
 export async function getContactFieldConfigs() {
   const response = await api.get<ContactFieldConfig[]>('/api/contacts/field-config');
-  return response.data;
+  return asArray<ContactFieldConfig>(response.data);
 }
 
 export async function updateContactFieldConfig(

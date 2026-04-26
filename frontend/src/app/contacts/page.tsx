@@ -12,7 +12,6 @@ import {
   getContactFieldConfigs,
   getContactGroups,
 } from '@/lib/api';
-import { Contact } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
@@ -45,6 +44,7 @@ import Link from 'next/link';
 import { Trash2, MessageCircle, Upload, Settings2, Phone, FolderTree, ListChecks, X } from 'lucide-react';
 import { getContactFieldDefs } from '@/lib/api';
 import { useToast } from '@/components/ui/toast-provider';
+import type { Contact } from '@/lib/types';
 
 function formatWA(phone: string): string | null {
   if (!phone) return null;
@@ -71,44 +71,56 @@ export default function ContactsPage() {
   const [contactTypeTab, setContactTypeTab] = useState<'interessado' | 'cliente'>('interessado');
   const { toast } = useToast();
 
-  const { data: currentUser, isLoading: currentUserLoading } = useQuery({
+  const {
+    data: currentUser,
+    isLoading: currentUserLoading,
+    isError: currentUserError,
+    refetch: refetchCurrentUser,
+  } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
     staleTime: 30_000,
   });
 
-  const workspaceResolved = !currentUserLoading;
+  const canLoadContactData = !!currentUser;
+  const workspaceResolved = !currentUserLoading && canLoadContactData;
   const isComercioWorkspace = workspaceResolved && currentUser?.workspaceMode === 'comercio';
   const effectiveContactType = isComercioWorkspace ? 'cliente' : contactTypeTab;
   const canShowPipelineUi = workspaceResolved && !isComercioWorkspace;
 
-  const { data: fieldDefs = [] } = useQuery({
+  const { data: fieldDefsData } = useQuery({
     queryKey: ['contactFieldDefs'],
     queryFn: getContactFieldDefs,
+    enabled: canLoadContactData,
   });
+  const fieldDefs = Array.isArray(fieldDefsData) ? fieldDefsData : [];
 
-  const { data: systemConfigs = [] } = useQuery({
+  const { data: systemConfigsData } = useQuery({
     queryKey: ['contactFieldConfigs'],
     queryFn: getContactFieldConfigs,
     staleTime: 5 * 60_000,
+    enabled: canLoadContactData,
   });
+  const systemConfigs = Array.isArray(systemConfigsData) ? systemConfigsData : [];
 
-  const { data: contactGroups = [] } = useQuery({
+  const { data: contactGroupsData } = useQuery({
     queryKey: ['contactGroups'],
     queryFn: getContactGroups,
-    enabled: workspaceResolved,
+    enabled: canLoadContactData,
   });
+  const contactGroups = Array.isArray(contactGroupsData) ? contactGroupsData : [];
 
   // System columns to show (excluding fields already rendered in dedicated columns/UI)
   const visibleSystemCols = systemConfigs
     .filter(c => c.visible && !['name', 'phone'].includes(c.fieldKey))
     .sort((a, b) => a.order - b.order);
 
-  const { data: pipelineStages = [] } = useQuery({
+  const { data: pipelineStagesData } = useQuery({
     queryKey: ['pipeline-stages'],
     queryFn: getPipelineStages,
-    enabled: canShowPipelineUi,
+    enabled: canLoadContactData && canShowPipelineUi,
   });
+  const pipelineStages = Array.isArray(pipelineStagesData) ? pipelineStagesData : [];
 
   const queryClient = useQueryClient();
 
@@ -145,12 +157,12 @@ export default function ContactsPage() {
         revenue: revenueFilter === 'ALL' ? undefined : revenueFilter,
         groupId: groupFilter === ALL_GROUPS_VALUE ? undefined : groupFilter,
         contactType: effectiveContactType,
-      }),
+    }),
     placeholderData: (previousData) => previousData,
     retry: false,
-    enabled: workspaceResolved,
+    enabled: canLoadContactData,
   });
-  const contacts: Contact[] = contactsQuery.data ?? [];
+  const contacts: Contact[] = Array.isArray(contactsQuery.data) ? contactsQuery.data : [];
   const visibleContactIds = useMemo(() => contacts.map((contact) => contact.id), [contacts]);
   const selectedVisibleCount = useMemo(
     () => visibleContactIds.filter((id) => selectedContactIds.includes(id)).length,
@@ -158,7 +170,7 @@ export default function ContactsPage() {
   );
   const allVisibleSelected = contacts.length > 0 && selectedVisibleCount === contacts.length;
   const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
-  const isContactsLoading = !workspaceResolved || contactsQuery.isLoading;
+  const isContactsLoading = currentUserLoading || (canLoadContactData && contactsQuery.isLoading);
   const pageDescription = useMemo(() => {
     if (!workspaceResolved) {
       return 'Contactos, históricos e campos personalizados num espaço único.';
@@ -226,6 +238,19 @@ export default function ContactsPage() {
 
     setSelectedContactIds((currentIds) => Array.from(new Set([...currentIds, ...visibleContactIds])));
   };
+
+  if (currentUserError) {
+    return (
+      <div className="mx-auto max-w-6xl p-4 md:p-6">
+        <ErrorState
+          title="Não foi possível abrir Contactos"
+          message="A sessão ou a configuração da API não respondeu como esperado. Tenta novamente ou volta ao login."
+          onRetry={() => refetchCurrentUser()}
+          secondaryAction={{ label: 'Ir para Login', href: '/login' }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">

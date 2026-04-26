@@ -46,6 +46,8 @@ export default function ContactBulkActionsModal({
   const [statusValue, setStatusValue] = useState(UNCHANGED_VALUE);
   const [stageValue, setStageValue] = useState(UNCHANGED_VALUE);
   const [contactTypeValue, setContactTypeValue] = useState(UNCHANGED_VALUE);
+  const safeContactGroups = Array.isArray(contactGroups) ? contactGroups : [];
+  const safePipelineStages = Array.isArray(pipelineStages) ? pipelineStages : [];
 
   const hasChanges = useMemo(() => (
     groupValue !== UNCHANGED_VALUE ||
@@ -131,7 +133,7 @@ export default function ContactBulkActionsModal({
             <SelectContent>
               <SelectItem value={UNCHANGED_VALUE}>Sem alteração</SelectItem>
               <SelectItem value={UNGROUPED_VALUE}>Sem grupo</SelectItem>
-              {contactGroups.map((group) => (
+              {safeContactGroups.map((group) => (
                 <SelectItem key={group.id} value={group.id}>
                   {group.name}
                 </SelectItem>
@@ -163,7 +165,7 @@ export default function ContactBulkActionsModal({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={UNCHANGED_VALUE}>Sem alteração</SelectItem>
-                {pipelineStages.map((stage) => (
+                {safePipelineStages.map((stage) => (
                   <SelectItem key={stage.id} value={stage.name}>
                     {stage.name}
                   </SelectItem>
