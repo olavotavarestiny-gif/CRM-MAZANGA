@@ -140,6 +140,8 @@ export default function SuperAdminPage() {
     password: '',
     plan: 'essencial' as PlanName,
     workspaceMode: 'servicos' as 'servicos' | 'comercio',
+    billingType: 'trial' as 'trial' | 'paid',
+    durationDays: 30 as 30 | 90 | 180 | 365,
   });
   const [createUserForm, setCreateUserForm] = useState({
     name: '',
@@ -234,7 +236,7 @@ export default function SuperAdminPage() {
       qc.invalidateQueries({ queryKey: ['admin-accounts'] });
       qc.invalidateQueries({ queryKey: ['superadmin-orgs'] });
       setShowCreateAccount(false);
-      setCreateAccountForm({ name: '', email: '', password: '', plan: 'essencial', workspaceMode: 'servicos' });
+      setCreateAccountForm({ name: '', email: '', password: '', plan: 'essencial', workspaceMode: 'servicos', billingType: 'trial', durationDays: 30 });
       setAccountError('');
       toast({
         variant: 'success',
@@ -830,6 +832,7 @@ export default function SuperAdminPage() {
                         <th className="w-8 px-4 py-3 text-left font-semibold text-[#0A2540]" />
                         <th className="px-4 py-3 text-left font-semibold text-[#0A2540]">Organização / Utilizador</th>
                         <th className="px-4 py-3 text-left font-semibold text-[#0A2540]">Plano</th>
+                        <th className="px-4 py-3 text-left font-semibold text-[#0A2540]">Acesso</th>
                         <th className="px-4 py-3 text-left font-semibold text-[#0A2540]">Workspace</th>
                         <th className="px-4 py-3 text-center font-semibold text-[#0A2540]">Membros</th>
                         <th className="px-4 py-3 text-center font-semibold text-[#0A2540]">Estado</th>
@@ -870,6 +873,61 @@ export default function SuperAdminPage() {
                                     <option value="enterprise">Estabilidade</option>
                                   </select>
                                   <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[#6b7e9a]" />
+                                </div>
+                              </td>
+                              <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+                                <div className="flex flex-col gap-1">
+                                  <select
+                                    value={org.billingType || 'trial'}
+                                    onChange={(event) =>
+                                      orgUpdateMutation.mutate({
+                                        id: org.id,
+                                        data: { billingType: event.target.value as 'trial' | 'paid' },
+                                      })
+                                    }
+                                    className="rounded-lg border border-[#dde3ec] bg-white px-2 py-1 text-xs font-medium text-[#0A2540]"
+                                  >
+                                    <option value="trial">Trial</option>
+                                    <option value="paid">Pago</option>
+                                  </select>
+                                  <select
+                                    defaultValue=""
+                                    onChange={(event) => {
+                                      const value = Number(event.target.value) as 30 | 90 | 180 | 365;
+                                      if (!value) return;
+                                      orgUpdateMutation.mutate({
+                                        id: org.id,
+                                        data: { durationDays: value, billingType: org.billingType || 'paid', accountStatus: 'active' },
+                                      });
+                                      event.currentTarget.value = '';
+                                    }}
+                                    className="rounded-lg border border-[#dde3ec] bg-white px-2 py-1 text-xs text-[#0A2540]"
+                                  >
+                                    <option value="">Renovar...</option>
+                                    <option value="30">30 dias</option>
+                                    <option value="90">90 dias</option>
+                                    <option value="180">180 dias</option>
+                                    <option value="365">365 dias</option>
+                                  </select>
+                                  <select
+                                    value={org.accountStatus || 'active'}
+                                    onChange={(event) =>
+                                      orgUpdateMutation.mutate({
+                                        id: org.id,
+                                        data: { accountStatus: event.target.value as 'active' | 'grace_period' | 'suspended' },
+                                      })
+                                    }
+                                    className="rounded-lg border border-[#dde3ec] bg-white px-2 py-1 text-xs text-[#0A2540]"
+                                  >
+                                    <option value="active">Activo</option>
+                                    <option value="grace_period">Grace</option>
+                                    <option value="suspended">Suspenso</option>
+                                  </select>
+                                  <span className="text-[10px] text-[#6b7e9a]">
+                                    {org.expiresAt || org.trialEndsAt
+                                      ? new Date(org.expiresAt || org.trialEndsAt || '').toLocaleDateString('pt-PT')
+                                      : 'Sem data'}
+                                  </span>
                                 </div>
                               </td>
                               <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
@@ -950,6 +1008,7 @@ export default function SuperAdminPage() {
                                     </div>
                                   </td>
                                   <td className="px-4 py-2 text-xs text-[#6b7e9a]">Membro</td>
+                                  <td className="px-4 py-2 text-xs text-[#6b7e9a]">Conta</td>
                                   <td className="px-4 py-2 text-xs text-[#6b7e9a]">{org.workspaceMode === 'comercio' ? 'Comércio' : 'Serviços'}</td>
                                   <td className="px-4 py-2" />
                                   <td className="px-4 py-2 text-center">
@@ -1171,6 +1230,38 @@ export default function SuperAdminPage() {
                 <option value="servicos">Serviços</option>
                 <option value="comercio">Comércio</option>
               </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-[#0A2540]">Tipo de acesso</label>
+                <select
+                  value={createAccountForm.billingType}
+                  onChange={(event) => setCreateAccountForm({
+                    ...createAccountForm,
+                    billingType: event.target.value as 'trial' | 'paid',
+                  })}
+                  className="w-full rounded-lg border border-[#dde3ec] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="trial">Trial</option>
+                  <option value="paid">Pago</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-[#0A2540]">Duração</label>
+                <select
+                  value={createAccountForm.durationDays}
+                  onChange={(event) => setCreateAccountForm({
+                    ...createAccountForm,
+                    durationDays: Number(event.target.value) as 30 | 90 | 180 | 365,
+                  })}
+                  className="w-full rounded-lg border border-[#dde3ec] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value={30}>30 dias</option>
+                  <option value={90}>90 dias</option>
+                  <option value={180}>180 dias</option>
+                  <option value={365}>365 dias</option>
+                </select>
+              </div>
             </div>
           </div>
           <DialogFooter>

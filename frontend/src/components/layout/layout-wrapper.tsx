@@ -9,6 +9,8 @@ import Sidebar from './sidebar';
 import { Footer } from './footer';
 import WelcomeModal from '@/components/help/welcome-modal';
 import ProductTourProvider, { useTour } from '@/components/help/product-tour';
+import { BillingSuspendedModal } from '@/components/billing/access-notice';
+import TrialStatusBadge from '@/components/billing/trial-status-badge';
 import KukuGestLogo from '@/components/KukuGestLogo';
 import { ReactNode } from 'react';
 import { Menu, Eye, Info, LogOut, X } from 'lucide-react';
@@ -383,6 +385,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
         onClose={() => { localStorage.setItem('kukugest_guide_seen', '1'); setShowWelcome(false); }}
         onStartTour={handleStartChecklist}
       />
+      <BillingSuspendedModal subscription={currentUser?.subscription} />
     </div>
   );
 }
@@ -414,6 +417,11 @@ function UserWidget({ user, compact = false }: { user: User | null; compact?: bo
         >
           {secondaryLabel}
         </span>
+        <TrialStatusBadge
+          subscription={user.subscription}
+          compact={compact}
+          className={compact ? 'mt-0.5 max-w-[7.5rem]' : 'mt-1 max-w-[14rem]'}
+        />
       </div>
       <div
         className={`rounded-full flex items-center justify-center flex-shrink-0 ${compact ? 'h-8 w-8' : 'w-9 h-9'}`}

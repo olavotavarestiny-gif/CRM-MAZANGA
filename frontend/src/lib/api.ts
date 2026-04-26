@@ -700,8 +700,28 @@ export interface User {
   impersonatedBy?: number | null;
   mustChangePassword?: boolean;
   workspaceMode?: 'servicos' | 'comercio';
+  billingType?: 'trial' | 'paid';
+  trialEndsAt?: string | null;
+  expiresAt?: string | null;
+  graceEndsAt?: string | null;
+  accountStatus?: 'active' | 'grace_period' | 'suspended';
+  subscription?: SubscriptionAccess;
   createdAt: string;
   lastLogin?: string;
+}
+
+export interface SubscriptionAccess {
+  billingType: 'trial' | 'paid';
+  accountStatus: 'active' | 'grace_period' | 'suspended';
+  planId?: string;
+  trialEndsAt?: string | null;
+  expiresAt?: string | null;
+  graceEndsAt?: string | null;
+  accessEndsAt?: string | null;
+  daysUntilExpiry?: number | null;
+  showExpiryWarning?: boolean;
+  readOnly?: boolean;
+  message?: string | null;
 }
 
 export interface LoginLog {
@@ -1392,6 +1412,9 @@ export async function updateSuperAdminOrg(
     active?: boolean;
     permissions?: UserPermissions | null;
     workspaceMode?: 'servicos' | 'comercio';
+    billingType?: 'trial' | 'paid';
+    durationDays?: 30 | 90 | 180 | 365;
+    accountStatus?: 'active' | 'grace_period' | 'suspended';
   }
 ): Promise<void> {
   await api.patch(`/api/superadmin/orgs/${id}`, data);
@@ -1730,6 +1753,9 @@ export async function createClientAccount(data: {
   plan?: PlanName;
   workspaceMode?: 'servicos' | 'comercio';
   permissions?: UserPermissions | null;
+  billingType?: 'trial' | 'paid';
+  durationDays?: 30 | 90 | 180 | 365;
+  accountStatus?: 'active' | 'grace_period' | 'suspended';
 }): Promise<User> {
   const res = await api.post('/api/superadmin/users', data);
   return res.data;
@@ -1785,6 +1811,9 @@ export interface OnboardingData {
   completedCount: number;
   totalCount: number;
   allDone?: boolean;
+  finalMessage?: string;
+  workspaceMode?: 'servicos' | 'comercio';
+  flowKey?: string;
   steps?: OnboardingStep[];
 }
 
@@ -1797,31 +1826,50 @@ export async function dismissOnboarding(): Promise<void> {
   await api.post('/api/onboarding/dismiss');
 }
 
-export interface DailyTipDeliveryResponse {
-  show: boolean;
-  visibleInDashboard?: boolean;
-  dismissedAt?: string | null;
-  date?: string;
-  tipIndex?: number;
-  workspaceMode?: 'servicos' | 'comercio';
-  audienceBucket?: 'owner' | 'equipa';
-  tip?: {
-    id: string;
-    title: string;
-    heading: string;
-    message: string;
-    personalizedMessage: string;
-    category?: string;
-  };
+export async function reopenOnboarding(): Promise<void> {
+  await api.post('/api/onboarding/reopen');
 }
 
-export async function getDailyTip(): Promise<DailyTipDeliveryResponse> {
-  const res = await api.post<DailyTipDeliveryResponse>('/api/daily-tip/deliver');
+export interface StartupTemplate {
+  key: string;
+  label: string;
+  workspaceMode: 'servicos' | 'comercio';
+  description: string;
+  pipelineStages: string[];
+  goals: string[];
+  tasks: string[];
+  financialCategories: string[];
+}
+
+export interface StartupTemplatesResponse {
+  title: string;
+  version: string;
+  workspaceMode: 'servicos' | 'comercio';
+  templates: StartupTemplate[];
+}
+
+export interface StartupTemplateStatus {
+  applied: boolean;
+  templateKey?: string;
+  workspaceMode?: 'servicos' | 'comercio';
+  appliedAt?: string;
+  goals?: string[];
+  alreadyApplied?: boolean;
+}
+
+export async function getStartupTemplates(): Promise<StartupTemplatesResponse> {
+  const res = await api.get<StartupTemplatesResponse>('/api/startup-templates');
   return res.data;
 }
 
-export async function dismissDailyTip(): Promise<void> {
-  await api.post('/api/daily-tip/dismiss');
+export async function getStartupTemplateStatus(): Promise<StartupTemplateStatus> {
+  const res = await api.get<StartupTemplateStatus>('/api/startup-templates/status');
+  return res.data;
+}
+
+export async function applyStartupTemplate(templateKey: string): Promise<StartupTemplateStatus> {
+  const res = await api.post<StartupTemplateStatus>('/api/startup-templates/apply', { templateKey });
+  return res.data;
 }
 
 export default api;

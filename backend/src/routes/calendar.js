@@ -2,6 +2,7 @@ const express = require('express');
 const { google } = require('googleapis');
 const prisma = require('../lib/prisma');
 const requireAuth = require('../middleware/auth');
+const { checkSubscriptionAccess } = require('../middleware/subscription-access');
 const { requirePermission } = require('../lib/permissions');
 const { requirePlanFeature } = require('../lib/plan-limits');
 const { log: logActivity } = require('../services/activity-log.service.js');
@@ -230,7 +231,7 @@ router.post('/webhook', async (req, res) => {
 // utilizador autenticado deve poder ligar/desligar a sua conta Google)
 // ---------------------------------------------------------------------------
 
-router.post('/connect', requireAuth, requirePlanFeature('calendario'), async (req, res) => {
+router.post('/connect', requireAuth, checkSubscriptionAccess, requirePlanFeature('calendario'), async (req, res) => {
   try {
     ensureGoogleCalendarConfigured();
 
@@ -261,7 +262,7 @@ router.post('/connect', requireAuth, requirePlanFeature('calendario'), async (re
   }
 });
 
-router.delete('/disconnect', requireAuth, requirePlanFeature('calendario'), async (req, res) => {
+router.delete('/disconnect', requireAuth, checkSubscriptionAccess, requirePlanFeature('calendario'), async (req, res) => {
   try {
     if (isImpersonating(req)) {
       return res.status(403).json({
@@ -320,7 +321,7 @@ router.delete('/disconnect', requireAuth, requirePlanFeature('calendario'), asyn
 // ---------------------------------------------------------------------------
 // Restantes rotas: requerem auth + plano + permissão de vista
 // ---------------------------------------------------------------------------
-router.use(requireAuth, requirePlanFeature('calendario'), requirePermission('calendario', 'view'));
+router.use(requireAuth, checkSubscriptionAccess, requirePlanFeature('calendario'), requirePermission('calendario', 'view'));
 
 router.get('/status', async (req, res) => {
   try {

@@ -6,6 +6,55 @@ const prisma = require('../lib/prisma');
 const { DEFAULT_PLAN, isSupportedPlan, normalizePlan } = require('../lib/plans');
 const superadminMessagingRouter = require('./superadmin-messaging');
 
+const BILLING_TYPES = new Set(['trial', 'paid']);
+const ACCOUNT_STATUSES = new Set(['active', 'grace_period', 'suspended']);
+const DURATIONS = new Set([30, 90, 180, 365]);
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function buildAccessFields({ billingType = 'trial', durationDays = 30, accountStatus = 'active' } = {}) {
+  const resolvedBillingType = BILLING_TYPES.has(billingType) ? billingType : 'trial';
+  const resolvedDuration = DURATIONS.has(Number(durationDays)) ? Number(durationDays) : 30;
+  const start = new Date();
+  const end = addDays(start, resolvedDuration);
+  return {
+    billingType: resolvedBillingType,
+    trialEndsAt: resolvedBillingType === 'trial' ? end : null,
+    expiresAt: resolvedBillingType === 'paid' ? end : null,
+    graceEndsAt: null,
+    accountStatus: ACCOUNT_STATUSES.has(accountStatus) ? accountStatus : 'active',
+  };
+}
+
+function pickBillingUpdates(body) {
+  const data = {};
+  if (body.billingType !== undefined) {
+    if (!BILLING_TYPES.has(body.billingType)) {
+      return { error: 'Tipo de acesso inválido. Use trial ou paid.' };
+    }
+    data.billingType = body.billingType;
+  }
+  if (body.accountStatus !== undefined) {
+    if (!ACCOUNT_STATUSES.has(body.accountStatus)) {
+      return { error: 'Estado de conta inválido.' };
+    }
+    data.accountStatus = body.accountStatus;
+  }
+  if (body.durationDays !== undefined) {
+    const durationDays = Number(body.durationDays);
+    if (!DURATIONS.has(durationDays)) {
+      return { error: 'Duração inválida. Use 30, 90, 180 ou 365 dias.' };
+    }
+    const billingType = data.billingType || body.billingType || 'paid';
+    Object.assign(data, buildAccessFields({ billingType, durationDays, accountStatus: data.accountStatus || 'active' }));
+  }
+  return { data };
+}
+
 let _supabaseAdmin = null;
 function getSupabaseAdmin() {
   if (!_supabaseAdmin) {
@@ -26,7 +75,8 @@ router.get('/orgs', async (req, res) => {
       where: { accountOwnerId: null, isSuperAdmin: false },
       select: {
         id: true, name: true, email: true, active: true, plan: true,
-        permissions: true, workspaceMode: true, createdAt: true,
+        permissions: true, workspaceMode: true, billingType: true, trialEndsAt: true,
+        expiresAt: true, graceEndsAt: true, accountStatus: true, createdAt: true,
         accountMembers: {
           select: { id: true, name: true, email: true, active: true },
           orderBy: { name: 'asc' },
@@ -50,7 +100,7 @@ router.get('/orgs', async (req, res) => {
   }
 });
 
-// PATCH /api/superadmin/orgs/:id — update plan, active, or org-level permissions
+// PATCH /api/superadmin/orgs/:id — update plan, active, billing, or org-level permissions
 router.patch('/orgs/:id', async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
@@ -73,11 +123,18 @@ router.patch('/orgs/:id', async (req, res) => {
       }
       data.workspaceMode = workspaceMode;
     }
+    const billingUpdate = pickBillingUpdates(req.body);
+    if (billingUpdate.error) return res.status(400).json({ error: billingUpdate.error });
+    Object.assign(data, billingUpdate.data);
 
     const updated = await prisma.user.update({
       where: { id: userId },
       data,
-      select: { id: true, name: true, email: true, plan: true, active: true, permissions: true, workspaceMode: true },
+      select: {
+        id: true, name: true, email: true, plan: true, active: true, permissions: true,
+        workspaceMode: true, billingType: true, trialEndsAt: true, expiresAt: true,
+        graceEndsAt: true, accountStatus: true,
+      },
     });
 
     res.json({
@@ -173,7 +230,7 @@ router.post('/impersonate/:userId', async (req, res) => {
 // POST /api/superadmin/users — create a new client account (same as admin but superadmin version)
 router.post('/users', async (req, res) => {
   try {
-    const { name, email, password, plan, permissions, workspaceMode } = req.body;
+    const { name, email, password, plan, permissions, workspaceMode, billingType, durationDays, accountStatus } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Nome, email e password são obrigatórios' });
@@ -210,12 +267,15 @@ router.post('/users', async (req, res) => {
         plan: plan ? normalizePlan(plan) : DEFAULT_PLAN,
         workspaceMode: workspaceMode || 'servicos',
         permissions: permissions ? JSON.stringify(permissions) : null,
+        ...buildAccessFields({ billingType, durationDays, accountStatus }),
       },
     });
 
     res.status(201).json({
       id: user.id, name: user.name, email: user.email,
       plan: normalizePlan(user.plan), active: user.active, workspaceMode: user.workspaceMode, createdAt: user.createdAt,
+      billingType: user.billingType, trialEndsAt: user.trialEndsAt, expiresAt: user.expiresAt,
+      graceEndsAt: user.graceEndsAt, accountStatus: user.accountStatus,
     });
   } catch (error) {
     console.error('Error creating user:', error);

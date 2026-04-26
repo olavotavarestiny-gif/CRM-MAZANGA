@@ -23,6 +23,7 @@ import { dismissOnboarding, getOnboarding } from '@/lib/api';
 import type { User } from '@/lib/api';
 
 const STEP_ICONS: Record<string, React.ElementType> = {
+  setup_company: Building2,
   add_contact:    UserPlus,
   setup_store:    Building2,
   setup_pipeline: Kanban,
@@ -78,23 +79,25 @@ export default function OnboardingChecklist({ currentUser }: OnboardingChecklist
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
-    <div className="mb-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+    <div className="mb-6 rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
           <div>
-            <p className="text-sm font-semibold text-[#2c2f31]">Configura a tua conta</p>
+            <p className="text-sm font-semibold text-[#2c2f31]">Configuração inicial</p>
             <p className="text-xs text-slate-500">{completedCount} de {totalCount} passos completos</p>
           </div>
         </div>
 
-        {/* Progress bar */}
         <div className="flex items-center gap-3">
-          <div className="h-2 w-32 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full bg-[var(--workspace-primary)] transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
+          <div className="flex gap-1">
+            {Array.from({ length: totalCount }).map((_, index) => (
+              <div
+                key={index}
+                className={`h-2 w-8 rounded-full transition-colors ${
+                  index < completedCount ? 'bg-[var(--workspace-primary)]' : 'bg-slate-100'
+                }`}
+              />
+            ))}
           </div>
           <span className="text-xs font-semibold text-slate-500">{progress}%</span>
 
@@ -110,7 +113,6 @@ export default function OnboardingChecklist({ currentUser }: OnboardingChecklist
         </div>
       </div>
 
-      {/* Dismiss confirmation */}
       {showDismissConfirm && (
         <div className="border-b border-amber-100 bg-amber-50 px-5 py-3">
           <p className="text-sm text-amber-800">
@@ -135,7 +137,6 @@ export default function OnboardingChecklist({ currentUser }: OnboardingChecklist
         </div>
       )}
 
-      {/* Steps list */}
       <div className="divide-y divide-slate-50 px-5 py-2">
         {steps.map((step, index) => {
           const Icon = STEP_ICONS[step.id] ?? Circle;

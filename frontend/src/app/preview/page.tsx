@@ -1,7 +1,6 @@
 'use client';
 
 import StatWidget from '@/components/dashboard/stat-widget';
-import DailyTipCard from '@/components/dashboard/daily-tip-card';
 
 export default function PreviewPainel() {
   return (
@@ -14,27 +13,6 @@ export default function PreviewPainel() {
         <StatWidget title="Novos Este Mês" value={106} color="#006668" subtitle="Meta: 150" />
         <StatWidget title="Nas Negociações" value={11} color="#8d3a8b" subtitle="Ativos" />
         <StatWidget title="Tarefas Pendentes" value={1} color="#b31b25" subtitle="Urgente" />
-      </div>
-
-      {/* Daily Tip Card */}
-      <div className="mb-8 max-w-2xl">
-        <DailyTipCard
-          dailyTip={{
-            show: true,
-            date: '2026-04-06',
-            tipIndex: 0,
-            workspaceMode: 'servicos',
-            audienceBucket: 'owner',
-            tip: {
-              id: 'preview-tip',
-              title: 'Dica do Dia',
-              heading: 'Prioridade de pipeline',
-              message: 'Comece o dia pelas propostas com maior probabilidade de fecho.',
-              personalizedMessage: 'Olavo, comece o dia pelas propostas com maior probabilidade de fecho.',
-              category: 'pipeline',
-            },
-          }}
-        />
       </div>
 
       {/* Rest of the dashboard */}

@@ -1,6 +1,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const requireAuth = require('../middleware/auth');
+const { checkSubscriptionAccess } = require('../middleware/subscription-access');
 
 const router = express.Router();
 
@@ -65,6 +66,7 @@ async function ensureBucketExists() {
 router.post(
   '/',
   requireAuth,
+  checkSubscriptionAccess,
   express.raw({ type: '*/*', limit: '15mb' }),
   async (req, res) => {
     try {
