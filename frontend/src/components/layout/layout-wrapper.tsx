@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useIsFetching } from '@tanstack/react-query';
 import { getCurrentUser } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
+import { getSupabaseEnv } from '@/lib/supabase/env';
 import Sidebar from './sidebar';
 import { Footer } from './footer';
 import WelcomeModal from '@/components/help/welcome-modal';
@@ -101,6 +102,8 @@ function LayoutInner({ children }: { children: ReactNode }) {
   // Detect Supabase password recovery flow — fires when user clicks a reset-password email link
   // The link lands on / with hash tokens; Supabase fires PASSWORD_RECOVERY so we redirect.
   useEffect(() => {
+    if (!getSupabaseEnv()) return;
+
     const supabase = createClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
@@ -113,6 +116,8 @@ function LayoutInner({ children }: { children: ReactNode }) {
   // Reset auth cache when Supabase session changes (e.g. after login/logout)
   useEffect(() => {
     if (isPublicPage) return;
+    if (!getSupabaseEnv()) return;
+
     const supabase = createClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const newSessionId = session?.access_token ?? null;
