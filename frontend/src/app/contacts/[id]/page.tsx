@@ -439,25 +439,33 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
     queryFn: getContactFieldConfigs,
     staleTime: 0,
   });
-  const systemConfigs = Array.isArray(systemConfigsData) ? systemConfigsData : [];
+  const systemConfigs = Array.isArray(systemConfigsData)
+    ? systemConfigsData.filter((config) => config && typeof config.fieldKey === 'string')
+    : [];
 
   const { data: customFieldDefsData } = useQuery({
     queryKey: ['contactFieldDefs'],
     queryFn: getContactFieldDefs,
   });
-  const customFieldDefs = Array.isArray(customFieldDefsData) ? customFieldDefsData : [];
+  const customFieldDefs = Array.isArray(customFieldDefsData)
+    ? customFieldDefsData.filter((field) => field && typeof field.id === 'string' && typeof field.key === 'string')
+    : [];
 
   const { data: pipelineStagesData } = useQuery({
     queryKey: ['pipeline-stages'],
     queryFn: getPipelineStages,
   });
-  const pipelineStages = Array.isArray(pipelineStagesData) ? pipelineStagesData : [];
+  const pipelineStages = Array.isArray(pipelineStagesData)
+    ? pipelineStagesData.filter((stage) => stage && typeof stage.id === 'string' && typeof stage.name === 'string' && stage.name.trim().length > 0)
+    : [];
 
   const { data: contactGroupsData } = useQuery({
     queryKey: ['contactGroups'],
     queryFn: getContactGroups,
   });
-  const contactGroups = Array.isArray(contactGroupsData) ? contactGroupsData : [];
+  const contactGroups = Array.isArray(contactGroupsData)
+    ? contactGroupsData.filter((group) => group && typeof group.id === 'string' && group.id.trim().length > 0)
+    : [];
 
   const { data: summary } = useQuery({
     queryKey: ['contact-summary', params.id],

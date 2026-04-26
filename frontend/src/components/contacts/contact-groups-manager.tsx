@@ -108,7 +108,9 @@ export default function ContactGroupsManager({
     },
   });
 
-  const groups = Array.isArray(groupsQuery.data) ? groupsQuery.data : [];
+  const groups = Array.isArray(groupsQuery.data)
+    ? groupsQuery.data.filter((group) => group && typeof group.id === 'string' && group.id.trim().length > 0)
+    : [];
   const isBusy = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   return (

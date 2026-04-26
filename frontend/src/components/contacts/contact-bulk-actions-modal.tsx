@@ -46,8 +46,12 @@ export default function ContactBulkActionsModal({
   const [statusValue, setStatusValue] = useState(UNCHANGED_VALUE);
   const [stageValue, setStageValue] = useState(UNCHANGED_VALUE);
   const [contactTypeValue, setContactTypeValue] = useState(UNCHANGED_VALUE);
-  const safeContactGroups = Array.isArray(contactGroups) ? contactGroups : [];
-  const safePipelineStages = Array.isArray(pipelineStages) ? pipelineStages : [];
+  const safeContactGroups = Array.isArray(contactGroups)
+    ? contactGroups.filter((group) => group && typeof group.id === 'string' && group.id.trim().length > 0)
+    : [];
+  const safePipelineStages = Array.isArray(pipelineStages)
+    ? pipelineStages.filter((stage) => stage && typeof stage.id === 'string' && typeof stage.name === 'string' && stage.name.trim().length > 0)
+    : [];
 
   const hasChanges = useMemo(() => (
     groupValue !== UNCHANGED_VALUE ||

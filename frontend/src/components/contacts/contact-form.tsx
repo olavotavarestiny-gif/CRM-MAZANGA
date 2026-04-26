@@ -189,7 +189,9 @@ export default function ContactForm({
     queryFn: getContactFieldDefs,
     enabled: hasCurrentUser,
   });
-  const fieldDefs = Array.isArray(fieldDefsData) ? fieldDefsData : [];
+  const fieldDefs = Array.isArray(fieldDefsData)
+    ? fieldDefsData.filter((field) => field && typeof field.id === 'string' && typeof field.key === 'string')
+    : [];
 
   const { data: systemConfigsData } = useQuery({
     queryKey: ['contactFieldConfigs'],
@@ -197,7 +199,9 @@ export default function ContactForm({
     staleTime: 0,
     enabled: hasCurrentUser,
   });
-  const systemConfigs = Array.isArray(systemConfigsData) ? systemConfigsData : [];
+  const systemConfigs = Array.isArray(systemConfigsData)
+    ? systemConfigsData.filter((config) => config && typeof config.fieldKey === 'string')
+    : [];
 
   const isComercioWorkspace = currentUser?.workspaceMode === 'comercio';
   const showStageField = isEditMode || !isComercioWorkspace;
@@ -207,14 +211,18 @@ export default function ContactForm({
     queryFn: getPipelineStages,
     enabled: hasCurrentUser && showStageField,
   });
-  const pipelineStages = Array.isArray(pipelineStagesData) ? pipelineStagesData : [];
+  const pipelineStages = Array.isArray(pipelineStagesData)
+    ? pipelineStagesData.filter((stage) => stage && typeof stage.id === 'string' && typeof stage.name === 'string' && stage.name.trim().length > 0)
+    : [];
 
   const { data: contactGroupsData } = useQuery({
     queryKey: ['contactGroups'],
     queryFn: getContactGroups,
     enabled: hasCurrentUser,
   });
-  const contactGroups = Array.isArray(contactGroupsData) ? contactGroupsData : [];
+  const contactGroups = Array.isArray(contactGroupsData)
+    ? contactGroupsData.filter((group) => group && typeof group.id === 'string' && group.id.trim().length > 0)
+    : [];
 
   useEffect(() => {
     if (contactGroupId && !contactGroups.some((group) => group.id === contactGroupId)) {

@@ -56,6 +56,49 @@ function formatWA(phone: string): string | null {
 const ALL_GROUPS_VALUE = 'ALL';
 const UNGROUPED_GROUP_VALUE = 'UNGROUPED';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object';
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  }
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return normalizeStringArray(parsed);
+    } catch {
+      return value.trim() ? [value] : [];
+    }
+  }
+
+  return [];
+}
+
+function normalizeCustomFields(value: unknown): Record<string, unknown> {
+  if (isRecord(value)) return value;
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return isRecord(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  return {};
+}
+
+function formatCustomFieldValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-';
+  if (Array.isArray(value)) return value.join(', ') || '-';
+  if (typeof value === 'object') return '-';
+  return String(value);
+}
+
 export default function ContactsPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -93,7 +136,9 @@ export default function ContactsPage() {
     queryFn: getContactFieldDefs,
     enabled: canLoadContactData,
   });
-  const fieldDefs = Array.isArray(fieldDefsData) ? fieldDefsData : [];
+  const fieldDefs = Array.isArray(fieldDefsData)
+    ? fieldDefsData.filter((field) => field && typeof field.id === 'string' && typeof field.key === 'string')
+    : [];
 
   const { data: systemConfigsData } = useQuery({
     queryKey: ['contactFieldConfigs'],
@@ -101,14 +146,18 @@ export default function ContactsPage() {
     staleTime: 5 * 60_000,
     enabled: canLoadContactData,
   });
-  const systemConfigs = Array.isArray(systemConfigsData) ? systemConfigsData : [];
+  const systemConfigs = Array.isArray(systemConfigsData)
+    ? systemConfigsData.filter((config) => config && typeof config.fieldKey === 'string')
+    : [];
 
   const { data: contactGroupsData } = useQuery({
     queryKey: ['contactGroups'],
     queryFn: getContactGroups,
     enabled: canLoadContactData,
   });
-  const contactGroups = Array.isArray(contactGroupsData) ? contactGroupsData : [];
+  const contactGroups = Array.isArray(contactGroupsData)
+    ? contactGroupsData.filter((group) => group && typeof group.id === 'string' && group.id.trim().length > 0)
+    : [];
 
   // System columns to show (excluding fields already rendered in dedicated columns/UI)
   const visibleSystemCols = systemConfigs
@@ -120,7 +169,9 @@ export default function ContactsPage() {
     queryFn: getPipelineStages,
     enabled: canLoadContactData && canShowPipelineUi,
   });
-  const pipelineStages = Array.isArray(pipelineStagesData) ? pipelineStagesData : [];
+  const pipelineStages = Array.isArray(pipelineStagesData)
+    ? pipelineStagesData.filter((stage) => stage && typeof stage.id === 'string' && typeof stage.name === 'string' && stage.name.trim().length > 0)
+    : [];
 
   const queryClient = useQueryClient();
 
@@ -162,7 +213,13 @@ export default function ContactsPage() {
     retry: false,
     enabled: canLoadContactData,
   });
-  const contacts: Contact[] = Array.isArray(contactsQuery.data) ? contactsQuery.data : [];
+  const contacts: Contact[] = Array.isArray(contactsQuery.data)
+    ? contactsQuery.data.filter((contact): contact is Contact => (
+      isRecord(contact) &&
+      typeof contact.id === 'number' &&
+      typeof contact.name === 'string'
+    ))
+    : [];
   const visibleContactIds = useMemo(() => contacts.map((contact) => contact.id), [contacts]);
   const selectedVisibleCount = useMemo(
     () => visibleContactIds.filter((id) => selectedContactIds.includes(id)).length,
@@ -486,13 +543,13 @@ export default function ContactsPage() {
                       {visibleSystemCols.map(cfg => (
                         <TableCell key={cfg.fieldKey} className="hidden md:table-cell text-sm">
                           {cfg.fieldKey === 'tags'
-                          ? ((contact.tags ?? []).join(', ') || '-')
+                          ? (normalizeStringArray(contact.tags).join(', ') || '-')
                           : ((contact as any)[cfg.fieldKey] || '-')}
                       </TableCell>
                     ))}
                     {fieldDefs.map((f) => (
                       <TableCell key={f.id} className="hidden lg:table-cell text-sm">
-                        {contact.customFields?.[f.key] || '-'}
+                        {formatCustomFieldValue(normalizeCustomFields(contact.customFields)[f.key])}
                       </TableCell>
                     ))}
                     {canShowPipelineUi ? (

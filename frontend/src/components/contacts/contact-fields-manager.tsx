@@ -40,9 +40,10 @@ const TYPE_LABELS: Record<ContactFieldType, string> = {
 // ── Options editor ─────────────────────────────────────────────────────────────
 function OptionsEditor({ options, onChange }: { options: string[]; onChange: (v: string[]) => void }) {
   const [input, setInput] = useState('');
+  const safeOptions = Array.isArray(options) ? options : [];
   const add = () => {
     const v = input.trim();
-    if (v && !options.includes(v)) { onChange([...options, v]); setInput(''); }
+    if (v && !safeOptions.includes(v)) { onChange([...safeOptions, v]); setInput(''); }
   };
   return (
     <div>
@@ -52,12 +53,12 @@ function OptionsEditor({ options, onChange }: { options: string[]; onChange: (v:
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} />
         <Button type="button" variant="outline" size="sm" className="h-8 px-2" onClick={add}><Plus className="w-3.5 h-3.5" /></Button>
       </div>
-      {options.length > 0 && (
+      {safeOptions.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2">
-          {options.map((opt) => (
+          {safeOptions.map((opt) => (
             <span key={opt} className="inline-flex items-center gap-1 bg-[#f5f7fa] border border-[#dde3ec] rounded-full px-2.5 py-0.5 text-xs text-[#0A2540]">
               {opt}
-              <button type="button" onClick={() => onChange(options.filter(o => o !== opt))}><X className="w-3 h-3 hover:text-red-500" /></button>
+              <button type="button" onClick={() => onChange(safeOptions.filter(o => o !== opt))}><X className="w-3 h-3 hover:text-red-500" /></button>
             </span>
           ))}
         </div>
@@ -146,11 +147,12 @@ function SystemFieldRow({ config }: { config: ContactFieldConfig }) {
 // ── Custom field row ────────────────────────────────────────────────────────────
 function CustomFieldRow({ field }: { field: ContactFieldDef }) {
   const queryClient = useQueryClient();
+  const fieldOptions = Array.isArray(field.options) ? field.options : [];
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [label, setLabel] = useState(field.label);
   const [required, setRequired] = useState(field.required);
-  const [options, setOptions] = useState<string[]>(field.options ?? []);
+  const [options, setOptions] = useState<string[]>(fieldOptions);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['contactFieldDefs'] });
 
@@ -175,12 +177,12 @@ function CustomFieldRow({ field }: { field: ContactFieldDef }) {
             <span className="text-sm font-medium text-[#0A2540]">{field.label}</span>
             {field.required && <span className="text-[10px] font-semibold text-red-500 bg-red-50 border border-red-100 rounded px-1 py-0.5">Obrigatório</span>}
           </div>
-          <span className="text-xs text-[#6b7e9a]">{TYPE_LABELS[field.type]}{field.type === 'select' && field.options?.length ? ` · ${field.options.join(', ')}` : ''}</span>
+          <span className="text-xs text-[#6b7e9a]">{TYPE_LABELS[field.type]}{field.type === 'select' && fieldOptions.length ? ` · ${fieldOptions.join(', ')}` : ''}</span>
         </div>
         {!editing && !confirmDelete && (
           <div className="flex items-center gap-1 flex-shrink-0">
             <Button variant="ghost" size="sm" className="h-8 px-2.5 text-[#6b7e9a] hover:text-[#0A2540] hover:bg-[#0A2540]/5"
-              onClick={() => { setLabel(field.label); setRequired(field.required); setOptions(field.options ?? []); setEditing(true); }}>
+              onClick={() => { setLabel(field.label); setRequired(field.required); setOptions(fieldOptions); setEditing(true); }}>
               <Pencil className="w-3.5 h-3.5 mr-1" /><span className="text-xs">Editar</span>
             </Button>
             <Button variant="ghost" size="sm" className="h-8 px-2.5 text-[#6b7e9a] hover:text-red-600 hover:bg-red-50"
@@ -289,19 +291,26 @@ export default function ContactFieldsManager({
 }) {
   const [adding, setAdding] = useState(false);
 
-  const { data: systemConfigs = [], isLoading: loadingSystem } = useQuery({
+  const { data: systemConfigsData, isLoading: loadingSystem, isError: systemConfigsError } = useQuery({
     queryKey: ['contactFieldConfigs'],
     queryFn: getContactFieldConfigs,
     enabled: open,
   });
 
-  const { data: customFields = [], isLoading: loadingCustom } = useQuery({
+  const { data: customFieldsData, isLoading: loadingCustom, isError: customFieldsError } = useQuery({
     queryKey: ['contactFieldDefs'],
     queryFn: getContactFieldDefs,
     enabled: open,
   });
 
+  const systemConfigs = Array.isArray(systemConfigsData)
+    ? systemConfigsData.filter((config) => config && typeof config.fieldKey === 'string')
+    : [];
+  const customFields = Array.isArray(customFieldsData)
+    ? customFieldsData.filter((field) => field && typeof field.id === 'string' && typeof field.key === 'string')
+    : [];
   const isLoading = loadingSystem || loadingCustom;
+  const hasError = systemConfigsError || customFieldsError;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setAdding(false); }}>
@@ -316,6 +325,10 @@ export default function ContactFieldsManager({
 
         {isLoading ? (
           <p className="text-sm text-[#6b7e9a] text-center py-6">A carregar...</p>
+        ) : hasError ? (
+          <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+            Não foi possível carregar a configuração dos campos. Fecha e tenta novamente.
+          </div>
         ) : (
           <div className="space-y-5">
 
