@@ -99,6 +99,10 @@ function formatCustomFieldValue(value: unknown): string {
   return String(value);
 }
 
+function sameNumberArray(left: number[], right: number[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
 export default function ContactsPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -213,13 +217,16 @@ export default function ContactsPage() {
     retry: false,
     enabled: canLoadContactData,
   });
-  const contacts: Contact[] = Array.isArray(contactsQuery.data)
-    ? contactsQuery.data.filter((contact): contact is Contact => (
-      isRecord(contact) &&
-      typeof contact.id === 'number' &&
-      typeof contact.name === 'string'
-    ))
-    : [];
+  const contacts: Contact[] = useMemo(
+    () => Array.isArray(contactsQuery.data)
+      ? contactsQuery.data.filter((contact): contact is Contact => (
+        isRecord(contact) &&
+        typeof contact.id === 'number' &&
+        typeof contact.name === 'string'
+      ))
+      : [],
+    [contactsQuery.data]
+  );
   const visibleContactIds = useMemo(() => contacts.map((contact) => contact.id), [contacts]);
   const selectedVisibleCount = useMemo(
     () => visibleContactIds.filter((id) => selectedContactIds.includes(id)).length,
@@ -244,7 +251,10 @@ export default function ContactsPage() {
   const isSearching = workspaceResolved && contactsQuery.isFetching && !contactsQuery.isLoading;
 
   useEffect(() => {
-    setSelectedContactIds((currentIds) => currentIds.filter((id) => visibleContactIds.includes(id)));
+    setSelectedContactIds((currentIds) => {
+      const nextIds = currentIds.filter((id) => visibleContactIds.includes(id));
+      return sameNumberArray(currentIds, nextIds) ? currentIds : nextIds;
+    });
   }, [visibleContactIds]);
 
   const deleteMutation = useMutation({
