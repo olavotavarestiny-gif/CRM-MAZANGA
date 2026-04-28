@@ -643,7 +643,6 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
     const parsedDealValue = parseDealValueInput(dealValueKz);
     const resolvedContactGroupId = await resolveContactGroupId(contactGroupId, userId);
     const parsedBirthDate = parseDateInput(birthDate);
-    const parsedBirthDate = parseDateInput(birthDate);
     const nifError = validateContactNif({ nif: resolvedNif, clienteType: finalClienteType });
     if (nifError) {
       return res.status(400).json({ error: nifError });
