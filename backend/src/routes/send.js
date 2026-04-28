@@ -4,6 +4,13 @@ const prisma = require('../lib/prisma');
 const whatsapp = require('../lib/whatsapp');
 const email = require('../lib/email');
 
+async function touchContactActivity(contactId) {
+  await prisma.contact.updateMany({
+    where: { id: Number(contactId) },
+    data: { lastActivityAt: new Date() },
+  });
+}
+
 // POST - Send WhatsApp message (text or template)
 router.post('/', async (req, res) => {
   try {
@@ -62,6 +69,7 @@ router.post('/', async (req, res) => {
         channel: 'whatsapp',
       },
     });
+    await touchContactActivity(id);
 
     // Return message + warning if delivery failed
     if (deliveryError) {
@@ -120,6 +128,7 @@ router.post('/email', async (req, res) => {
         subject,
       },
     });
+    await touchContactActivity(id);
 
     res.json(message);
   } catch (error) {

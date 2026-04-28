@@ -7,7 +7,19 @@ const { requirePermission, requireDeletePermission } = require('../lib/permissio
 const { requirePlanFeature, canCreateContact, getPlanContext, hasPlanFeature } = require('../lib/plan-limits');
 const { getDefaultStageName } = require('../lib/pipeline-stages');
 
-const CONTACT_FIELD_KEYS = new Set(['name', 'phone', 'email', 'company', 'sector', 'revenue']);
+const STANDARD_CONTACT_FIELDS = [
+  { key: 'name', binding: 'standard:name', label: 'Nome', type: 'text', required: true },
+  { key: 'phone', binding: 'standard:phone', label: 'Telefone', type: 'text', required: true },
+  { key: 'email', binding: 'standard:email', label: 'Email', type: 'text', required: false },
+  { key: 'company', binding: 'standard:company', label: 'Empresa', type: 'text', required: false },
+  { key: 'location', binding: 'standard:location', label: 'Localização', type: 'text', required: false },
+  { key: 'birthDate', binding: 'standard:birthDate', label: 'Aniversário', type: 'date', required: false },
+  { key: 'sector', binding: 'standard:sector', label: 'Setor', type: 'text', required: false },
+  { key: 'revenue', binding: 'standard:revenue', label: 'Faturamento', type: 'text', required: false },
+];
+
+const CONTACT_FIELD_KEYS = new Set(STANDARD_CONTACT_FIELDS.map((field) => field.key));
+const LEGACY_CONTACT_FIELD_KEYS = new Set(['name', 'phone', 'email', 'company', 'sector', 'revenue', 'location', 'birthDate']);
 const INFERRED_CONTACT_FIELD_PATTERNS = {
   name: [/^nome$/i, /^nome completo$/i, /^contacto$/i],
   phone: [/telefone/i, /telemovel/i, /telemóvel/i, /numero/i, /n[uú]mero/i, /celular/i, /whatsapp/i],
@@ -15,7 +27,103 @@ const INFERRED_CONTACT_FIELD_PATTERNS = {
   company: [/empresa/i, /companhia/i, /neg[oó]cio/i, /organiz/i],
   sector: [/setor/i, /sector/i, /ramo/i, /ind[uú]stria/i, /area/i, /área/i],
   revenue: [/fatura[cç][aã]o/i, /receita/i, /or[cç]amento/i, /volume/i, /revenue/i],
+  location: [/local/i, /morada/i, /endere[cç]o/i, /prov[ií]ncia/i, /cidade/i],
+  birthDate: [/anivers/i, /nascimento/i, /data de nascimento/i],
 };
+
+function safeParseJson(value, fallback) {
+  if (value === null || value === undefined || value === '') return fallback;
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeBinding(contactField) {
+  if (!contactField) return null;
+  const raw = String(contactField).trim();
+  if (!raw || raw === 'none') return null;
+  if (raw.startsWith('standard:') || raw.startsWith('custom:')) return raw;
+  if (LEGACY_CONTACT_FIELD_KEYS.has(raw)) return `standard:${raw}`;
+  return raw;
+}
+
+function getStandardFieldKey(contactField) {
+  const binding = normalizeBinding(contactField);
+  if (!binding) return null;
+  if (binding.startsWith('standard:')) {
+    const key = binding.slice('standard:'.length);
+    return CONTACT_FIELD_KEYS.has(key) ? key : null;
+  }
+  if (LEGACY_CONTACT_FIELD_KEYS.has(binding)) return binding;
+  return null;
+}
+
+function getCustomFieldKey(contactField) {
+  const binding = normalizeBinding(contactField);
+  return binding?.startsWith('custom:') ? binding.slice('custom:'.length) : null;
+}
+
+function formatDateValue(value) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function serialiseFormField(field) {
+  return {
+    ...field,
+    contactField: normalizeBinding(field.contactField) || field.contactField,
+    options: field.options ? safeParseJson(field.options, []) : undefined,
+  };
+}
+
+async function getCustomFieldMap(userId) {
+  const fields = await prisma.contactFieldDef.findMany({
+    where: { userId, active: true },
+    orderBy: { order: 'asc' },
+  });
+
+  return new Map(fields.map((field) => [
+    field.key,
+    {
+      ...field,
+      options: safeParseJson(field.options, []),
+    },
+  ]));
+}
+
+async function resolveFieldPersistenceData({ userId, type, options, contactField, contactFieldProvided = false }) {
+  const data = {};
+  const binding = normalizeBinding(contactField);
+  if (contactFieldProvided) {
+    data.contactField = binding || null;
+  }
+
+  const customKey = getCustomFieldKey(binding);
+  if (customKey) {
+    const customField = await prisma.contactFieldDef.findFirst({
+      where: { userId, key: customKey, active: true },
+    });
+    if (!customField) {
+      const error = new Error('Campo personalizado não encontrado');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (customField.type === 'select') {
+      data.type = 'multiple_choice';
+      data.options = JSON.stringify(safeParseJson(customField.options, []));
+      return data;
+    }
+  }
+
+  if (type !== undefined) data.type = type;
+  if (options !== undefined) data.options = options ? JSON.stringify(options) : null;
+  return data;
+}
 
 function normaliseText(value) {
   return String(value || '')
@@ -26,25 +134,31 @@ function normaliseText(value) {
 }
 
 function inferContactField(field, submittedValue = '') {
-  if (field?.contactField && CONTACT_FIELD_KEYS.has(field.contactField)) {
-    return field.contactField;
+  const standardField = getStandardFieldKey(field?.contactField);
+  if (standardField) {
+    return `standard:${standardField}`;
+  }
+
+  const customField = getCustomFieldKey(field?.contactField);
+  if (customField) {
+    return `custom:${customField}`;
   }
 
   const normalisedLabel = normaliseText(field?.label);
 
   for (const [contactField, patterns] of Object.entries(INFERRED_CONTACT_FIELD_PATTERNS)) {
     if (patterns.some((pattern) => pattern.test(normalisedLabel))) {
-      return contactField;
+      return `standard:${contactField}`;
     }
   }
 
   const normalisedValue = normaliseSubmittedValue(submittedValue);
   if (normalisedValue.includes('@')) {
-    return 'email';
+    return 'standard:email';
   }
 
   if (/^[\d\s\+\-\(\)]{7,20}$/.test(normalisedValue)) {
-    return 'phone';
+    return 'standard:phone';
   }
 
   return null;
@@ -75,11 +189,22 @@ function buildAnswersSnapshot(fields, submittedAnswers) {
 
 function buildContactDataFromAnswers(answerSnapshots) {
   return answerSnapshots.reduce((acc, answer) => {
-    if (answer.contactField && CONTACT_FIELD_KEYS.has(answer.contactField) && answer.value) {
-      acc[answer.contactField] = answer.value;
+    if (!answer.value) {
+      return acc;
+    }
+
+    const standardKey = getStandardFieldKey(answer.contactField);
+    if (standardKey) {
+      acc.standard[standardKey] = answer.value;
+      return acc;
+    }
+
+    const customKey = getCustomFieldKey(answer.contactField);
+    if (customKey) {
+      acc.custom[customKey] = answer.value;
     }
     return acc;
-  }, {});
+  }, { standard: {}, custom: {} });
 }
 
 function serialiseSubmissionAnswer(answer) {
@@ -107,13 +232,90 @@ router.get('/', requireAuth, requirePlanFeature('formularios'), requirePermissio
       where: { userId: req.user.effectiveUserId },
       include: {
         _count: { select: { submissions: true } },
-        fields: { select: { id: true, type: true, label: true, order: true } },
+        fields: { select: { id: true, type: true, label: true, order: true, options: true, contactField: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
-    res.json(forms);
+    res.json(forms.map((form) => ({
+      ...form,
+      fields: form.fields.map(serialiseFormField),
+    })));
   } catch (error) {
     console.error('Error fetching forms:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/forms/contact-fields - campos disponíveis para mapear no builder
+router.get('/contact-fields', requireAuth, requirePlanFeature('formularios'), requirePermission('forms', 'view'), async (req, res) => {
+  try {
+    const customFields = await prisma.contactFieldDef.findMany({
+      where: { userId: req.user.effectiveUserId, active: true },
+      orderBy: { order: 'asc' },
+    });
+
+    res.json({
+      standard: STANDARD_CONTACT_FIELDS,
+      custom: customFields.map((field) => ({
+        id: field.id,
+        key: field.key,
+        binding: `custom:${field.key}`,
+        label: field.label,
+        type: field.type,
+        required: field.required,
+        options: safeParseJson(field.options, []),
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching form contact fields:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/contact-fields', requireAuth, requirePlanFeature('formularios'), requirePermission('forms', 'edit'), async (req, res) => {
+  try {
+    const { label, type, options, required } = req.body;
+    if (!label?.trim()) {
+      return res.status(400).json({ error: 'Label is required' });
+    }
+
+    const fieldType = ['text', 'number', 'date', 'select', 'url'].includes(type) ? type : 'text';
+    const baseKey = normaliseText(label)
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_|_$/g, '')
+      .slice(0, 40) || `campo_${Date.now()}`;
+    let key = baseKey;
+    const existing = await prisma.contactFieldDef.findFirst({ where: { userId: req.user.effectiveUserId, key } });
+    if (existing) key = `${baseKey}_${Date.now().toString().slice(-4)}`;
+
+    const maxOrder = await prisma.contactFieldDef.aggregate({
+      where: { userId: req.user.effectiveUserId },
+      _max: { order: true },
+    });
+
+    const field = await prisma.contactFieldDef.create({
+      data: {
+        userId: req.user.effectiveUserId,
+        label: label.trim(),
+        key,
+        type: fieldType,
+        options: fieldType === 'select' && Array.isArray(options) ? JSON.stringify(options) : null,
+        required: !!required,
+        order: (maxOrder._max.order ?? -1) + 1,
+      },
+    });
+
+    res.status(201).json({
+      id: field.id,
+      key: field.key,
+      binding: `custom:${field.key}`,
+      label: field.label,
+      type: field.type,
+      required: field.required,
+      options: safeParseJson(field.options, []),
+    });
+  } catch (error) {
+    console.error('Error creating form contact field:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -158,10 +360,7 @@ router.get('/:id', async (req, res) => {
       return res.status(403).json({ error: 'Funcionalidade não disponível no seu plano' });
     }
     // Parse options JSON para campos de múltipla escolha
-    const fieldsWithParsedOptions = form.fields.map((field) => ({
-      ...field,
-      options: field.options ? JSON.parse(field.options) : undefined,
-    }));
+    const fieldsWithParsedOptions = form.fields.map(serialiseFormField);
     res.json({ ...form, fields: fieldsWithParsedOptions });
   } catch (error) {
     console.error('Error fetching form:', error);
@@ -260,21 +459,25 @@ router.post('/:id/fields', requireAuth, requirePlanFeature('formularios'), requi
     }
 
     const { type, label, required, order, options, contactField } = req.body;
+    const fieldData = await resolveFieldPersistenceData({
+      userId: req.user.effectiveUserId,
+      type,
+      options,
+      contactField,
+      contactFieldProvided: Object.prototype.hasOwnProperty.call(req.body, 'contactField'),
+    });
     const field = await prisma.formField.create({
       data: {
         formId: req.params.id,
-        type,
         label,
         required: required || false,
         order,
-        options: options ? JSON.stringify(options) : null,
-        contactField: contactField || null,
+        type: fieldData.type || type,
+        options: fieldData.options ?? null,
+        contactField: fieldData.contactField ?? null,
       },
     });
-    res.status(201).json({
-      ...field,
-      options: field.options ? JSON.parse(field.options) : undefined,
-    });
+    res.status(201).json(serialiseFormField(field));
   } catch (error) {
     console.error('Error creating field:', error);
     res.status(500).json({ error: error.message });
@@ -294,21 +497,23 @@ router.put('/:id/fields/:fieldId', requireAuth, requirePlanFeature('formularios'
     }
 
     const { type, label, required, order, options, contactField } = req.body;
+    const fieldData = await resolveFieldPersistenceData({
+      userId: req.user.effectiveUserId,
+      type,
+      options,
+      contactField,
+      contactFieldProvided: Object.prototype.hasOwnProperty.call(req.body, 'contactField'),
+    });
     const field = await prisma.formField.update({
       where: { id: req.params.fieldId },
       data: {
-        ...(type !== undefined && { type }),
         ...(label !== undefined && { label }),
         ...(required !== undefined && { required }),
         ...(order !== undefined && { order }),
-        ...(options !== undefined && { options: options ? JSON.stringify(options) : null }),
-        ...(contactField !== undefined && { contactField: contactField || null }),
+        ...fieldData,
       },
     });
-    res.json({
-      ...field,
-      options: field.options ? JSON.parse(field.options) : undefined,
-    });
+    res.json(serialiseFormField(field));
   } catch (error) {
     console.error('Error updating field:', error);
     res.status(500).json({ error: error.message });
@@ -426,35 +631,48 @@ router.post('/:id/submit', async (req, res) => {
 
     try {
       const contactData = buildContactDataFromAnswers(answerSnapshots);
+      const standardData = contactData.standard;
+      const customData = contactData.custom;
       automationContact = {
         ...automationContact,
-        name: contactData.name || '',
-        phone: contactData.phone || '',
-        email: contactData.email || '',
-        company: contactData.company || '',
-        revenue: contactData.revenue || null,
-        sector: contactData.sector || null,
+        name: standardData.name || '',
+        phone: standardData.phone || '',
+        email: standardData.email || '',
+        company: standardData.company || '',
+        revenue: standardData.revenue || null,
+        sector: standardData.sector || null,
+        location: standardData.location || null,
       };
 
-      if (contactData.phone) {
+      if (standardData.phone) {
         const defaultStage = await getDefaultStageName(form.userId);
         const existingContact = await prisma.contact.findFirst({
           where: {
             userId: form.userId,
-            phone: contactData.phone,
+            phone: standardData.phone,
           },
         });
 
         if (existingContact) {
+          const existingCustomFields = safeParseJson(existingContact.customFields, {});
           const updateData = {
             inPipeline: true,
+            lastActivityAt: new Date(),
           };
 
-          if (contactData.name) updateData.name = contactData.name;
-          if (contactData.email) updateData.email = contactData.email;
-          if (contactData.company) updateData.company = contactData.company;
-          if (contactData.sector) updateData.sector = contactData.sector;
-          if (contactData.revenue) updateData.revenue = contactData.revenue;
+          if (standardData.name) updateData.name = standardData.name;
+          if (standardData.email) updateData.email = standardData.email;
+          if (standardData.company) updateData.company = standardData.company;
+          if (standardData.sector) updateData.sector = standardData.sector;
+          if (standardData.revenue) updateData.revenue = standardData.revenue;
+          if (standardData.location) updateData.location = standardData.location;
+          if (standardData.birthDate) {
+            const birthDate = formatDateValue(standardData.birthDate);
+            if (birthDate) updateData.birthDate = birthDate;
+          }
+          if (Object.keys(customData).length > 0) {
+            updateData.customFields = JSON.stringify({ ...existingCustomFields, ...customData });
+          }
 
           syncedContact = await prisma.contact.update({
             where: { id: existingContact.id },
@@ -473,16 +691,20 @@ router.post('/:id/submit', async (req, res) => {
             syncedContact = await prisma.contact.create({
               data: {
                 userId: form.userId,
-                name: contactData.name || 'Sem nome',
-                phone: contactData.phone,
-                email: contactData.email || '',
-                company: contactData.company || '',
-                revenue: contactData.revenue || null,
-                sector: contactData.sector || null,
+                name: standardData.name || 'Sem nome',
+                phone: standardData.phone,
+                email: standardData.email || '',
+                company: standardData.company || '',
+                revenue: standardData.revenue || null,
+                sector: standardData.sector || null,
+                location: standardData.location || null,
+                birthDate: formatDateValue(standardData.birthDate),
+                customFields: JSON.stringify(customData),
                 stage: defaultStage,
                 inPipeline: true,
                 contactType: 'interessado',
                 status: 'ativo',
+                lastActivityAt: new Date(),
               },
             });
             automationContact = {

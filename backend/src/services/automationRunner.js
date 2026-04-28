@@ -52,6 +52,16 @@ function matchesConditionalTrigger(trigger, automation, contact) {
     return contact.sector === automation.triggerValue;
   }
 
+  if (trigger === 'stage_changed') {
+    return contact.stage === automation.triggerValue;
+  }
+
+  if (trigger === 'contact_inactivity') {
+    const requiredDays = parseInt(automation.triggerValue || '7', 10);
+    const inactivityDays = Number(context.inactivityDays || contact.inactivityDays || 0);
+    return Number.isInteger(requiredDays) && inactivityDays >= requiredDays;
+  }
+
   return true;
 }
 
@@ -60,7 +70,7 @@ function matchesAutomation(trigger, automation, contact, context) {
     return false;
   }
 
-  if (['contact_tag', 'contact_revenue', 'contact_sector'].includes(trigger)) {
+  if (['contact_tag', 'contact_revenue', 'contact_sector', 'stage_changed', 'contact_inactivity'].includes(trigger)) {
     return matchesConditionalTrigger(trigger, automation, contact);
   }
 
@@ -82,6 +92,9 @@ function buildTriggerData(trigger, triggerValue, context, contact) {
     triggerValue,
     formId: context.formId || null,
     formTitle: contact.formTitle || null,
+    oldStage: context.oldStage || null,
+    newStage: context.newStage || null,
+    inactivityDays: context.inactivityDays || null,
     contact: {
       id: contact.id || null,
       name: contact.name || null,
@@ -215,10 +228,33 @@ async function executeAutomationAction(automation, contact, context) {
         notes: automation.taskNotes ? interpolate(automation.taskNotes, contact) : null,
         dueDate,
         priority: automation.taskPriority || 'Media',
+        source: 'automation',
+        automationId: automation.id,
       },
     });
 
     console.log(`Automation executed: ${automation.trigger} -> create_task`);
+    return;
+  }
+
+  if (automation.action === 'create_alert') {
+    const userId = contact.userId || context.userId || automation.userId || null;
+    if (!userId) {
+      throw new Error('Organização não encontrada para criar alerta');
+    }
+
+    await prisma.automationAlert.create({
+      data: {
+        userId,
+        contactId: contact.id || null,
+        automationId: automation.id,
+        type: automation.trigger,
+        title: interpolate(automation.taskTitle, contact),
+        message: automation.taskNotes ? interpolate(automation.taskNotes, contact) : null,
+      },
+    });
+
+    console.log(`Automation executed: ${automation.trigger} -> create_alert`);
     return;
   }
 

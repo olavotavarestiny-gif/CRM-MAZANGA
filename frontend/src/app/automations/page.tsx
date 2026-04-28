@@ -35,6 +35,9 @@ const TRIGGER_LABELS: Record<string, string> = {
   contact_tag: 'Contacto com Tag',
   contact_revenue: 'Contacto por Faturação',
   contact_sector: 'Contacto por Setor',
+  stage_changed: 'Mudança de Etapa',
+  contact_inactivity: 'Sem Atividade',
+  contact_birthday: 'Aniversário',
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -43,6 +46,7 @@ const ACTION_LABELS: Record<string, string> = {
   send_whatsapp_text: 'Mensagem WhatsApp',
   update_stage: 'Mover etapa',
   create_task: 'Criar tarefa',
+  create_alert: 'Criar alerta',
 };
 
 const percentFormatter = new Intl.NumberFormat('pt-PT', {

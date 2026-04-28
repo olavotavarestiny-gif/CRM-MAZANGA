@@ -4,13 +4,20 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { getTasks, getCalendarStatus, getCalendarEvents, disconnectCalendar, connectCalendar, syncCalendar } from '@/lib/api';
+import { createLocalCalendarEvent, getChatUsers, getTasks, getCalendarStatus, getCalendarEvents, getLocalCalendarEvents, disconnectCalendar, connectCalendar, syncCalendar } from '@/lib/api';
 import type { CalendarEvent } from '@/lib/types';
 import CalendarGrid from '@/components/calendar/calendar-grid';
 import DayEventsPanel from '@/components/calendar/day-events-panel';
 import TaskFormModal from '@/components/tasks/task-form-modal';
 import { ErrorState } from '@/components/ui/error-state';
 import { useToast } from '@/components/ui/toast-provider';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 const MONTH_NAMES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -39,6 +46,14 @@ export default function CalendarioPage() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [taskModalDate, setTaskModalDate] = useState('');
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [eventTitle, setEventTitle] = useState('');
+  const [eventNotes, setEventNotes] = useState('');
+  const [eventStart, setEventStart] = useState('');
+  const [eventEnd, setEventEnd] = useState('');
+  const [eventContactId, setEventContactId] = useState('');
+  const [eventAssigneeId, setEventAssigneeId] = useState('');
+  const [eventSyncGoogle, setEventSyncGoogle] = useState(false);
 
   const getCalendarReturnTo = () => {
     if (typeof window === 'undefined') return undefined;
@@ -116,6 +131,11 @@ export default function CalendarioPage() {
     retry: false,
   });
 
+  const { data: teamUsers = [] } = useQuery({
+    queryKey: ['chat-users'],
+    queryFn: getChatUsers,
+  });
+
   // Date range for the visible month (+ padding for weeks)
   const rangeStart = new Date(year, month, 1).toISOString();
   const rangeEnd = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
@@ -129,6 +149,17 @@ export default function CalendarioPage() {
   } = useQuery({
     queryKey: ['tasks', { all: true }],
     queryFn: () => getTasks({}),
+  });
+
+  const {
+    data: localEvents = [],
+    isLoading: localEventsLoading,
+    isError: localEventsError,
+    refetch: refetchLocalEvents,
+  } = useQuery({
+    queryKey: ['localCalendarEvents', year, month],
+    queryFn: () => getLocalCalendarEvents(rangeStart, rangeEnd),
+    retry: false,
   });
 
   // Google Calendar events
@@ -201,6 +232,30 @@ export default function CalendarioPage() {
     },
   });
 
+  const createEventMutation = useMutation({
+    mutationFn: () => createLocalCalendarEvent({
+      title: eventTitle,
+      notes: eventNotes || undefined,
+      startDate: eventStart,
+      endDate: eventEnd,
+      contactId: eventContactId ? Number(eventContactId) : null,
+      assignedToUserId: eventAssigneeId ? Number(eventAssigneeId) : null,
+      syncWithGoogle: eventSyncGoogle,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['localCalendarEvents'] });
+      queryClient.invalidateQueries({ queryKey: ['calendarEvents'] });
+      setEventModalOpen(false);
+      setEventTitle('');
+      setEventNotes('');
+      setEventContactId('');
+      toast({ variant: 'success', title: 'Evento criado', description: 'O evento foi adicionado ao calendário.' });
+    },
+    onError: (error: any) => {
+      toast({ variant: 'error', title: 'Não foi possível criar evento', description: error?.message || 'Tenta novamente.' });
+    },
+  });
+
   // Build CRM events from tasks
   const crmEvents: CalendarEvent[] = (tasksData || [])
     .filter((t) => !!t.dueDate)
@@ -219,9 +274,24 @@ export default function CalendarioPage() {
       googleSyncError: t.googleCalendarSyncError || null,
     }));
 
-  const allEvents: CalendarEvent[] = [...crmEvents, ...googleEvents];
-  const isCalendarLoading = calendarStatusLoading || tasksLoading || (calendarStatus?.connected ? googleEventsLoading : false);
-  const hasCalendarError = calendarStatusError || tasksError || (calendarStatus?.connected ? googleEventsError : false);
+  const localCalendarEvents: CalendarEvent[] = localEvents.map((event) => ({
+    id: `local_${event.id}`,
+    localEventId: event.id,
+    title: event.title,
+    start: event.startDate,
+    end: event.endDate,
+    allDay: false,
+    source: 'crm',
+    color: '#0EA5E9',
+    contactName: event.contact?.name,
+    externalUrl: event.googleCalendarHtmlLink || undefined,
+    googleLinked: !!event.googleCalendarEventId,
+    googleSyncError: event.googleCalendarSyncError || null,
+  }));
+
+  const allEvents: CalendarEvent[] = [...crmEvents, ...localCalendarEvents, ...googleEvents];
+  const isCalendarLoading = calendarStatusLoading || tasksLoading || localEventsLoading || (calendarStatus?.connected ? googleEventsLoading : false);
+  const hasCalendarError = calendarStatusError || tasksError || localEventsError || (calendarStatus?.connected ? googleEventsError : false);
   const hasEventsInView = allEvents.some((event) => {
     const eventDate = new Date(event.start);
     return eventDate.getFullYear() === year && eventDate.getMonth() === month;
@@ -235,6 +305,7 @@ export default function CalendarioPage() {
   const retryCalendarData = () => {
     refetchCalendarStatus();
     refetchTasks();
+    refetchLocalEvents();
     if (calendarStatus?.connected) {
       refetchGoogleEvents();
     }
@@ -254,6 +325,14 @@ export default function CalendarioPage() {
     setYear(today.getFullYear());
     setMonth(today.getMonth());
     setSelectedDay(today.toISOString().slice(0, 10));
+  }
+
+  function openEventModal(date?: string) {
+    const base = date || selectedDay || today.toISOString().slice(0, 10);
+    setEventStart(`${base}T09:00`);
+    setEventEnd(`${base}T10:00`);
+    setEventAssigneeId(teamUsers[0]?.id ? String(teamUsers[0].id) : '');
+    setEventModalOpen(true);
   }
 
   return (
@@ -317,6 +396,10 @@ export default function CalendarioPage() {
                       {calendarStatus.reauthRequired ? 'Google requer reconexão' : 'Google Agenda'}
                     </span>
                   )}
+                  <span className="flex items-center gap-1.5 rounded-full bg-sky-50 px-3 py-2 text-sky-700">
+                    <span className="w-2 h-2 rounded-full bg-sky-500" />
+                    Eventos CRM
+                  </span>
                 </div>
               </div>
             </div>
@@ -382,6 +465,12 @@ export default function CalendarioPage() {
                   <span>Conectar Google Agenda</span>
                 </button>
               )}
+              <button
+                onClick={() => openEventModal()}
+                className="flex items-center gap-2 rounded-2xl bg-[var(--workspace-primary)] px-4 py-2 text-sm font-semibold text-[var(--workspace-on-primary)] transition-opacity hover:opacity-90"
+              >
+                Novo evento
+              </button>
             </div>
           </div>
         </div>
@@ -485,6 +574,63 @@ export default function CalendarioPage() {
         onClose={() => setTaskModalOpen(false)}
         defaultDate={taskModalDate}
       />
+
+      <Dialog open={eventModalOpen} onOpenChange={setEventModalOpen}>
+        <DialogContent className="max-w-lg bg-white">
+          <DialogHeader>
+            <DialogTitle>Novo evento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Título *</Label>
+              <Input value={eventTitle} onChange={(event) => setEventTitle(event.target.value)} />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Início *</Label>
+                <Input type="datetime-local" value={eventStart} onChange={(event) => setEventStart(event.target.value)} />
+              </div>
+              <div>
+                <Label>Fim *</Label>
+                <Input type="datetime-local" value={eventEnd} onChange={(event) => setEventEnd(event.target.value)} />
+              </div>
+            </div>
+            <div>
+              <Label>Responsável</Label>
+              <Select value={eventAssigneeId || '__self__'} onValueChange={(value) => setEventAssigneeId(value === '__self__' ? '' : value)}>
+                <SelectTrigger><SelectValue placeholder="Selecionar responsável" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__self__">Eu</SelectItem>
+                  {teamUsers.map((user) => (
+                    <SelectItem key={user.id} value={String(user.id)}>{user.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Contacto</Label>
+              <Input type="number" min="1" placeholder="ID do contacto" value={eventContactId} onChange={(event) => setEventContactId(event.target.value)} />
+            </div>
+            <div>
+              <Label>Notas</Label>
+              <Textarea rows={3} value={eventNotes} onChange={(event) => setEventNotes(event.target.value)} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={eventSyncGoogle} onCheckedChange={setEventSyncGoogle} />
+              <Label>Sincronizar com Google Calendar</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEventModalOpen(false)}>Cancelar</Button>
+            <Button
+              disabled={!eventTitle.trim() || !eventStart || !eventEnd || createEventMutation.isPending}
+              onClick={() => createEventMutation.mutate()}
+            >
+              {createEventMutation.isPending ? 'A guardar...' : 'Guardar evento'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -160,6 +160,14 @@ async function logTaskActivity(req, data) {
   });
 }
 
+async function touchContactActivity(contactId) {
+  if (!contactId) return;
+  await prisma.contact.updateMany({
+    where: { id: Number(contactId) },
+    data: { lastActivityAt: new Date() },
+  });
+}
+
 function trimTaskSyncError(message) {
   if (!message) return null;
   return String(message).slice(0, 1000);
@@ -461,6 +469,8 @@ router.post('/', requirePermission('tasks', 'edit'), async (req, res) => {
       rawDueDate: dueDate,
     });
 
+    await touchContactActivity(createdTask.contactId);
+
     res.status(201).json(task);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create task' });
@@ -536,6 +546,7 @@ router.put('/:id', requirePermission('tasks', 'edit'), async (req, res) => {
     });
 
     if (task.done !== persistedTask.done) {
+      await touchContactActivity(persistedTask.contactId);
       await logTaskActivity(req, {
         entity_type: 'task',
         entity_id: persistedTask.id,

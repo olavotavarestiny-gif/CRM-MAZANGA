@@ -44,6 +44,7 @@ const onboardingRouter = require('./routes/onboarding');
 const startupTemplatesRouter = require('./routes/startup-templates');
 const uploadsRouter = require('./routes/uploads');
 const reportsRouter = require('./routes/reports');
+const serviceDashboardRouter = require('./routes/service-dashboard');
 const requireAuth = require('./middleware/auth');
 const { requireSuperAdmin } = require('./middleware/auth');
 const { requirePlanFeature } = require('./lib/plan-limits');
@@ -198,6 +199,7 @@ app.use('/api/activity', requireAuth, checkSubscriptionAccess, activityRouter);
 app.use('/api/onboarding', requireAuth, onboardingRouter);
 app.use('/api/startup-templates', requireAuth, startupTemplatesRouter);
 app.use('/api/reports', requireAuth, checkSubscriptionAccess, reportsRouter);
+app.use('/api/dashboard', requireAuth, checkSubscriptionAccess, serviceDashboardRouter);
 app.use('/api/uploads', uploadsRouter);
 app.use('/api', requireAuth, checkSubscriptionAccess, notesRouter);
 
@@ -205,6 +207,7 @@ app.use('/api', requireAuth, checkSubscriptionAccess, notesRouter);
 try {
   const cron = require('node-cron');
   const { processRecorrentes } = require('./lib/faturacao/scheduler');
+  const { processFollowUpAutomations } = require('./services/followup-automation-scheduler');
   cron.schedule('5 0 * * *', () => {
     console.log('[Scheduler] A processar faturas recorrentes...');
     processRecorrentes().catch(err => console.error('[Scheduler] Erro:', err.message));
@@ -217,6 +220,13 @@ try {
     });
   });
   console.log('[Scheduler] Cron de renovação de watch Google Calendar iniciado (06:00 UTC diário)');
+
+  cron.schedule('15 6 * * *', () => {
+    processFollowUpAutomations()
+      .then((result) => console.log('[Scheduler] Automações de follow-up processadas:', result))
+      .catch((err) => console.error('[Scheduler] Erro nas automações de follow-up:', err.message));
+  });
+  console.log('[Scheduler] Cron de automações de follow-up iniciado (06:15 UTC diário)');
 } catch (err) {
   console.warn('[Scheduler] node-cron não disponível:', err.message);
 }

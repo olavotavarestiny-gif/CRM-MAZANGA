@@ -105,6 +105,8 @@ export interface Task {
   googleCalendarHtmlLink?: string | null;
   googleCalendarSyncedAt?: string | null;
   googleCalendarSyncError?: string | null;
+  source?: string;
+  automationId?: string | null;
   createdAt: string;
   updatedAt: string;
   contact?: {
@@ -125,6 +127,9 @@ export interface Contact {
   email: string;
   phone: string;
   company: string;
+  location?: string | null;
+  birthDate?: string | null;
+  lastActivityAt?: string | null;
   contactGroupId?: string | null;
   nif?: string | null;
   dealValueKz?: number | null;
@@ -213,6 +218,8 @@ export type SystemFieldKey =
   | 'email'
   | 'nif'
   | 'company'
+  | 'location'
+  | 'birthDate'
   | 'clienteType'
   | 'revenue'
   | 'sector'
@@ -438,6 +445,21 @@ export interface FormField {
   contactField?: string;
 }
 
+export interface FormContactFieldOption {
+  id?: string;
+  key: string;
+  binding: string;
+  label: string;
+  type: string;
+  required?: boolean;
+  options?: string[];
+}
+
+export interface FormContactFieldsResponse {
+  standard: FormContactFieldOption[];
+  custom: FormContactFieldOption[];
+}
+
 export interface CRMForm {
   id: string;
   title: string;
@@ -509,8 +531,63 @@ export interface CalendarEvent {
   externalUrl?: string;
   googleLinked?: boolean;
   googleSyncError?: string | null;
+  localEventId?: string;
 }
 
+export interface LocalCalendarEvent {
+  id: string;
+  userId: number;
+  contactId?: number | null;
+  assignedToUserId?: number | null;
+  title: string;
+  notes?: string | null;
+  startDate: string;
+  endDate: string;
+  syncWithGoogle: boolean;
+  googleCalendarEventId?: string | null;
+  googleCalendarHtmlLink?: string | null;
+  googleCalendarSyncError?: string | null;
+  googleCalendarSyncedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  contact?: { id: number; name: string; company: string } | null;
+  assignedTo?: { id: number; name: string; email: string } | null;
+}
+
+export interface ServicesDashboardBase {
+  range: { period: string; start: string; end: string };
+  permissions: { revenue: boolean; pipeline: boolean; tasks: boolean };
+  kpis: {
+    closedRevenue: number | null;
+    pipelineOpenValue: number | null;
+    winRate: number | null;
+    averageDealValue: number | null;
+    averageSalesCycleDays: number | null;
+    pipelineVelocity: number | null;
+    openOpportunities: number | null;
+    wonCount: number | null;
+    lostCount: number | null;
+  };
+  pipelineHealth: {
+    byStage: Array<{
+      stage: string;
+      color: string;
+      count: number;
+      averageDaysInStage: number | null;
+      conversionRate: number | null;
+      winRateFromStage: number | null;
+    }>;
+    slowestStage: { stage: string; averageDaysInStage: number | null } | null;
+    staleDeals: Array<{ id: number; name: string; company: string; stage: string; daysInStage: number; lastActivityDays: number | null }>;
+    leadsWithoutFollowUp: Array<{ id: number; name: string; company: string; stage: string; lastActivityDays: number | null }>;
+  } | null;
+  nextActions: {
+    overdueTasks: Task[];
+    followUpsToday: Task[];
+    birthdaysToday: Array<{ id: number; name: string; company: string; birthDate: string }>;
+    alerts: Array<{ id: string; title: string; message?: string | null; type: string; createdAt: string; contact?: { id: number; name: string; company: string } | null }>;
+  } | null;
+}
 // Finance types
 export type TransactionType = 'entrada' | 'saida';
 export type TransactionStatus = 'pago' | 'pendente' | 'atrasado';

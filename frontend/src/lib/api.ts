@@ -39,7 +39,9 @@ import type {
   FaturacaoDashboard,
   FinancialCategory,
   FormField,
+  FormContactFieldsResponse,
   FormSubmission,
+  LocalCalendarEvent,
   PipelineAnalyticsConversionResponse,
   PipelineAnalyticsForecastResponse,
   PipelineAnalyticsTeamResponse,
@@ -54,6 +56,7 @@ import type {
   ServicesAdvancedPipelineResponse,
   ServicesAdvancedRevenueResponse,
   ServicesAdvancedTeamResponse,
+  ServicesDashboardBase,
   StockMovement,
   SystemFieldKey,
   Task,
@@ -588,6 +591,26 @@ export async function getFormSubmissions(formId: string) {
   return response.data;
 }
 
+export async function getFormContactFields() {
+  const response = await api.get<FormContactFieldsResponse>('/api/forms/contact-fields');
+  return response.data;
+}
+
+export async function createFormContactField(data: {
+  label: string;
+  type: string;
+  options?: string[];
+  required?: boolean;
+}) {
+  const response = await api.post('/api/forms/contact-fields', data);
+  return response.data as FormContactFieldsResponse['custom'][number];
+}
+
+export async function getServicesDashboardBase(params?: { period?: 'month' | '7d' | '30d' | '90d' }) {
+  const response = await api.get<ServicesDashboardBase>('/api/dashboard/servicos/base', { params });
+  return response.data;
+}
+
 // Authentication
 export interface LoginRequest {
   email: string;
@@ -967,6 +990,33 @@ export async function getCalendarStatus(): Promise<CalendarConnectionStatus> {
 export async function getCalendarEvents(start: string, end: string): Promise<CalendarEvent[]> {
   const response = await api.get('/api/calendar/events', { params: { start, end } });
   return response.data;
+}
+
+export async function getLocalCalendarEvents(start: string, end: string): Promise<LocalCalendarEvent[]> {
+  const response = await api.get('/api/calendar/local-events', { params: { start, end } });
+  return response.data;
+}
+
+export async function createLocalCalendarEvent(data: {
+  title: string;
+  notes?: string;
+  startDate: string;
+  endDate: string;
+  contactId?: number | null;
+  assignedToUserId?: number | null;
+  syncWithGoogle?: boolean;
+}): Promise<LocalCalendarEvent> {
+  const response = await api.post('/api/calendar/local-events', data);
+  return response.data;
+}
+
+export async function updateLocalCalendarEvent(id: string, data: Partial<LocalCalendarEvent>): Promise<LocalCalendarEvent> {
+  const response = await api.put(`/api/calendar/local-events/${id}`, data);
+  return response.data;
+}
+
+export async function deleteLocalCalendarEvent(id: string): Promise<void> {
+  await api.delete(`/api/calendar/local-events/${id}`);
 }
 
 export async function connectCalendar(returnTo?: string): Promise<{ authUrl: string }> {

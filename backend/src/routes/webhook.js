@@ -73,6 +73,10 @@ router.post('/', async (req, res) => {
               timestamp,
             },
           });
+          await prisma.contact.update({
+            where: { id: contact.id },
+            data: { lastActivityAt: timestamp },
+          });
 
           console.log('Message saved for contact:', contact.id);
         }

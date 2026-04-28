@@ -42,7 +42,9 @@ const SYSTEM_FIELD_DEFAULTS = [
   { key: 'email',       label: 'Email',           required: false, order: 2, visibleDefault: true },
   { key: 'nif',         label: 'NIF',             required: false, order: 3, visibleDefault: true },
   { key: 'company',     label: 'Empresa',         required: false, order: 4, visibleDefault: true },
-  { key: 'clienteType', label: 'Tipo de Cliente', required: true,  order: 5, visibleDefault: true },
+  { key: 'location',    label: 'Localização',     required: false, order: 5, visibleDefault: true },
+  { key: 'birthDate',   label: 'Aniversário',     required: false, order: 6, visibleDefault: false },
+  { key: 'clienteType', label: 'Tipo de Cliente', required: true,  order: 7, visibleDefault: true },
 ];
 
 // Slugify a label into a unique key
@@ -360,6 +362,20 @@ async function resolveContactGroupId(rawValue, userId) {
   return group.id;
 }
 
+function parseDateInput(rawValue) {
+  if (rawValue === undefined) return { provided: false, value: undefined };
+  if (rawValue === null || rawValue === '') return { provided: true, value: null };
+
+  const parsed = new Date(rawValue);
+  if (Number.isNaN(parsed.getTime())) {
+    const error = new Error('Data inválida');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return { provided: true, value: parsed };
+}
+
 async function getWorkspaceModeForUser(userId) {
   const ownerAccount = await prisma.user.findUnique({
     where: { id: userId },
@@ -590,7 +606,7 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
 // POST create new contact
 router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
-    const { name, email, phone, company, dealValueKz, revenue, sector, stage, tags, customFields, contactType, status, clienteType, nif, contactGroupId } = req.body;
+    const { name, email, phone, company, location, birthDate, dealValueKz, revenue, sector, stage, tags, customFields, contactType, status, clienteType, nif, contactGroupId } = req.body;
     const userId = req.user.effectiveUserId;
 
     if (!name || !phone) {
@@ -626,6 +642,8 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
         : resolveContactNif({ customFields });
     const parsedDealValue = parseDealValueInput(dealValueKz);
     const resolvedContactGroupId = await resolveContactGroupId(contactGroupId, userId);
+    const parsedBirthDate = parseDateInput(birthDate);
+    const parsedBirthDate = parseDateInput(birthDate);
     const nifError = validateContactNif({ nif: resolvedNif, clienteType: finalClienteType });
     if (nifError) {
       return res.status(400).json({ error: nifError });
@@ -639,6 +657,8 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
         email: email || '',
         phone,
         company: company || '',
+        location: location || null,
+        birthDate: parsedBirthDate.provided ? parsedBirthDate.value : null,
         nif: resolvedNif,
         dealValueKz: parsedDealValue.provided ? parsedDealValue.value : null,
         revenue: revenue || null,
@@ -650,6 +670,7 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
         contactType: finalContactType,
         status: ['ativo', 'inativo'].includes(status) ? status : 'ativo',
         clienteType: finalClienteType,
+        lastActivityAt: new Date(),
       },
       include: {
         contactGroup: {
@@ -1004,7 +1025,7 @@ router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
 // PUT update contact
 router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
-    const { name, email, phone, company, dealValueKz, revenue, sector, stage, inPipeline, tags, customFields, contactType, status, documents, clienteType, nif, contactGroupId } = req.body;
+    const { name, email, phone, company, location, birthDate, dealValueKz, revenue, sector, stage, inPipeline, tags, customFields, contactType, status, documents, clienteType, nif, contactGroupId } = req.body;
     const updateData = {};
     const contactId = parseInt(req.params.id);
     const userId = req.user.effectiveUserId;
@@ -1031,6 +1052,7 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
         ? cleanNifValue(nif)
         : resolveContactNif({ customFields: mergedCustomFields }) || resolveContactNif(existing);
     const parsedDealValue = parseDealValueInput(dealValueKz);
+    const parsedBirthDate = parseDateInput(birthDate);
     const nifError = validateContactNif({ nif: resolvedNif, clienteType: nextClienteType });
 
     if (nifError) {
@@ -1041,6 +1063,8 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
     if (company !== undefined) updateData.company = company;
+    if (location !== undefined) updateData.location = location || null;
+    if (parsedBirthDate.provided) updateData.birthDate = parsedBirthDate.value;
     if (nif !== undefined || resolvedNif !== cleanNifValue(existing.nif)) {
       updateData.nif = resolvedNif;
     }
@@ -1074,6 +1098,10 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
           if (Array.isArray(parsed)) updateData.documents = documents;
         } catch {}
       }
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      updateData.lastActivityAt = new Date();
     }
 
     const contact = await prisma.contact.update({
@@ -1152,6 +1180,13 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
           old_stage_name: existing.stage,
           new_stage_name: contact.stage,
         },
+      });
+      automationRunner.run('stage_changed', contact, contact.stage, {
+        userId,
+        oldStage: existing.stage,
+        newStage: contact.stage,
+      }).catch((err) => {
+        console.error('Automation error:', err);
       });
     }
 

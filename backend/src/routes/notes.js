@@ -2,6 +2,14 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 
+async function touchContactActivity(contactId) {
+  if (!contactId) return;
+  await prisma.contact.updateMany({
+    where: { id: Number(contactId) },
+    data: { lastActivityAt: new Date() },
+  });
+}
+
 // GET /api/contacts/:id/notes
 router.get('/contacts/:id/notes', async (req, res) => {
   try {
@@ -48,6 +56,7 @@ router.post('/contacts/:id/notes', async (req, res) => {
       },
       include: { user: { select: { id: true, name: true } } },
     });
+    await touchContactActivity(contactId);
 
     res.status(201).json(note);
   } catch (error) {
@@ -78,6 +87,7 @@ router.put('/notes/:id', async (req, res) => {
       data: { content: content.trim() },
       include: { user: { select: { id: true, name: true } } },
     });
+    await touchContactActivity(note.contactId);
 
     res.json(updated);
   } catch (error) {

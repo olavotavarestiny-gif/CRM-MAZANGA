@@ -45,6 +45,8 @@ model User {
   contactFieldDefs          ContactFieldDef[]      @relation("ContactFieldDefUser")
   contactGroups             ContactGroup[]         @relation("ContactGroupUser")
   contactNotes              ContactNote[]          @relation("NoteAuthor")
+  calendarEvents            CalendarEvent[]        @relation("CalendarEventUser")
+  assignedCalendarEvents    CalendarEvent[]        @relation("CalendarEventAssignee")
   estabelecimentos          Estabelecimento[]      @relation("EstabelecimentoUser")
   facturas                  Factura[]              @relation("FacturaUser")
   facturaRecorrentes        FacturaRecorrente[]    @relation("FacturaRecorrenteUser")
@@ -66,6 +68,7 @@ model User {
   accountMembers            User[]                 @relation("AccountMembers")
   assignedEstabelecimento   Estabelecimento?       @relation("AssignedEstabelecimento", fields: [assignedEstabelecimentoId], references: [id])
   automationLogs            AutomationLog[]
+  automationAlerts          AutomationAlert[]
   dailyTipDeliveries        DailyTipDelivery[]
   startupTemplateApplied    StartupTemplateApplication? @relation("StartupTemplateOrganization")
   startupTemplatesAppliedBy StartupTemplateApplication[] @relation("StartupTemplateAppliedBy")
@@ -93,6 +96,9 @@ model Contact {
   company         String
   revenue         String?
   sector          String?
+  location        String?
+  birthDate       DateTime?
+  lastActivityAt  DateTime?
   stage           String           @default("Novo")
   inPipeline      Boolean          @default(false)
   tags            String           @default("[]")
@@ -111,10 +117,12 @@ model Contact {
   user            User?            @relation("ContactUser", fields: [userId], references: [id], onDelete: SetNull)
   notes           ContactNote[]
   formSubmissions FormSubmission[]
+  calendarEvents  CalendarEvent[]
   messages        Message[]
   tasks           Task[]
   transactions    Transaction[]
   automationLogs  AutomationLog[]
+  automationAlerts AutomationAlert[]
 
   @@unique([userId, phone], name: "user_phone_unique")
   @@index([contactGroupId])
@@ -122,6 +130,8 @@ model Contact {
   @@index([userId, createdAt])
   @@index([userId, inPipeline])
   @@index([userId, stage])
+  @@index([userId, lastActivityAt])
+  @@index([userId, birthDate])
 }
 
 model ContactGroup {
@@ -218,6 +228,8 @@ model Task {
   googleCalendarHtmlLink  String?
   googleCalendarSyncError String?
   googleCalendarSyncedAt  DateTime?
+  source                  String    @default("manual")
+  automationId            String?
   assignedTo              User?     @relation("TaskAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
   contact                 Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
   user                    User?     @relation("TaskUser", fields: [userId], references: [id], onDelete: SetNull)
@@ -225,6 +237,8 @@ model Task {
   @@index([assignedToUserId])
   @@index([userId, dueDate])
   @@index([contactId])
+  @@index([userId, source])
+  @@index([automationId])
 }
 
 model Automation {
@@ -247,6 +261,28 @@ model Automation {
   form                 Form?           @relation(fields: [formId], references: [id])
   user                 User?           @relation("AutomationUser", fields: [userId], references: [id])
   logs                 AutomationLog[]
+  alerts               AutomationAlert[]
+}
+
+model AutomationAlert {
+  id           String      @id @default(cuid())
+  userId       Int
+  contactId    Int?
+  automationId String?
+  type         String
+  title        String
+  message      String?
+  status       String      @default("open")
+  createdAt    DateTime    @default(now())
+  resolvedAt   DateTime?
+  automation   Automation? @relation(fields: [automationId], references: [id], onDelete: SetNull)
+  contact      Contact?    @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
+  @@index([contactId])
+  @@index([automationId])
+  @@map("automation_alert")
 }
 
 model AutomationLog {
@@ -420,6 +456,32 @@ model GoogleCalendarToken {
   scope             String?
   status            String    @default("connected")
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CalendarEvent {
+  id                      String    @id @default(cuid())
+  userId                  Int
+  contactId               Int?
+  assignedToUserId        Int?
+  title                   String
+  notes                   String?
+  startDate               DateTime
+  endDate                 DateTime
+  syncWithGoogle          Boolean   @default(false)
+  googleCalendarEventId   String?
+  googleCalendarHtmlLink  String?
+  googleCalendarSyncError String?
+  googleCalendarSyncedAt  DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  assignedTo              User?     @relation("CalendarEventAssignee", fields: [assignedToUserId], references: [id])
+  contact                 Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  user                    User      @relation("CalendarEventUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([assignedToUserId, startDate])
+  @@index([contactId])
+  @@index([userId, startDate])
+  @@index([googleCalendarEventId])
 }
 
 model GoogleCalendarEvent {

@@ -90,6 +90,91 @@ function handleCalendarError(res, error, fallbackMessage) {
   });
 }
 
+function isPrivilegedCalendarUser(req) {
+  return !!(req.user?.isSuperAdmin || req.user?.isAccountOwner || req.user?.role === 'admin');
+}
+
+async function getOrgMember(orgId, targetUserId) {
+  if (!targetUserId) return null;
+  return prisma.user.findFirst({
+    where: {
+      id: Number(targetUserId),
+      active: true,
+      OR: [{ id: orgId }, { accountOwnerId: orgId }],
+    },
+    select: { id: true, name: true, email: true },
+  });
+}
+
+async function assertContactAccess(orgId, contactId) {
+  if (!contactId) return null;
+  return prisma.contact.findFirst({
+    where: { id: Number(contactId), userId: orgId },
+    select: { id: true },
+  });
+}
+
+function buildLocalEventGooglePayload(event) {
+  return {
+    title: event.title,
+    description: [
+      event.notes?.trim() || null,
+      event.contact?.name ? `Contacto CRM: ${event.contact.name}` : null,
+      `Evento CRM #${event.id}`,
+    ].filter(Boolean).join('\n\n'),
+    startTime: new Date(event.startDate).toISOString(),
+    endTime: new Date(event.endDate).toISOString(),
+    googleEventId: event.googleCalendarEventId || undefined,
+  };
+}
+
+async function syncLocalEventToGoogle(event) {
+  if (!event.syncWithGoogle) {
+    if (event.googleCalendarEventId) {
+      await deleteEventFromGoogle(event.assignedToUserId || event.userId, event.googleCalendarEventId).catch(() => null);
+    }
+    return prisma.calendarEvent.update({
+      where: { id: event.id },
+      data: {
+        googleCalendarEventId: null,
+        googleCalendarHtmlLink: null,
+        googleCalendarSyncedAt: null,
+        googleCalendarSyncError: null,
+      },
+      include: LOCAL_EVENT_INCLUDE,
+    });
+  }
+
+  const calendarUserId = event.assignedToUserId || event.userId;
+  try {
+    const result = await pushEventToGoogle(calendarUserId, buildLocalEventGooglePayload(event));
+    return prisma.calendarEvent.update({
+      where: { id: event.id },
+      data: {
+        googleCalendarEventId: result.googleEventId,
+        googleCalendarHtmlLink: result.htmlLink,
+        googleCalendarSyncedAt: new Date(),
+        googleCalendarSyncError: null,
+      },
+      include: LOCAL_EVENT_INCLUDE,
+    });
+  } catch (error) {
+    const details = error instanceof CalendarIntegrationError
+      ? { message: error.message }
+      : getGoogleErrorDetails(error);
+    return prisma.calendarEvent.update({
+      where: { id: event.id },
+      data: { googleCalendarSyncError: String(details.message || 'Falha ao sincronizar') },
+      include: LOCAL_EVENT_INCLUDE,
+    });
+  }
+}
+
+const LOCAL_EVENT_INCLUDE = {
+  contact: { select: { id: true, name: true, company: true } },
+  assignedTo: { select: { id: true, name: true, email: true } },
+};
+
 // Callback público do Google OAuth
 router.get('/callback', async (req, res) => {
   let frontendReturnTo = null;
@@ -412,6 +497,174 @@ router.post('/sync', async (req, res) => {
     const details = getGoogleErrorDetails(error);
     console.error('[calendar] sync error:', details.message);
     return handleCalendarError(res, error, 'Falha ao sincronizar eventos do Google Calendar');
+  }
+});
+
+router.get('/local-events', async (req, res) => {
+  try {
+    const { start, end } = parseSyncWindow(req.query);
+    const where = {
+      userId: req.user.effectiveUserId,
+      startDate: { lte: end },
+      endDate: { gte: start },
+    };
+
+    if (!isPrivilegedCalendarUser(req)) {
+      where.assignedToUserId = req.user.id;
+    }
+
+    const events = await prisma.calendarEvent.findMany({
+      where,
+      include: LOCAL_EVENT_INCLUDE,
+      orderBy: [{ startDate: 'asc' }, { endDate: 'asc' }],
+    });
+
+    return res.json(events);
+  } catch (error) {
+    return handleCalendarError(res, error, 'Não foi possível carregar eventos locais');
+  }
+});
+
+router.post('/local-events', requirePermission('calendario', 'edit'), async (req, res) => {
+  try {
+    const { title, notes, startDate, endDate, contactId, assignedToUserId, syncWithGoogle } = req.body || {};
+
+    if (!title?.trim()) {
+      return res.status(400).json({ error: 'Título é obrigatório' });
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      return res.status(400).json({ error: 'Datas do evento inválidas' });
+    }
+
+    const assigneeId = assignedToUserId ? Number(assignedToUserId) : req.user.id;
+    const assignee = await getOrgMember(req.user.effectiveUserId, assigneeId);
+    if (!assignee) {
+      return res.status(400).json({ error: 'Responsável inválido' });
+    }
+
+    if (!isPrivilegedCalendarUser(req) && assigneeId !== req.user.id) {
+      return res.status(403).json({ error: 'Sem permissão para atribuir este evento' });
+    }
+
+    if (contactId && !await assertContactAccess(req.user.effectiveUserId, contactId)) {
+      return res.status(404).json({ error: 'Contacto não encontrado' });
+    }
+
+    let event = await prisma.calendarEvent.create({
+      data: {
+        userId: req.user.effectiveUserId,
+        title: title.trim(),
+        notes: notes?.trim() || null,
+        startDate: start,
+        endDate: end,
+        contactId: contactId ? Number(contactId) : null,
+        assignedToUserId: assigneeId,
+        syncWithGoogle: Boolean(syncWithGoogle),
+      },
+      include: LOCAL_EVENT_INCLUDE,
+    });
+
+    event = await syncLocalEventToGoogle(event);
+    return res.status(201).json(event);
+  } catch (error) {
+    return handleCalendarError(res, error, 'Não foi possível criar evento');
+  }
+});
+
+router.put('/local-events/:id', requirePermission('calendario', 'edit'), async (req, res) => {
+  try {
+    const existing = await prisma.calendarEvent.findFirst({
+      where: { id: req.params.id, userId: req.user.effectiveUserId },
+    });
+    if (!existing) {
+      return res.status(404).json({ error: 'Evento não encontrado' });
+    }
+    if (!isPrivilegedCalendarUser(req) && existing.assignedToUserId !== req.user.id) {
+      return res.status(403).json({ error: 'Sem acesso a este evento' });
+    }
+
+    const { title, notes, startDate, endDate, contactId, assignedToUserId, syncWithGoogle } = req.body || {};
+    const data = {};
+
+    if (title !== undefined) {
+      if (!title?.trim()) return res.status(400).json({ error: 'Título é obrigatório' });
+      data.title = title.trim();
+    }
+    if (notes !== undefined) data.notes = notes?.trim() || null;
+    if (startDate !== undefined) {
+      const start = new Date(startDate);
+      if (Number.isNaN(start.getTime())) return res.status(400).json({ error: 'Data inicial inválida' });
+      data.startDate = start;
+    }
+    if (endDate !== undefined) {
+      const end = new Date(endDate);
+      if (Number.isNaN(end.getTime())) return res.status(400).json({ error: 'Data final inválida' });
+      data.endDate = end;
+    }
+
+    const nextStart = data.startDate || existing.startDate;
+    const nextEnd = data.endDate || existing.endDate;
+    if (nextEnd <= nextStart) {
+      return res.status(400).json({ error: 'A data final deve ser posterior à data inicial' });
+    }
+
+    if (assignedToUserId !== undefined) {
+      const assigneeId = assignedToUserId ? Number(assignedToUserId) : req.user.id;
+      const assignee = await getOrgMember(req.user.effectiveUserId, assigneeId);
+      if (!assignee) return res.status(400).json({ error: 'Responsável inválido' });
+      if (!isPrivilegedCalendarUser(req) && assigneeId !== req.user.id) {
+        return res.status(403).json({ error: 'Sem permissão para atribuir este evento' });
+      }
+      data.assignedToUserId = assigneeId;
+    }
+
+    if (contactId !== undefined) {
+      if (contactId && !await assertContactAccess(req.user.effectiveUserId, contactId)) {
+        return res.status(404).json({ error: 'Contacto não encontrado' });
+      }
+      data.contactId = contactId ? Number(contactId) : null;
+    }
+    if (syncWithGoogle !== undefined) data.syncWithGoogle = Boolean(syncWithGoogle);
+
+    let event = await prisma.calendarEvent.update({
+      where: { id: req.params.id },
+      data,
+      include: LOCAL_EVENT_INCLUDE,
+    });
+
+    event = await syncLocalEventToGoogle(event);
+    return res.json(event);
+  } catch (error) {
+    return handleCalendarError(res, error, 'Não foi possível atualizar evento');
+  }
+});
+
+router.delete('/local-events/:id', requirePermission('calendario', 'edit'), async (req, res) => {
+  try {
+    const event = await prisma.calendarEvent.findFirst({
+      where: { id: req.params.id, userId: req.user.effectiveUserId },
+    });
+    if (!event) {
+      return res.status(404).json({ error: 'Evento não encontrado' });
+    }
+    if (!isPrivilegedCalendarUser(req) && event.assignedToUserId !== req.user.id) {
+      return res.status(403).json({ error: 'Sem acesso a este evento' });
+    }
+
+    if (event.googleCalendarEventId) {
+      await deleteEventFromGoogle(event.assignedToUserId || event.userId, event.googleCalendarEventId).catch((error) => {
+        const details = getGoogleErrorDetails(error);
+        console.warn(`[calendar/local-events] failed to delete Google event ${event.id}:`, details.message);
+      });
+    }
+
+    await prisma.calendarEvent.delete({ where: { id: req.params.id } });
+    return res.json({ success: true });
+  } catch (error) {
+    return handleCalendarError(res, error, 'Não foi possível apagar evento');
   }
 });
 

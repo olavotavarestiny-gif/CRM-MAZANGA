@@ -1,23 +1,16 @@
 'use client';
 
 import { memo, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Trash2, X } from 'lucide-react';
+import { createFormContactField, getFormContactFields } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { FormField } from '@/lib/types';
-
-const CONTACT_FIELD_OPTIONS = [
-  { value: 'name', label: 'Nome' },
-  { value: 'phone', label: 'Telefone' },
-  { value: 'email', label: 'Email' },
-  { value: 'company', label: 'Empresa' },
-  { value: 'sector', label: 'Setor' },
-  { value: 'revenue', label: 'Faturamento' },
-];
 
 function createDraft(field: FormField) {
   return {
@@ -48,6 +41,30 @@ export const FormFieldEditor = memo(function FormFieldEditor({
 }: FormFieldEditorProps) {
   const [draft, setDraft] = useState(() => (field ? createDraft(field) : null));
   const [newOptionValue, setNewOptionValue] = useState('');
+  const [newCustomLabel, setNewCustomLabel] = useState('');
+  const queryClient = useQueryClient();
+
+  const { data: contactFields } = useQuery({
+    queryKey: ['form-contact-fields'],
+    queryFn: getFormContactFields,
+  });
+
+  const createCustomFieldMutation = useMutation({
+    mutationFn: () => createFormContactField({
+      label: newCustomLabel.trim(),
+      type: draft?.type === 'multiple_choice' ? 'select' : 'text',
+      options: draft?.type === 'multiple_choice' ? draft.options : undefined,
+    }),
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ['form-contact-fields'] });
+      setNewCustomLabel('');
+      const binding = created.binding;
+      updateDraft({
+        contactField: binding,
+        ...(created.type === 'select' ? { type: 'multiple_choice' as const, options: created.options || [] } : {}),
+      }, true);
+    },
+  });
 
   useEffect(() => {
     setDraft(field ? createDraft(field) : null);
@@ -82,6 +99,28 @@ export const FormFieldEditor = memo(function FormFieldEditor({
     }
 
     updateDraft({ options: draft.options.filter((_, optionIndex) => optionIndex !== index) }, true);
+  };
+
+  const allContactFieldOptions = [
+    ...(contactFields?.standard || []),
+    ...(contactFields?.custom || []),
+  ];
+  const selectedCustomField = contactFields?.custom.find((option) => option.binding === draft?.contactField);
+  const inheritsOptions = !!selectedCustomField && selectedCustomField.type === 'select';
+
+  const handleContactFieldChange = (value: string) => {
+    if (value === 'none') {
+      updateDraft({ contactField: undefined }, true);
+      return;
+    }
+
+    const selected = allContactFieldOptions.find((option) => option.binding === value);
+    const updates: Partial<FormField> = { contactField: value };
+    if (selected?.type === 'select') {
+      updates.type = 'multiple_choice';
+      updates.options = selected.options || [];
+    }
+    updateDraft(updates, true);
   };
 
   return (
@@ -129,18 +168,41 @@ export const FormFieldEditor = memo(function FormFieldEditor({
               <div className="flex gap-2 mt-1">
                 <Select
                   value={draft.contactField || 'none'}
-                  onValueChange={(value) => updateDraft({ contactField: value === 'none' ? undefined : value }, true)}
+                  onValueChange={handleContactFieldChange}
                 >
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Selecionar..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">— Nenhum —</SelectItem>
-                    {CONTACT_FIELD_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                    <SelectSeparator />
+                    <SelectGroup>
+                      <div className="px-2 py-1 text-xs font-semibold text-slate-500">Campos padrão</div>
+                      {(contactFields?.standard || []).map((option) => (
+                        <SelectItem key={option.binding} value={option.binding}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                    {(contactFields?.custom || []).length > 0 && (
+                      <>
+                        <SelectSeparator />
+                        <SelectGroup>
+                          <div className="px-2 py-1 text-xs font-semibold text-slate-500">Campos personalizados</div>
+                          {(contactFields?.custom || []).map((option) => (
+                            <SelectItem key={option.binding} value={option.binding}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </>
+                    )}
+                    {/* Compatibilidade enquanto opções antigas ainda existirem em formulários antigos. */}
+                    {draft.contactField && !allContactFieldOptions.some((option) => option.binding === draft.contactField) && (
+                      <SelectItem value={draft.contactField}>
+                        {draft.contactField}
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
                 {draft.contactField && (
@@ -149,16 +211,37 @@ export const FormFieldEditor = memo(function FormFieldEditor({
                   </Button>
                 )}
               </div>
+              <div className="mt-2 flex gap-2">
+                <Input
+                  value={newCustomLabel}
+                  onChange={(event) => setNewCustomLabel(event.target.value)}
+                  placeholder="Criar campo personalizado..."
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!newCustomLabel.trim() || createCustomFieldMutation.isPending}
+                  onClick={() => createCustomFieldMutation.mutate()}
+                >
+                  Criar
+                </Button>
+              </div>
             </div>
 
             {draft.type === 'multiple_choice' && (
               <div className="space-y-3 border-t border-[#E2E8F0] pt-4">
                 <Label className="text-[#0A2540]">Opções</Label>
+                {inheritsOptions && (
+                  <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-[#64748B]">
+                    Opções herdadas de “{selectedCustomField?.label}”. Atualiza o campo personalizado em Contactos para alterar esta lista.
+                  </p>
+                )}
                 <div className="space-y-2">
                   {draft.options.map((option, index) => (
                     <div key={`${field.id}-option-${index}`} className="flex items-center gap-2">
                       <Input value={option} readOnly className="text-sm" />
-                      <Button variant="ghost" size="sm" onClick={() => handleRemoveOption(index)}>
+                      <Button variant="ghost" size="sm" disabled={inheritsOptions} onClick={() => handleRemoveOption(index)}>
                         <X className="w-4 h-4" />
                       </Button>
                     </div>
@@ -169,6 +252,7 @@ export const FormFieldEditor = memo(function FormFieldEditor({
                     placeholder="Nova opção..."
                     value={newOptionValue}
                     onChange={(e) => setNewOptionValue(e.target.value)}
+                    disabled={inheritsOptions}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();

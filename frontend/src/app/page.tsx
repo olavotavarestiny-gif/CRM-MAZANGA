@@ -10,9 +10,10 @@ import {
   Clock3,
   CreditCard,
   Settings2,
+  Target,
   Workflow,
 } from 'lucide-react';
-import { getContacts, getCurrentUser, getFinanceDashboard, getTasks } from '@/lib/api';
+import { getContacts, getCurrentUser, getFinanceDashboard, getServicesDashboardBase, getTasks } from '@/lib/api';
 import { isComercio } from '@/lib/business-modes';
 import type { Contact, DashboardStats, Task } from '@/lib/types';
 import PainelComercialPage from '@/components/comercial/painel-comercial';
@@ -212,6 +213,16 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
     queryKey: ['tasks', 'pending'],
     queryFn: () => getTasks({ done: false }),
   });
+  const {
+    data: serviceDashboard,
+    isLoading: serviceDashboardLoading,
+    isError: serviceDashboardError,
+    refetch: refetchServiceDashboard,
+  } = useQuery({
+    queryKey: ['services-dashboard-base', 'month'],
+    queryFn: () => getServicesDashboardBase({ period: 'month' }),
+    retry: false,
+  });
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -287,7 +298,133 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
         </div>
       )}
 
-      {statGoalWidgets.length > 0 && (
+      <div className="mb-6 space-y-6">
+        {serviceDashboardError ? (
+          <ErrorState
+            compact
+            title="Não foi possível carregar os indicadores comerciais"
+            message="O painel base não respondeu como esperado."
+            onRetry={() => refetchServiceDashboard()}
+          />
+        ) : serviceDashboardLoading || !serviceDashboard ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-6">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="h-28 animate-pulse rounded-xl bg-slate-100" />
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-6">
+              {[
+                { title: 'Receita fechada', value: serviceDashboard.kpis.closedRevenue, unit: 'Kz', icon: Banknote },
+                { title: 'Pipeline aberto', value: serviceDashboard.kpis.pipelineOpenValue, unit: 'Kz', icon: Workflow },
+                { title: 'Win Rate', value: serviceDashboard.kpis.winRate, unit: '%', icon: Target },
+                { title: 'Ticket médio', value: serviceDashboard.kpis.averageDealValue, unit: 'Kz', icon: CreditCard },
+                { title: 'Tempo de fecho', value: serviceDashboard.kpis.averageSalesCycleDays, unit: 'dias', icon: Clock3 },
+                { title: 'Pipeline Velocity', value: serviceDashboard.kpis.pipelineVelocity, unit: 'Kz/dia', icon: BriefcaseBusiness },
+              ].map((metric) => {
+                const Icon = metric.icon;
+                const value = metric.value === null || metric.value === undefined
+                  ? '—'
+                  : metric.unit === '%'
+                  ? `${metric.value}%`
+                  : metric.unit === 'dias'
+                  ? `${metric.value} dias`
+                  : `${new Intl.NumberFormat('pt-AO', { maximumFractionDigits: 0 }).format(Number(metric.value))} ${metric.unit}`;
+                return (
+                  <Card key={metric.title} className="border-slate-200 p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-medium text-[#64748B]">{metric.title}</p>
+                        <p className="mt-2 text-xl font-bold text-[#0A2540]">{value}</p>
+                      </div>
+                      <Icon className="h-5 w-5 text-[var(--workspace-primary)]" />
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              <Card className="border-slate-200 p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-[#0A2540]">Pipeline Health</h2>
+                    <p className="text-sm text-[#64748B]">Etapas, gargalos e oportunidades paradas.</p>
+                  </div>
+                  {serviceDashboard.pipelineHealth?.slowestStage && (
+                    <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                      Gargalo: {serviceDashboard.pipelineHealth.slowestStage.stage}
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  {(serviceDashboard.pipelineHealth?.byStage || []).map((stage) => (
+                    <div key={stage.stage} className="rounded-lg border border-slate-100 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-2 text-sm font-semibold text-[#0A2540]">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ background: stage.color }} />
+                          {stage.stage}
+                        </span>
+                        <span className="text-xs text-[#64748B]">{stage.count} aberto(s)</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-[#64748B]">
+                        <span>{stage.averageDaysInStage ?? 0} dias médios</span>
+                        <span>Conversão: {stage.conversionRate ?? 0}%</span>
+                      </div>
+                    </div>
+                  ))}
+                  {serviceDashboard.pipelineHealth?.staleDeals?.length ? (
+                    <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                      {serviceDashboard.pipelineHealth.staleDeals.length} negócio(s) parado(s) há 14+ dias.
+                    </div>
+                  ) : null}
+                  {serviceDashboard.pipelineHealth?.leadsWithoutFollowUp?.length ? (
+                    <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-700">
+                      {serviceDashboard.pipelineHealth.leadsWithoutFollowUp.length} lead(s) sem follow-up futuro.
+                    </div>
+                  ) : null}
+                </div>
+              </Card>
+
+              <Card className="border-slate-200 p-5 shadow-sm">
+                <div className="mb-4">
+                  <h2 className="text-lg font-bold text-[#0A2540]">Próximas ações</h2>
+                  <p className="text-sm text-[#64748B]">O que precisa de atenção agora.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg bg-red-50 p-3">
+                    <p className="text-xs font-medium text-red-700">Tarefas vencidas</p>
+                    <p className="mt-1 text-2xl font-bold text-red-700">{serviceDashboard.nextActions?.overdueTasks.length || 0}</p>
+                  </div>
+                  <div className="rounded-lg bg-blue-50 p-3">
+                    <p className="text-xs font-medium text-blue-700">Follow-ups hoje</p>
+                    <p className="mt-1 text-2xl font-bold text-blue-700">{serviceDashboard.nextActions?.followUpsToday.length || 0}</p>
+                  </div>
+                  <div className="rounded-lg bg-emerald-50 p-3">
+                    <p className="text-xs font-medium text-emerald-700">Aniversários</p>
+                    <p className="mt-1 text-2xl font-bold text-emerald-700">{serviceDashboard.nextActions?.birthdaysToday.length || 0}</p>
+                  </div>
+                  <div className="rounded-lg bg-amber-50 p-3">
+                    <p className="text-xs font-medium text-amber-700">Alertas</p>
+                    <p className="mt-1 text-2xl font-bold text-amber-700">{serviceDashboard.nextActions?.alerts.length || 0}</p>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {(serviceDashboard.nextActions?.alerts || []).slice(0, 4).map((alert) => (
+                    <div key={alert.id} className="rounded-lg border border-slate-100 px-3 py-2 text-sm text-[#0A2540]">
+                      {alert.title}
+                      {alert.contact?.name ? <span className="text-[#64748B]"> · {alert.contact.name}</span> : null}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          </>
+        )}
+      </div>
+
+      {false && statGoalWidgets.length > 0 && (
         <div data-tour="dashboard-stats" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           {statGoalWidgets.map((widget) => {
             const source = widget.source;
@@ -341,7 +478,7 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
         </div>
       )}
 
-      {otherWidgets.length > 0 && (
+      {false && otherWidgets.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {otherWidgets.map((widget) => {
             if (widget.type === 'tasks') {
@@ -355,7 +492,7 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
         </div>
       )}
 
-      {statGoalWidgets.length === 0 && otherWidgets.length === 0 && (
+      {false && statGoalWidgets.length === 0 && otherWidgets.length === 0 && (
         <Card>
           <div className="p-8 text-center">
             <h2 className="text-lg font-semibold text-[#2c2f31]">Nenhum widget ativo</h2>

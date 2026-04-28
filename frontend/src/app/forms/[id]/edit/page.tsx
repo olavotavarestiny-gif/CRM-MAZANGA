@@ -48,7 +48,9 @@ const CONTACT_SYNC_LABELS: Record<FormSubmission['contactSyncStatus'], string> =
 };
 
 function getSubmissionAnswerValue(submission: FormSubmission, contactField: string) {
-  const answer = submission.answers.find((item) => item.contactField === contactField && item.value);
+  const answer = submission.answers.find((item) => (
+    item.value && (item.contactField === contactField || item.contactField === `standard:${contactField}`)
+  ));
   return answer?.value || '';
 }
 

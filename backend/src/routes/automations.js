@@ -10,8 +10,8 @@ const {
   getAutomationStats,
 } = require('../services/automation-logger.service');
 
-const VALID_TRIGGERS = ['new_contact', 'form_submission', 'contact_tag', 'contact_revenue', 'contact_sector'];
-const VALID_ACTIONS = ['send_email', 'send_whatsapp_template', 'send_whatsapp_text', 'update_stage', 'create_task'];
+const VALID_TRIGGERS = ['new_contact', 'form_submission', 'contact_tag', 'contact_revenue', 'contact_sector', 'stage_changed', 'contact_inactivity', 'contact_birthday'];
+const VALID_ACTIONS = ['send_email', 'send_whatsapp_template', 'send_whatsapp_text', 'update_stage', 'create_task', 'create_alert'];
 const VALID_TASK_PRIORITIES = ['Baixa', 'Media', 'Alta'];
 
 async function validateFormOwnership(userId, formId) {
@@ -79,6 +79,24 @@ async function validateAutomationPayload({
     return 'triggerValue is required for tag, revenue, and sector triggers';
   }
 
+  if (trigger === 'stage_changed') {
+    if (!triggerValue) {
+      return 'triggerValue is required for stage_changed trigger';
+    }
+
+    const stageIsValid = await isValidStageName(userId, triggerValue);
+    if (!stageIsValid) {
+      return 'triggerValue is invalid for this account';
+    }
+  }
+
+  if (trigger === 'contact_inactivity' && triggerValue) {
+    const inactivityDays = parseInt(triggerValue, 10);
+    if (!Number.isInteger(inactivityDays) || inactivityDays < 1 || inactivityDays > 365) {
+      return 'triggerValue for contact_inactivity must be a number of days between 1 and 365';
+    }
+  }
+
   if (trigger === 'form_submission' && formId) {
     const form = await validateFormOwnership(userId, formId);
     if (!form) {
@@ -109,11 +127,13 @@ async function validateAutomationPayload({
     return 'emailSubject and emailBody are required for send_email action';
   }
 
-  if (action === 'create_task') {
+  if (['create_task', 'create_alert'].includes(action)) {
     if (!taskTitle || !String(taskTitle).trim()) {
-      return 'taskTitle is required for create_task action';
+      return `taskTitle is required for ${action} action`;
     }
+  }
 
+  if (action === 'create_task') {
     const validAssignee = await validateOrgMember(userId, taskAssignedToUserId);
     if (!validAssignee) {
       return 'taskAssignedToUserId is invalid for this account';

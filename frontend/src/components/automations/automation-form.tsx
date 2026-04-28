@@ -85,7 +85,7 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
         action: formData.action,
       };
 
-      if (['contact_tag', 'contact_revenue', 'contact_sector'].includes(formData.trigger)) {
+      if (['contact_tag', 'contact_revenue', 'contact_sector', 'stage_changed', 'contact_inactivity'].includes(formData.trigger)) {
         payload.triggerValue = formData.triggerValue;
       }
 
@@ -97,12 +97,14 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
         payload.targetStage = formData.targetStage;
       }
 
-      if (formData.action === 'create_task') {
+      if (formData.action === 'create_task' || formData.action === 'create_alert') {
         payload.taskTitle = formData.taskTitle;
         payload.taskNotes = formData.taskNotes;
-        payload.taskPriority = formData.taskPriority;
-        payload.taskAssignedToUserId = parseInt(formData.taskAssignedToUserId, 10);
-        payload.taskDueDays = formData.taskDueDays === '' ? null : parseInt(formData.taskDueDays, 10);
+        if (formData.action === 'create_task') {
+          payload.taskPriority = formData.taskPriority;
+          payload.taskAssignedToUserId = parseInt(formData.taskAssignedToUserId, 10);
+          payload.taskDueDays = formData.taskDueDays === '' ? null : parseInt(formData.taskDueDays, 10);
+        }
       }
 
       return createAutomation(payload);
@@ -125,7 +127,7 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
   });
 
   const isValidForm = () => {
-    if (['contact_tag', 'contact_revenue', 'contact_sector'].includes(formData.trigger) && !formData.triggerValue) {
+    if (['contact_tag', 'contact_revenue', 'contact_sector', 'stage_changed', 'contact_inactivity'].includes(formData.trigger) && !formData.triggerValue) {
       return false;
     }
 
@@ -151,6 +153,10 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
       }
     }
 
+    if (formData.action === 'create_alert') {
+      return !!formData.taskTitle.trim();
+    }
+
     return true;
   };
 
@@ -158,13 +164,71 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
     setFormData((prev) => ({
       ...prev,
       trigger: value,
-      triggerValue: '',
+      triggerValue: value === 'contact_inactivity' ? '7' : '',
       formId: value === 'form_submission' ? prev.formId : '',
     }));
   };
 
+  const applyPreset = (preset: 'new_lead' | 'proposal' | 'inactive' | 'birthday') => {
+    if (preset === 'new_lead') {
+      setFormData((prev) => ({
+        ...prev,
+        trigger: 'new_contact',
+        triggerValue: '',
+        action: 'create_task',
+        taskTitle: 'Fazer follow-up com {{nome}}',
+        taskNotes: 'Novo lead criado no KukuGest.',
+        taskDueDays: '0',
+        taskPriority: 'Alta',
+      }));
+    }
+    if (preset === 'proposal') {
+      setFormData((prev) => ({
+        ...prev,
+        trigger: 'stage_changed',
+        triggerValue: stages.find((stage) => /proposta/i.test(stage.name))?.name || stages[0]?.name || '',
+        action: 'create_task',
+        taskTitle: 'Follow-up da proposta enviada para {{nome}}',
+        taskNotes: 'Confirmar receção da proposta e próximo passo.',
+        taskDueDays: '1',
+        taskPriority: 'Alta',
+      }));
+    }
+    if (preset === 'inactive') {
+      setFormData((prev) => ({
+        ...prev,
+        trigger: 'contact_inactivity',
+        triggerValue: '7',
+        action: 'create_task',
+        taskTitle: 'Retomar contacto com {{nome}}',
+        taskNotes: 'Contacto sem atividade há 7 dias.',
+        taskDueDays: '0',
+        taskPriority: 'Media',
+      }));
+    }
+    if (preset === 'birthday') {
+      setFormData((prev) => ({
+        ...prev,
+        trigger: 'contact_birthday',
+        triggerValue: '',
+        action: 'create_task',
+        taskTitle: 'Dar parabéns ao cliente {{nome}}',
+        taskNotes: 'Aniversário do contacto.',
+        taskDueDays: '0',
+        taskPriority: 'Baixa',
+      }));
+    }
+  };
+
   return (
     <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <Button type="button" variant="outline" onClick={() => applyPreset('new_lead')}>Novo lead</Button>
+        <Button type="button" variant="outline" onClick={() => applyPreset('proposal')}>Proposta enviada</Button>
+        <Button type="button" variant="outline" onClick={() => applyPreset('inactive')}>Sem atividade 7 dias</Button>
+        <Button type="button" variant="outline" onClick={() => applyPreset('birthday')}>Aniversário</Button>
+      </div>
+
       <div>
         <Label htmlFor="trigger">Trigger (Evento)</Label>
         <Select value={formData.trigger} onValueChange={handleTriggerChange}>
@@ -177,6 +241,9 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
             <SelectItem value="contact_tag">Contacto com Tag</SelectItem>
             <SelectItem value="contact_revenue">Contacto por Faturação</SelectItem>
             <SelectItem value="contact_sector">Contacto por Setor</SelectItem>
+            <SelectItem value="stage_changed">Mudança de Etapa</SelectItem>
+            <SelectItem value="contact_inactivity">Sem Atividade</SelectItem>
+            <SelectItem value="contact_birthday">Aniversário</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -252,6 +319,33 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
         </div>
       )}
 
+      {formData.trigger === 'stage_changed' && (
+        <div>
+          <Label>Quando entrar na etapa *</Label>
+          <Select value={formData.triggerValue} onValueChange={(value) => setFormData((prev) => ({ ...prev, triggerValue: value }))}>
+            <SelectTrigger><SelectValue placeholder="Selecione uma etapa" /></SelectTrigger>
+            <SelectContent>
+              {stages.map((stage) => (
+                <SelectItem key={stage.id} value={stage.name}>{stage.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {formData.trigger === 'contact_inactivity' && (
+        <div>
+          <Label>Dias sem atividade *</Label>
+          <Input
+            type="number"
+            min="1"
+            max="365"
+            value={formData.triggerValue}
+            onChange={(e) => setFormData((prev) => ({ ...prev, triggerValue: e.target.value }))}
+          />
+        </div>
+      )}
+
       <div>
         <Label>Ação</Label>
         <Select value={formData.action} onValueChange={(value) => setFormData((prev) => ({ ...prev, action: value }))}>
@@ -259,6 +353,7 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
           <SelectContent>
             <SelectItem value="update_stage">Mover para Etapa do Pipeline</SelectItem>
             <SelectItem value="create_task">Criar Tarefa</SelectItem>
+            <SelectItem value="create_alert">Criar Alerta</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -283,10 +378,10 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
         </div>
       )}
 
-      {formData.action === 'create_task' && (
+      {(formData.action === 'create_task' || formData.action === 'create_alert') && (
         <>
           <div>
-            <Label>Título da tarefa *</Label>
+            <Label>{formData.action === 'create_alert' ? 'Título do alerta *' : 'Título da tarefa *'}</Label>
             <Input
               value={formData.taskTitle}
               onChange={(e) => setFormData((prev) => ({ ...prev, taskTitle: e.target.value }))}
@@ -304,10 +399,11 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
           </div>
 
           <div>
-            <Label>Responsável *</Label>
+            <Label>Responsável {formData.action === 'create_task' ? '*' : ''}</Label>
             <Select
               value={formData.taskAssignedToUserId}
               onValueChange={(value) => setFormData((prev) => ({ ...prev, taskAssignedToUserId: value }))}
+              disabled={formData.action === 'create_alert'}
             >
               <SelectTrigger><SelectValue placeholder="Selecione um responsável" /></SelectTrigger>
               <SelectContent>
@@ -320,33 +416,37 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
             </Select>
           </div>
 
-          <div>
-            <Label>Prioridade</Label>
-            <Select
-              value={formData.taskPriority}
-              onValueChange={(value) => setFormData((prev) => ({ ...prev, taskPriority: value as (typeof TASK_PRIORITIES)[number] }))}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {TASK_PRIORITIES.map((priority) => (
-                  <SelectItem key={priority} value={priority}>
-                    {priority}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {formData.action === 'create_task' && (
+            <>
+              <div>
+                <Label>Prioridade</Label>
+                <Select
+                  value={formData.taskPriority}
+                  onValueChange={(value) => setFormData((prev) => ({ ...prev, taskPriority: value as (typeof TASK_PRIORITIES)[number] }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TASK_PRIORITIES.map((priority) => (
+                      <SelectItem key={priority} value={priority}>
+                        {priority}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div>
-            <Label>Prazo em dias</Label>
-            <Input
-              type="number"
-              min="0"
-              value={formData.taskDueDays}
-              onChange={(e) => setFormData((prev) => ({ ...prev, taskDueDays: e.target.value }))}
-              placeholder="0 = hoje"
-            />
-          </div>
+              <div>
+                <Label>Prazo em dias</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.taskDueDays}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, taskDueDays: e.target.value }))}
+                  placeholder="0 = hoje"
+                />
+              </div>
+            </>
+          )}
         </>
       )}
 
