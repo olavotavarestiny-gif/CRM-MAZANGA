@@ -7,6 +7,7 @@ const { verifySupabaseJwt } = require('../middleware/auth');
 const { intersectPermissions, parsePermissions } = require('../lib/permissions');
 const { normalizePlan } = require('../lib/plans');
 const { getSerializedPlanCatalog } = require('../lib/plan-limits');
+const { getSubscriptionState } = require('../lib/subscription-access');
 
 // Lazy Supabase admin client
 let _supabaseAdmin = null;
@@ -27,6 +28,11 @@ const CURRENT_USER_BASE_SELECT = {
   role: true,
   active: true,
   plan: true,
+  billingType: true,
+  trialEndsAt: true,
+  expiresAt: true,
+  graceEndsAt: true,
+  accountStatus: true,
   permissions: true,
   mustChangePassword: true,
   accountOwnerId: true,
@@ -162,6 +168,7 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
   }
 
   const currentPlanCatalog = getSerializedPlanCatalog(effectivePlan, effectiveWorkspaceMode);
+  const subscription = await getSubscriptionState(user.accountOwnerId || user.id);
 
   return {
     ...user,
@@ -177,6 +184,12 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
     permissions: effectivePermissions,
     accountOwnerName,
     impersonatedBy,
+    subscription,
+    billingType: subscription?.billingType || user.billingType,
+    trialEndsAt: subscription?.trialEndsAt || user.trialEndsAt,
+    expiresAt: subscription?.expiresAt || user.expiresAt,
+    graceEndsAt: subscription?.graceEndsAt || user.graceEndsAt,
+    accountStatus: subscription?.accountStatus || user.accountStatus,
   };
 }
 

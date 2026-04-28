@@ -146,7 +146,7 @@ export interface Contact {
 
 export interface ContactGroup {
   id: string;
-  userId?: number;
+  userId: number;
   name: string;
   createdAt: string;
   updatedAt: string;
@@ -167,7 +167,6 @@ export interface BulkUpdateContactsResponse {
   matchedCount: number;
   updatedCount: number;
 }
-
 export interface ContactsPageResponse {
   data: Contact[];
   pagination: {

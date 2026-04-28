@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3,
   CreditCard,
@@ -16,11 +16,12 @@ import {
   Trophy,
   Unlock,
 } from 'lucide-react';
-import { dismissDailyTip, getCaixaSessaoAtual, getComercialAnalise, getComercialResumo, getCurrentUser, getDailyTip } from '@/lib/api';
+import { getCaixaSessaoAtual, getComercialAnalise, getComercialResumo, getCurrentUser } from '@/lib/api';
 import type { User } from '@/lib/api';
-import DailyTipCard from '@/components/dashboard/daily-tip-card';
 import OnboardingChecklist from '@/components/onboarding/onboarding-checklist';
+import StartupModelSelector from '@/components/onboarding/startup-model-selector';
 import WidgetWrapper from '@/components/dashboard/widget-wrapper';
+import { BillingAccessBanner } from '@/components/billing/access-notice';
 import { CommerceButton as Button } from '@/components/ui/button-commerce';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -419,7 +420,6 @@ function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
 
 export default function PainelComercialPage({ currentUser: currentUserProp }: { currentUser?: User }) {
   const [modo, setModo] = useState<'resumo' | 'analise'>('resumo');
-  const queryClient = useQueryClient();
   const {
     data: fetchedCurrentUser,
     isLoading: loadingUser,
@@ -449,28 +449,6 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
     queryFn: getComercialResumo,
     refetchInterval: 60_000,
     enabled: !!currentUser && podeResumo,
-  });
-
-  const { data: dailyTip } = useQuery({
-    queryKey: ['daily-tip', currentUser?.id, currentUser?.workspaceMode],
-    queryFn: getDailyTip,
-    staleTime: 1000 * 60 * 60,
-    retry: false,
-    enabled: !!currentUser,
-  });
-  const dismissDailyTipMutation = useMutation({
-    mutationFn: dismissDailyTip,
-    onSuccess: () => {
-      queryClient.setQueryData(['daily-tip', currentUser?.id, currentUser?.workspaceMode], (old: any) =>
-        old
-          ? {
-              ...old,
-              visibleInDashboard: false,
-              dismissedAt: new Date().toISOString(),
-            }
-          : old
-      );
-    },
   });
 
   const {
@@ -543,6 +521,8 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
         ) : null}
       </div>
 
+      <BillingAccessBanner subscription={currentUser?.subscription} />
+      <StartupModelSelector currentUser={currentUser} />
       <OnboardingChecklist currentUser={currentUser} />
 
       {modo === 'analise' && podeAnalise ? (
@@ -596,14 +576,6 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            {dailyTip?.tip && dailyTip.visibleInDashboard !== false && (
-              <DailyTipCard
-                dailyTip={dailyTip}
-                onDismiss={() => dismissDailyTipMutation.mutate()}
-                dismissing={dismissDailyTipMutation.isPending}
-              />
-            )}
-
             <Card className="border-slate-200 p-5 shadow-sm">
               <p className="text-sm font-semibold text-[#2c2f31]">Ações rápidas</p>
               <div className="mt-4 grid gap-3">

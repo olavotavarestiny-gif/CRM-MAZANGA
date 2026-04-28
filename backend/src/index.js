@@ -40,13 +40,14 @@ const notesRouter = require('./routes/notes');
 const quickSalesRouter = require('./routes/quick-sales');
 const caixaSessoesRouter = require('./routes/caixa-sessoes');
 const activityRouter = require('./routes/activity');
-const dailyTipRouter = require('./routes/daily-tip');
 const onboardingRouter = require('./routes/onboarding');
+const startupTemplatesRouter = require('./routes/startup-templates');
 const uploadsRouter = require('./routes/uploads');
 const reportsRouter = require('./routes/reports');
 const requireAuth = require('./middleware/auth');
 const { requireSuperAdmin } = require('./middleware/auth');
 const { requirePlanFeature } = require('./lib/plan-limits');
+const { checkSubscriptionAccess } = require('./middleware/subscription-access');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -159,13 +160,13 @@ app.use('/api/forms', formsRouter);
 app.use('/api/setup', setupRouter);
 
 // Protected routes (require authentication)
-app.use('/api/contacts', requireAuth, contactsRouter);
-app.use('/api/messages', requireAuth, messagesRouter);
-app.use('/api/send', requireAuth, sendRouter);
-app.use('/api/automations', requireAuth, requirePlanFeature('automacoes'), automationsRouter);
-app.use('/api/whatsapp', requireAuth, whatsappRouter);
-app.use('/api/tasks', requireAuth, tasksRouter);
-app.use('/api/inbox', requireAuth, inboxRouter);
+app.use('/api/contacts', requireAuth, checkSubscriptionAccess, contactsRouter);
+app.use('/api/messages', requireAuth, checkSubscriptionAccess, messagesRouter);
+app.use('/api/send', requireAuth, checkSubscriptionAccess, sendRouter);
+app.use('/api/automations', requireAuth, checkSubscriptionAccess, requirePlanFeature('automacoes'), automationsRouter);
+app.use('/api/whatsapp', requireAuth, checkSubscriptionAccess, whatsappRouter);
+app.use('/api/tasks', requireAuth, checkSubscriptionAccess, tasksRouter);
+app.use('/api/inbox', requireAuth, checkSubscriptionAccess, inboxRouter);
 
 // Platform admin routes
 app.use('/api/admin', requireAuth, requireSuperAdmin, adminRouter);
@@ -174,31 +175,31 @@ app.use('/api/admin', requireAuth, requireSuperAdmin, adminRouter);
 app.use('/api/superadmin', requireAuth, requireSuperAdmin, superadminRouter);
 
 // Account owner or admin routes
-app.use('/api/finances', requireAuth, requirePlanFeature('financas'), financesRouter);
-app.use('/api/account', requireAuth, accountRouter);
-app.use('/api/pipeline-stages', requireAuth, pipelineStagesRouter);
-app.use('/api/pipeline/analytics', requireAuth, requirePlanFeature('processos'), pipelineAnalyticsRouter);
+app.use('/api/finances', requireAuth, checkSubscriptionAccess, requirePlanFeature('financas'), financesRouter);
+app.use('/api/account', requireAuth, checkSubscriptionAccess, accountRouter);
+app.use('/api/pipeline-stages', requireAuth, checkSubscriptionAccess, pipelineStagesRouter);
+app.use('/api/pipeline/analytics', requireAuth, checkSubscriptionAccess, requirePlanFeature('processos'), pipelineAnalyticsRouter);
 app.use('/api/calendar', calendarRouter);
 // Faturação AGT
-app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoConfigRouter);
-app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoSeriesRouter);
-app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoClientesRouter);
-app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoProdutosRouter);
-app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoFacturasRouter);
-app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoSaftRouter);
-app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoRelatoriosRouter);
-app.use('/api/faturacao', requireAuth, requirePlanFeature('vendas'), faturacaoRecorrentesRouter);
-app.use('/api/produto-categorias', requireAuth, requirePlanFeature('vendas'), produtoCategoriasRouter);
-app.use('/api/comercial', requireAuth, requirePlanFeature('vendas'), comercialDashboardRouter);
-app.use('/api/chat', requireAuth, requirePlanFeature('conversas'), chatRouter);
-app.use('/api/quick-sales', requireAuth, requirePlanFeature('vendas'), quickSalesRouter);
-app.use('/api/caixa', requireAuth, requirePlanFeature('vendas'), caixaSessoesRouter);
-app.use('/api/activity', requireAuth, activityRouter);
-app.use('/api/daily-tip', requireAuth, dailyTipRouter);
+app.use('/api/faturacao', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), faturacaoConfigRouter);
+app.use('/api/faturacao', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), faturacaoSeriesRouter);
+app.use('/api/faturacao', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), faturacaoClientesRouter);
+app.use('/api/faturacao', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), faturacaoProdutosRouter);
+app.use('/api/faturacao', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), faturacaoFacturasRouter);
+app.use('/api/faturacao', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), faturacaoSaftRouter);
+app.use('/api/faturacao', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), faturacaoRelatoriosRouter);
+app.use('/api/faturacao', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), faturacaoRecorrentesRouter);
+app.use('/api/produto-categorias', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), produtoCategoriasRouter);
+app.use('/api/comercial', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), comercialDashboardRouter);
+app.use('/api/chat', requireAuth, checkSubscriptionAccess, requirePlanFeature('conversas'), chatRouter);
+app.use('/api/quick-sales', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), quickSalesRouter);
+app.use('/api/caixa', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), caixaSessoesRouter);
+app.use('/api/activity', requireAuth, checkSubscriptionAccess, activityRouter);
 app.use('/api/onboarding', requireAuth, onboardingRouter);
-app.use('/api/reports', requireAuth, reportsRouter);
+app.use('/api/startup-templates', requireAuth, startupTemplatesRouter);
+app.use('/api/reports', requireAuth, checkSubscriptionAccess, reportsRouter);
 app.use('/api/uploads', uploadsRouter);
-app.use('/api', requireAuth, notesRouter);
+app.use('/api', requireAuth, checkSubscriptionAccess, notesRouter);
 
 // Scheduler: process recurring invoices daily at 00:05
 try {

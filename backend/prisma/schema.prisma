@@ -3,8 +3,6 @@ generator client {
 }
 
 datasource db {
-  // IMPORTANT: Render uses PostgreSQL (DATABASE_URL configured on Render dashboard)
-  // Local dev: update .env to use the Supabase/Render PostgreSQL URL
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
@@ -13,59 +11,69 @@ model User {
   id                        Int                    @id @default(autoincrement())
   name                      String
   email                     String                 @unique
-  jobTitle                  String?
-  supabaseUid               String?                @unique // UUID from Supabase auth.users
-  passwordHash              String                 @default("SUPABASE_AUTH") // legacy; not used after Supabase auth
+  passwordHash              String                 @default("SUPABASE_AUTH")
   resetToken                String?
   resetExpiry               DateTime?
-  role                      String                 @default("user") // "admin" | "user"
-  active                    Boolean                @default(true)
-  plan                      String                 @default("essencial") // "essencial" | "profissional"
-  isSuperAdmin              Boolean                @default(false)
-  permissions               String? // JSON: null = full access; see permissions structure in lib/permissions.js
-  mustChangePassword        Boolean                @default(false)
-  accountOwnerId            Int? // null = owner of their own account; Int = member of another account
-  assignedEstabelecimentoId String?
-  workspaceMode             String                 @default("servicos") // "servicos" | "comercio"
   createdAt                 DateTime               @default(now())
-  loginLogs                 LoginLog[]
-  contacts                  Contact[]              @relation("ContactUser")
-  contactGroups             ContactGroup[]         @relation("ContactGroupUser")
-  contactFieldDefs          ContactFieldDef[]      @relation("ContactFieldDefUser")
-  contactFieldConfigs       ContactFieldConfig[]   @relation("ContactFieldConfigUser")
-  pipelineStages            PipelineStage[]        @relation("PipelineStageUser")
-  tasks                     Task[]                 @relation("TaskUser")
-  assignedTasks             Task[]                 @relation("TaskAssignee")
-  transactions              Transaction[]          @relation("TransactionUser")
+  active                    Boolean                @default(true)
+  role                      String                 @default("user")
+  mustChangePassword        Boolean                @default(false)
+  accountOwnerId            Int?
+  supabaseUid               String?                @unique
+  plan                      String                 @default("essencial")
+  isSuperAdmin              Boolean                @default(false)
+  permissions               String?
+  jobTitle                  String?
+  workspaceMode             String                 @default("servicos")
+  assignedEstabelecimentoId String?
+  billingType               String                 @default("trial")
+  trialEndsAt               DateTime?
+  expiresAt                 DateTime?
+  graceEndsAt               DateTime?
+  accountStatus             String                 @default("active")
   automations               Automation[]           @relation("AutomationUser")
-  automationLogs            AutomationLog[]
-  forms                     Form[]                 @relation("FormUser")
-  googleCalendarToken       GoogleCalendarToken?
-  googleCalendarEvents      GoogleCalendarEvent[]
-  estabelecimentos          Estabelecimento[]      @relation("EstabelecimentoUser")
-  series                    Serie[]                @relation("SerieUser")
-  clientesFaturacao         ClienteFaturacao[]     @relation("ClienteFaturacaoUser")
-  produtoCategorias         ProdutoCategoria[]     @relation("ProdutoCategoriaUser")
-  produtos                  Produto[]              @relation("ProdutoUser")
-  stockMovements            StockMovement[]        @relation("StockMovementUser")
-  stockMovementsCreated     StockMovement[]        @relation("StockMovementCreatedBy")
-  caixaSessoes              CaixaSessao[]          @relation("CaixaSessaoUser")
-  caixaSessoesAbertas       CaixaSessao[]          @relation("CaixaSessaoOpenedBy")
   caixaSessoesFechadas      CaixaSessao[]          @relation("CaixaSessaoClosedBy")
-  facturas                  Factura[]              @relation("FacturaUser")
-  facturaRecorrentes        FacturaRecorrente[]    @relation("FacturaRecorrenteUser")
-  saftPeriodos              SaftPeriodo[]          @relation("SaftPeriodoUser")
-  configuracaoFaturacao     ConfiguracaoFaturacao? @relation("ConfigFaturacaoUser")
-  accountOwner              User?                  @relation("AccountMembers", fields: [accountOwnerId], references: [id], onDelete: SetNull)
-  accountMembers            User[]                 @relation("AccountMembers")
-  assignedEstabelecimento   Estabelecimento?       @relation("AssignedEstabelecimento", fields: [assignedEstabelecimentoId], references: [id], onDelete: SetNull)
+  caixaSessoesAbertas       CaixaSessao[]          @relation("CaixaSessaoOpenedBy")
+  caixaSessoes              CaixaSessao[]          @relation("CaixaSessaoUser")
+  calendarSync              CalendarSync?
   chatChannelMemberships    ChatChannelMember[]    @relation("ChatMemberUser")
   chatMessagesSent          ChatMessage[]          @relation("ChatSenderUser")
+  clientesFaturacao         ClienteFaturacao[]     @relation("ClienteFaturacaoUser")
+  configuracaoFaturacao     ConfiguracaoFaturacao? @relation("ConfigFaturacaoUser")
+  contacts                  Contact[]              @relation("ContactUser")
+  contactFieldConfigs       ContactFieldConfig[]   @relation("ContactFieldConfigUser")
+  contactFieldDefs          ContactFieldDef[]      @relation("ContactFieldDefUser")
+  contactGroups             ContactGroup[]         @relation("ContactGroupUser")
   contactNotes              ContactNote[]          @relation("NoteAuthor")
+  estabelecimentos          Estabelecimento[]      @relation("EstabelecimentoUser")
+  facturas                  Factura[]              @relation("FacturaUser")
+  facturaRecorrentes        FacturaRecorrente[]    @relation("FacturaRecorrenteUser")
+  forms                     Form[]                 @relation("FormUser")
+  googleCalendarEvents      GoogleCalendarEvent[]
+  googleCalendarToken       GoogleCalendarToken?
+  loginLogs                 LoginLog[]
+  pipelineStages            PipelineStage[]        @relation("PipelineStageUser")
+  produtos                  Produto[]              @relation("ProdutoUser")
+  produtoCategorias         ProdutoCategoria[]     @relation("ProdutoCategoriaUser")
+  saftPeriodos              SaftPeriodo[]          @relation("SaftPeriodoUser")
+  series                    Serie[]                @relation("SerieUser")
+  stockMovementsCreated     StockMovement[]        @relation("StockMovementCreatedBy")
+  stockMovements            StockMovement[]        @relation("StockMovementUser")
+  assignedTasks             Task[]                 @relation("TaskAssignee")
+  tasks                     Task[]                 @relation("TaskUser")
+  transactions              Transaction[]          @relation("TransactionUser")
+  accountOwner              User?                  @relation("AccountMembers", fields: [accountOwnerId], references: [id])
+  accountMembers            User[]                 @relation("AccountMembers")
+  assignedEstabelecimento   Estabelecimento?       @relation("AssignedEstabelecimento", fields: [assignedEstabelecimentoId], references: [id])
+  automationLogs            AutomationLog[]
   dailyTipDeliveries        DailyTipDelivery[]
-  calendarSync              CalendarSync?
+  startupTemplateApplied    StartupTemplateApplication? @relation("StartupTemplateOrganization")
+  startupTemplatesAppliedBy StartupTemplateApplication[] @relation("StartupTemplateAppliedBy")
 
   @@index([assignedEstabelecimentoId])
+  @@index([accountStatus])
+  @@index([expiresAt])
+  @@index([trialEndsAt])
 }
 
 model LoginLog {
@@ -79,30 +87,30 @@ model LoginLog {
 
 model Contact {
   id              Int              @id @default(autoincrement())
-  userId          Int?
-  contactGroupId  String?
   name            String
   email           String
   phone           String
   company         String
-  nif             String?
-  dealValueKz     Float?
   revenue         String?
   sector          String?
   stage           String           @default("Novo")
   inPipeline      Boolean          @default(false)
-  tags            String           @default("[]") // JSON array stored as string: ["tag1", "tag2"]
-  customFields    String           @default("{}") // JSON object: { "fieldKey": "value" }
-  contactType     String           @default("interessado")
-  status          String           @default("ativo")
-  clienteType     String           @default("particular") // "empresa" | "particular"
-  documents       String           @default("[]")
-  notes           ContactNote[]
-  formSubmissions FormSubmission[]
+  tags            String           @default("[]")
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
-  user            User?            @relation("ContactUser", fields: [userId], references: [id], onDelete: SetNull)
+  userId          Int?
+  customFields    String           @default("{}")
+  contactType     String           @default("interessado")
+  documents       String           @default("[]")
+  status          String           @default("ativo")
+  clienteType     String           @default("particular")
+  nif             String?
+  dealValueKz     Float?
+  contactGroupId  String?
   contactGroup    ContactGroup?    @relation(fields: [contactGroupId], references: [id], onDelete: SetNull)
+  user            User?            @relation("ContactUser", fields: [userId], references: [id], onDelete: SetNull)
+  notes           ContactNote[]
+  formSubmissions FormSubmission[]
   messages        Message[]
   tasks           Task[]
   transactions    Transaction[]
@@ -137,16 +145,16 @@ model ContactNote {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  user      User?    @relation("NoteAuthor", fields: [userId], references: [id], onDelete: SetNull)
+  user      User?    @relation("NoteAuthor", fields: [userId], references: [id])
 }
 
 model ContactFieldDef {
   id        String   @id @default(cuid())
   userId    Int
   label     String
-  key       String // slug used as key in customFields JSON
-  type      String   @default("text") // "text" | "number" | "date" | "select" | "url"
-  options   String? // JSON array for select type: '["Option A","Option B"]'
+  key       String
+  type      String   @default("text")
+  options   String?
   required  Boolean  @default(false)
   order     Int      @default(0)
   active    Boolean  @default(true)
@@ -156,13 +164,11 @@ model ContactFieldDef {
   @@unique([userId, key])
 }
 
-// Stores per-user config overrides for built-in contact fields (email, phone, company, revenue, sector, tags)
-// Per-user customisable pipeline stages
 model PipelineStage {
   id        String   @id @default(cuid())
   userId    Int
   name      String
-  color     String   @default("#6b7e9a") // hex color for the stage badge
+  color     String   @default("#6b7e9a")
   order     Int      @default(0)
   createdAt DateTime @default(now())
   user      User     @relation("PipelineStageUser", fields: [userId], references: [id], onDelete: Cascade)
@@ -173,8 +179,8 @@ model PipelineStage {
 model ContactFieldConfig {
   id       String  @id @default(cuid())
   userId   Int
-  fieldKey String // "email" | "phone" | "company" | "revenue" | "sector" | "tags"
-  label    String // user-defined label (defaults to the built-in label)
+  fieldKey String
+  label    String
   visible  Boolean @default(true)
   required Boolean @default(false)
   order    Int     @default(0)
@@ -197,24 +203,24 @@ model Message {
 }
 
 model Task {
-  id               Int       @id @default(autoincrement())
-  userId           Int?
-  assignedToUserId Int?
-  contactId        Int?
-  title            String
-  notes            String?
-  dueDate          DateTime?
+  id                      Int       @id @default(autoincrement())
+  contactId               Int?
+  title                   String
+  notes                   String?
+  dueDate                 DateTime?
+  priority                String    @default("Media")
+  done                    Boolean   @default(false)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  userId                  Int?
+  assignedToUserId        Int?
   googleCalendarEventId   String?
   googleCalendarHtmlLink  String?
-  googleCalendarSyncedAt  DateTime?
   googleCalendarSyncError String?
-  priority         String    @default("Media")
-  done             Boolean   @default(false)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  user             User?     @relation("TaskUser", fields: [userId], references: [id], onDelete: SetNull)
-  assignedTo       User?     @relation("TaskAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
-  contact          Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  googleCalendarSyncedAt  DateTime?
+  assignedTo              User?     @relation("TaskAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  contact                 Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  user                    User?     @relation("TaskUser", fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([assignedToUserId])
   @@index([userId, dueDate])
@@ -223,24 +229,24 @@ model Task {
 
 model Automation {
   id                   String          @id @default(cuid())
-  userId               Int?
-  formId               String?
-  trigger              String // "new_contact", "form_submission", "contact_tag", "contact_revenue", "contact_sector"
-  triggerValue         String? // tag name, revenue range, or sector (for matching conditions)
-  action               String // "send_email", "send_template", "send_text", "update_stage", "create_task"
-  targetStage          String? // "Novo", "Contactado", etc. (for update_stage action)
+  trigger              String
+  triggerValue         String?
+  action               String
+  targetStage          String?
   templateName         String?
   emailSubject         String?
   emailBody            String?
-  taskTitle            String?
+  active               Boolean         @default(true)
+  userId               Int?
+  formId               String?
+  taskAssignedToUserId Int?
+  taskDueDays          Int?
   taskNotes            String?
   taskPriority         String?
-  taskDueDays          Int?
-  taskAssignedToUserId Int?
-  active               Boolean         @default(true)
+  taskTitle            String?
+  form                 Form?           @relation(fields: [formId], references: [id])
+  user                 User?           @relation("AutomationUser", fields: [userId], references: [id])
   logs                 AutomationLog[]
-  user                 User?           @relation("AutomationUser", fields: [userId], references: [id], onDelete: SetNull)
-  form                 Form?           @relation(fields: [formId], references: [id], onDelete: SetNull)
 }
 
 model AutomationLog {
@@ -257,8 +263,8 @@ model AutomationLog {
   duration_ms     Int?
   created_at      DateTime   @default(now())
   automation      Automation @relation(fields: [automation_id], references: [id], onDelete: Cascade)
+  contact         Contact?   @relation(fields: [contact_id], references: [id])
   organization    User       @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  contact         Contact?   @relation(fields: [contact_id], references: [id], onDelete: SetNull)
 
   @@index([automation_id, created_at])
   @@index([organization_id, created_at])
@@ -289,25 +295,25 @@ model ActivityLog {
 
 model Form {
   id                String           @id @default(cuid())
-  userId            Int?
   title             String
   description       String?
   mode              String           @default("step")
   thankYouUrl       String?
-  brandColor        String? // hex — cor principal (botões, barra de progresso)
-  bgColor           String? // hex — cor de fundo
-  logoUrl           String? // base64 data URL do logotipo
-  metaPixelEnabled  Boolean          @default(false)
-  metaPixelId       String?
-  googleTagEnabled  Boolean          @default(false)
-  googleTagId       String?
-  trackSubmitAsLead Boolean          @default(true)
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
-  user              User?            @relation("FormUser", fields: [userId], references: [id], onDelete: SetNull)
+  userId            Int?
+  bgColor           String?
+  brandColor        String?
+  logoUrl           String?
+  googleTagEnabled  Boolean          @default(false)
+  googleTagId       String?
+  metaPixelEnabled  Boolean          @default(false)
+  metaPixelId       String?
+  trackSubmitAsLead Boolean          @default(true)
+  automations       Automation[]
+  user              User?            @relation("FormUser", fields: [userId], references: [id])
   fields            FormField[]
   submissions       FormSubmission[]
-  automations       Automation[]
 }
 
 model FormField {
@@ -319,64 +325,64 @@ model FormField {
   order        Int
   options      String?
   contactField String?
-  form         Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
   answers      FormAnswer[]
+  form         Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
 }
 
 model FormSubmission {
   id                String       @id @default(cuid())
   formId            String
+  submittedAt       DateTime     @default(now())
   contactId         Int?
   contactSyncStatus String       @default("skipped")
-  submittedAt       DateTime     @default(now())
-  form              Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
-  contact           Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
   answers           FormAnswer[]
+  contact           Contact?     @relation(fields: [contactId], references: [id])
+  form              Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
 }
 
 model FormAnswer {
   id           String         @id @default(cuid())
   submissionId String
   fieldId      String?
-  fieldLabel   String?
-  contactField String?
   value        String
+  contactField String?
+  fieldLabel   String?
+  field        FormField?     @relation(fields: [fieldId], references: [id])
   submission   FormSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  field        FormField?     @relation(fields: [fieldId], references: [id], onDelete: SetNull)
 }
 
 model Transaction {
   id                     String       @id @default(cuid())
-  userId                 Int?
   date                   DateTime
   clientId               Int?
   clientName             String?
-  invoiceId              String?      @map("invoice_id")
-  cashSessionId          String?      @map("cash_session_id")
-  type                   String // "entrada" | "saida"
-  revenueType            String? // "recorrente" | "one-off"
+  type                   String
+  revenueType            String?
   contractDurationMonths Int?
   nextPaymentDate        DateTime?
   category               String
   subcategory            String?
   description            String?
   amountKz               Float
-  currencyOrigin         String       @default("KZ") // KZ | CHF | EUR | USD
+  currencyOrigin         String       @default("KZ")
   exchangeRate           Float        @default(1.0)
   paymentMethod          String?
-  status                 String       @default("pago") // "pago" | "pendente" | "atrasado"
+  status                 String       @default("pago")
   receiptNumber          String?
   notes                  String?
-  attachments            String       @default("[]")
   deleted                Boolean      @default(false)
-  reconciled             Boolean      @default(false)
-  reconciledAt           DateTime?    @map("reconciled_at")
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
-  user                   User?        @relation("TransactionUser", fields: [userId], references: [id], onDelete: SetNull)
-  contact                Contact?     @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  invoice                Factura?     @relation("TransactionInvoice", fields: [invoiceId], references: [id], onDelete: SetNull)
-  cashSession            CaixaSessao? @relation("TransactionCashSession", fields: [cashSessionId], references: [id], onDelete: SetNull)
+  userId                 Int?
+  cashSessionId          String?      @map("cash_session_id")
+  invoiceId              String?      @map("invoice_id")
+  reconciled             Boolean      @default(false)
+  reconciledAt           DateTime?    @map("reconciled_at")
+  attachments            String       @default("[]")
+  cashSession            CaixaSessao? @relation("TransactionCashSession", fields: [cashSessionId], references: [id])
+  contact                Contact?     @relation(fields: [clientId], references: [id])
+  invoice                Factura?     @relation("TransactionInvoice", fields: [invoiceId], references: [id])
+  user                   User?        @relation("TransactionUser", fields: [userId], references: [id])
 
   @@index([invoiceId])
   @@index([cashSessionId])
@@ -386,9 +392,9 @@ model Transaction {
 
 model FinancialCategory {
   id            String  @id @default(cuid())
-  type          String // "entrada" | "saida"
+  type          String
   category      String
-  subcategories String? // JSON array as string: ["sub1","sub2"]
+  subcategories String?
   color         String?
   icon          String?
   active        Boolean @default(true)
@@ -398,41 +404,41 @@ model FinancialCategory {
 }
 
 model GoogleCalendarToken {
-  id                String   @id @default(cuid())
-  userId            Int      @unique
-  provider          String   @default("google")
-  status            String   @default("connected")
+  id                String    @id @default(cuid())
+  userId            Int       @unique
   accessToken       String
   refreshToken      String?
   expiresAt         DateTime
-  scope             String?
   googleEmail       String?
-  primaryCalendarId String   @default("primary")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   lastSyncAt        DateTime?
   lastSyncError     String?
   lastSyncErrorAt   DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  primaryCalendarId String    @default("primary")
+  provider          String    @default("google")
+  scope             String?
+  status            String    @default("connected")
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model GoogleCalendarEvent {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   userId          Int
-  calendarId      String   @default("primary")
+  calendarId      String    @default("primary")
   googleEventId   String
   title           String
   description     String?
   location        String?
   startAt         DateTime
   endAt           DateTime
-  isAllDay        Boolean  @default(false)
-  status          String   @default("confirmed")
+  isAllDay        Boolean   @default(false)
+  status          String    @default("confirmed")
   htmlLink        String?
   sourceUpdatedAt DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, calendarId, googleEventId])
   @@index([userId, startAt])
@@ -450,31 +456,26 @@ model CalendarSync {
   watchExpiry  DateTime
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
-
-// ============================================
-// MÓDULO FATURAÇÃO AGT
-// ============================================
 
 model Estabelecimento {
   id                 String              @id @default(cuid())
   userId             Int
   nome               String
   nif                String
-  defaultSerieId     String?
   morada             String?
   telefone           String?
   email              String?
   isPrincipal        Boolean             @default(false)
   createdAt          DateTime            @default(now())
+  defaultSerieId     String?
+  caixaSessoes       CaixaSessao[]
+  defaultSerie       Serie?              @relation("EstabelecimentoDefaultSerie", fields: [defaultSerieId], references: [id])
   user               User                @relation("EstabelecimentoUser", fields: [userId], references: [id], onDelete: Cascade)
-  series             Serie[]             @relation("EstabelecimentoSeries")
-  defaultSerie       Serie?              @relation("EstabelecimentoDefaultSerie", fields: [defaultSerieId], references: [id], onDelete: SetNull)
   facturas           Factura[]
   facturaRecorrentes FacturaRecorrente[]
-  caixaSessoes       CaixaSessao[]
+  series             Serie[]             @relation("EstabelecimentoSeries")
   assignedUsers      User[]              @relation("AssignedEstabelecimento")
 }
 
@@ -484,16 +485,16 @@ model Serie {
   estabelecimentoId          String
   seriesCode                 String
   seriesYear                 Int
-  documentType               String // FT, FR, ND, NC, FA
+  documentType               String
   firstDocumentNumber        Int                 @default(1)
   lastDocumentNumber         Int?
-  seriesStatus               String              @default("A") // A=Ativa, U=Em uso, F=Fechada
+  seriesStatus               String              @default("A")
   createdAt                  DateTime            @default(now())
-  user                       User                @relation("SerieUser", fields: [userId], references: [id], onDelete: Cascade)
-  estabelecimento            Estabelecimento     @relation("EstabelecimentoSeries", fields: [estabelecimentoId], references: [id], onDelete: Cascade)
   defaultForEstabelecimentos Estabelecimento[]   @relation("EstabelecimentoDefaultSerie")
   facturas                   Factura[]
   facturaRecorrentes         FacturaRecorrente[]
+  estabelecimento            Estabelecimento     @relation("EstabelecimentoSeries", fields: [estabelecimentoId], references: [id], onDelete: Cascade)
+  user                       User                @relation("SerieUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, seriesCode, seriesYear, documentType])
 }
@@ -523,8 +524,8 @@ model ProdutoCategoria {
   cor       String?   @default("#6b7e9a")
   isDefault Boolean   @default(false)
   createdAt DateTime  @default(now())
-  user      User      @relation("ProdutoCategoriaUser", fields: [userId], references: [id], onDelete: Cascade)
   produtos  Produto[]
+  user      User      @relation("ProdutoCategoriaUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, nome])
 }
@@ -534,21 +535,21 @@ model Produto {
   userId             Int
   productCode        String
   productDescription String
-  unitPrice          Float             @default(0) // preço de venda (salePrice)
-  cost               Float? // preço de custo
-  productType        String            @default("S") // S=serviço, P=produto, O=outro (AGT)
-  sku                String? // referência interna
-  barcode            String? // código de barras EAN/QR (para leitura por scanner)
+  unitPrice          Float             @default(0)
   unitOfMeasure      String            @default("UN")
   taxPercentage      Float             @default(14)
   taxCode            String            @default("NOR")
   active             Boolean           @default(true)
-  stock              Int?              @default(0) // stock atual (null = produto sem controlo de stock)
-  stockMinimo        Int?              @default(0)
-  categoriaId        String?
   createdAt          DateTime          @default(now())
+  cost               Float?
+  productType        String            @default("S")
+  sku                String?
+  barcode            String?
+  stock              Int?              @default(0)
+  categoriaId        String?
+  stockMinimo        Int?              @default(0)
+  categoria          ProdutoCategoria? @relation(fields: [categoriaId], references: [id])
   user               User              @relation("ProdutoUser", fields: [userId], references: [id], onDelete: Cascade)
-  categoria          ProdutoCategoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   stockMovements     StockMovement[]
 
   @@unique([userId, productCode])
@@ -557,20 +558,20 @@ model Produto {
 model StockMovement {
   id              String   @id @default(cuid())
   productId       String
-  userId          Int // effectiveUserId (scoping por conta)
-  type            String // "entry" | "exit" | "adjustment"
+  userId          Int
+  type            String
   quantity        Int
   previousStock   Int
   newStock        Int
   reason          String?
   notes           String?
   createdByUserId Int
-  referenceType   String? // "manual" | "quick_sale"
+  referenceType   String?
   referenceId     String?
   createdAt       DateTime @default(now())
+  createdBy       User     @relation("StockMovementCreatedBy", fields: [createdByUserId], references: [id])
   product         Produto  @relation(fields: [productId], references: [id], onDelete: Cascade)
   user            User     @relation("StockMovementUser", fields: [userId], references: [id])
-  createdBy       User     @relation("StockMovementCreatedBy", fields: [createdByUserId], references: [id])
 }
 
 model Factura {
@@ -581,43 +582,43 @@ model Factura {
   serieId              String
   estabelecimentoId    String
   documentDate         DateTime          @default(now())
-  documentStatus       String            @default("N") // N=Normal, A=Anulada
+  documentStatus       String            @default("N")
   documentCancelReason String?
   customerTaxID        String
   customerName         String
   customerAddress      String?
   clienteFaturacaoId   String?
-  lines                String // JSON
+  lines                String
   netTotal             Float
   taxPayable           Float
   grossTotal           Float
   qrCodeUrl            String?
   qrCodeImage          String?
-  hashCode             String? // Cadeia de hash AGT (SHA256 → RSA-2048 quando certificado disponível)
-  hashControl          String? // "1" = primeiro doc da série; "0" = encadeado
   jwsSignature         String            @default("PLACEHOLDER")
   agtRequestId         String?
-  agtValidationStatus  String            @default("P") // P=Pendente, V=Válida, I=Inválida, A=Anulada
+  agtValidationStatus  String            @default("P")
   agtSubmittedAt       DateTime?
-  baseCurrency         String            @default("AOA")
-  displayCurrency      String            @default("AOA")
-  currencyCode         String            @default("AOA")
-  currencyAmount       Float?
-  exchangeRate         Float?
-  exchangeRateDate     DateTime?
-  displayMode          String            @default("DOCUMENT_ONLY")
-  paymentMethod        String            @default("Transferência Bancária")
   isOffline            Boolean           @default(false)
   offlineEmittedAt     DateTime?
   offlineSubmittedAt   DateTime?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
-  user                 User              @relation("FacturaUser", fields: [userId], references: [id], onDelete: SetNull)
-  serie                Serie             @relation(fields: [serieId], references: [id])
-  estabelecimento      Estabelecimento   @relation(fields: [estabelecimentoId], references: [id])
-  clienteFaturacao     ClienteFaturacao? @relation(fields: [clienteFaturacaoId], references: [id])
+  currencyAmount       Float?
+  currencyCode         String            @default("AOA")
+  exchangeRate         Float?
+  paymentMethod        String            @default("Transferência Bancária")
+  hashCode             String?
+  hashControl          String?
   caixaSessaoId        String?
-  caixaSessao          CaixaSessao?      @relation(fields: [caixaSessaoId], references: [id], onDelete: SetNull)
+  baseCurrency         String            @default("AOA")
+  displayCurrency      String            @default("AOA")
+  displayMode          String            @default("DOCUMENT_ONLY")
+  exchangeRateDate     DateTime?
+  caixaSessao          CaixaSessao?      @relation(fields: [caixaSessaoId], references: [id])
+  clienteFaturacao     ClienteFaturacao? @relation(fields: [clienteFaturacaoId], references: [id])
+  estabelecimento      Estabelecimento   @relation(fields: [estabelecimentoId], references: [id])
+  serie                Serie             @relation(fields: [serieId], references: [id])
+  user                 User              @relation("FacturaUser", fields: [userId], references: [id], onDelete: SetNull)
   financeTransactions  Transaction[]     @relation("TransactionInvoice")
 
   @@unique([userId, documentNo])
@@ -625,7 +626,7 @@ model Factura {
 
 model CaixaSessao {
   id                    String          @id @default(cuid())
-  userId                Int // effectiveUserId (scoping)
+  userId                Int
   estabelecimentoId     String
   openedByUserId        Int
   closedByUserId        Int?
@@ -637,18 +638,18 @@ model CaixaSessao {
   differenceAmount      Float?
   totalSalesAmount      Float           @default(0)
   salesCount            Int             @default(0)
-  totalCash             Float           @default(0)
-  totalMulticaixa       Float           @default(0)
-  totalTpa              Float           @default(0)
-  totalTransferencia    Float           @default(0)
-  status                String          @default("open") // "open" | "closed"
+  status                String          @default("open")
   notes                 String?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
-  user                  User            @relation("CaixaSessaoUser", fields: [userId], references: [id])
-  openedBy              User            @relation("CaixaSessaoOpenedBy", fields: [openedByUserId], references: [id])
+  totalCash             Float           @default(0)
+  totalMulticaixa       Float           @default(0)
+  totalTransferencia    Float           @default(0)
+  totalTpa              Float           @default(0)
   closedBy              User?           @relation("CaixaSessaoClosedBy", fields: [closedByUserId], references: [id])
   estabelecimento       Estabelecimento @relation(fields: [estabelecimentoId], references: [id])
+  openedBy              User            @relation("CaixaSessaoOpenedBy", fields: [openedByUserId], references: [id])
+  user                  User            @relation("CaixaSessaoUser", fields: [userId], references: [id])
   facturas              Factura[]
   financeTransactions   Transaction[]   @relation("TransactionCashSession")
 }
@@ -656,7 +657,7 @@ model CaixaSessao {
 model SaftPeriodo {
   id            String   @id @default(cuid())
   userId        Int
-  periodo       String // "2026-01"
+  periodo       String
   startDate     DateTime
   endDate       DateTime
   status        String   @default("GENERATED")
@@ -689,15 +690,11 @@ model FacturaRecorrente {
   customerName       String
   customerAddress    String?
   documentType       String            @default("FT")
-  lines              String // JSON array (template das linhas)
-  baseCurrency       String            @default("AOA")
-  displayCurrency    String            @default("AOA")
+  lines              String
   currencyCode       String            @default("AOA")
   exchangeRate       Float?
-  exchangeRateDate   DateTime?
-  displayMode        String            @default("DOCUMENT_ONLY")
   paymentMethod      String            @default("Transferência Bancária")
-  frequency          String // WEEKLY | MONTHLY | QUARTERLY | ANNUAL
+  frequency          String
   startDate          DateTime
   nextRunDate        DateTime
   lastRunDate        DateTime?
@@ -708,10 +705,14 @@ model FacturaRecorrente {
   notes              String?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
-  user               User              @relation("FacturaRecorrenteUser", fields: [userId], references: [id], onDelete: Cascade)
-  serie              Serie             @relation(fields: [serieId], references: [id])
-  estabelecimento    Estabelecimento   @relation(fields: [estabelecimentoId], references: [id])
+  baseCurrency       String            @default("AOA")
+  displayCurrency    String            @default("AOA")
+  displayMode        String            @default("DOCUMENT_ONLY")
+  exchangeRateDate   DateTime?
   clienteFaturacao   ClienteFaturacao? @relation(fields: [clienteFaturacaoId], references: [id])
+  estabelecimento    Estabelecimento   @relation(fields: [estabelecimentoId], references: [id])
+  serie              Serie             @relation(fields: [serieId], references: [id])
+  user               User              @relation("FacturaRecorrenteUser", fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ConfiguracaoFaturacao {
@@ -720,11 +721,6 @@ model ConfiguracaoFaturacao {
   nifEmpresa               String    @default("")
   nomeEmpresa              String    @default("")
   moradaEmpresa            String    @default("")
-  telefoneEmpresa          String    @default("")
-  emailEmpresa             String    @default("")
-  websiteEmpresa           String    @default("")
-  iban                     String    @default("")
-  logoUrl                  String?
   agtMockMode              Boolean   @default(true)
   agtCertNumber            String    @default("PENDING")
   contingencyMode          Boolean   @default(false)
@@ -733,19 +729,20 @@ model ConfiguracaoFaturacao {
   defaultEstabelecimentoId String?
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
+  iban                     String    @default("")
+  logoUrl                  String?
+  emailEmpresa             String    @default("")
+  telefoneEmpresa          String    @default("")
+  websiteEmpresa           String    @default("")
   user                     User      @relation("ConfigFaturacaoUser", fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// ============================================
-// MÓDULO CHAT INTERNO
-// ============================================
-
 model ChatChannel {
   id          String              @id @default(cuid())
-  orgId       Int // effectiveUserId do criador (= account owner ID)
+  orgId       Int
   name        String
   description String?
-  type        String              @default("channel") // "channel" | "dm"
+  type        String              @default("channel")
   createdById Int
   createdAt   DateTime            @default(now())
   members     ChatChannelMember[]
@@ -771,8 +768,8 @@ model ChatMessage {
   channelId   String
   senderId    Int
   text        String
-  attachments String      @default("[]") // JSON: [{url, name, size, type}]
-  mentions    String      @default("[]") // JSON: [userId, ...]
+  attachments String      @default("[]")
+  mentions    String      @default("[]")
   createdAt   DateTime    @default(now())
   channel     ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   sender      User        @relation("ChatSenderUser", fields: [senderId], references: [id], onDelete: Cascade)
@@ -782,29 +779,46 @@ model ChatMessage {
 
 model OnboardingProgress {
   id              String    @id @default(cuid())
-  organization_id String // effectiveUserId as String
-  workspace_mode  String // locked at creation: "servicos" | "comercio"
+  organization_id String
+  workspace_mode  String
+  flow_key        String    @default("onboarding_v2")
   completed_steps String[]  @default([])
   dismissed       Boolean   @default(false)
   dismissed_at    DateTime?
   completed_at    DateTime?
+  reopened_at     DateTime?
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 
-  @@unique([organization_id, workspace_mode])
+  @@unique([organization_id, workspace_mode, flow_key])
+}
+
+model StartupTemplateApplication {
+  id              String    @id @default(cuid())
+  organizationId  Int       @unique
+  templateKey     String
+  workspaceMode   String
+  appliedAt       DateTime  @default(now())
+  appliedByUserId Int?
+  metadata        Json?
+  organization    User      @relation("StartupTemplateOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  appliedByUser   User?     @relation("StartupTemplateAppliedBy", fields: [appliedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([templateKey])
+  @@index([workspaceMode])
 }
 
 model DailyTipDelivery {
   id                   String    @id @default(cuid())
   userId               Int
-  deliveryDate         String    @map("delivery_date") // "YYYY-MM-DD" em Africa/Luanda
+  deliveryDate         String    @map("delivery_date")
   workspaceMode        String    @map("workspace_mode")
-  audienceBucket       String    @map("audience_bucket") // "owner" | "equipa"
+  audienceBucket       String    @map("audience_bucket")
   tipId                String    @map("tip_id")
   payload              Json?
-  dismissedInDashboard Boolean   @default(false) @map("dismissed_in_dashboard")
-  dismissedAt          DateTime? @map("dismissed_at")
   createdAt            DateTime  @default(now()) @map("created_at")
+  dismissedAt          DateTime? @map("dismissed_at")
+  dismissedInDashboard Boolean   @default(false) @map("dismissed_in_dashboard")
   user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, deliveryDate])
@@ -813,41 +827,41 @@ model DailyTipDelivery {
 }
 
 model MessagingCampaign {
-  id                         String                      @id @default(cuid())
-  provider                   String                      @default("ZIETT")
-  providerCampaignId         String?
-  name                       String
-  content                    String
-  channelType                String                      @default("SMS")
-  remitterId                 String
-  countryAlpha2              String                      @default("AO")
-  requestedRecipientsCount   Int                         @default(0)
-  acceptedRecipientsCount    Int                         @default(0)
-  invalidRecipientsCount     Int                         @default(0)
-  duplicateRecipientsCount   Int                         @default(0)
-  optedOutRecipientsCount    Int                         @default(0)
-  notAllowedRecipientsCount  Int                         @default(0)
-  status                     String                      @default("pending")
-  providerStatus             String?
-  triggerSource              String                      @default("SUPERADMIN_PANEL")
-  createdByUserId            Int
-  createdByEmail             String
-  accountOwnerId             Int?
-  workspaceMode              String?
-  isTest                     Boolean                     @default(true)
-  statusNote                 String?
-  providerErrorCode          String?
-  providerErrorMessage       String?
-  providerTraceId            String?
-  rawRequestJson             Json?
-  rawResponseJson            Json?
-  sentAt                     DateTime?
-  processedAt                DateTime?
-  completedAt                DateTime?
-  createdAt                  DateTime                    @default(now())
-  updatedAt                  DateTime                    @updatedAt
-  recipients                 MessagingCampaignRecipient[]
-  messages                   MessagingMessageLog[]
+  id                        String                       @id @default(cuid())
+  provider                  String                       @default("ZIETT")
+  providerCampaignId        String?
+  name                      String
+  content                   String
+  channelType               String                       @default("SMS")
+  remitterId                String
+  countryAlpha2             String                       @default("AO")
+  requestedRecipientsCount  Int                          @default(0)
+  acceptedRecipientsCount   Int                          @default(0)
+  invalidRecipientsCount    Int                          @default(0)
+  duplicateRecipientsCount  Int                          @default(0)
+  optedOutRecipientsCount   Int                          @default(0)
+  notAllowedRecipientsCount Int                          @default(0)
+  status                    String                       @default("pending")
+  providerStatus            String?
+  triggerSource             String                       @default("SUPERADMIN_PANEL")
+  createdByUserId           Int
+  createdByEmail            String
+  accountOwnerId            Int?
+  workspaceMode             String?
+  isTest                    Boolean                      @default(true)
+  statusNote                String?
+  providerErrorCode         String?
+  providerErrorMessage      String?
+  providerTraceId           String?
+  rawRequestJson            Json?
+  rawResponseJson           Json?
+  sentAt                    DateTime?
+  processedAt               DateTime?
+  completedAt               DateTime?
+  createdAt                 DateTime                     @default(now())
+  updatedAt                 DateTime                     @updatedAt
+  recipients                MessagingCampaignRecipient[]
+  messages                  MessagingMessageLog[]
 
   @@index([createdAt])
   @@index([status, createdAt])
@@ -882,8 +896,8 @@ model MessagingCampaignRecipient {
 }
 
 model MessagingMessageLog {
-  id                   String                     @id @default(cuid())
-  provider             String                     @default("ZIETT")
+  id                   String                      @id @default(cuid())
+  provider             String                      @default("ZIETT")
   providerMessageId    String?
   campaignId           String?
   campaignRecipientId  String?
@@ -891,25 +905,25 @@ model MessagingMessageLog {
   phoneOriginal        String
   phoneNormalized      String
   contactId            Int?
-  channelType          String                     @default("SMS")
+  channelType          String                      @default("SMS")
   remitterId           String
-  status               String                     @default("pending")
+  status               String                      @default("pending")
   providerStatus       String?
   channelDestination   String?
   cost                 Float?
-  triggerSource        String                     @default("SUPERADMIN_PANEL")
+  triggerSource        String                      @default("SUPERADMIN_PANEL")
   createdByUserId      Int
   createdByEmail       String
-  isTest               Boolean                    @default(true)
+  isTest               Boolean                     @default(true)
   providerErrorCode    String?
   providerErrorMessage String?
   providerTraceId      String?
   rawRequestJson       Json?
   rawResponseJson      Json?
-  createdAt            DateTime                   @default(now())
-  updatedAt            DateTime                   @updatedAt
-  campaign             MessagingCampaign?         @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  campaignRecipient    MessagingCampaignRecipient? @relation(fields: [campaignRecipientId], references: [id], onDelete: SetNull)
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  campaign             MessagingCampaign?          @relation(fields: [campaignId], references: [id])
+  campaignRecipient    MessagingCampaignRecipient? @relation(fields: [campaignRecipientId], references: [id])
 
   @@index([createdAt])
   @@index([status, createdAt])

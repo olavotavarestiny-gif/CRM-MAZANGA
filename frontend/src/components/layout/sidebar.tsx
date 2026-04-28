@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BarChart3, Users, MessageSquare, Zap, Kanban,
   CheckSquare, FileText, LogOut, X, DollarSign, CalendarDays,
@@ -12,9 +12,10 @@ import {
 } from 'lucide-react';
 import { isComercio } from '@/lib/business-modes';
 import KukuGestLogo from '@/components/KukuGestLogo';
+import TrialStatusBadge from '@/components/billing/trial-status-badge';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
-import { getChatUnreadCount, getOnboarding } from '@/lib/api';
+import { getChatUnreadCount, getOnboarding, reopenOnboarding } from '@/lib/api';
 import { canAccessCommerceRoute, canView, canViewReports } from '@/lib/permissions';
 import type { ModuleKey } from '@/lib/permissions';
 import { buildWhatsAppSupportLink, getPlanBadgeClasses, getPricingTierLabel } from '@/lib/plan-utils';
@@ -37,6 +38,7 @@ export default function Sidebar({
   onStartTour?: () => void;
 }) {
   const pathname = usePathname();
+  const queryClient = useQueryClient();
   const [gestaoInternaOpen, setGestaoInternaOpen] = useState(true);
 
   const isActive = (path: string) => {
@@ -71,6 +73,13 @@ export default function Sidebar({
     staleTime: 60_000,
     refetchInterval: 60_000,
     enabled: isOnboardingEligible,
+  });
+  const reopenOnboardingMutation = useMutation({
+    mutationFn: reopenOnboarding,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['onboarding'] });
+      onClose();
+    },
   });
   const showOnboardingBadge =
     isOnboardingEligible &&
@@ -316,6 +325,7 @@ export default function Sidebar({
             <div className={`mt-2 inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getPlanBadgeClasses(currentUser.plan)}`}>
               {getPricingTierLabel(currentUser.plan)}
             </div>
+            <TrialStatusBadge subscription={currentUser.subscription} className="mt-2" />
           </div>
         )}
         {showOnboardingBadge && (
@@ -356,6 +366,19 @@ export default function Sidebar({
           <HelpCircle className="w-[18px] h-[18px] flex-shrink-0" />
           <span>Ajuda</span>
         </a>
+        {isOnboardingEligible && (
+          <Link
+            href="/"
+            onClick={() => {
+              reopenOnboardingMutation.mutate();
+              onClose();
+            }}
+            className={navItemClass(false)}
+          >
+            <CheckSquare className="w-[18px] h-[18px] flex-shrink-0" />
+            <span>Guia inicial</span>
+          </Link>
+        )}
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2 text-[#6b7e9a] hover:text-[#b31b25] hover:bg-[#b31b25]/5 transition-all text-left text-sm font-medium rounded-xl"

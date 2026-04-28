@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { isPast, isSameDay, parseISO } from 'date-fns';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   Banknote,
@@ -12,7 +12,7 @@ import {
   Settings2,
   Workflow,
 } from 'lucide-react';
-import { dismissDailyTip, getContacts, getCurrentUser, getDailyTip, getFinanceDashboard, getTasks } from '@/lib/api';
+import { getContacts, getCurrentUser, getFinanceDashboard, getTasks } from '@/lib/api';
 import { isComercio } from '@/lib/business-modes';
 import type { Contact, DashboardStats, Task } from '@/lib/types';
 import PainelComercialPage from '@/components/comercial/painel-comercial';
@@ -23,9 +23,10 @@ import StatWidget from '@/components/dashboard/stat-widget';
 import TasksWidget from '@/components/dashboard/tasks-widget';
 import { SOURCE_UNITS, type DashboardWidget, type WidgetSource } from '@/components/dashboard/types';
 import { useDashboardConfig } from '@/components/dashboard/use-dashboard-config';
-import DailyTipCard from '@/components/dashboard/daily-tip-card';
 import WidgetWrapper from '@/components/dashboard/widget-wrapper';
 import OnboardingChecklist from '@/components/onboarding/onboarding-checklist';
+import StartupModelSelector from '@/components/onboarding/startup-model-selector';
+import { BillingAccessBanner } from '@/components/billing/access-notice';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
@@ -190,31 +191,8 @@ function FinanceMetricWidget({ widget }: { widget: DashboardWidget }) {
 
 function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof getCurrentUser>> | undefined }) {
   const [customizerOpen, setCustomizerOpen] = useState(false);
-  const queryClient = useQueryClient();
   const dashboardScope = currentUser?.id ?? 'demo-user';
   const { widgets, loaded } = useDashboardConfig(dashboardScope);
-
-  const { data: dailyTip } = useQuery({
-    queryKey: ['daily-tip', currentUser?.id, currentUser?.workspaceMode],
-    queryFn: getDailyTip,
-    staleTime: 1000 * 60 * 60,
-    retry: false,
-    enabled: !!currentUser,
-  });
-  const dismissDailyTipMutation = useMutation({
-    mutationFn: dismissDailyTip,
-    onSuccess: () => {
-      queryClient.setQueryData(['daily-tip', currentUser?.id, currentUser?.workspaceMode], (old: any) =>
-        old
-          ? {
-              ...old,
-              visibleInDashboard: false,
-              dismissedAt: new Date().toISOString(),
-            }
-          : old
-      );
-    },
-  });
 
   const {
     data: contacts = [],
@@ -291,6 +269,8 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
         </Button>
       </div>
 
+      <BillingAccessBanner subscription={currentUser?.subscription} />
+      <StartupModelSelector currentUser={currentUser} />
       <OnboardingChecklist currentUser={currentUser} />
 
       {(contactsError || tasksError) && (
@@ -358,16 +338,6 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
               </WidgetWrapper>
             );
           })}
-        </div>
-      )}
-
-      {dailyTip?.tip && dailyTip.visibleInDashboard !== false && (
-        <div className="mb-6 max-w-2xl">
-          <DailyTipCard
-            dailyTip={dailyTip}
-            onDismiss={() => dismissDailyTipMutation.mutate()}
-            dismissing={dismissDailyTipMutation.isPending}
-          />
         </div>
       )}
 
