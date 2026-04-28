@@ -2,6 +2,7 @@ const prisma = require('../lib/prisma');
 const whatsapp = require('../lib/whatsapp');
 const email = require('../lib/email');
 const { resolveStageName } = require('../lib/pipeline-stages');
+const WON_STAGE = 'Fechado';
 const { logExecution } = require('./automation-logger.service');
 
 function interpolate(template, contact) {
@@ -200,16 +201,24 @@ async function executeAutomationAction(automation, contact, context) {
     }
 
     const resolvedStage = await resolveStageName(contact.userId || context.userId, automation.targetStage);
+    const updatePayload = {
+      stage: resolvedStage,
+      inPipeline: true,
+    };
+    if (resolvedStage === WON_STAGE) {
+      updatePayload.contactType = 'cliente';
+    }
+
     await prisma.contact.update({
       where: { id: contact.id },
-      data: {
-        stage: resolvedStage,
-        inPipeline: true,
-      },
+      data: updatePayload,
     });
 
     contact.stage = resolvedStage;
     contact.inPipeline = true;
+    if (resolvedStage === WON_STAGE) {
+      contact.contactType = 'cliente';
+    }
     console.log(`Automation executed: ${automation.trigger} -> update_stage to ${resolvedStage}`);
     return;
   }

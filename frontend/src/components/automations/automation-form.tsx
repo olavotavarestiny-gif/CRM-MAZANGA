@@ -160,6 +160,39 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
     return true;
   };
 
+  const getValidationMessage = () => {
+    if (['contact_tag', 'contact_revenue', 'contact_sector', 'stage_changed', 'contact_inactivity'].includes(formData.trigger) && !formData.triggerValue) {
+      return 'Preencha a condição do evento para continuar.';
+    }
+
+    if (formData.action === 'update_stage' && !formData.targetStage) {
+      return 'Selecione a etapa de destino.';
+    }
+
+    if ((formData.action === 'create_task' || formData.action === 'create_alert') && !formData.taskTitle.trim()) {
+      return formData.action === 'create_alert'
+        ? 'Informe o título do alerta.'
+        : 'Informe o título da tarefa.';
+    }
+
+    if (formData.action === 'create_task' && !formData.taskAssignedToUserId) {
+      return 'Selecione um responsável para a tarefa.';
+    }
+
+    if (formData.action === 'create_task' && formData.taskDueDays !== '' && Number.isNaN(Number(formData.taskDueDays))) {
+      return 'O prazo em dias precisa ser um número válido.';
+    }
+
+    if (formData.action === 'create_task' && formData.taskDueDays !== '' && Number(formData.taskDueDays) < 0) {
+      return 'O prazo em dias não pode ser negativo.';
+    }
+
+    return null;
+  };
+
+  const validationMessage = getValidationMessage();
+  const canSubmit = !mutation.isPending && !validationMessage;
+
   const handleTriggerChange = (value: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -221,7 +254,14 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
   };
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!canSubmit) return;
+        mutation.mutate();
+      }}
+      className="space-y-4"
+    >
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Button type="button" variant="outline" onClick={() => applyPreset('new_lead')}>Novo lead</Button>
         <Button type="button" variant="outline" onClick={() => applyPreset('proposal')}>Proposta enviada</Button>
@@ -230,7 +270,7 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
       </div>
 
       <div>
-        <Label htmlFor="trigger">Trigger (Evento)</Label>
+        <Label htmlFor="trigger">Evento</Label>
         <Select value={formData.trigger} onValueChange={handleTriggerChange}>
           <SelectTrigger>
             <SelectValue />
@@ -450,11 +490,21 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
         </>
       )}
 
-      <Button type="submit" disabled={mutation.isPending || !isValidForm()} className="w-full">
+      {validationMessage ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {validationMessage}
+        </div>
+      ) : null}
+
+      <Button type="submit" disabled={!canSubmit} className="w-full">
         {mutation.isPending ? 'Guardando...' : 'Guardar'}
       </Button>
 
-      {mutation.isError && <p className="text-red-600 text-sm">Erro ao criar automação</p>}
+      {mutation.isError && (
+        <p className="text-sm text-red-600">
+          {(mutation.error as Error)?.message || 'Erro ao criar automação'}
+        </p>
+      )}
     </form>
   );
 }

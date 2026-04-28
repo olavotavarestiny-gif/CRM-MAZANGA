@@ -57,22 +57,34 @@ function summarizeClientsByTransactions(transactions) {
   });
 }
 
+function isWonContact(contact) {
+  return contact.stage === WON_STAGE || contact.contactType === 'cliente';
+}
+
+function isLostContact(contact) {
+  return contact.stage === LOST_STAGE;
+}
+
 function buildStageMetrics(contacts, stages) {
   const stageOrder = new Map(stages.map((stage, index) => [stage.name, index]));
   const totalContacts = contacts.length;
   const totalValue = contacts.reduce((sum, contact) => sum + estimateContactValue(contact), 0);
 
   const byStage = stages.map((stage, index) => {
-    const currentContacts = contacts.filter((contact) => contact.stage === stage.name);
+    const currentContacts = contacts.filter((contact) => {
+      if (stage.name === WON_STAGE) return isWonContact(contact);
+      if (stage.name === LOST_STAGE) return isLostContact(contact);
+      return contact.stage === stage.name;
+    });
     const reachedCount = contacts.filter((contact) => {
-      if (stage.name === WON_STAGE) return contact.stage === WON_STAGE;
-      if (stage.name === LOST_STAGE) return contact.stage === LOST_STAGE;
+      if (stage.name === WON_STAGE) return isWonContact(contact);
+      if (stage.name === LOST_STAGE) return isLostContact(contact);
       const currentIndex = stageOrder.get(contact.stage);
       if (currentIndex === undefined) return false;
       return currentIndex >= index;
     }).length;
     const wonAfterReaching = contacts.filter((contact) => {
-      if (contact.stage !== WON_STAGE) return false;
+      if (!isWonContact(contact)) return false;
       if (stage.name === WON_STAGE) return true;
       const wonIndex = stageOrder.get(contact.stage);
       return wonIndex !== undefined && wonIndex >= index;
@@ -124,13 +136,13 @@ async function getServicesAdvancedOverview({ organizationId, period, startDate, 
       where: {
         userId: organizationId,
         inPipeline: true,
-        stage: { notIn: [WON_STAGE, LOST_STAGE] },
       },
       select: {
         id: true,
         dealValueKz: true,
         revenue: true,
         stage: true,
+        contactType: true,
       },
     }),
     prisma.transaction.aggregate({
@@ -218,7 +230,8 @@ async function getServicesAdvancedOverview({ organizationId, period, startDate, 
   const receivedPrevious = Number(receivedPreviousAgg._sum.amountKz || 0);
   const issuedCurrent = currentInvoices.reduce((sum, invoice) => sum + Number(invoice.grossTotal || 0), 0);
   const issuedPrevious = previousInvoices.reduce((sum, invoice) => sum + Number(invoice.grossTotal || 0), 0);
-  const negotiationValue = pipelineContacts.reduce((sum, contact) => sum + estimateContactValue(contact), 0);
+  const activePipelineContacts = pipelineContacts.filter((contact) => !isWonContact(contact) && !isLostContact(contact));
+  const negotiationValue = activePipelineContacts.reduce((sum, contact) => sum + estimateContactValue(contact), 0);
   const topClients = limitTop(
     summarizeClientsByTransactions(revenueTransactionsCurrent)
       .sort((a, b) => b.revenue - a.revenue)
@@ -237,7 +250,7 @@ async function getServicesAdvancedOverview({ organizationId, period, startDate, 
       contactsAdded: contactsAddedCurrent,
       contactsAddedPrevious,
       contactsAddedGrowthPercent: calculateGrowth(contactsAddedCurrent, contactsAddedPrevious),
-      activePipelineContacts: pipelineContacts.length,
+      activePipelineContacts: activePipelineContacts.length,
       wonDeals: wonDealsCurrent,
       lostDeals: lostDealsCurrent,
       negotiationValue: roundCurrency(negotiationValue),
@@ -268,6 +281,7 @@ async function getServicesAdvancedPipeline({ organizationId, period, startDate, 
         id: true,
         stage: true,
         inPipeline: true,
+        contactType: true,
         dealValueKz: true,
         revenue: true,
         createdAt: true,
@@ -282,6 +296,7 @@ async function getServicesAdvancedPipeline({ organizationId, period, startDate, 
         id: true,
         stage: true,
         inPipeline: true,
+        contactType: true,
         dealValueKz: true,
         revenue: true,
         createdAt: true,
@@ -326,13 +341,24 @@ async function getServicesAdvancedPipeline({ organizationId, period, startDate, 
     ...previousContacts.map((contact) => [String(contact.id), contact.createdAt]),
   ]);
 
+  const currentWonWithoutLogCount = currentContacts.filter((contact) =>
+    isWonContact(contact) &&
+    !currentWonLogs.some((log) => String(log.entity_id) === String(contact.id))
+  ).length;
+  const previousWonWithoutLogCount = previousContacts.filter((contact) =>
+    isWonContact(contact) &&
+    !previousWonLogs.some((log) => String(log.entity_id) === String(contact.id))
+  ).length;
+  const currentWonDeals = currentMetrics.byStage.find((stage) => stage.stage === WON_STAGE)?.count || 0;
+  const previousWonDeals = previousMetrics.byStage.find((stage) => stage.stage === WON_STAGE)?.count || 0;
+
   const currentAverageCloseDays = calculateAverage(
     currentWonLogs.reduce((sum, log) => {
       const createdAt = createdAtMap.get(String(log.entity_id));
       if (!createdAt) return sum;
       return sum + ((new Date(log.created_at).getTime() - new Date(createdAt).getTime()) / (24 * 60 * 60 * 1000));
     }, 0),
-    currentWonLogs.filter((log) => createdAtMap.has(String(log.entity_id))).length
+    currentWonLogs.filter((log) => createdAtMap.has(String(log.entity_id))).length + currentWonWithoutLogCount
   );
 
   const previousAverageCloseDays = calculateAverage(
@@ -341,7 +367,7 @@ async function getServicesAdvancedPipeline({ organizationId, period, startDate, 
       if (!createdAt) return sum;
       return sum + ((new Date(log.created_at).getTime() - new Date(createdAt).getTime()) / (24 * 60 * 60 * 1000));
     }, 0),
-    previousWonLogs.filter((log) => createdAtMap.has(String(log.entity_id))).length
+    previousWonLogs.filter((log) => createdAtMap.has(String(log.entity_id))).length + previousWonWithoutLogCount
   );
 
   const stageComparisons = currentMetrics.byStage.map((stage) => {
@@ -373,14 +399,14 @@ async function getServicesAdvancedPipeline({ organizationId, period, startDate, 
       totalValue: currentMetrics.totalValue,
       previousTotalValue: previousMetrics.totalValue,
       totalConversionRate: calculatePercentage(
-        currentStageMap.get(WON_STAGE)?.count || 0,
+        currentWonDeals,
         currentMetrics.totalContacts
       ),
       previousConversionRate: calculatePercentage(
-        previousStageMap.get(WON_STAGE)?.count || 0,
+        previousWonDeals,
         previousMetrics.totalContacts
       ),
-      wonDeals: currentStageMap.get(WON_STAGE)?.count || 0,
+      wonDeals: currentWonDeals,
       lostDeals: currentStageMap.get(LOST_STAGE)?.count || 0,
       averageCloseDays: roundCurrency(currentAverageCloseDays),
       previousAverageCloseDays: roundCurrency(previousAverageCloseDays),
@@ -394,8 +420,8 @@ async function getServicesAdvancedPipeline({ organizationId, period, startDate, 
     },
     byStage: stageComparisons,
     stageTime: {
-      available: false,
-      reason: 'O tempo por etapa ainda não é confiável com os dados actuais, porque o sistema não guarda histórico detalhado de permanência em cada etapa.',
+      available: true,
+      reason: null,
     },
   };
 }

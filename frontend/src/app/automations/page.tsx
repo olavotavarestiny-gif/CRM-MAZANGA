@@ -194,7 +194,13 @@ export default function AutomationsPage() {
 
         <div className="flex items-center gap-3">
           <Button onClick={() => setIsFormOpen(true)}>Nova Automação</Button>
-          <Modal open={isFormOpen} onClose={() => setIsFormOpen(false)} title="Nova Automação">
+          <Modal
+            open={isFormOpen}
+            onClose={() => setIsFormOpen(false)}
+            title="Nova Automação"
+            size="lg"
+            scrollable
+          >
             <AutomationForm
               onSuccess={() => {
                 setIsFormOpen(false);

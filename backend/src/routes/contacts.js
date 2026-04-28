@@ -10,6 +10,7 @@ const { cleanNifValue, parseCustomFields, resolveContactNif, stripNifKeysFromCus
 const { getDefaultStageName, isValidStageName } = require('../lib/pipeline-stages');
 const VALID_FIELD_TYPES = ['text', 'number', 'date', 'select', 'url'];
 const UNGROUPED_GROUP_ID = 'UNGROUPED';
+const WON_STAGE = 'Fechado';
 
 function parseTags(value) {
   if (Array.isArray(value)) return value.filter(Boolean);
@@ -393,6 +394,31 @@ async function getValidatedStageName(userId, requestedStage) {
   return getDefaultStageName(userId);
 }
 
+function normalizeServiceClosureState({ workspaceMode, stage, contactType, inPipeline }) {
+  if (workspaceMode === 'comercio') {
+    return {
+      stage,
+      contactType: 'cliente',
+      inPipeline: false,
+    };
+  }
+
+  const isWon = stage === WON_STAGE || contactType === 'cliente';
+  if (isWon) {
+    return {
+      stage: WON_STAGE,
+      contactType: 'cliente',
+      inPipeline: true,
+    };
+  }
+
+  return {
+    stage,
+    contactType: ['interessado', 'cliente'].includes(contactType) ? contactType : 'interessado',
+    inPipeline: typeof inPipeline === 'boolean' ? inPipeline : true,
+  };
+}
+
 router.get('/groups', requirePermission('contacts', 'view'), async (req, res) => {
   try {
     const groups = await prisma.contactGroup.findMany({
@@ -623,15 +649,14 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
     }
 
     const workspaceMode = await getWorkspaceModeForUser(userId);
-    const finalStage = await getValidatedStageName(userId, stage);
-    const finalInPipeline = workspaceMode === 'comercio' ? false : true;
+    const requestedStage = await getValidatedStageName(userId, stage);
     const finalClienteType = normaliseClienteType(clienteType);
-    const finalContactType =
-      workspaceMode === 'comercio'
-        ? 'cliente'
-        : ['interessado', 'cliente'].includes(contactType)
-        ? contactType
-        : 'interessado';
+    const normalizedClosure = normalizeServiceClosureState({
+      workspaceMode,
+      stage: requestedStage,
+      contactType,
+      inPipeline: workspaceMode === 'comercio' ? false : true,
+    });
     const cleanedCustomFields =
       customFields && typeof customFields === 'object'
         ? stripNifKeysFromCustomFields(customFields)
@@ -663,10 +688,10 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
         revenue: revenue || null,
         sector: sector || null,
         tags: Array.isArray(tags) ? JSON.stringify(tags) : '[]',
-        stage: finalStage,
-        inPipeline: finalInPipeline,
+        stage: normalizedClosure.stage,
+        inPipeline: normalizedClosure.inPipeline,
         customFields: JSON.stringify(cleanedCustomFields),
-        contactType: finalContactType,
+        contactType: normalizedClosure.contactType,
         status: ['ativo', 'inativo'].includes(status) ? status : 'ativo',
         clienteType: finalClienteType,
         lastActivityAt: new Date(),
@@ -1097,6 +1122,22 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
           if (Array.isArray(parsed)) updateData.documents = documents;
         } catch {}
       }
+    }
+
+    const normalizedClosure = normalizeServiceClosureState({
+      workspaceMode,
+      stage: updateData.stage ?? existing.stage,
+      contactType: updateData.contactType ?? existing.contactType,
+      inPipeline: updateData.inPipeline ?? existing.inPipeline,
+    });
+    if (normalizedClosure.stage !== existing.stage || updateData.stage !== undefined) {
+      updateData.stage = normalizedClosure.stage;
+    }
+    if (normalizedClosure.contactType !== existing.contactType || updateData.contactType !== undefined) {
+      updateData.contactType = normalizedClosure.contactType;
+    }
+    if (normalizedClosure.inPipeline !== existing.inPipeline || updateData.inPipeline !== undefined) {
+      updateData.inPipeline = normalizedClosure.inPipeline;
     }
 
     if (Object.keys(updateData).length > 0) {

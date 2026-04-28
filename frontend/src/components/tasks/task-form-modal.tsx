@@ -216,7 +216,7 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md bg-white text-[#2c2f31]">
+      <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto bg-white text-[#2c2f31]">
         <DialogHeader>
           <DialogTitle className="text-[#2c2f31]">
             {isEdit ? 'Editar Tarefa' : 'Nova Tarefa'}

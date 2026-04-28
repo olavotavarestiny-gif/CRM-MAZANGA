@@ -94,6 +94,19 @@ function contactValue(contact, averageDealValue = 0) {
   return averageDealValue;
 }
 
+function isWonContact(contact) {
+  return contact.stage === WON_STAGE || contact.contactType === 'cliente';
+}
+
+function isLostContact(contact) {
+  return contact.stage === LOST_STAGE;
+}
+
+function getStageStartDate(contact, latestStageLogByContact) {
+  const latestLog = latestStageLogByContact.get(String(contact.id));
+  return latestLog?.created_at || contact.createdAt || contact.updatedAt || null;
+}
+
 function uniqueOptions(values) {
   const seen = new Set();
   const options = [];
@@ -211,6 +224,7 @@ async function getDashboardContext(userId, currentUser, filters) {
       phone: true,
       stage: true,
       inPipeline: true,
+      contactType: true,
       dealValueKz: true,
       customFields: true,
       createdAt: true,
@@ -302,26 +316,48 @@ async function buildPipelineKpis(userId, range, revenue, contacts) {
 
   const scopedWonLogs = wonLogs.filter((log) => contactIdSet.has(String(log.entity_id)));
   const scopedLostLogs = lostLogs.filter((log) => contactIdSet.has(String(log.entity_id)));
+  const wonLogIds = new Set(scopedWonLogs.map((log) => String(log.entity_id)));
+  const lostLogIds = new Set(scopedLostLogs.map((log) => String(log.entity_id)));
   const openContacts = contacts.filter((contact) =>
-    contact.inPipeline && ![WON_STAGE, LOST_STAGE].includes(contact.stage)
+    contact.inPipeline && !isWonContact(contact) && !isLostContact(contact)
   );
-  const wonCount = scopedWonLogs.length;
-  const lostCount = scopedLostLogs.length;
+  const wonCount = scopedWonLogs.length + contacts.filter((contact) =>
+    isWonContact(contact) &&
+    contact.createdAt >= range.start &&
+    contact.createdAt <= range.end &&
+    !wonLogIds.has(String(contact.id))
+  ).length;
+  const lostCount = scopedLostLogs.length + contacts.filter((contact) =>
+    isLostContact(contact) &&
+    contact.createdAt >= range.start &&
+    contact.createdAt <= range.end &&
+    !lostLogIds.has(String(contact.id))
+  ).length;
   const winRate = wonCount + lostCount > 0 ? wonCount / (wonCount + lostCount) : 0;
   const averageWonDealValue = contacts
-    .filter((contact) => contact.stage === WON_STAGE && Number(contact.dealValueKz || 0) > 0)
+    .filter((contact) => isWonContact(contact) && Number(contact.dealValueKz || 0) > 0)
     .reduce((acc, contact, _, arr) => acc + Number(contact.dealValueKz || 0) / arr.length, 0);
   const averageDealValue = averageWonDealValue || revenue.averagePaidTicket || 0;
   const pipelineOpenValue = openContacts.reduce((sum, contact) => sum + contactValue(contact, averageDealValue), 0);
 
   const contactsById = new Map(contacts.map((contact) => [String(contact.id), contact]));
-  const closeDurations = scopedWonLogs
+  const closeDurations = [
+    ...scopedWonLogs
     .map((log) => {
       const contact = contactsById.get(String(log.entity_id));
       if (!contact) return null;
       return (new Date(log.created_at).getTime() - new Date(contact.createdAt).getTime()) / DAY_MS;
     })
-    .filter((value) => value !== null && value >= 0);
+    .filter((value) => value !== null && value >= 0),
+    ...contacts
+      .filter((contact) =>
+        isWonContact(contact) &&
+        contact.createdAt >= range.start &&
+        contact.createdAt <= range.end &&
+        !wonLogIds.has(String(contact.id))
+      )
+      .map(() => 0),
+  ];
   const averageSalesCycleDays = closeDurations.length
     ? closeDurations.reduce((sum, value) => sum + value, 0) / closeDurations.length
     : 30;
@@ -379,20 +415,23 @@ async function buildPipelineHealth(userId, pipelineData, stages) {
 
   const stageOrder = new Map(stages.map((stage, index) => [stage.name, index]));
   const totalContacts = pipelineData.contacts.length;
-  const wonContacts = pipelineData.contacts.filter((contact) => contact.stage === WON_STAGE).length;
+  const wonContacts = pipelineData.contacts.filter((contact) => isWonContact(contact)).length;
   const pendingTaskContactIds = new Set(pendingTasks.map((task) => task.contactId).filter(Boolean));
 
   const byStage = stages.map((stage, index) => {
-    const contactsInStage = pipelineData.openContacts.filter((contact) => contact.stage === stage.name);
+    const contactsInStage = pipelineData.contacts.filter((contact) => {
+      if (stage.name === WON_STAGE) return isWonContact(contact);
+      if (stage.name === LOST_STAGE) return isLostContact(contact);
+      return contact.inPipeline && !isWonContact(contact) && !isLostContact(contact) && contact.stage === stage.name;
+    });
     const ages = contactsInStage.map((contact) => {
-      const log = latestStageLogByContact.get(String(contact.id));
-      return daysSince(log?.created_at || contact.updatedAt) || 0;
+      return daysSince(getStageStartDate(contact, latestStageLogByContact)) || 0;
     });
     const averageDays = ages.length ? ages.reduce((sum, value) => sum + value, 0) / ages.length : 0;
     const reachedCount = pipelineData.contacts.filter((contact) => {
       const currentIndex = stageOrder.get(contact.stage);
-      if (stage.name === WON_STAGE) return contact.stage === WON_STAGE;
-      if (stage.name === LOST_STAGE) return contact.stage === LOST_STAGE;
+      if (stage.name === WON_STAGE) return isWonContact(contact);
+      if (stage.name === LOST_STAGE) return isLostContact(contact);
       return currentIndex !== undefined && currentIndex >= index;
     }).length;
 
@@ -412,8 +451,7 @@ async function buildPipelineHealth(userId, pipelineData, stages) {
 
   const staleDeals = pipelineData.openContacts
     .map((contact) => {
-      const log = latestStageLogByContact.get(String(contact.id));
-      const daysInStage = daysSince(log?.created_at || contact.updatedAt) || 0;
+      const daysInStage = daysSince(getStageStartDate(contact, latestStageLogByContact)) || 0;
       return {
         id: contact.id,
         name: contact.name,
