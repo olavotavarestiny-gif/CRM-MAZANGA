@@ -26,6 +26,10 @@ function startOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
 }
 
+function endOfMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+
 function getRange(period) {
   const now = new Date();
   const end = now;
@@ -33,6 +37,15 @@ function getRange(period) {
   if (period === '30d') return { start: new Date(now.getTime() - 30 * DAY_MS), end, period };
   if (period === '90d') return { start: new Date(now.getTime() - 90 * DAY_MS), end, period };
   return { start: startOfMonth(now), end, period: 'month' };
+}
+
+function getMonthRange(date = new Date()) {
+  return {
+    start: startOfMonth(date),
+    end: date,
+    calendarEnd: endOfMonth(date),
+    period: 'month',
+  };
 }
 
 function toNumber(value) {
@@ -87,6 +100,48 @@ function canView(user, module, action = 'view') {
 
 function isPrivilegedUser(user) {
   return !!(user?.isSuperAdmin || user?.isAccountOwner || user?.role === 'admin');
+}
+
+async function getServicesDashboardSettings({ user }) {
+  const userId = user.effectiveUserId;
+  await assertServicesWorkspace(userId);
+  const settings = await prisma.serviceDashboardSettings.findUnique({
+    where: { userId },
+  });
+
+  return {
+    monthlyRevenueGoalKz: settings?.monthlyRevenueGoalKz ?? null,
+  };
+}
+
+async function updateServicesDashboardSettings({ user, data }) {
+  const userId = user.effectiveUserId;
+  await assertServicesWorkspace(userId);
+  if (!isPrivilegedUser(user)) {
+    const error = new Error('Sem permissão para alterar a meta mensal');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const rawGoal = data?.monthlyRevenueGoalKz;
+  const monthlyRevenueGoalKz = rawGoal === null || rawGoal === ''
+    ? null
+    : Number(rawGoal);
+  if (monthlyRevenueGoalKz !== null && (!Number.isFinite(monthlyRevenueGoalKz) || monthlyRevenueGoalKz < 0)) {
+    const error = new Error('Meta mensal inválida');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const settings = await prisma.serviceDashboardSettings.upsert({
+    where: { userId },
+    update: { monthlyRevenueGoalKz },
+    create: { userId, monthlyRevenueGoalKz },
+  });
+
+  return {
+    monthlyRevenueGoalKz: settings.monthlyRevenueGoalKz ?? null,
+  };
 }
 
 function contactValue(contact, averageDealValue = 0) {
@@ -284,6 +339,90 @@ async function buildRevenueKpis(userId, range, contactIds, contactFiltersActive)
     closedRevenue: toNumber(revenueAgg._sum.amountKz),
     paidRevenueCount: revenueAgg._count.id || 0,
     averagePaidTicket: toNumber(avgAgg._avg.amountKz),
+  };
+}
+
+function calculateMonthlyForecast(monthRevenue, monthRange) {
+  const now = monthRange.end;
+  const elapsedDays = Math.max(1, now.getDate());
+  const totalDays = monthRange.calendarEnd.getDate();
+  if (!monthRevenue || monthRevenue <= 0) return 0;
+  return round((monthRevenue / elapsedDays) * totalDays, 2);
+}
+
+function buildGoalSummary(settings, closedRevenue, monthlyForecastKz) {
+  const monthlyRevenueGoalKz = settings?.monthlyRevenueGoalKz ?? null;
+  if (!monthlyRevenueGoalKz || monthlyRevenueGoalKz <= 0) {
+    return {
+      monthlyRevenueGoalKz: null,
+      attainmentPercent: null,
+      gapKz: null,
+    };
+  }
+
+  return {
+    monthlyRevenueGoalKz: round(monthlyRevenueGoalKz, 2),
+    attainmentPercent: round((Number(closedRevenue || 0) / monthlyRevenueGoalKz) * 100, 1),
+    gapKz: round(Math.max(monthlyRevenueGoalKz - Number(monthlyForecastKz || 0), 0), 2),
+  };
+}
+
+function buildHealthScore(kpis, pipelineHealth, nextActions) {
+  if (!pipelineHealth) {
+    return {
+      score: 0,
+      status: 'risco',
+      reasons: ['Sem dados suficientes do funil'],
+    };
+  }
+
+  const staleCount = pipelineHealth.staleDeals.length;
+  const noFollowUpCount = pipelineHealth.leadsWithoutFollowUp.length;
+  const overdueCount = nextActions?.overdueTasks?.length || 0;
+  const winRate = Number(kpis?.winRate || 0);
+  const averageSalesCycleDays = Number(kpis?.averageSalesCycleDays || 0);
+
+  let score = 100;
+  score -= Math.min(staleCount * 8, 32);
+  score -= Math.min(noFollowUpCount * 5, 25);
+  score -= Math.min(overdueCount * 4, 20);
+  if (winRate > 0 && winRate < 20) score -= 12;
+  if (averageSalesCycleDays > 45) score -= 10;
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  const status = score >= 75 ? 'saudavel' : score >= 50 ? 'atencao' : 'risco';
+  const reasons = [];
+  if (staleCount > 0) reasons.push(`${staleCount} negócio(s) parado(s)`);
+  if (noFollowUpCount > 0) reasons.push(`${noFollowUpCount} potencial(is) cliente(s) sem acompanhamento`);
+  if (overdueCount > 0) reasons.push(`${overdueCount} tarefa(s) vencida(s)`);
+  if (!reasons.length) reasons.push('Funil sem bloqueios críticos');
+
+  return { score, status, reasons };
+}
+
+function buildHeadline({ monthlyForecastKz, goal, riskDealsCount }) {
+  const riskLabel = riskDealsCount === 1 ? '1 negócio em risco' : `${riskDealsCount} negócios em risco`;
+  const goalLabel = goal.attainmentPercent !== null
+    ? `${goal.attainmentPercent}% da meta`
+    : 'Meta mensal por definir';
+  return {
+    monthlyForecastKz,
+    riskDealsCount,
+    summary: `${goalLabel} · ${riskLabel}`,
+  };
+}
+
+function buildKpiContext(kpis, goal, nextActions) {
+  const openOpportunities = kpis?.openOpportunities ?? 0;
+  const wonCount = kpis?.wonCount ?? 0;
+  const winRate = kpis?.winRate ?? 0;
+  const overdueTasks = nextActions?.overdueTasks?.length || 0;
+
+  return {
+    pipelineOpenValue: `${openOpportunities} oportunidade(s) aberta(s)`,
+    averageSalesCycleDays: winRate > 0 ? `${winRate}% de taxa de ganho` : 'Sem ganhos suficientes no período',
+    averageDealValue: goal.attainmentPercent !== null ? `${goal.attainmentPercent}% da meta` : `${wonCount} negócio(s) ganho(s)`,
+    followUpsToday: overdueTasks > 0 ? `${overdueTasks} vencida(s)` : 'Sem vencidas',
   };
 }
 
@@ -581,6 +720,7 @@ async function getServicesDashboardBase({ user, query }) {
   await assertServicesWorkspace(userId);
   const filters = sanitizeFilters(query);
   const range = getRange(filters.period);
+  const monthRange = getMonthRange();
 
   const canSeePipeline = canView(user, 'pipeline');
   const canSeeTasks = canView(user, 'tasks');
@@ -589,19 +729,44 @@ async function getServicesDashboardBase({ user, query }) {
   const contactFiltersActive = !!(filters.stage || filters.leadOrigin || filters.segment);
   const scopedContactIds = contactFiltersActive ? context.contactIds : null;
 
-  const revenue = canSeeFinance
-    ? await buildRevenueKpis(userId, range, context.contactIds, contactFiltersActive)
+  const [settings, revenue, monthRevenue] = await Promise.all([
+    getServicesDashboardSettings({ user }),
+    canSeeFinance
+      ? buildRevenueKpis(userId, range, context.contactIds, contactFiltersActive)
+      : Promise.resolve({ closedRevenue: null, paidRevenueCount: 0, averagePaidTicket: 0 }),
+    canSeeFinance
+      ? buildRevenueKpis(userId, monthRange, context.contactIds, contactFiltersActive)
+      : Promise.resolve({ closedRevenue: null, paidRevenueCount: 0, averagePaidTicket: 0 }),
+  ]);
+  const normalizedRevenue = canSeeFinance
+    ? revenue
     : { closedRevenue: null, paidRevenueCount: 0, averagePaidTicket: 0 };
   const pipelineData = canSeePipeline
-    ? await buildPipelineKpis(userId, range, revenue, context.contacts)
+    ? await buildPipelineKpis(userId, range, normalizedRevenue, context.contacts)
     : null;
 
   const [pipelineHealth, nextActions] = await Promise.all([
     pipelineData ? buildPipelineHealth(userId, pipelineData, context.stages) : Promise.resolve(null),
     canSeeTasks ? buildNextActions(userId, user, filters, scopedContactIds) : Promise.resolve(null),
   ]);
+  const kpis = pipelineData?.kpis || {
+    pipelineOpenValue: null,
+    winRate: null,
+    averageDealValue: null,
+    averageSalesCycleDays: null,
+    pipelineVelocity: null,
+    openOpportunities: null,
+    wonCount: null,
+    lostCount: null,
+  };
+  const monthlyForecastKz = canSeeFinance ? calculateMonthlyForecast(monthRevenue.closedRevenue, monthRange) : null;
+  const goal = buildGoalSummary(settings, monthRevenue.closedRevenue, monthlyForecastKz);
+  const riskDealsCount = pipelineHealth?.staleDeals?.length || 0;
+  const headline = buildHeadline({ monthlyForecastKz, goal, riskDealsCount });
+  const healthScore = buildHealthScore(kpis, pipelineHealth, nextActions);
 
   return {
+    generatedAt: new Date().toISOString(),
     range: {
       period: range.period,
       start: range.start.toISOString(),
@@ -620,18 +785,13 @@ async function getServicesDashboardBase({ user, query }) {
       segment: filters.segment,
     },
     filters: buildFilterOptions(context),
+    goal,
+    headline,
+    healthScore,
+    kpiContext: buildKpiContext(kpis, goal, nextActions),
     kpis: {
-      closedRevenue: revenue.closedRevenue,
-      ...(pipelineData?.kpis || {
-        pipelineOpenValue: null,
-        winRate: null,
-        averageDealValue: null,
-        averageSalesCycleDays: null,
-        pipelineVelocity: null,
-        openOpportunities: null,
-        wonCount: null,
-        lostCount: null,
-      }),
+      closedRevenue: normalizedRevenue.closedRevenue,
+      ...kpis,
     },
     pipelineHealth,
     nextActions,
@@ -640,4 +800,6 @@ async function getServicesDashboardBase({ user, query }) {
 
 module.exports = {
   getServicesDashboardBase,
+  getServicesDashboardSettings,
+  updateServicesDashboardSettings,
 };

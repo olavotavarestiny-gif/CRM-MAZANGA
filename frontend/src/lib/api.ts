@@ -57,6 +57,7 @@ import type {
   ServicesAdvancedRevenueResponse,
   ServicesAdvancedTeamResponse,
   ServicesDashboardBase,
+  ServicesDashboardSettings,
   StockMovement,
   SystemFieldKey,
   Task,
@@ -614,6 +615,16 @@ export async function getServicesDashboardBase(params?: {
   segment?: string | null;
 }) {
   const response = await api.get<ServicesDashboardBase>('/api/dashboard/servicos/base', { params });
+  return response.data;
+}
+
+export async function getServicesDashboardSettings() {
+  const response = await api.get<ServicesDashboardSettings>('/api/dashboard/servicos/settings');
+  return response.data;
+}
+
+export async function updateServicesDashboardSettings(data: ServicesDashboardSettings) {
+  const response = await api.patch<ServicesDashboardSettings>('/api/dashboard/servicos/settings', data);
   return response.data;
 }
 

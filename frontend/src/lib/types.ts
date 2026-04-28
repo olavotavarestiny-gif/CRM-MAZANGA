@@ -555,6 +555,7 @@ export interface LocalCalendarEvent {
 }
 
 export interface ServicesDashboardBase {
+  generatedAt: string;
   range: { period: string; start: string; end: string };
   permissions: { revenue: boolean; pipeline: boolean; tasks: boolean };
   activeFilters: {
@@ -582,6 +583,27 @@ export interface ServicesDashboardBase {
     wonCount: number | null;
     lostCount: number | null;
   };
+  goal: {
+    monthlyRevenueGoalKz: number | null;
+    attainmentPercent: number | null;
+    gapKz: number | null;
+  };
+  headline: {
+    monthlyForecastKz: number | null;
+    riskDealsCount: number;
+    summary: string;
+  };
+  healthScore: {
+    score: number;
+    status: 'saudavel' | 'atencao' | 'risco';
+    reasons: string[];
+  };
+  kpiContext: {
+    pipelineOpenValue: string;
+    averageSalesCycleDays: string;
+    averageDealValue: string;
+    followUpsToday: string;
+  };
   pipelineHealth: {
     byStage: Array<{
       stage: string;
@@ -601,6 +623,10 @@ export interface ServicesDashboardBase {
     birthdaysToday: Array<{ id: number; name: string; company: string; birthDate: string }>;
     alerts: Array<{ id: string; title: string; message?: string | null; type: string; createdAt: string; contact?: { id: number; name: string; company: string } | null }>;
   } | null;
+}
+
+export interface ServicesDashboardSettings {
+  monthlyRevenueGoalKz: number | null;
 }
 // Finance types
 export type TransactionType = 'entrada' | 'saida';
