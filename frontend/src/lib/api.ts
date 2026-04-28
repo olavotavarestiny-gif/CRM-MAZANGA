@@ -606,7 +606,13 @@ export async function createFormContactField(data: {
   return response.data as FormContactFieldsResponse['custom'][number];
 }
 
-export async function getServicesDashboardBase(params?: { period?: 'month' | '7d' | '30d' | '90d' }) {
+export async function getServicesDashboardBase(params?: {
+  period?: 'month' | '7d' | '30d' | '90d';
+  responsibleUserId?: string | null;
+  stage?: string | null;
+  leadOrigin?: string | null;
+  segment?: string | null;
+}) {
   const response = await api.get<ServicesDashboardBase>('/api/dashboard/servicos/base', { params });
   return response.data;
 }

@@ -557,6 +557,20 @@ export interface LocalCalendarEvent {
 export interface ServicesDashboardBase {
   range: { period: string; start: string; end: string };
   permissions: { revenue: boolean; pipeline: boolean; tasks: boolean };
+  activeFilters: {
+    period: string;
+    responsibleUserId: string | null;
+    stage: string | null;
+    leadOrigin: string | null;
+    segment: string | null;
+  };
+  filters: {
+    periods: Array<{ value: string; label: string }>;
+    responsibleUsers: Array<{ value: string; label: string }>;
+    stages: Array<{ value: string; label: string; color?: string }>;
+    leadOrigins: Array<{ value: string; label: string }>;
+    segments: Array<{ value: string; label: string }>;
+  };
   kpis: {
     closedRevenue: number | null;
     pipelineOpenValue: number | null;
