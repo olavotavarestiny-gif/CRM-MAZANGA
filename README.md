@@ -126,10 +126,11 @@ npm run start
 
 ## Documentação mantida
 
-- [DATABASE_SETUP.md](/Users/mazangangunza/Desktop/mazanga-crm/DATABASE_SETUP.md): como configurar PostgreSQL no projeto
-- [DEPLOYMENT.md](/Users/mazangangunza/Desktop/mazanga-crm/DEPLOYMENT.md): deploy de backend e frontend
-- [kuku.md](/Users/mazangangunza/Desktop/mazanga-crm/kuku.md): visão funcional do sistema
-- [agt.md](/Users/mazangangunza/Desktop/mazanga-crm/agt.md): estado e requisitos do módulo AGT
+- [DEVELOPER_EVALUATION.md](./DEVELOPER_EVALUATION.md): briefing técnico para um programador avaliar rapidamente o projecto
+- [DATABASE_SETUP.md](./DATABASE_SETUP.md): como configurar PostgreSQL no projeto
+- [DEPLOYMENT.md](./DEPLOYMENT.md): deploy de backend e frontend
+- [kuku.md](./kuku.md): visão funcional do sistema
+- [agt.md](./agt.md): estado e requisitos do módulo AGT
 
 ## Notas de manutenção
 
