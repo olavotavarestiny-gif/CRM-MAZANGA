@@ -23,9 +23,10 @@ Auth    -> Supabase
 - Root directory: `backend`
 - Runtime: `Node`
 - Build command: `npm install && npm run build`
-- Start command: `npm start`
+- Start command: `node src/index.js`
 
-`npm run build` no backend já executa `prisma generate` e `prisma db push`.
+`npm run build` no backend deve executar apenas `prisma generate`.
+Não usar `prisma db push` no build nem no start command de produção.
 
 ### Variáveis obrigatórias
 
@@ -64,6 +65,7 @@ O projeto já tem `vercel.json` preparado para construir a app dentro de `fronte
 | Variável | Obrigatória | Observação |
 |----------|-------------|------------|
 | `NEXT_PUBLIC_API_URL` | sim | URL pública do backend |
+| `NEXT_PUBLIC_APP_URL` | sim | origem pública do frontend, por exemplo `https://app.kukugest.ao` |
 | `NEXT_PUBLIC_SUPABASE_URL` | sim | URL pública do Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | sim | anon key do Supabase |
 
@@ -87,10 +89,12 @@ O projeto já tem `vercel.json` preparado para construir a app dentro de `fronte
 Depois do deploy, validar:
 
 1. `GET /health` no backend responde `{"status":"ok"}`
-2. a página `/login` abre
-3. o login carrega a sessão e redireciona
-4. uma rota autenticada como `/contacts` responde normalmente
-5. um formulário público em `/f/[id]` abre sem autenticação
+2. `GET /api/health` no backend responde `{"status":"ok"}`
+3. `GET /api/auth/diagnostics` responde sem expor tokens, passwords ou connection strings
+4. a página `/login` abre
+5. o login carrega a sessão e redireciona
+6. uma rota autenticada como `/contacts` responde normalmente
+7. um formulário público em `/f/[id]` abre sem autenticação
 
 ## Erros comuns
 

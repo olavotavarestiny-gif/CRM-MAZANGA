@@ -2,19 +2,82 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Mail, Lock } from 'lucide-react';
+import { Activity, Copy, Lock, Mail, RefreshCw } from 'lucide-react';
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
 import { KukuGestLoginLogo } from '@/components/KukuGestLogo';
+import {
+  getLoginUserMessage,
+  isRetryableLoginCode,
+  type LoginTechnicalError,
+} from '@/lib/auth-error-codes';
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [retryingProfile, setRetryingProfile] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [error, setError] = useState<LoginTechnicalError | null>(null);
+  const [diagnostics, setDiagnostics] = useState<Record<string, unknown> | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  const supportCode = error
+    ? JSON.stringify({
+      code: error.code,
+      requestId: error.requestId,
+      details: error.details,
+    })
+    : '';
+
+  const copySupportCode = async () => {
+    if (!supportCode || typeof navigator === 'undefined') return;
+    await navigator.clipboard?.writeText(supportCode).catch(() => {});
+  };
+
+  const runDiagnostics = async () => {
+    setDiagnosing(true);
+    try {
+      const response = await fetch('/api/auth/diagnostics', { cache: 'no-store' });
+      const payload = await response.json().catch(() => null);
+      setDiagnostics(payload || { ok: false, code: 'LOGIN_DIAGNOSTICS_FAILED' });
+    } catch {
+      setDiagnostics({ ok: false, code: 'LOGIN_NETWORK_ERROR' });
+    } finally {
+      setDiagnosing(false);
+    }
+  };
+
+  const retryProfileLoad = async () => {
+    setRetryingProfile(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/auth/me', { cache: 'no-store' });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setError({
+          code: payload?.code || 'LOGIN_PROFILE_LOAD_FAILED',
+          message: getLoginUserMessage(payload?.code || 'LOGIN_PROFILE_LOAD_FAILED'),
+          requestId: payload?.requestId,
+          details: payload?.details,
+        });
+        return;
+      }
+
+      window.location.assign(payload?.mustChangePassword ? '/change-password' : '/');
+    } catch {
+      setError({
+        code: 'LOGIN_NETWORK_ERROR',
+        message: getLoginUserMessage('LOGIN_NETWORK_ERROR'),
+      });
+    } finally {
+      setRetryingProfile(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError(null);
+    setDiagnostics(null);
     setLoading(true);
 
     try {
@@ -36,7 +99,13 @@ export default function LoginPage() {
       const result = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setError(result?.error || 'Erro ao ligar ao servidor. Tente novamente.');
+        const code = result?.code || 'LOGIN_UNKNOWN_ERROR';
+        setError({
+          code,
+          message: getLoginUserMessage(code),
+          requestId: result?.requestId,
+          details: result?.details,
+        });
         return;
       }
 
@@ -44,7 +113,10 @@ export default function LoginPage() {
         window.location.assign(result?.mustChangePassword ? '/change-password' : '/');
       }
     } catch {
-      setError('Erro ao ligar ao servidor. Tente novamente.');
+      setError({
+        code: 'LOGIN_NETWORK_ERROR',
+        message: getLoginUserMessage('LOGIN_NETWORK_ERROR'),
+      });
     } finally {
       setLoading(false);
     }
@@ -72,8 +144,57 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="relative mt-7 rounded-2xl border border-[#ffb3bc]/40 bg-[#811b27]/22 px-4 py-3 text-sm text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                {error}
+              <div className="relative mt-7 space-y-3 rounded-2xl border border-[#ffb3bc]/40 bg-[#811b27]/22 px-4 py-3 text-sm text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                <div>{error.message}</div>
+
+                <div className="rounded-xl border border-white/15 bg-black/15 p-3 text-xs text-white/80">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <span className="font-semibold text-white/90">Código para suporte</span>
+                    <button
+                      type="button"
+                      onClick={copySupportCode}
+                      className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-white/20 px-2 text-[11px] text-white/85 transition hover:bg-white/10"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      Copiar
+                    </button>
+                  </div>
+                  <code className="block break-words font-mono text-[11px] leading-relaxed text-white/75">
+                    {supportCode}
+                  </code>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {isRetryableLoginCode(error.code) && (
+                    <button
+                      type="button"
+                      onClick={retryProfileLoad}
+                      disabled={retryingProfile}
+                      className="inline-flex h-9 items-center gap-2 rounded-lg bg-white/15 px-3 text-xs font-semibold text-white transition hover:bg-white/22 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${retryingProfile ? 'animate-spin' : ''}`} />
+                      {retryingProfile ? 'A tentar...' : 'Tentar novamente'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={runDiagnostics}
+                    disabled={diagnosing}
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/20 px-3 text-xs font-semibold text-white/85 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Activity className={`h-3.5 w-3.5 ${diagnosing ? 'animate-pulse' : ''}`} />
+                    {diagnosing ? 'A diagnosticar...' : 'Diagnóstico'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {diagnostics && (
+              <div className="relative mt-3 rounded-2xl border border-white/18 bg-black/18 px-4 py-3 text-xs text-white/78">
+                <div className="mb-2 font-semibold text-white/90">Diagnóstico técnico</div>
+                <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">
+                  {JSON.stringify(diagnostics, null, 2)}
+                </pre>
               </div>
             )}
 

@@ -661,8 +661,28 @@ export async function login(data: LoginRequest) {
 }
 
 export async function getCurrentUser() {
-  const response = await api.get<User>('/api/auth/me');
-  return response.data;
+  const response = await fetch('/api/auth/me', {
+    method: 'GET',
+    cache: 'no-store',
+  });
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message =
+      payload?.error ||
+      payload?.message ||
+      'Não foi possível carregar a conta.';
+    const error = new Error(message);
+    (error as any).response = {
+      status: response.status,
+      data: payload,
+    };
+    (error as any).code = payload?.code;
+    (error as any).requestId = payload?.requestId;
+    throw error;
+  }
+
+  return payload as User;
 }
 
 export async function updateCurrentUserProfile(data: { name?: string; jobTitle?: string | null }) {

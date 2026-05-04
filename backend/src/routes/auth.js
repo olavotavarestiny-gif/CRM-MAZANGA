@@ -9,6 +9,134 @@ const { normalizePlan } = require('../lib/plans');
 const { getSerializedPlanCatalog } = require('../lib/plan-limits');
 const { getSubscriptionState } = require('../lib/subscription-access');
 
+const DIAGNOSTIC_TIMEOUT_MS = 3500;
+
+function makeRequestId() {
+  return `diag_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getHost(value) {
+  if (!value) return null;
+  try {
+    return new URL(value).host;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeOrigin(value) {
+  if (!value) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  return trimmed.startsWith('http://') || trimmed.startsWith('https://')
+    ? trimmed.replace(/\/+$/, '')
+    : `https://${trimmed.replace(/\/+$/, '')}`;
+}
+
+function parseAllowedOrigins(...values) {
+  return [...new Set(
+    values
+      .flatMap((value) => String(value || '').split(/[,\s]+/))
+      .map(normalizeOrigin)
+      .filter(Boolean)
+  )];
+}
+
+function isManagedFrontendOrigin(origin) {
+  try {
+    const { hostname, protocol } = new URL(origin);
+    if (protocol !== 'https:' && protocol !== 'http:') return false;
+    return (
+      hostname === 'app.kukugest.ao' ||
+      hostname.endsWith('.app.kukugest.ao') ||
+      hostname === 'beta.kukugest.ao'
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getCorsDiagnostic(origin) {
+  if (!origin) {
+    return { origin: null, allowed: true, reason: 'no_origin_header' };
+  }
+
+  if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+    return { origin, allowed: true, reason: 'localhost' };
+  }
+
+  if (isManagedFrontendOrigin(origin)) {
+    return { origin, allowed: true, reason: 'managed_frontend_origin' };
+  }
+
+  const explicitlyAllowedOrigins = new Set(
+    parseAllowedOrigins(process.env.FRONTEND_URL, process.env.ALLOWED_VERCEL_URL)
+  );
+
+  if (explicitlyAllowedOrigins.has(origin)) {
+    return { origin, allowed: true, reason: 'explicit_env_origin' };
+  }
+
+  return { origin, allowed: false, reason: 'not_allowed_by_cors' };
+}
+
+function withTimeout(promise, timeoutMs, timeoutValue) {
+  let timeout;
+  return Promise.race([
+    promise.finally(() => clearTimeout(timeout)),
+    new Promise((resolve) => {
+      timeout = setTimeout(() => resolve(timeoutValue), timeoutMs);
+    }),
+  ]);
+}
+
+async function checkDatabase() {
+  try {
+    const result = await withTimeout(
+      prisma.$queryRaw`SELECT 1`,
+      DIAGNOSTIC_TIMEOUT_MS,
+      { timeout: true }
+    );
+
+    if (result?.timeout) {
+      return { ok: false, code: 'DB_TIMEOUT' };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, code: 'DB_UNAVAILABLE', detail: error?.code || error?.name || 'DB_ERROR' };
+  }
+}
+
+async function checkSupabaseJwks() {
+  if (!process.env.SUPABASE_URL) {
+    return { ok: false, code: 'SUPABASE_URL_MISSING' };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DIAGNOSTIC_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${process.env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`, {
+      method: 'GET',
+      signal: controller.signal,
+    });
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      code: response.ok ? 'OK' : 'SUPABASE_JWKS_UNAVAILABLE',
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      code: error?.name === 'AbortError' ? 'SUPABASE_JWKS_TIMEOUT' : 'SUPABASE_JWKS_NETWORK_ERROR',
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Lazy Supabase admin client
 let _supabaseAdmin = null;
 function getSupabaseAdmin() {
@@ -118,6 +246,54 @@ function mapPasswordProviderError(rawMessage) {
 
   return 'Não foi possível alterar a password. Tente novamente.';
 }
+
+router.get('/diagnostics', async (req, res) => {
+  const requestId = makeRequestId();
+  const origin = req.headers.origin || null;
+
+  const [database, supabaseJwks] = await Promise.all([
+    checkDatabase(),
+    checkSupabaseJwks(),
+  ]);
+
+  const envPresence = {
+    DATABASE_URL: Boolean(process.env.DATABASE_URL),
+    FRONTEND_URL: Boolean(process.env.FRONTEND_URL),
+    ALLOWED_VERCEL_URL: Boolean(process.env.ALLOWED_VERCEL_URL),
+    SUPABASE_URL: Boolean(process.env.SUPABASE_URL),
+    SUPABASE_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    JWT_SECRET: Boolean(process.env.JWT_SECRET),
+  };
+
+  const cors = getCorsDiagnostic(origin);
+  const ok = Boolean(
+    envPresence.DATABASE_URL &&
+    envPresence.FRONTEND_URL &&
+    envPresence.SUPABASE_URL &&
+    database.ok &&
+    supabaseJwks.ok &&
+    cors.allowed
+  );
+
+  res.status(200).json({
+    ok,
+    code: ok ? 'AUTH_DIAGNOSTICS_OK' : 'AUTH_DIAGNOSTICS_DEGRADED',
+    message: ok ? 'Diagnóstico de autenticação OK' : 'Diagnóstico de autenticação com falhas',
+    requestId,
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    envPresence,
+    hosts: {
+      frontend: getHost(process.env.FRONTEND_URL),
+      supabase: getHost(process.env.SUPABASE_URL),
+    },
+    cors,
+    checks: {
+      database,
+      supabaseJwks,
+    },
+  });
+});
 
 async function getCurrentUserPayload(userId, impersonatedBy = null) {
   let user;

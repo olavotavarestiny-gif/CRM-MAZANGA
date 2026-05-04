@@ -117,14 +117,16 @@ Para referência completa e agrupada por domínio, ver também [../setup/environ
 Depois do deploy, validar:
 
 1. `GET /health` no backend responde `{"status":"ok"}`
-2. os logs mostram `Prisma client initialized`
-3. os logs mostram `Backend started`
-4. os logs mostram o mapa de presença das env vars essenciais sem expor segredos
-5. quando a base responder, os logs mostram `Prisma database connection ready`
-6. a página `/login` abre
-7. o login carrega a sessão e redireciona
-8. uma rota autenticada como `/contacts` responde normalmente
-9. um formulário público em `/f/[id]` abre sem autenticação
+2. `GET /api/health` no backend responde `{"status":"ok"}`
+3. `GET /api/auth/diagnostics` responde sem expor tokens, passwords ou connection strings
+4. os logs mostram `Prisma client initialized`
+5. os logs mostram `Backend started`
+6. os logs mostram o mapa de presença das env vars essenciais sem expor segredos
+7. quando a base responder, os logs mostram `Prisma database connection ready`
+8. a página `/login` abre
+9. o login carrega a sessão e redireciona
+10. uma rota autenticada como `/contacts` responde normalmente
+11. um formulário público em `/f/[id]` abre sem autenticação
 
 ## Erros comuns
 
