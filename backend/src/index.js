@@ -15,6 +15,7 @@ const automationsRouter = require('./routes/automations');
 const whatsappRouter = require('./routes/whatsapp');
 const tasksRouter = require('./routes/tasks');
 const formsRouter = require('./routes/forms');
+const publicLeadRouter = require('./routes/public-lead');
 const inboxRouter = require('./routes/inbox');
 const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
@@ -129,6 +130,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/webhook', webhookRouter);
 app.use('/api/forms', formsRouter);
 app.use('/api/setup', setupRouter);
+app.use('/api/public', publicLeadRouter);
 
 // Protected routes (require authentication)
 app.use('/api/contacts', requireAuth, contactsRouter);
