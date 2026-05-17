@@ -2,8 +2,8 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { useIsFetching } from '@tanstack/react-query';
-import { getCurrentUser } from '@/lib/api';
+import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { dismissWelcomeOnboarding, getCurrentUser, getOnboarding } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import Sidebar from './sidebar';
@@ -21,6 +21,7 @@ import { isComercio } from '@/lib/business-modes';
 import { getBlockedFeatureCopy } from '@/lib/plan-utils';
 import { DEV_AUTH_USER, isDevAuthSessionActive, writeDevAuthSession } from '@/lib/dev-auth';
 import { getAccessRoleLabel } from '@/lib/roles';
+import { TOUR_KEYS } from '@/lib/tour-steps';
 
 const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
 
@@ -90,6 +91,7 @@ function LayoutInner({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const fetchingCount = useIsFetching();
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -124,6 +126,41 @@ function LayoutInner({
     pathname === '/manutencao' ||
     pathname.startsWith('/f/') ||
     pathname.startsWith('/preview');
+
+  const onboardingQuery = useQuery({
+    queryKey: ['onboarding', currentUser?.workspaceMode],
+    queryFn: getOnboarding,
+    staleTime: 60_000,
+    enabled: !!currentUser && !isPublicPage && !devAuthBypassEnabled,
+  });
+
+  const dismissWelcomeMutation = useMutation({
+    mutationFn: dismissWelcomeOnboarding,
+    onSuccess: () => {
+      queryClient.setQueryData(['onboarding', currentUser?.workspaceMode], (old: unknown) => (
+        old && typeof old === 'object'
+          ? {
+              ...old,
+              welcome: {
+                ...((old as { welcome?: object }).welcome || {}),
+                show: false,
+                dismissed: true,
+              },
+            }
+          : old
+      ));
+      queryClient.invalidateQueries({ queryKey: ['onboarding'] });
+    },
+  });
+
+  useEffect(() => {
+    if (devAuthBypassEnabled || isPublicPage || !currentUser) {
+      setShowWelcome(false);
+      return;
+    }
+
+    setShowWelcome(Boolean(onboardingQuery.data?.welcome?.show));
+  }, [currentUser, devAuthBypassEnabled, isPublicPage, onboardingQuery.data?.welcome?.show]);
 
   // Detect Supabase password recovery flow — fires when user clicks a reset-password email link
   // The link lands on / with hash tokens; Supabase fires PASSWORD_RECOVERY so we redirect.
@@ -270,8 +307,6 @@ function LayoutInner({
 
         enforceAccess(user);
 
-        // Show welcome modal on first visit, except in dev demo mode where screens should open directly.
-        if (!devAuthBypassEnabled && !localStorage.getItem('kukugest_guide_seen')) setShowWelcome(true);
       } catch (err: any) {
         if (err?.response?.status === 401 || err?.response?.status === 403) {
           router.push('/login');
@@ -291,9 +326,18 @@ function LayoutInner({
     checkAuth();
   }, [pathname, authRetryNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleStartChecklist = () => {
-    localStorage.setItem('kukugest_guide_seen', '1');
+  const dismissWelcomeForAccount = () => {
     setShowWelcome(false);
+    if (!dismissWelcomeMutation.isPending) {
+      dismissWelcomeMutation.mutate();
+    }
+  };
+
+  const handleStartChecklist = () => {
+    dismissWelcomeForAccount();
+    sessionStorage.setItem(TOUR_KEYS.ACTIVE, 'true');
+    sessionStorage.setItem(TOUR_KEYS.GROUP, '0');
+    window.dispatchEvent(new Event('kukugest:start-tour'));
     router.push('/');
   };
 
@@ -466,7 +510,7 @@ function LayoutInner({
 
       <WelcomeModal
         open={showWelcome && !devAuthBypassEnabled}
-        onClose={() => { localStorage.setItem('kukugest_guide_seen', '1'); setShowWelcome(false); }}
+        onClose={dismissWelcomeForAccount}
         onStartTour={handleStartChecklist}
       />
       <BillingSuspendedModal subscription={currentUser?.subscription} />

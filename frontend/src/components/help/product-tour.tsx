@@ -91,6 +91,24 @@ export default function ProductTourProvider({ children }: { children: ReactNode 
     return () => clearTimeout(t);
   }, [pathname, driveGroup]);
 
+  useEffect(() => {
+    const handleStartTour = () => {
+      if (!isActive()) return;
+      const groupId = getGroup();
+      const group = TOUR_GROUPS[groupId];
+      if (!group) return;
+
+      if (group.route === pathname) {
+        setTimeout(() => driveGroup(groupId), 150);
+      } else {
+        router.push(group.route);
+      }
+    };
+
+    window.addEventListener('kukugest:start-tour', handleStartTour);
+    return () => window.removeEventListener('kukugest:start-tour', handleStartTour);
+  }, [driveGroup, pathname, router]);
+
   // Cleanup on unmount
   useEffect(() => () => driverRef.current?.destroy(), []);
 

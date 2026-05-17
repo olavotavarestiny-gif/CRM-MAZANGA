@@ -5,6 +5,8 @@ const requireAuth = require('../middleware/auth');
 
 const router = express.Router();
 const FLOW_KEY = 'onboarding_v2';
+const WELCOME_FLOW_KEY = 'welcome_v1';
+const GLOBAL_WORKSPACE_MODE = 'global';
 
 const SERVICOS_STEPS = [
   { id: 'setup_company', label: 'Complete os dados da empresa', href: '/faturacao/configuracao' },
@@ -88,6 +90,10 @@ function getCacheKey(orgId, workspaceMode, viewerScope) {
   return `${FLOW_KEY}:${orgId}:${workspaceMode}:${viewerScope}`;
 }
 
+function getWelcomeCacheKey(orgId, viewerScope) {
+  return `${WELCOME_FLOW_KEY}:${orgId}:${viewerScope}`;
+}
+
 function getStepDefinitions(workspaceMode) {
   return workspaceMode === 'comercio' ? COMERCIO_STEPS : SERVICOS_STEPS;
 }
@@ -119,6 +125,36 @@ async function ensureRecord(orgId, workspaceMode) {
   });
 }
 
+async function hasAccountDismissedOnboarding(orgId) {
+  const dismissedRecord = await prisma.onboardingProgress.findFirst({
+    where: {
+      organization_id: String(orgId),
+      flow_key: FLOW_KEY,
+      dismissed: true,
+    },
+    select: { id: true },
+  });
+  return Boolean(dismissedRecord);
+}
+
+async function ensureWelcomeRecord(orgId) {
+  return prisma.onboardingProgress.upsert({
+    where: {
+      organization_id_workspace_mode_flow_key: {
+        organization_id: String(orgId),
+        workspace_mode: GLOBAL_WORKSPACE_MODE,
+        flow_key: WELCOME_FLOW_KEY,
+      },
+    },
+    create: {
+      organization_id: String(orgId),
+      workspace_mode: GLOBAL_WORKSPACE_MODE,
+      flow_key: WELCOME_FLOW_KEY,
+    },
+    update: {},
+  });
+}
+
 async function computeOnboarding(orgId, workspaceMode) {
   const steps = await Promise.all(
     getStepDefinitions(workspaceMode).map(async (step) => {
@@ -140,10 +176,16 @@ router.get('/', requireAuth, async (req, res) => {
     const workspaceMode = await getWorkspaceMode(orgId);
     const viewerScope = getViewerScope(req.user);
     const cacheKey = getCacheKey(orgId, workspaceMode, viewerScope);
+    const welcomeCacheKey = getWelcomeCacheKey(orgId, viewerScope);
     const cached = cache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) return res.json(cached.data);
+    const cachedWelcome = cache.get(welcomeCacheKey);
+    if (cached && cached.expiresAt > Date.now() && cachedWelcome && cachedWelcome.expiresAt > Date.now()) {
+      return res.json({ ...cached.data, welcome: cachedWelcome.data });
+    }
 
     const record = await ensureRecord(orgId, workspaceMode);
+    const welcomeRecord = await ensureWelcomeRecord(orgId);
+    const accountDismissed = record.dismissed || await hasAccountDismissedOnboarding(orgId);
     const steps = await computeOnboarding(orgId, workspaceMode);
     const completedSteps = steps.filter((step) => step.completed).map((step) => step.id);
     const completedCount = completedSteps.length;
@@ -165,18 +207,24 @@ router.get('/', requireAuth, async (req, res) => {
     });
 
     const payload = {
-      show: !record.dismissed && !allDone,
-      dismissed: record.dismissed,
+      show: !accountDismissed && !allDone,
+      dismissed: accountDismissed,
       completedCount,
       totalCount,
       allDone,
       finalMessage: FINAL_MESSAGES[workspaceMode],
       workspaceMode,
       flowKey: FLOW_KEY,
+      welcome: {
+        show: !welcomeRecord.dismissed,
+        dismissed: welcomeRecord.dismissed,
+        flowKey: WELCOME_FLOW_KEY,
+      },
       steps,
     };
 
     cache.set(cacheKey, { data: payload, expiresAt: Date.now() + CACHE_TTL });
+    cache.set(welcomeCacheKey, { data: payload.welcome, expiresAt: Date.now() + CACHE_TTL });
     return res.json(payload);
   } catch (err) {
     console.error('[onboarding] GET error:', err);
@@ -184,22 +232,21 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/dismiss', requireAuth, async (req, res) => {
+router.post('/welcome/dismiss', requireAuth, async (req, res) => {
   try {
     const orgId = req.user.effectiveUserId;
-    const workspaceMode = await getWorkspaceMode(orgId);
     await prisma.onboardingProgress.upsert({
       where: {
         organization_id_workspace_mode_flow_key: {
           organization_id: String(orgId),
-          workspace_mode: workspaceMode,
-          flow_key: FLOW_KEY,
+          workspace_mode: GLOBAL_WORKSPACE_MODE,
+          flow_key: WELCOME_FLOW_KEY,
         },
       },
       create: {
         organization_id: String(orgId),
-        workspace_mode: workspaceMode,
-        flow_key: FLOW_KEY,
+        workspace_mode: GLOBAL_WORKSPACE_MODE,
+        flow_key: WELCOME_FLOW_KEY,
         dismissed: true,
         dismissed_at: new Date(),
       },
@@ -208,6 +255,50 @@ router.post('/dismiss', requireAuth, async (req, res) => {
         dismissed_at: new Date(),
       },
     });
+    cache.clear();
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[onboarding] welcome dismiss error:', err);
+    return res.status(500).json({ error: 'Failed to dismiss welcome onboarding' });
+  }
+});
+
+router.post('/dismiss', requireAuth, async (req, res) => {
+  try {
+    const orgId = req.user.effectiveUserId;
+    const workspaceMode = await getWorkspaceMode(orgId);
+    await prisma.$transaction([
+      prisma.onboardingProgress.updateMany({
+        where: {
+          organization_id: String(orgId),
+          flow_key: FLOW_KEY,
+        },
+        data: {
+          dismissed: true,
+          dismissed_at: new Date(),
+        },
+      }),
+      prisma.onboardingProgress.upsert({
+        where: {
+          organization_id_workspace_mode_flow_key: {
+            organization_id: String(orgId),
+            workspace_mode: workspaceMode,
+            flow_key: FLOW_KEY,
+          },
+        },
+        create: {
+          organization_id: String(orgId),
+          workspace_mode: workspaceMode,
+          flow_key: FLOW_KEY,
+          dismissed: true,
+          dismissed_at: new Date(),
+        },
+        update: {
+          dismissed: true,
+          dismissed_at: new Date(),
+        },
+      }),
+    ]);
     cache.clear();
     return res.json({ success: true });
   } catch (err) {
@@ -220,25 +311,37 @@ router.post('/reopen', requireAuth, async (req, res) => {
   try {
     const orgId = req.user.effectiveUserId;
     const workspaceMode = await getWorkspaceMode(orgId);
-    await prisma.onboardingProgress.upsert({
-      where: {
-        organization_id_workspace_mode_flow_key: {
+    await prisma.$transaction([
+      prisma.onboardingProgress.updateMany({
+        where: {
+          organization_id: String(orgId),
+          flow_key: FLOW_KEY,
+        },
+        data: {
+          dismissed: false,
+          reopened_at: new Date(),
+        },
+      }),
+      prisma.onboardingProgress.upsert({
+        where: {
+          organization_id_workspace_mode_flow_key: {
+            organization_id: String(orgId),
+            workspace_mode: workspaceMode,
+            flow_key: FLOW_KEY,
+          },
+        },
+        create: {
           organization_id: String(orgId),
           workspace_mode: workspaceMode,
           flow_key: FLOW_KEY,
+          reopened_at: new Date(),
         },
-      },
-      create: {
-        organization_id: String(orgId),
-        workspace_mode: workspaceMode,
-        flow_key: FLOW_KEY,
-        reopened_at: new Date(),
-      },
-      update: {
-        dismissed: false,
-        reopened_at: new Date(),
-      },
-    });
+        update: {
+          dismissed: false,
+          reopened_at: new Date(),
+        },
+      }),
+    ]);
     cache.clear();
     return res.json({ success: true });
   } catch (err) {

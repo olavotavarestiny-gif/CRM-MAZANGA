@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { BriefcaseBusiness, Building2, CheckCircle2, Stethoscope, Store, Wrench } from 'lucide-react';
 import {
   applyStartupTemplate,
+  getOnboarding,
   getStartupTemplateStatus,
   getStartupTemplates,
   type StartupTemplate,
@@ -69,6 +70,12 @@ function ModelCard({
 export default function StartupModelSelector({ currentUser }: { currentUser: User | null | undefined }) {
   const queryClient = useQueryClient();
   const eligible = isEligible(currentUser);
+  const onboardingQuery = useQuery({
+    queryKey: ['onboarding', currentUser?.workspaceMode],
+    queryFn: getOnboarding,
+    enabled: eligible,
+    staleTime: 60_000,
+  });
   const statusQuery = useQuery({
     queryKey: ['startup-template-status', currentUser?.workspaceMode],
     queryFn: getStartupTemplateStatus,
@@ -102,7 +109,13 @@ export default function StartupModelSelector({ currentUser }: { currentUser: Use
     },
   });
 
-  if (!eligible || statusQuery.isLoading || statusQuery.data?.applied !== false || models.length === 0) {
+  if (
+    !eligible ||
+    onboardingQuery.data?.welcome?.show ||
+    statusQuery.isLoading ||
+    statusQuery.data?.applied !== false ||
+    models.length === 0
+  ) {
     return null;
   }
 

@@ -1963,6 +1963,11 @@ export interface OnboardingData {
   finalMessage?: string;
   workspaceMode?: 'servicos' | 'comercio';
   flowKey?: string;
+  welcome?: {
+    show: boolean;
+    dismissed: boolean;
+    flowKey: string;
+  };
   steps?: OnboardingStep[];
 }
 
@@ -1973,6 +1978,10 @@ export async function getOnboarding(): Promise<OnboardingData> {
 
 export async function dismissOnboarding(): Promise<void> {
   await api.post('/api/onboarding/dismiss');
+}
+
+export async function dismissWelcomeOnboarding(): Promise<void> {
+  await api.post('/api/onboarding/welcome/dismiss');
 }
 
 export async function reopenOnboarding(): Promise<void> {

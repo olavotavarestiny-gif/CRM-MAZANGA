@@ -734,7 +734,25 @@ function handleRequest(config: InternalAxiosRequestConfig): AxiosResponse | Prom
 
   if (method === 'get' && path === '/api/activity') return response(config, { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 }, users: [{ id: DEV_USER_ID, name: 'Dev Tester', email: 'dev@local.test' }], filters: { userId: null, entityType: null, search: '', dateFrom: null, dateTo: null } });
   if (method === 'get' && path === '/api/activity/export-csv') return response(config, new Blob(['tipo,accao,data\\ncontact,created,2026-05-01\\n'], { type: 'text/csv' }));
-  if (method === 'get' && path === '/api/onboarding') return response(config, { checklist: [], progress: { completed: 4, total: 6, percent: 67 } });
+  if (method === 'get' && path === '/api/onboarding') return response(config, {
+    show: true,
+    dismissed: false,
+    completedCount: 2,
+    totalCount: 5,
+    allDone: false,
+    finalMessage: 'Conta configurada com sucesso.',
+    workspaceMode: 'servicos',
+    flowKey: 'onboarding_v2',
+    welcome: { show: false, dismissed: true, flowKey: 'welcome_v1' },
+    steps: [
+      { id: 'setup_company', label: 'Complete os dados da empresa', href: '/faturacao/configuracao', completed: true },
+      { id: 'add_contact', label: 'Crie o primeiro contacto', href: '/contacts', completed: true },
+      { id: 'setup_pipeline', label: 'Configure o primeiro Processo de Venda', href: '/pipeline', completed: false },
+      { id: 'create_task', label: 'Crie uma tarefa', href: '/tasks', completed: false },
+      { id: 'create_invoice', label: 'Emita a primeira fatura', href: '/faturacao/nova', completed: false },
+    ],
+  });
+  if (method === 'post' && path === '/api/onboarding/welcome/dismiss') return response(config, { success: true });
   if (method === 'get' && path === '/api/startup-templates') return response(config, { templates: [], applied: [] });
   if (method === 'get' && path === '/api/startup-templates/status') return response(config, { applied: false, templateId: null });
 
