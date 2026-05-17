@@ -437,7 +437,7 @@ export interface AutomationStatsResponse {
 export interface FormField {
   id: string;
   formId: string;
-  type: 'text' | 'multiple_choice';
+  type: 'text' | 'number' | 'multiple_choice';
   label: string;
   required: boolean;
   order: number;
@@ -503,6 +503,10 @@ export interface FormSubmission {
     stage: string;
     inPipeline: boolean;
   } | null;
+  form?: {
+    id: string;
+    title: string;
+  };
   answers: FormSubmissionAnswer[];
 }
 
@@ -1390,7 +1394,15 @@ export interface ChatMessage {
   createdAt: string;
 }
 
-import type { PlanCatalogEntry, PlanName } from './api';
+export type ClientAccountPlanName = 'essencial' | 'profissional' | 'enterprise';
+export type ClientAccountPermissions = Record<string, unknown>;
+
+export interface ClientAccountPlanCatalogEntry {
+  label: string;
+  description?: string;
+  limits?: Record<string, unknown>;
+  features?: Record<string, boolean>;
+}
 
 export interface PlanUsageItem {
   current: number;
@@ -1398,11 +1410,11 @@ export interface PlanUsageItem {
 }
 
 export interface PlanUsage {
-  plan: PlanName;
+  plan: ClientAccountPlanName;
   usage: Record<string, PlanUsageItem>;
 }
 
-export type AvailablePlanCatalog = Record<PlanName, PlanCatalogEntry>;
+export type AvailablePlanCatalog = Record<ClientAccountPlanName, ClientAccountPlanCatalogEntry>;
 
 // ── GESTÃO DE CONTAS CLIENTES ────────────────────────────────
 export interface ClientAccountMember {
@@ -1410,7 +1422,7 @@ export interface ClientAccountMember {
   name: string;
   email: string;
   active: boolean;
-  permissions: import('./api').UserPermissions | null;
+  permissions: ClientAccountPermissions | null;
 }
 
 export interface ClientAccount {
@@ -1418,8 +1430,8 @@ export interface ClientAccount {
   name: string;
   email: string;
   active: boolean;
-  plan: PlanName;
-  permissions: import('./api').UserPermissions | null;
+  plan: ClientAccountPlanName;
+  permissions: ClientAccountPermissions | null;
   createdAt: string;
   accountMembers: ClientAccountMember[];
   _count: { accountMembers: number };

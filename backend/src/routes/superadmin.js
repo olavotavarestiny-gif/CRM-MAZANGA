@@ -209,6 +209,10 @@ router.post('/impersonate/:userId', async (req, res) => {
       return res.status(404).json({ error: 'Utilizador não encontrado ou inactivo' });
     }
 
+    if (!process.env.JWT_SECRET) {
+      return res.status(503).json({ error: 'JWT_SECRET não configurado no servidor' });
+    }
+
     const token = jwt.sign(
       {
         type: 'impersonation',
@@ -216,7 +220,7 @@ router.post('/impersonate/:userId', async (req, res) => {
         impersonatorId: req.user.id,
         impersonatorEmail: req.user.email,
       },
-      process.env.JWT_SECRET || 'fallback-secret',
+      process.env.JWT_SECRET,
       { expiresIn: '2h' }
     );
 

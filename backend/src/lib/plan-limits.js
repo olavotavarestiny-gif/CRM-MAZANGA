@@ -432,6 +432,10 @@ async function getFeatureState(orgId, feature) {
 function requirePlanFeature(feature) {
   return async (req, res, next) => {
     try {
+      if (req.user?.isDevAuthBypass) {
+        return next();
+      }
+
       const state = await getFeatureState(req.user.effectiveUserId, feature);
       if (!state.allowed) {
         return res.status(403).json({ error: 'Funcionalidade não disponível no seu plano' });

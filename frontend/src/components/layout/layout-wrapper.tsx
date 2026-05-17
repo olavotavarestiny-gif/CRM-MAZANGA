@@ -9,7 +9,7 @@ import { getSupabaseEnv } from '@/lib/supabase/env';
 import Sidebar from './sidebar';
 import { Footer } from './footer';
 import WelcomeModal from '@/components/help/welcome-modal';
-import ProductTourProvider, { useTour } from '@/components/help/product-tour';
+import ProductTourProvider from '@/components/help/product-tour';
 import { BillingSuspendedModal } from '@/components/billing/access-notice';
 import TrialStatusBadge from '@/components/billing/trial-status-badge';
 import KukuGestLogo from '@/components/KukuGestLogo';
@@ -19,6 +19,8 @@ import type { User } from '@/lib/api';
 import { canAccessWorkspaceRoute, getWorkspaceFallbackRoute, hasFeature } from '@/lib/permissions';
 import { isComercio } from '@/lib/business-modes';
 import { getBlockedFeatureCopy } from '@/lib/plan-utils';
+import { DEV_AUTH_USER, isDevAuthSessionActive, writeDevAuthSession } from '@/lib/dev-auth';
+import { getAccessRoleLabel } from '@/lib/roles';
 
 const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
 
@@ -79,10 +81,15 @@ type AuthLoadError = {
 
 // ── Inner layout — consumes TourContext ──────────────────────────────────────
 
-function LayoutInner({ children }: { children: ReactNode }) {
+function LayoutInner({
+  children,
+  devAuthBypassEnabled,
+}: {
+  children: ReactNode;
+  devAuthBypassEnabled: boolean;
+}) {
   const pathname = usePathname();
   const router = useRouter();
-  const { startTour } = useTour();
   const fetchingCount = useIsFetching();
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -96,6 +103,15 @@ function LayoutInner({ children }: { children: ReactNode }) {
   const [showTopProgress, setShowTopProgress] = useState(false);
   const authChecked = useRef(false);
   const currentSessionRef = useRef<string | null>(null);
+
+  if (devAuthBypassEnabled && typeof window !== 'undefined' && !isDevAuthSessionActive()) {
+    writeDevAuthSession(DEV_AUTH_USER);
+  }
+
+  useEffect(() => {
+    if (!devAuthBypassEnabled) return;
+    writeDevAuthSession(DEV_AUTH_USER);
+  }, [devAuthBypassEnabled]);
 
   const isPublicPage =
     pathname === '/login' ||
@@ -112,6 +128,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
   // Detect Supabase password recovery flow — fires when user clicks a reset-password email link
   // The link lands on / with hash tokens; Supabase fires PASSWORD_RECOVERY so we redirect.
   useEffect(() => {
+    if (devAuthBypassEnabled) return;
     if (!getSupabaseEnv()) return;
 
     const supabase = createClient();
@@ -121,10 +138,11 @@ function LayoutInner({ children }: { children: ReactNode }) {
       }
     });
     return () => subscription.unsubscribe();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [devAuthBypassEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset auth cache when Supabase session changes (e.g. after login/logout)
   useEffect(() => {
+    if (devAuthBypassEnabled) return;
     if (isPublicPage) return;
     if (!getSupabaseEnv()) return;
 
@@ -139,7 +157,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
       }
     });
     return () => subscription.unsubscribe();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [devAuthBypassEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const handleUserUpdated = (event: Event) => {
@@ -181,13 +199,14 @@ function LayoutInner({ children }: { children: ReactNode }) {
 
   // Keep-alive: ping backend every 14 minutes to prevent Render free tier cold starts
   useEffect(() => {
+    if (devAuthBypassEnabled) return;
     if (isPublicPage) return;
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const ping = () => fetch(`${API_URL}/health`, { method: 'GET' }).catch(() => {});
     ping();
     const interval = setInterval(ping, 14 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [devAuthBypassEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isPublicPage) {
@@ -251,8 +270,8 @@ function LayoutInner({ children }: { children: ReactNode }) {
 
         enforceAccess(user);
 
-        // Show welcome modal on first visit
-        if (!localStorage.getItem('kukugest_guide_seen')) setShowWelcome(true);
+        // Show welcome modal on first visit, except in dev demo mode where screens should open directly.
+        if (!devAuthBypassEnabled && !localStorage.getItem('kukugest_guide_seen')) setShowWelcome(true);
       } catch (err: any) {
         if (err?.response?.status === 401 || err?.response?.status === 403) {
           router.push('/login');
@@ -347,7 +366,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           currentUser={currentUser}
-          onStartTour={startTour}
         />
       </div>
 
@@ -363,7 +381,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           currentUser={currentUser}
-          onStartTour={startTour}
         />
       </div>
 
@@ -412,6 +429,12 @@ function LayoutInner({ children }: { children: ReactNode }) {
           </div>
         )}
 
+        {devAuthBypassEnabled && (
+          <div className="flex items-center justify-center bg-red-700 px-4 py-2 text-center text-sm font-black text-white shadow-sm">
+            ⚠️ MODO DEV — Auth desactivado — Não é produção
+          </div>
+        )}
+
         {/* Main Scrollable Area */}
         <main className="flex-1 overflow-y-auto bg-[#f5f7f9]">
           {accessNotice && (
@@ -442,7 +465,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
       </div>
 
       <WelcomeModal
-        open={showWelcome}
+        open={showWelcome && !devAuthBypassEnabled}
         onClose={() => { localStorage.setItem('kukugest_guide_seen', '1'); setShowWelcome(false); }}
         onStartTour={handleStartChecklist}
       />
@@ -464,7 +487,7 @@ function UserWidget({ user, compact = false }: { user: User | null; compact?: bo
     .toUpperCase();
   const secondaryLabel =
     user.jobTitle?.trim() ||
-    (user.isSuperAdmin ? 'Super Admin' : user.role === 'admin' ? 'Administrador' : 'Utilizador');
+    getAccessRoleLabel(user);
 
   return (
     <div className="flex items-center gap-3">
@@ -500,10 +523,16 @@ function UserWidget({ user, compact = false }: { user: User | null; compact?: bo
 
 // ── Outer wrapper — provides TourContext ─────────────────────────────────────
 
-export default function LayoutWrapper({ children }: { children: ReactNode }) {
+export default function LayoutWrapper({
+  children,
+  devAuthBypassEnabled = false,
+}: {
+  children: ReactNode;
+  devAuthBypassEnabled?: boolean;
+}) {
   return (
     <ProductTourProvider>
-      <LayoutInner>{children}</LayoutInner>
+      <LayoutInner devAuthBypassEnabled={devAuthBypassEnabled}>{children}</LayoutInner>
     </ProductTourProvider>
   );
 }

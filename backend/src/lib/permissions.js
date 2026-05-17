@@ -42,6 +42,8 @@
  * null permissions = full access (no restriction) — for owners and admins
  */
 
+const { hasOrgAdminAccess } = require('./roles');
+
 const PERMISSION_LEVEL = { none: 0, view: 1, edit: 2 };
 const BOOLEAN_SCOPE_RULES = {
   comercial: {
@@ -196,7 +198,7 @@ function canTaskAssignment(permissionsJson, key) {
 }
 
 function hasFullAccess(req) {
-  return req.user.isSuperAdmin || req.user.isAccountOwner || req.user.role === 'admin';
+  return hasOrgAdminAccess(req.user);
 }
 
 /**

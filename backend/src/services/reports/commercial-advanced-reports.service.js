@@ -4,7 +4,6 @@ const {
   serializeRange,
   calculateAverage,
   calculateGrowth,
-  calculatePercentage,
   roundCurrency,
   limitTop,
   parseInvoiceLines,

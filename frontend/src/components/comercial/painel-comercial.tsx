@@ -13,7 +13,6 @@ import {
   Store,
   TrendingDown,
   TrendingUp,
-  Trophy,
   Unlock,
 } from 'lucide-react';
 import { getCaixaSessaoAtual, getComercialAnalise, getComercialResumo, getCurrentUser } from '@/lib/api';
@@ -65,15 +64,15 @@ function CommercialSummaryCard({
 }) {
   return (
     <Card className="overflow-hidden border-slate-200 shadow-sm">
-      <div className="p-5">
+      <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{title}</p>
-            <p className="mt-3 text-2xl font-black tracking-tight text-[#2c2f31]">{value}</p>
-            {hint ? <p className="mt-2 text-sm text-slate-500">{hint}</p> : null}
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{title}</p>
+            <p className="mt-4 text-2xl font-black tracking-tight text-[#2c2f31]">{value}</p>
+            {hint ? <p className="mt-2 text-xs text-slate-500">{hint}</p> : null}
           </div>
-          <div className={`rounded-2xl p-3 ${accentClass}`}>
-            <Icon className="h-5 w-5" />
+          <div className={`rounded-lg p-2 ${accentClass}`}>
+            <Icon className="h-4 w-4" />
           </div>
         </div>
       </div>
@@ -84,7 +83,7 @@ function CommercialSummaryCard({
 function SummaryCardSkeleton() {
   return (
     <Card className="overflow-hidden border-slate-200 shadow-sm">
-      <div className="animate-pulse p-5 space-y-3">
+      <div className="flex animate-pulse flex-col gap-3 p-4">
         <div className="h-3 w-28 rounded-full bg-slate-200" />
         <div className="h-9 w-36 rounded-full bg-slate-200" />
         <div className="h-4 w-40 rounded-full bg-slate-200" />
@@ -106,10 +105,7 @@ function TopProdutosMesCard({
 }) {
   return (
     <Card className="border-slate-200 p-5 shadow-sm">
-      <div className="flex items-center gap-2">
-        <Trophy className="h-4 w-4 text-[#B84D0E]" />
-        <p className="text-sm font-semibold text-[#2c2f31]">Top 3 do Mês</p>
-      </div>
+      <p className="text-base font-semibold text-[#2c2f31]">Top 3 do mês</p>
       <div className="mt-4">
         <WidgetWrapper
           title="top 3 do mês"
@@ -119,9 +115,9 @@ function TopProdutosMesCard({
           onRetry={onRetry}
           className="border-0 bg-transparent p-0"
         >
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             {items.map((item, index) => (
-              <div key={item.productCode} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+              <div key={item.productCode} className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                 <div className="min-w-0">
                   <p className="truncate font-medium text-[#2c2f31]">{index + 1}. {item.productDescription}</p>
                   <p className="text-xs text-slate-500">{item.productCode}</p>
@@ -153,10 +149,7 @@ function CaixaSessaoCard({
 
   return (
     <Card className="border-slate-200 p-5 shadow-sm">
-      <div className="flex items-center gap-2">
-        <CreditCard className="h-4 w-4 text-[#B84D0E]" />
-        <p className="text-sm font-semibold text-[#2c2f31]">Sessão Caixa</p>
-      </div>
+      <p className="text-base font-semibold text-[#2c2f31]">Sessão caixa</p>
       <div className="mt-4">
         <WidgetWrapper
           title="sessão de caixa"
@@ -166,7 +159,7 @@ function CaixaSessaoCard({
           className="border-0 bg-transparent p-0"
         >
           {sessao?.status === 'open' ? (
-            <div className="space-y-3 rounded-2xl border border-green-200 bg-green-50 p-4">
+            <div className="flex flex-col gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
               <Badge variant="success">Aberta</Badge>
               <div>
                 <p className="text-sm font-medium text-[#2c2f31]">{sessao.estabelecimento?.nome || 'Sem estabelecimento'}</p>
@@ -182,7 +175,7 @@ function CaixaSessaoCard({
               </Button>
             </div>
           ) : (
-            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
               <Badge variant="secondary">Fechada</Badge>
               <p className="text-sm text-slate-600">Sem sessão aberta neste momento.</p>
               <Button asChild variant="outline" className="justify-start gap-2">
@@ -209,7 +202,7 @@ function PainelAnalise() {
     return (
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="h-40 animate-pulse rounded-2xl bg-slate-200" />
+          <div key={index} className="h-40 animate-pulse rounded-lg bg-slate-100" />
         ))}
       </div>
     );
@@ -246,8 +239,8 @@ function PainelAnalise() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="border-slate-200 p-5 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Performance</p>
-        <div className="mt-4 space-y-3 text-sm">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Performance</p>
+        <div className="mt-4 flex flex-col gap-3 text-sm">
           <div className="flex items-center justify-between"><span className="text-slate-500">Total vendido</span><strong>{formatKz(data.totalVendas)}</strong></div>
           <div className="flex items-center justify-between"><span className="text-slate-500">Número de vendas</span><strong>{data.numVendas}</strong></div>
           <div className="flex items-center justify-between"><span className="text-slate-500">Ticket médio</span><strong>{formatKz(data.ticketMedio)}</strong></div>
@@ -255,8 +248,8 @@ function PainelAnalise() {
         </Card>
 
         <Card className="border-slate-200 p-5 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Top por Quantidade</p>
-        <div className="mt-4 space-y-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Top por quantidade</p>
+        <div className="mt-4 flex flex-col gap-3">
           {data.topPorQuantidade.slice(0, 5).map((item) => (
             <div key={item.productCode} className="flex items-center justify-between gap-4 text-sm">
               <div className="min-w-0">
@@ -271,8 +264,8 @@ function PainelAnalise() {
         </Card>
 
         <Card className="border-slate-200 p-5 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Top por Faturação</p>
-        <div className="mt-4 space-y-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Top por faturação</p>
+        <div className="mt-4 flex flex-col gap-3">
           {data.topPorFacturacao.slice(0, 5).map((item) => (
             <div key={item.productCode} className="flex items-center justify-between gap-4 text-sm">
               <div className="min-w-0">
@@ -287,8 +280,8 @@ function PainelAnalise() {
         </Card>
 
         <Card className="border-slate-200 p-5 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Produtos Parados</p>
-        <div className="mt-4 space-y-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Produtos parados</p>
+        <div className="mt-4 flex flex-col gap-3">
           {data.produtosParados.slice(0, 5).map((produto) => (
             <div key={produto.id} className="flex items-center justify-between gap-4 text-sm">
               <div className="min-w-0">
@@ -333,10 +326,11 @@ function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
   ].filter(Boolean) as { href: string; label: string; icon: typeof CreditCard }[];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 p-4 md:p-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Painel Operacional</h1>
+          <p className="text-sm text-slate-500">Olá, {currentUser.name}</p>
+          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-[#2c2f31]">Painel operacional</h1>
           <p className="mt-1 text-sm text-slate-500">
             Área focada na operação do dia, sem métricas comerciais nem dados de faturação.
           </p>
@@ -345,13 +339,10 @@ function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.05fr]">
         <Card className="border-slate-200 p-5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <Store className="h-4 w-4 text-[#B84D0E]" />
-            <p className="text-sm font-semibold text-[#2c2f31]">Estado Operacional</p>
-          </div>
+          <p className="text-base font-semibold text-[#2c2f31]">Estado operacional</p>
 
           {podeVerCaixa ? (
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
               {loadingSessao ? (
                 <div className="space-y-2">
                   <div className="h-4 w-32 animate-pulse rounded-full bg-slate-200" />
@@ -386,17 +377,14 @@ function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
               )}
             </div>
           ) : (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
               Não tens acesso à supervisão do caixa nesta conta.
             </div>
           )}
         </Card>
 
         <Card className="border-slate-200 p-5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-[#B84D0E]" />
-            <p className="text-sm font-semibold text-[#2c2f31]">Acessos Rápidos</p>
-          </div>
+          <p className="text-base font-semibold text-[#2c2f31]">Acessos rápidos</p>
           <div className="mt-4 grid gap-3">
             {links.map(({ href, label, icon: Icon }) => (
               <Button key={href} asChild variant="outline" className="justify-start gap-2">
@@ -407,7 +395,7 @@ function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
               </Button>
             ))}
             {links.length === 0 ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
                 Não há atalhos operacionais disponíveis para este perfil no momento.
               </div>
             ) : null}
@@ -492,33 +480,36 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
     : `${variacaoSemana}% vs semana anterior`;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 p-4 md:p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Painel Comercial</h1>
+          <p className="text-sm text-slate-500">Olá, {currentUser?.name || 'utilizador'}</p>
+          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-[#2c2f31]">Painel comercial</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Acompanha vendas, operação de caixa e sinais rápidos do mês.
+            {new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
 
-        {podeAnalise ? (
-          <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
+          {podeAnalise ? (
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
             <button
               type="button"
               onClick={() => setModo('resumo')}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${modo === 'resumo' ? 'bg-[#B84D0E] text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${modo === 'resumo' ? 'bg-[#B84D0E] text-white' : 'text-slate-500 hover:bg-orange-50 hover:text-[#B84D0E]'}`}
             >
               Resumo
             </button>
             <button
               type="button"
               onClick={() => setModo('analise')}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${modo === 'analise' ? 'bg-[#B84D0E] text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${modo === 'analise' ? 'bg-[#B84D0E] text-white' : 'text-slate-500 hover:bg-orange-50 hover:text-[#B84D0E]'}`}
             >
               Análise
             </button>
           </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
       <BillingAccessBanner subscription={currentUser?.subscription} />
@@ -577,7 +568,7 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
             <Card className="border-slate-200 p-5 shadow-sm">
-              <p className="text-sm font-semibold text-[#2c2f31]">Ações rápidas</p>
+              <p className="text-base font-semibold text-[#2c2f31]">Ações rápidas</p>
               <div className="mt-4 grid gap-3">
                 {podeVerVendas ? (
                   <Button asChild className="justify-start gap-2">
@@ -604,7 +595,7 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
                   </Button>
                 ) : null}
                 {!podeVerVendas && !podeVerFaturacao ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
                     Não há ações rápidas comerciais disponíveis para este perfil.
                   </div>
                 ) : null}

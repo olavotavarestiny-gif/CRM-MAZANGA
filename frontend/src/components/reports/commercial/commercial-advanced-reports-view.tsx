@@ -8,7 +8,6 @@ import {
   Package,
   ShoppingCart,
   Store,
-  Users,
   Wallet,
 } from 'lucide-react';
 import {

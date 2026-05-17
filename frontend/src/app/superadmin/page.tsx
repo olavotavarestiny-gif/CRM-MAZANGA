@@ -24,11 +24,8 @@ import {
 import type {
   LoginLog,
   PlanName,
-  SuperAdminDashboard,
-  SuperAdminOrg,
   SuperAdminStorageStat,
   SuperAdminUsageStat,
-  User,
 } from '@/lib/api';
 import type { ClientAccount } from '@/lib/types';
 import {

@@ -1,6 +1,14 @@
 const { createLocalJWKSet, createRemoteJWKSet, jwtVerify } = require('jose');
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
+const { ACCESS_ROLES, getAccessRole, hasSuperAdminAccess } = require('../lib/roles');
+const {
+  buildDevAuthRequestUser,
+  hasValidDevAuthHeader,
+  isDevAuthBypassEnabled,
+  isDevAuthWrite,
+  runWithDevAuthBypass,
+} = require('../lib/dev-auth');
 
 // Dynamic JWKS — fetched from Supabase when SUPABASE_URL is set.
 // jose caches and auto-refreshes on key rotation.
@@ -67,6 +75,19 @@ const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'olavo@kukugest.ao';
 const SUPER_ADMIN_EMAILS = [...new Set([SUPER_ADMIN_EMAIL, 'olavo@kukugest.ao'])];
 
 async function requireAuth(req, res, next) {
+  if (isDevAuthBypassEnabled() && hasValidDevAuthHeader(req)) {
+    req.user = buildDevAuthRequestUser();
+
+    if (isDevAuthWrite(req) && !String(req.originalUrl || '').startsWith('/api/auth/log-login')) {
+      return res.status(403).json({
+        error: 'Modo DEV com auth desactivado não permite operações de escrita.',
+        code: 'DEV_AUTH_WRITE_BLOCKED',
+      });
+    }
+
+    return runWithDevAuthBypass(() => next());
+  }
+
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -77,34 +98,37 @@ async function requireAuth(req, res, next) {
   // ── Impersonation token (HS256, signed with JWT_SECRET) ───────────────────
   // We attempt HS256 verification first. If it succeeds and type='impersonation',
   // we use the impersonated user. Otherwise fall through to Supabase JWT.
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
-    if (decoded.type === 'impersonation') {
-      const targetUser = await prisma.user.findUnique({
-        where: { id: decoded.impersonatedUserId },
-        select: USER_SELECT,
-      });
-      if (!targetUser || !targetUser.active) {
-        return res.status(403).json({ error: 'Utilizador impersonado não encontrado ou inactivo' });
+  if (process.env.JWT_SECRET) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded.type === 'impersonation') {
+        const targetUser = await prisma.user.findUnique({
+          where: { id: decoded.impersonatedUserId },
+          select: USER_SELECT,
+        });
+        if (!targetUser || !targetUser.active) {
+          return res.status(403).json({ error: 'Utilizador impersonado não encontrado ou inactivo' });
+        }
+        req.user = {
+          id: targetUser.id,
+          email: targetUser.email,
+          name: targetUser.name,
+          role: targetUser.role,
+          isSuperAdmin: targetUser.isSuperAdmin || SUPER_ADMIN_EMAILS.includes(targetUser.email),
+          permissionsJson: targetUser.permissions,
+          accountOwnerId: targetUser.accountOwnerId || null,
+          supabaseUid: targetUser.supabaseUid || null,
+          effectiveUserId: targetUser.accountOwnerId || targetUser.id,
+          isAccountOwner: !targetUser.accountOwnerId,
+          mustChangePassword: targetUser.mustChangePassword,
+          impersonatedBy: decoded.impersonatorId,
+        };
+        req.user.accessRole = getAccessRole(req.user);
+        return next();
       }
-      req.user = {
-        id: targetUser.id,
-        email: targetUser.email,
-        name: targetUser.name,
-        role: targetUser.role,
-        isSuperAdmin: targetUser.isSuperAdmin || SUPER_ADMIN_EMAILS.includes(targetUser.email),
-        permissionsJson: targetUser.permissions,
-        accountOwnerId: targetUser.accountOwnerId || null,
-        supabaseUid: targetUser.supabaseUid || null,
-        effectiveUserId: targetUser.accountOwnerId || targetUser.id,
-        isAccountOwner: !targetUser.accountOwnerId,
-        mustChangePassword: targetUser.mustChangePassword,
-        impersonatedBy: decoded.impersonatorId,
-      };
-      return next();
+    } catch {
+      // Not a valid HS256 token — fall through to Supabase verification
     }
-  } catch {
-    // Not a valid HS256 token — fall through to Supabase verification
   }
 
   // ── Supabase JWT (ES256, dynamic JWKS) ───────────────────────────────────
@@ -160,6 +184,7 @@ async function requireAuth(req, res, next) {
       mustChangePassword: user.mustChangePassword,
       impersonatedBy: null,
     };
+    req.user.accessRole = getAccessRole(req.user);
     next();
   } catch (error) {
     console.error('[auth] DB error:', error.message);
@@ -189,7 +214,7 @@ function requireAccountOwnerOrAdmin(req, res, next) {
 }
 
 function requireSuperAdmin(req, res, next) {
-  if (!req.user?.isSuperAdmin) {
+  if (!hasSuperAdminAccess(req.user)) {
     return res.status(403).json({ error: 'Acção reservada ao super-administrador' });
   }
   next();
@@ -201,4 +226,5 @@ module.exports.requireAccountOwner = requireAccountOwner;
 module.exports.requireAccountOwnerOrAdmin = requireAccountOwnerOrAdmin;
 module.exports.requireSuperAdmin = requireSuperAdmin;
 module.exports.SUPER_ADMIN_EMAIL = SUPER_ADMIN_EMAIL;
+module.exports.ACCESS_ROLES = ACCESS_ROLES;
 module.exports.verifySupabaseJwt = verifySupabaseJwt;

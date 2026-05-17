@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit --noUnusedLocals --noUnusedParameters --incremental false",
     "check": "npm run lint && npm run build",
     "deploy": "vercel --prod"
   },

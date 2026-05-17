@@ -10,7 +10,6 @@ import type {
   CaixaSessao,
   ChatChannel,
   ChatMessage,
-  ClientAccount,
   ClientProfitability,
   ClienteFaturacao,
   ComercialAnalise,
@@ -23,10 +22,8 @@ import type {
   Contact,
   BulkUpdateContactsInput,
   BulkUpdateContactsResponse,
-  ContactStatsResponse,
   ContactsPageResponse,
   ContactGroup,
-  ContactFacetsResponse,
   ContactFieldConfig,
   ContactFieldDef,
   CRMForm,
@@ -64,6 +61,16 @@ import type {
   Transaction,
 } from './types';
 import { createClient } from './supabase/client';
+import {
+  DEV_AUTH_HEADER,
+  DEV_AUTH_TOKEN,
+  clearDevAuthSession,
+  isDevAuthSessionActive,
+  isDevAuthUserPayload,
+  writeDevAuthSession,
+} from './dev-auth';
+import { createDevSampleApiAdapter } from './dev-sample-api';
+import type { AccessRole } from './roles';
 
 const DEFAULT_API_URL = 'http://localhost:3001';
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL?.trim() || '';
@@ -126,8 +133,20 @@ function getSupabaseClient() {
 
 // Request interceptor: prefer impersonation token, fall back to Supabase session token
 api.interceptors.request.use(async (config) => {
+  const devSampleAdapter = createDevSampleApiAdapter();
+  if (devSampleAdapter) {
+    config.adapter = devSampleAdapter;
+    config.headers[DEV_AUTH_HEADER] = DEV_AUTH_TOKEN;
+    return config;
+  }
+
   if (API_URL_CONFIG_ERROR) {
     throw new Error(API_URL_CONFIG_ERROR);
+  }
+
+  if (isDevAuthSessionActive()) {
+    config.headers[DEV_AUTH_HEADER] = DEV_AUTH_TOKEN;
+    return config;
   }
 
   if (typeof window !== 'undefined') {
@@ -225,10 +244,6 @@ export async function searchContacts(params?: Omit<ContactsQueryParams, 'page' |
   });
   return response.data;
 }
-export async function getContactStats() {
-  const response = await api.get<ContactStatsResponse>('/api/contacts/stats');
-  return response.data;
-}
 
 export async function getContactGroups() {
   const response = await api.get<ContactGroup[]>('/api/contacts/groups');
@@ -247,11 +262,6 @@ export async function updateContactGroup(id: string, data: Pick<ContactGroup, 'n
 
 export async function deleteContactGroup(id: string) {
   const response = await api.delete<{ message: string; detachedContactsCount: number }>(`/api/contacts/groups/${id}`);
-  return response.data;
-}
-
-export async function getContactFacets() {
-  const response = await api.get<ContactFacetsResponse>('/api/contacts/facets');
   return response.data;
 }
 
@@ -563,7 +573,7 @@ export async function deleteForm(id: string) {
 
 export async function addField(
   formId: string,
-  data: { type: string; label: string; required?: boolean; order: number; options?: string[]; contactField?: string }
+  data: { type: FormField['type']; label: string; required?: boolean; order: number; options?: string[]; contactField?: string }
 ) {
   const response = await api.post<FormField>(`/api/forms/${formId}/fields`, data);
   return response.data;
@@ -589,6 +599,11 @@ export async function submitForm(formId: string, answers: { fieldId: string; val
 
 export async function getFormSubmissions(formId: string) {
   const response = await api.get<FormSubmission[]>(`/api/forms/${formId}/submissions`);
+  return response.data;
+}
+
+export async function getContactFormSubmissions(contactId: number) {
+  const response = await api.get<FormSubmission[]>(`/api/contacts/${contactId}/form-submissions`);
   return response.data;
 }
 
@@ -628,38 +643,6 @@ export async function updateServicesDashboardSettings(data: ServicesDashboardSet
   return response.data;
 }
 
-// Authentication
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-export interface RegisterRequest {
-  name: string;
-  email: string;
-  password: string;
-}
-
-export interface AuthResponse {
-  token: string;
-  user: {
-    id: number;
-    name: string;
-    email: string;
-  };
-  mustChangePassword?: boolean;
-}
-
-export async function register(data: RegisterRequest) {
-  const response = await api.post<AuthResponse>('/api/auth/register', data);
-  return response.data;
-}
-
-export async function login(data: LoginRequest) {
-  const response = await api.post<AuthResponse>('/api/auth/login', data);
-  return response.data;
-}
-
 export async function getCurrentUser() {
   const response = await fetch('/api/auth/me', {
     method: 'GET',
@@ -668,6 +651,7 @@ export async function getCurrentUser() {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
+    clearDevAuthSession();
     const message =
       payload?.error ||
       payload?.message ||
@@ -680,6 +664,12 @@ export async function getCurrentUser() {
     (error as any).code = payload?.code;
     (error as any).requestId = payload?.requestId;
     throw error;
+  }
+
+  if (isDevAuthUserPayload(payload)) {
+    writeDevAuthSession(payload);
+  } else {
+    clearDevAuthSession();
   }
 
   return payload as User;
@@ -810,6 +800,7 @@ export interface User {
   name: string;
   email: string;
   role: string;
+  accessRole?: AccessRole;
   jobTitle?: string | null;
   active: boolean;
   plan?: PlanName;
@@ -1402,14 +1393,19 @@ export async function getVendasReport(year: number) {
   return res.data as import('./types').VendasReport;
 }
 
+function getDownloadApiUrl(): string {
+  if (API_URL_CONFIG_ERROR) {
+    throw new Error(API_URL_CONFIG_ERROR);
+  }
+  return API_URL;
+}
+
 export function getIvaExportUrl(periodo: string): string {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3011';
-  return `${API_URL}/api/faturacao/relatorios/iva/export?periodo=${periodo}`;
+  return `${getDownloadApiUrl()}/api/faturacao/relatorios/iva/export?periodo=${periodo}`;
 }
 
 export function getVendasExportUrl(year: number): string {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3011';
-  return `${API_URL}/api/faturacao/relatorios/vendas/export?year=${year}`;
+  return `${getDownloadApiUrl()}/api/faturacao/relatorios/vendas/export?year=${year}`;
 }
 
 export async function validateSaft(periodo: string): Promise<{ valid: boolean; errors: string[] }> {
@@ -1421,7 +1417,7 @@ export async function getSaftDownloadUrl(id: string): Promise<string> {
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token ?? '';
-  return `${API_URL}/api/faturacao/saft/${id}/download?token=${encodeURIComponent(token)}`;
+  return `${getDownloadApiUrl()}/api/faturacao/saft/${id}/download?token=${encodeURIComponent(token)}`;
 }
 
 // Faturas Recorrentes

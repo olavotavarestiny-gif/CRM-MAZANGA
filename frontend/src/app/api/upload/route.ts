@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { UploadFolder } from '@/lib/storage';
+import { uploadFile, type UploadFolder } from '@/lib/storage';
 import { createClient } from '@/lib/supabase/server';
 
 const MAX_SIZES: Record<UploadFolder, number> = {
@@ -44,7 +44,7 @@ function getUploadErrorMessage(error: unknown): string {
   }
 
   if (/storage não configurado/i.test(rawMessage)) {
-    return 'O storage de ficheiros não está configurado no backend.';
+    return 'O storage de ficheiros não está configurado.';
   }
 
   if (/token|unauthorized|forbidden|access denied|not authorized/i.test(rawMessage)) {
@@ -100,7 +100,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const folder = folderRaw as UploadFolder;
   const maxSize = MAX_SIZES[folder];
   const allowedTypes = ALLOWED_TYPES[folder];
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
   if (file.size > maxSize) {
     const mb = (maxSize / 1024 / 1024).toFixed(0);
@@ -120,29 +119,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
-    const accessToken = session?.access_token;
 
-    if (!accessToken) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Sessão expirada. Inicie sessão novamente.' }, { status: 401 });
     }
 
-    const arrayBuffer = await file.arrayBuffer();
-    const backendRes = await fetch(`${apiUrl}/api/uploads`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/octet-stream',
-        'x-upload-folder': folder,
-        'x-file-name': encodeURIComponent(file.name),
-        'x-file-type': file.type,
-      },
-      body: arrayBuffer,
-    });
-
-    const payload = await backendRes.json();
-    if (!backendRes.ok) {
-      throw new Error(typeof payload?.error === 'string' ? payload.error : 'Erro no upload');
-    }
+    const payload = await uploadFile(file, folder, session.user.id);
 
     return NextResponse.json(payload, { status: 200 });
   } catch (err) {

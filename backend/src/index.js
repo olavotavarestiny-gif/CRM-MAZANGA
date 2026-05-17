@@ -1,5 +1,8 @@
 if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config();
+  const path = require('path');
+  const dotenv = require('dotenv');
+  dotenv.config();
+  dotenv.config({ path: path.resolve(__dirname, '../../frontend/.env.local') });
 }
 
 const express = require('express');
@@ -15,6 +18,7 @@ const automationsRouter = require('./routes/automations');
 const whatsappRouter = require('./routes/whatsapp');
 const tasksRouter = require('./routes/tasks');
 const formsRouter = require('./routes/forms');
+const publicLeadRouter = require('./routes/public-lead');
 const inboxRouter = require('./routes/inbox');
 const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
@@ -42,7 +46,6 @@ const caixaSessoesRouter = require('./routes/caixa-sessoes');
 const activityRouter = require('./routes/activity');
 const onboardingRouter = require('./routes/onboarding');
 const startupTemplatesRouter = require('./routes/startup-templates');
-const uploadsRouter = require('./routes/uploads');
 const reportsRouter = require('./routes/reports');
 const serviceDashboardRouter = require('./routes/service-dashboard');
 const requireAuth = require('./middleware/auth');
@@ -163,6 +166,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/webhook', webhookRouter);
 app.use('/api/forms', formsRouter);
 app.use('/api/setup', setupRouter);
+app.use('/api/public', publicLeadRouter);
 
 // Protected routes (require authentication)
 app.use('/api/contacts', requireAuth, checkSubscriptionAccess, contactsRouter);
@@ -204,7 +208,6 @@ app.use('/api/onboarding', requireAuth, onboardingRouter);
 app.use('/api/startup-templates', requireAuth, startupTemplatesRouter);
 app.use('/api/reports', requireAuth, checkSubscriptionAccess, reportsRouter);
 app.use('/api/dashboard', requireAuth, checkSubscriptionAccess, serviceDashboardRouter);
-app.use('/api/uploads', uploadsRouter);
 app.use('/api', requireAuth, checkSubscriptionAccess, notesRouter);
 
 // Scheduler: process recurring invoices daily at 00:05

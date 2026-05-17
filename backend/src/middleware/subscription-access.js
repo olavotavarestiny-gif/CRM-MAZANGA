@@ -14,7 +14,12 @@ function isRenewalPath(path) {
 
 async function checkSubscriptionAccess(req, res, next) {
   try {
-    if (!req.user || req.user.isSuperAdmin || isRenewalPath(req.originalUrl || req.path)) return next();
+    if (
+      !req.user ||
+      req.user.isDevAuthBypass ||
+      req.user.isSuperAdmin ||
+      isRenewalPath(req.originalUrl || req.path)
+    ) return next();
 
     const state = await getSubscriptionState(req.user.effectiveUserId);
     if (!state) return next();

@@ -18,11 +18,12 @@ export interface StoredFile {
 
 /**
  * Uploads a File to Vercel Blob under the given folder.
- * Generates a unique name: {folder}/{timestamp}-{sanitizedFilename}
+ * Generates a unique name: {folder}/{scope}/{timestamp}-{sanitizedFilename}
  */
 export async function uploadFile(
   file: File,
-  folder: UploadFolder
+  folder: UploadFolder,
+  scope = 'shared'
 ): Promise<UploadResult> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     throw new Error(
@@ -31,7 +32,8 @@ export async function uploadFile(
   }
 
   const sanitized = sanitizeFilename(file.name);
-  const pathname = `${folder}/${Date.now()}-${sanitized}`;
+  const safeScope = sanitizeFilename(scope).replace(/\.[^.]+$/, '') || 'shared';
+  const pathname = `${folder}/${safeScope}/${Date.now()}-${sanitized}`;
 
   const blob = await put(pathname, file, {
     access: 'public',

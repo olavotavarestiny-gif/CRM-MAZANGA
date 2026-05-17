@@ -3,12 +3,10 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Briefcase,
   CheckCircle2,
   FileText,
   KanbanSquare,
   Target,
-  TrendingUp,
   Users,
   Wallet,
 } from 'lucide-react';

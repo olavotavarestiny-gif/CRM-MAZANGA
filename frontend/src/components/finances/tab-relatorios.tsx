@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, BarChart2, FileText, TrendingUp, RefreshCw } from 'lucide-react';
+import { Download, BarChart2, FileText, RefreshCw } from 'lucide-react';
 import { getIvaReport, getVendasReport, getIvaExportUrl, getVendasExportUrl } from '@/lib/api';
 
 const MONTHS = ['01','02','03','04','05','06','07','08','09','10','11','12'];

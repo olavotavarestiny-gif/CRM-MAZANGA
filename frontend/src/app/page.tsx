@@ -4,820 +4,552 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Banknote,
-  BarChart3,
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  Clock3,
-  CreditCard,
-  Filter,
-  ListChecks,
-  RotateCcw,
-  ShieldCheck,
-  Workflow,
-} from 'lucide-react';
-import {
-  createLocalCalendarEvent,
-  createTask,
+  getFacturas,
+  getFaturacaoDashboard,
   getCurrentUser,
   getServicesDashboardBase,
-  updateServicesDashboardSettings,
   updateTask,
 } from '@/lib/api';
 import { isComercio } from '@/lib/business-modes';
-import type { ServicesDashboardBase, Task } from '@/lib/types';
+import type { Factura, ServicesDashboardBase, Task } from '@/lib/types';
 import PainelComercialPage from '@/components/comercial/painel-comercial';
 import OnboardingChecklist from '@/components/onboarding/onboarding-checklist';
 import StartupModelSelector from '@/components/onboarding/startup-model-selector';
+import TaskFormModal from '@/components/tasks/task-form-modal';
 import { BillingAccessBanner } from '@/components/billing/access-notice';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ErrorState } from '@/components/ui/error-state';
-import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast-provider';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
-type VistaDashboard = 'comercial' | 'gestao' | 'operacional';
-type PeriodoDashboard = 'month' | '7d' | '30d' | '90d';
+type PeriodoDashboard = '7d' | 'month' | '90d';
+type DashboardWidgetId =
+  | 'receita'
+  | 'pipeline'
+  | 'clientes'
+  | 'conversao'
+  | 'facturas_atraso'
+  | 'ticket_medio'
+  | 'funil'
+  | 'actividade'
+  | 'tarefas'
+  | 'facturas_pendentes';
 
-interface DashboardFiltersState {
-  period: PeriodoDashboard;
-  responsibleUserId: string;
-  stage: string;
-  leadOrigin: string;
-  segment: string;
-}
-
-interface MetricCardConfig {
-  title: string;
-  value: number | string | null | undefined;
-  unit?: 'Kz' | '%' | 'dias' | 'numero' | 'Kz/dia';
-  icon: typeof Banknote;
-  context: string;
-  tone?: 'normal' | 'danger' | 'warning' | 'success';
-}
-
-interface DashboardActionItem {
+interface ActivityItem {
   id: string;
-  type: 'task' | 'birthday' | 'alert';
-  title: string;
+  label: string;
   detail: string;
-  priority: 'Alta' | 'Media' | 'Baixa';
-  dueDate?: string | null;
-  taskId?: number;
-  contact?: { id: number; name: string; company?: string | null } | null;
+  time: string;
+  tone: 'normal' | 'danger' | 'warning' | 'success';
 }
 
-const ALL_VALUE = 'all';
-const VIEW_STORAGE_PREFIX = 'dashboard_servicos_vista';
-const FILTER_STORAGE_PREFIX = 'dashboard_servicos_filtros';
-const DEFAULT_VIEW: VistaDashboard = 'comercial';
-const DEFAULT_FILTERS: DashboardFiltersState = {
-  period: 'month',
-  responsibleUserId: ALL_VALUE,
-  stage: ALL_VALUE,
-  leadOrigin: ALL_VALUE,
-  segment: ALL_VALUE,
-};
-
-const VIEW_OPTIONS: Array<{ value: VistaDashboard; label: string; description: string }> = [
-  { value: 'comercial', label: 'Vista Comercial', description: 'Funil, acompanhamentos e risco comercial.' },
-  { value: 'gestao', label: 'Vista Gestão', description: 'Receita, eficiência e performance.' },
-  { value: 'operacional', label: 'Vista Operacional', description: 'Ações, alertas e rotina diária.' },
+const PERIOD_OPTIONS: Array<{ value: PeriodoDashboard; label: string }> = [
+  { value: '7d', label: 'Semana' },
+  { value: 'month', label: 'Mês' },
+  { value: '90d', label: 'Trimestre' },
 ];
 
-function getStorageKey(prefix: string, userId?: number | null) {
-  return userId ? `${prefix}:${userId}` : null;
+const WIDGET_OPTIONS: Array<{ id: DashboardWidgetId; label: string }> = [
+  { id: 'receita', label: 'Receita' },
+  { id: 'pipeline', label: 'Pipeline' },
+  { id: 'clientes', label: 'Clientes activos' },
+  { id: 'conversao', label: 'Taxa conversão' },
+  { id: 'facturas_atraso', label: 'Faturas pendentes' },
+  { id: 'ticket_medio', label: 'Ticket médio' },
+  { id: 'funil', label: 'Funil pipeline' },
+  { id: 'actividade', label: 'Actividade recente' },
+  { id: 'tarefas', label: 'Tarefas' },
+  { id: 'facturas_pendentes', label: 'Faturas pendentes' },
+];
+
+const DEFAULT_WIDGET_VISIBILITY = WIDGET_OPTIONS.reduce(
+  (acc, widget) => ({ ...acc, [widget.id]: true }),
+  {} as Record<DashboardWidgetId, boolean>
+);
+
+function dashboardWidgetStorageKey(userId?: number | null) {
+  return userId ? `kuku_dashboard_widgets_${userId}` : null;
 }
 
-function readStoredView(storageKey: string | null): VistaDashboard {
-  if (!storageKey || typeof window === 'undefined') return DEFAULT_VIEW;
-  const stored = window.localStorage.getItem(storageKey);
-  return stored === 'gestao' || stored === 'operacional' || stored === 'comercial'
-    ? stored
-    : DEFAULT_VIEW;
-}
-
-function readStoredFilters(storageKey: string | null): DashboardFiltersState {
-  if (!storageKey || typeof window === 'undefined') return DEFAULT_FILTERS;
+function readWidgetVisibility(storageKey: string | null) {
+  if (!storageKey || typeof window === 'undefined') return DEFAULT_WIDGET_VISIBILITY;
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(storageKey) || '{}') as Partial<DashboardFiltersState>;
-    return {
-      period: parsed.period === '7d' || parsed.period === '30d' || parsed.period === '90d' || parsed.period === 'month'
-        ? parsed.period
-        : DEFAULT_FILTERS.period,
-      responsibleUserId: parsed.responsibleUserId || ALL_VALUE,
-      stage: parsed.stage || ALL_VALUE,
-      leadOrigin: parsed.leadOrigin || ALL_VALUE,
-      segment: parsed.segment || ALL_VALUE,
-    };
+    const parsed = JSON.parse(window.localStorage.getItem(storageKey) || '{}') as Partial<Record<DashboardWidgetId, boolean>>;
+    return WIDGET_OPTIONS.reduce(
+      (acc, widget) => ({ ...acc, [widget.id]: parsed[widget.id] ?? true }),
+      {} as Record<DashboardWidgetId, boolean>
+    );
   } catch {
-    return DEFAULT_FILTERS;
+    return DEFAULT_WIDGET_VISIBILITY;
   }
 }
 
 function formatKz(value: number | null | undefined) {
   if (value === null || value === undefined) return '—';
-  return `${new Intl.NumberFormat('pt-AO', { maximumFractionDigits: 0 }).format(Number(value))} Kz`;
+  return `${new Intl.NumberFormat('pt-AO', { maximumFractionDigits: 0 }).format(Number(value || 0))} Kz`;
 }
 
 function formatShortKz(value: number | null | undefined) {
   if (value === null || value === undefined) return '—';
   const number = Number(value || 0);
-  if (Math.abs(number) >= 1_000_000) return `${new Intl.NumberFormat('pt-AO', { maximumFractionDigits: 1 }).format(number / 1_000_000)}M Kz`;
-  if (Math.abs(number) >= 1_000) return `${new Intl.NumberFormat('pt-AO', { maximumFractionDigits: 0 }).format(number / 1_000)}k Kz`;
+  if (Math.abs(number) >= 1_000_000) {
+    return `${new Intl.NumberFormat('pt-AO', { maximumFractionDigits: 1 }).format(number / 1_000_000)}M Kz`;
+  }
+  if (Math.abs(number) >= 1_000) {
+    return `${new Intl.NumberFormat('pt-AO', { maximumFractionDigits: 0 }).format(number / 1_000)}k Kz`;
+  }
   return formatKz(number);
 }
 
-function formatRelativeUpdate(value?: string | null) {
-  if (!value) return 'Atualizado agora';
+function formatNumber(value: number | null | undefined) {
+  if (value === null || value === undefined) return '—';
+  return new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 0 }).format(Number(value || 0));
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return 'Sem data';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Sem data';
+  return parsed.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' });
+}
+
+function formatRelative(value?: string | null) {
+  if (!value) return 'agora';
   const parsed = new Date(value).getTime();
-  if (Number.isNaN(parsed)) return 'Atualizado agora';
+  if (Number.isNaN(parsed)) return 'agora';
   const minutes = Math.max(0, Math.floor((Date.now() - parsed) / 60000));
-  if (minutes < 1) return 'Atualizado agora';
-  if (minutes === 1) return 'Atualizado há 1 minuto';
-  if (minutes < 60) return `Atualizado há ${minutes} minutos`;
+  if (minutes < 1) return 'agora';
+  if (minutes < 60) return `há ${minutes} min`;
   const hours = Math.floor(minutes / 60);
-  return hours === 1 ? 'Atualizado há 1 hora' : `Atualizado há ${hours} horas`;
+  if (hours < 24) return `há ${hours}h`;
+  return `há ${Math.floor(hours / 24)}d`;
 }
 
-function formatTaskTime(value?: string | null) {
-  if (!value) return 'Sem hora';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Sem hora';
-  return date.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+function isOverdue(value?: string | null) {
+  if (!value) return false;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  parsed.setHours(0, 0, 0, 0);
+  return parsed < today;
 }
 
-function getHealthLabel(status: ServicesDashboardBase['healthScore']['status']) {
-  if (status === 'saudavel') return 'Saudável';
-  if (status === 'atencao') return 'Atenção';
-  return 'Risco';
-}
-
-function formatMetricValue(metric: MetricCardConfig) {
-  if (typeof metric.value === 'string') return metric.value;
-  if (metric.value === null || metric.value === undefined) return '—';
-  if (metric.unit === 'Kz') return formatKz(metric.value);
-  if (metric.unit === 'Kz/dia') {
-    return `${new Intl.NumberFormat('pt-AO', { maximumFractionDigits: 0 }).format(Number(metric.value))} Kz/dia`;
+function getDateRange(period: PeriodoDashboard) {
+  const end = new Date();
+  const start = new Date();
+  if (period === 'month') {
+    start.setDate(1);
+  } else {
+    start.setDate(start.getDate() - (period === '7d' ? 6 : 89));
   }
-  if (metric.unit === '%') return `${metric.value}%`;
-  if (metric.unit === 'dias') return `${metric.value} dias`;
-  return new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 0 }).format(Number(metric.value));
-}
-
-function getMetricToneClass(tone: MetricCardConfig['tone']) {
-  switch (tone) {
-    case 'danger':
-      return 'bg-red-50 text-red-700';
-    case 'warning':
-      return 'bg-amber-50 text-amber-700';
-    case 'success':
-      return 'bg-emerald-50 text-emerald-700';
-    default:
-      return 'bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)]';
-  }
-}
-
-function MetricCard({ metric }: { metric: MetricCardConfig }) {
-  const Icon = metric.icon;
-  return (
-    <Card className="border-slate-200 p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-[#64748B]">{metric.title}</p>
-          <p className="mt-2 text-xl font-bold text-[#0A2540]">{formatMetricValue(metric)}</p>
-          <p className="mt-1 text-xs text-[#64748B]">{metric.context}</p>
-        </div>
-        <div className={cn('rounded-lg p-2', getMetricToneClass(metric.tone))}>
-          <Icon className="h-4 w-4" />
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function getMetricsForView(_view: VistaDashboard, data: ServicesDashboardBase): MetricCardConfig[] {
-  const todayFollowUps = data.nextActions?.followUpsToday.length || 0;
-
-  return [
-    {
-      title: 'Pipeline em aberto',
-      value: data.kpis.pipelineOpenValue,
-      unit: 'Kz',
-      icon: Workflow,
-      context: data.kpiContext.pipelineOpenValue,
-    },
-    {
-      title: 'Tempo médio de fecho',
-      value: data.kpis.averageSalesCycleDays,
-      unit: 'dias',
-      icon: Clock3,
-      context: data.kpiContext.averageSalesCycleDays,
-    },
-    {
-      title: 'Ticket médio',
-      value: data.kpis.averageDealValue,
-      unit: 'Kz',
-      icon: CreditCard,
-      context: data.kpiContext.averageDealValue,
-    },
-    {
-      title: 'Acompanhamentos hoje',
-      value: todayFollowUps,
-      unit: 'numero',
-      icon: ListChecks,
-      context: data.kpiContext.followUpsToday,
-      tone: todayFollowUps > 0 ? 'normal' : 'success',
-    },
-  ];
+  return {
+    dateFrom: start.toISOString().slice(0, 10),
+    dateTo: end.toISOString().slice(0, 10),
+  };
 }
 
 function DashboardSkeleton() {
   return (
     <div className="mx-auto max-w-7xl p-4 md:p-6">
-      <div className="animate-pulse space-y-6">
-        <div className="flex items-start justify-between">
-          <div className="space-y-3">
-            <div className="h-8 w-32 rounded-full bg-slate-200" />
-            <div className="h-4 w-56 rounded-full bg-slate-200" />
+      <div className="flex animate-pulse flex-col gap-6">
+        <div className="flex flex-col gap-4 md:flex-row md:justify-between">
+          <div className="flex flex-col gap-3">
+            <div className="h-8 w-56 rounded-lg bg-slate-200" />
+            <div className="h-4 w-72 rounded-lg bg-slate-100" />
           </div>
-          <div className="h-10 w-44 rounded-lg bg-slate-200" />
+          <div className="h-10 w-72 rounded-lg bg-slate-100" />
         </div>
-        <div className="h-48 rounded-lg bg-slate-100" />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-28 rounded-lg bg-slate-100" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="h-32 rounded-lg bg-slate-100" />
           ))}
         </div>
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <div className="h-80 rounded-lg bg-slate-100" />
-          <div className="h-80 rounded-lg bg-slate-100" />
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-72 rounded-lg bg-slate-100" />
+          ))}
         </div>
       </div>
     </div>
   );
 }
 
-function ViewSelector({
-  value,
-  onChange,
+function TopBar({
+  userName,
+  period,
+  customizing,
+  onPeriodChange,
+  onToggleCustomizing,
 }: {
-  value: VistaDashboard;
-  onChange: (value: VistaDashboard) => void;
+  userName: string;
+  period: PeriodoDashboard;
+  customizing: boolean;
+  onPeriodChange: (period: PeriodoDashboard) => void;
+  onToggleCustomizing: () => void;
 }) {
-  return (
-    <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-      {VIEW_OPTIONS.map((option) => {
-        const selected = option.value === value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onChange(option.value)}
-            className={cn(
-              'rounded-lg border px-4 py-3 text-left transition-colors',
-              selected
-                ? 'border-[var(--workspace-primary)] bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)]'
-                : 'border-slate-200 bg-white text-[#0A2540] hover:border-slate-300'
-            )}
-          >
-            <span className="block text-sm font-bold">{option.label}</span>
-            <span className="mt-1 block text-xs text-[#64748B]">{option.description}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function FiltersBar({
-  filters,
-  options,
-  onChange,
-  onReset,
-}: {
-  filters: DashboardFiltersState;
-  options?: ServicesDashboardBase['filters'];
-  onChange: (patch: Partial<DashboardFiltersState>) => void;
-  onReset: () => void;
-}) {
-  const periods = options?.periods?.length ? options.periods : [
-    { value: 'month', label: 'Este mês' },
-    { value: '7d', label: 'Últimos 7 dias' },
-    { value: '30d', label: 'Últimos 30 dias' },
-    { value: '90d', label: 'Últimos 90 dias' },
-  ];
+  const today = new Date().toLocaleDateString('pt-PT', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 
   return (
-    <Card className="border-slate-200 p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-[#0A2540]">
-          <Filter className="h-4 w-4 text-[var(--workspace-primary)]" />
-          Filtros
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <p className="text-sm text-slate-500">Olá, {userName}</p>
+        <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-[#2c2f31]">Dashboard</h1>
+        <p className="mt-1 text-sm text-slate-500">{today}</p>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+          {PERIOD_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onPeriodChange(option.value)}
+              className={cn(
+                'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                period === option.value
+                  ? 'bg-[var(--workspace-primary)] text-[var(--workspace-on-primary)]'
+                  : 'text-slate-500 hover:bg-[var(--workspace-primary-soft)] hover:text-[var(--workspace-primary)]'
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
-        <Button variant="ghost" size="sm" onClick={onReset} className="gap-2">
-          <RotateCcw className="h-4 w-4" />
-          Limpar
+
+        <Button variant={customizing ? 'default' : 'outline'} onClick={onToggleCustomizing}>
+          Personalizar
         </Button>
       </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-[#64748B]">Período</label>
-          <Select value={filters.period} onValueChange={(value) => onChange({ period: value as PeriodoDashboard })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {periods.map((option) => (
-                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-[#64748B]">Responsável</label>
-          <Select value={filters.responsibleUserId} onValueChange={(value) => onChange({ responsibleUserId: value })}>
-            <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_VALUE}>Todos</SelectItem>
-              {(options?.responsibleUsers || []).map((option) => (
-                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-[#64748B]">Etapa do funil</label>
-          <Select value={filters.stage} onValueChange={(value) => onChange({ stage: value })}>
-            <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_VALUE}>Todas</SelectItem>
-              {(options?.stages || []).map((option) => (
-                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {options?.leadOrigins?.length ? (
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-[#64748B]">Origem do contacto</label>
-            <Select value={filters.leadOrigin} onValueChange={(value) => onChange({ leadOrigin: value })}>
-              <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_VALUE}>Todas</SelectItem>
-                {options.leadOrigins.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-
-        {options?.segments?.length ? (
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-[#64748B]">Segmento</label>
-            <Select value={filters.segment} onValueChange={(value) => onChange({ segment: value })}>
-              <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_VALUE}>Todos</SelectItem>
-                {options.segments.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-      </div>
-    </Card>
+    </div>
   );
 }
 
-function HeadlinePanel({
-  data,
-  goalDraft,
-  canEditGoal,
-  isSavingGoal,
-  onGoalDraftChange,
-  onGoalSave,
+function WidgetPicker({
+  visible,
+  onToggle,
 }: {
-  data: ServicesDashboardBase;
-  goalDraft: string;
-  canEditGoal: boolean;
-  isSavingGoal: boolean;
-  onGoalDraftChange: (value: string) => void;
-  onGoalSave: () => void;
+  visible: Record<DashboardWidgetId, boolean>;
+  onToggle: (id: DashboardWidgetId) => void;
 }) {
-  const status = data.healthScore.status;
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:p-6">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr]">
-        <div>
-          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-[#64748B]">
-            <span>{formatRelativeUpdate(data.generatedAt)}</span>
-            <span className="h-1 w-1 rounded-full bg-slate-300" />
-            <span>{data.headline.summary}</span>
-          </div>
-          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--workspace-primary)]">
-            Previsão do mês
-          </p>
-          <div className="mt-2 flex flex-wrap items-end gap-x-4 gap-y-2">
-            <h2 className="text-4xl font-black tracking-tight text-[#0A2540] md:text-5xl">
-              {formatShortKz(data.headline.monthlyForecastKz)}
-            </h2>
-            <span className={cn(
-              'mb-1 rounded-full px-3 py-1 text-sm font-bold',
-              status === 'risco'
-                ? 'bg-red-50 text-red-700'
-                : status === 'atencao'
-                ? 'bg-amber-50 text-amber-700'
-                : 'bg-emerald-50 text-emerald-700'
-            )}>
-              {getHealthLabel(status)}
-            </span>
-          </div>
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div>
-              <p className="text-xs text-[#64748B]">Meta atingida</p>
-              <p className="mt-1 text-lg font-bold text-[#0A2540]">
-                {data.goal.attainmentPercent !== null ? `${data.goal.attainmentPercent}%` : 'Sem meta'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-[#64748B]">Gap previsto</p>
-              <p className="mt-1 text-lg font-bold text-[#0A2540]">{formatShortKz(data.goal.gapKz)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-[#64748B]">Risco ativo</p>
-              <p className="mt-1 text-lg font-bold text-[#0A2540]">
-                {data.headline.riskDealsCount} negócio(s)
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-bold text-[#0A2540]">Saúde KukuGest</p>
-              <p className="mt-1 text-xs text-[#64748B]">{data.healthScore.reasons[0]}</p>
-            </div>
-            <ShieldCheck className="h-5 w-5 text-[var(--workspace-primary)]" />
-          </div>
-          <div className="mt-4 flex items-end gap-3">
-            <span className="text-4xl font-black text-[#0A2540]">{data.healthScore.score}</span>
-            <span className="pb-2 text-sm font-semibold text-[#64748B]">/100</span>
-          </div>
-          <div className="mt-3 h-2 rounded-full bg-slate-200">
-            <div
-              className={cn(
-                'h-2 rounded-full',
-                status === 'risco' ? 'bg-red-500' : status === 'atencao' ? 'bg-amber-500' : 'bg-emerald-500'
-              )}
-              style={{ width: `${Math.max(4, data.healthScore.score)}%` }}
-            />
-          </div>
-
-          {canEditGoal ? (
-            <div className="mt-4 flex gap-2">
-              <Input
-                type="number"
-                min="0"
-                value={goalDraft}
-                onChange={(event) => onGoalDraftChange(event.target.value)}
-                placeholder="Meta mensal Kz"
-                className="h-9 bg-white"
-              />
-              <Button size="sm" onClick={onGoalSave} disabled={isSavingGoal}>
-                Guardar
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function PipelineHealthCard({ data, expanded, onToggleExpanded }: { data: ServicesDashboardBase; expanded: boolean; onToggleExpanded: () => void }) {
-  const health = data.pipelineHealth;
-  const visibleStages = health
-    ? [...health.byStage]
-      .filter((stage) => stage.count > 0 || stage.stage === health.slowestStage?.stage)
-      .sort((a, b) => (b.count - a.count) || ((b.averageDaysInStage || 0) - (a.averageDaysInStage || 0)))
-      .slice(0, expanded ? undefined : 3)
-    : [];
-  return (
-    <Card className="border-slate-200 p-5 shadow-sm">
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-[#0A2540]">Saúde do funil</h2>
-          <p className="text-sm text-[#64748B]">Gargalo principal, risco e etapas que mais pesam agora.</p>
-        </div>
+    <Card className="border-slate-200 shadow-sm">
+      <CardContent className="p-4">
         <div className="flex flex-wrap gap-2">
-          {health?.slowestStage ? (
-            <span className="w-fit rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-              Gargalo: {health.slowestStage.stage}
-            </span>
-          ) : null}
-          <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-[#0A2540]">
-            Velocidade: {formatShortKz(data.kpis.pipelineVelocity)}/dia
-          </span>
+          {WIDGET_OPTIONS.map((widget) => {
+            const active = visible[widget.id];
+            return (
+              <button
+                key={widget.id}
+                type="button"
+                onClick={() => onToggle(widget.id)}
+                className={cn(
+                  'rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
+                  active
+                    ? 'border-[var(--workspace-primary)] bg-[var(--workspace-primary)] text-[var(--workspace-on-primary)]'
+                    : 'border-slate-200 bg-white text-slate-500 hover:border-[var(--workspace-primary-border)] hover:text-[var(--workspace-primary)]'
+                )}
+              >
+                {widget.label}
+              </button>
+            );
+          })}
         </div>
-      </div>
-
-      {health ? (
-        <div className="space-y-3">
-          {visibleStages.map((stage) => (
-            <div key={stage.stage} className="rounded-lg border border-slate-100 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[#0A2540]">
-                  <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: stage.color }} />
-                  <span className="truncate">{stage.stage}</span>
-                </span>
-                <span className="text-xs text-[#64748B]">{stage.count} aberto(s)</span>
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-[#64748B]">
-                <span>{stage.averageDaysInStage ?? 0} dias médios</span>
-                <span>Conversão: {stage.conversionRate ?? 0}%</span>
-              </div>
-            </div>
-          ))}
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
-              {health.staleDeals.length} negócio(s) parado(s) há 14+ dias.
-            </div>
-            <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-700">
-              {health.leadsWithoutFollowUp.length} potenciais clientes sem acompanhamento futuro.
-            </div>
-          </div>
-          {health.byStage.length > 3 ? (
-            <Button variant="ghost" size="sm" onClick={onToggleExpanded} className="gap-2 px-0 text-[var(--workspace-primary)]">
-              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              {expanded ? 'Ver menos' : 'Ver detalhe do funil'}
-            </Button>
-          ) : null}
-        </div>
-      ) : (
-        <div className="rounded-lg border border-slate-100 p-4 text-sm text-[#64748B]">
-          Sem permissão ou dados suficientes para mostrar o funil.
-        </div>
-      )}
+      </CardContent>
     </Card>
   );
 }
 
-function buildActionItems(data: ServicesDashboardBase): DashboardActionItem[] {
+function KpiCard({
+  label,
+  value,
+  variation,
+  danger,
+}: {
+  label: string;
+  value: string;
+  variation: string;
+  danger?: boolean;
+}) {
+  return (
+    <Card className={cn('border-slate-200 shadow-sm', danger && 'border-red-200 bg-red-50/40')}>
+      <CardContent className="p-4">
+        <p className={cn('text-xs font-medium uppercase tracking-wide text-slate-500', danger && 'text-red-700')}>
+          {label}
+        </p>
+        <p className={cn('mt-4 text-2xl font-black tracking-tight text-[#2c2f31]', danger && 'text-red-700')}>
+          {value}
+        </p>
+        <p className={cn('mt-2 text-xs text-slate-500', danger && 'text-red-600')}>{variation}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SectionCard({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="border-slate-200 shadow-sm">
+      <CardHeader className="flex-row items-center justify-between gap-3 p-5 pb-2">
+        <CardTitle className="text-base font-semibold text-[#2c2f31]">{title}</CardTitle>
+        {action}
+      </CardHeader>
+      <CardContent className="p-5 pt-3">{children}</CardContent>
+    </Card>
+  );
+}
+
+function PipelineFunnelCard({ data, accentColor }: { data: ServicesDashboardBase; accentColor: string }) {
+  const stages = data.pipelineHealth?.byStage ?? [];
+  const visibleStages = stages.length ? stages : [
+    { stage: 'Prospecção', count: 0 },
+    { stage: 'Proposta', count: 0 },
+    { stage: 'Negociação', count: 0 },
+    { stage: 'Fechado', count: data.kpis.wonCount ?? 0 },
+  ];
+  const max = Math.max(1, ...visibleStages.map((stage) => stage.count));
+
+  return (
+    <SectionCard title="Funil de pipeline">
+      <div className="flex flex-col gap-4">
+        {visibleStages.slice(0, 6).map((stage) => (
+          <div key={stage.stage}>
+            <div className="mb-1.5 flex items-center justify-between gap-4 text-sm">
+              <span className="truncate font-medium text-[#2c2f31]">{stage.stage}</span>
+              <span className="text-slate-500">{stage.count}</span>
+            </div>
+            <div className="h-2 rounded-full bg-slate-100">
+              <div
+                className="h-2 rounded-full"
+                style={{
+                  width: `${Math.max(4, (stage.count / max) * 100)}%`,
+                  backgroundColor: accentColor,
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+function buildTaskItems(data: ServicesDashboardBase) {
   const actions = data.nextActions;
   if (!actions) return [];
   return [
-    ...actions.overdueTasks.map((task) => ({
-      id: `task-overdue-${task.id}`,
-      type: 'task' as const,
-      title: task.title,
-      detail: task.contact?.name || 'Tarefa vencida',
-      priority: task.priority,
-      dueDate: task.dueDate,
-      taskId: task.id,
-      contact: task.contact,
-    })),
-    ...actions.followUpsToday.map((task) => ({
-      id: `task-today-${task.id}`,
-      type: 'task' as const,
-      title: task.title,
-      detail: task.contact?.name || 'Acompanhamento de hoje',
-      priority: task.priority,
-      dueDate: task.dueDate,
-      taskId: task.id,
-      contact: task.contact,
-    })),
-    ...actions.birthdaysToday.map((contact) => ({
-      id: `birthday-${contact.id}`,
-      type: 'birthday' as const,
-      title: 'Dar parabéns ao cliente',
-      detail: contact.name,
-      priority: 'Baixa' as const,
-      dueDate: contact.birthDate,
-      contact,
-    })),
-    ...actions.alerts.map((alert) => ({
-      id: `alert-${alert.id}`,
-      type: 'alert' as const,
-      title: alert.title,
-      detail: alert.contact?.name || alert.message || 'Alerta aberto',
-      priority: alert.type === 'critical' ? 'Alta' as const : 'Media' as const,
-      dueDate: alert.createdAt,
-      contact: alert.contact,
-    })),
-  ].slice(0, 8);
+    ...actions.overdueTasks,
+    ...actions.followUpsToday,
+  ].filter((task) => !task.done).slice(0, 5);
 }
 
-function NextActionsCard({
+function TasksCard({
   data,
   completingTaskId,
-  onCompleteTask,
-  onCreateFollowUp,
+  onComplete,
+  onCreate,
 }: {
   data: ServicesDashboardBase;
   completingTaskId: number | null;
-  onCompleteTask: (taskId: number) => void;
-  onCreateFollowUp: (item: DashboardActionItem) => void;
+  onComplete: (taskId: number) => void;
+  onCreate: () => void;
 }) {
-  const actions = data.nextActions;
-  const items = buildActionItems(data);
-  return (
-    <Card className="border-slate-200 p-5 shadow-sm">
-      <div className="mb-4">
-        <h2 className="text-lg font-bold text-[#0A2540]">Próximas ações</h2>
-        <p className="text-sm text-[#64748B]">Prioridades práticas para hoje.</p>
-      </div>
+  const tasks = buildTaskItems(data);
 
-      {actions ? (
-        items.length ? (
-          <div className="divide-y divide-slate-100 rounded-lg border border-slate-100">
-            {items.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 px-3 py-3">
-                <button
-                  type="button"
-                  disabled={!item.taskId || completingTaskId === item.taskId}
-                  onClick={() => item.taskId && onCompleteTask(item.taskId)}
-                  className={cn(
-                    'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border',
-                    item.taskId ? 'border-slate-300 hover:border-[var(--workspace-primary)]' : 'border-slate-200 bg-slate-50'
-                  )}
-                  aria-label="Concluir tarefa"
-                >
-                  {item.taskId && completingTaskId === item.taskId ? (
-                    <span className="h-2 w-2 rounded-full bg-[var(--workspace-primary)]" />
-                  ) : null}
-                </button>
+  return (
+    <SectionCard
+      title="Tarefas"
+      action={<Button size="sm" variant="outline" onClick={onCreate}>+ Nova</Button>}
+    >
+      {tasks.length ? (
+        <div className="flex flex-col divide-y divide-slate-100">
+          {tasks.map((task) => {
+            const overdue = isOverdue(task.dueDate);
+            return (
+              <div key={task.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                <Checkbox
+                  checked={task.done}
+                  disabled={completingTaskId === task.id}
+                  onCheckedChange={() => onComplete(task.id)}
+                  aria-label={`Concluir ${task.title}`}
+                  className="rounded"
+                />
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="truncate text-sm font-semibold text-[#0A2540]">{item.title}</p>
-                    <span className={cn(
-                      'rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                      item.priority === 'Alta' ? 'bg-red-50 text-red-700' : item.priority === 'Media' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'
-                    )}>
-                      {item.priority}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 truncate text-xs text-[#64748B]">
-                    {formatTaskTime(item.dueDate)} · {item.detail}
-                  </p>
+                  <p className="truncate text-sm font-medium text-[#2c2f31]">{task.title}</p>
+                  <p className="truncate text-xs text-slate-500">{task.contact?.name || task.notes || 'Sem cliente associado'}</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => onCreateFollowUp(item)}>
-                  Agendar
-                </Button>
+                <Badge variant={overdue ? 'destructive' : 'secondary'}>
+                  {overdue ? 'Atraso' : formatDate(task.dueDate)}
+                </Badge>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-700">
-            Sem ações urgentes para hoje.
-          </div>
-        )
-      ) : (
-        <div className="rounded-lg border border-slate-100 p-4 text-sm text-[#64748B]">
-          Sem permissão para consultar tarefas.
+            );
+          })}
         </div>
+      ) : (
+        <p className="rounded-lg border border-slate-100 bg-slate-50 p-4 text-sm text-slate-500">
+          Sem tarefas urgentes no período.
+        </p>
       )}
-    </Card>
+    </SectionCard>
   );
 }
 
-function AlertsCard({
-  data,
-  onCreateTask,
-  onCreateFollowUp,
-}: {
-  data: ServicesDashboardBase;
-  onCreateTask: (item: DashboardActionItem) => void;
-  onCreateFollowUp: (item: DashboardActionItem) => void;
-}) {
-  const alerts = data.nextActions?.alerts || [];
-  const staleDeals = data.pipelineHealth?.staleDeals || [];
-  const leadsWithoutFollowUp = data.pipelineHealth?.leadsWithoutFollowUp || [];
-  const visibleItems: Array<DashboardActionItem & { tone: 'danger' | 'warning' | 'success'; group: string }> = [
-    ...alerts.map((alert) => ({
-      id: `alert-${alert.id}`,
-      type: 'alert' as const,
-      title: alert.title,
-      detail: alert.contact?.name || alert.message || 'Alerta aberto',
-      priority: alert.type === 'critical' ? 'Alta' as const : 'Media' as const,
-      dueDate: alert.createdAt,
-      contact: alert.contact,
-      tone: alert.type === 'opportunity' ? 'success' as const : alert.type === 'critical' ? 'danger' as const : 'warning' as const,
-      group: alert.type === 'opportunity' ? 'Oportunidade' : alert.type === 'critical' ? 'Crítico' : 'Atenção',
-    })),
-    ...staleDeals.slice(0, 3).map((deal) => ({
-      id: `stale-${deal.id}`,
-      type: 'alert' as const,
-      title: `${deal.name} parado em ${deal.stage}`,
-      detail: `${deal.daysInStage} dias na etapa`,
-      priority: 'Alta' as const,
-      contact: { id: deal.id, name: deal.name, company: deal.company },
+function buildActivityItems(data: ServicesDashboardBase): ActivityItem[] {
+  const actions = data.nextActions;
+  const staleDeals = data.pipelineHealth?.staleDeals ?? [];
+  if (!actions) return [];
+
+  return [
+    ...actions.overdueTasks.map((task) => ({
+      id: `overdue-${task.id}`,
+      label: 'Tarefa em atraso',
+      detail: task.title,
+      time: formatRelative(task.dueDate),
       tone: 'danger' as const,
-      group: 'Crítico',
     })),
-    ...leadsWithoutFollowUp.slice(0, 3).map((lead) => ({
-      id: `follow-${lead.id}`,
-      type: 'alert' as const,
-      title: `${lead.name} sem acompanhamento futuro`,
-      detail: lead.stage,
-      priority: 'Media' as const,
-      contact: { id: lead.id, name: lead.name, company: lead.company },
+    ...actions.followUpsToday.map((task) => ({
+      id: `follow-${task.id}`,
+      label: 'Follow-up marcado',
+      detail: task.contact?.name || task.title,
+      time: formatRelative(task.updatedAt),
+      tone: 'normal' as const,
+    })),
+    ...actions.alerts.map((alert) => ({
+      id: `alert-${alert.id}`,
+      label: alert.type === 'critical' ? 'Alerta crítico' : 'Alerta',
+      detail: alert.title,
+      time: formatRelative(alert.createdAt),
+      tone: alert.type === 'critical' ? 'danger' as const : 'warning' as const,
+    })),
+    ...actions.birthdaysToday.map((contact) => ({
+      id: `birthday-${contact.id}`,
+      label: 'Aniversário',
+      detail: contact.name,
+      time: 'hoje',
+      tone: 'success' as const,
+    })),
+    ...staleDeals.map((deal) => ({
+      id: `deal-${deal.id}`,
+      label: 'Negócio parado',
+      detail: `${deal.name} em ${deal.stage}`,
+      time: `${deal.daysInStage}d`,
       tone: 'warning' as const,
-      group: 'Atenção',
     })),
-  ].slice(0, 8);
+  ].slice(0, 5);
+}
+
+function ActivityCard({ data }: { data: ServicesDashboardBase }) {
+  const items = buildActivityItems(data);
 
   return (
-    <Card className="border-slate-200 p-5 shadow-sm">
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-[#0A2540]">Alertas e insights</h2>
-          <p className="text-sm text-[#64748B]">Sinais simples para orientar a ação diária.</p>
-        </div>
-        <Button asChild variant="outline" size="sm" className="w-fit gap-2">
-          <Link href="/relatorios/servicos">
-            <BarChart3 className="h-4 w-4" />
-            Relatórios avançados
-          </Link>
-        </Button>
-      </div>
-
-      {visibleItems.length ? (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {visibleItems.map((item) => (
-            <div
-              key={item.id}
-              className={cn(
-                'rounded-lg border px-3 py-3 text-sm',
-                item.tone === 'danger'
-                  ? 'border-red-100 bg-red-50 text-red-700'
-                  : item.tone === 'success'
-                  ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-                  : 'border-amber-100 bg-amber-50 text-amber-700'
-              )}
-            >
-              <p className="text-xs font-bold uppercase tracking-[0.12em] opacity-80">{item.group}</p>
-              <p className="mt-1 font-semibold">{item.title}</p>
-              <p className="mt-1 text-xs opacity-80">{item.detail}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => onCreateTask(item)}>
-                  Criar tarefa
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => onCreateFollowUp(item)}>
-                  Agendar follow-up
-                </Button>
+    <SectionCard title="Actividade recente">
+      {items.length ? (
+        <div className="flex flex-col divide-y divide-slate-100">
+          {items.map((item) => (
+            <div key={item.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+              <span
+                className={cn(
+                  'mt-1 block h-2 w-2 rounded-full',
+                  item.tone === 'danger'
+                    ? 'bg-red-500'
+                    : item.tone === 'warning'
+                    ? 'bg-amber-500'
+                    : item.tone === 'success'
+                    ? 'bg-emerald-500'
+                    : 'bg-slate-400'
+                )}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-[#2c2f31]">{item.label}</p>
+                <p className="truncate text-xs text-slate-500">{item.detail}</p>
               </div>
+              <span className="text-xs text-slate-400">{item.time}</span>
             </div>
           ))}
         </div>
       ) : (
-        <div className="flex items-center gap-3 rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-700">
-          <CheckCircle2 className="h-5 w-5" />
-          Sem alertas críticos. Mantém os acompanhamentos de hoje em dia.
-        </div>
+        <p className="rounded-lg border border-slate-100 bg-slate-50 p-4 text-sm text-slate-500">
+          Sem actividade recente para mostrar.
+        </p>
       )}
-    </Card>
+    </SectionCard>
+  );
+}
+
+function getFacturaStatusLabel(status: Factura['agtValidationStatus']) {
+  if (status === 'P') return 'Pendente';
+  if (status === 'V') return 'Emitida';
+  if (status === 'I') return 'Inválida';
+  return 'Anulada';
+}
+
+function PendingInvoicesCard({ facturas }: { facturas: Factura[] }) {
+  return (
+    <SectionCard
+      title="Faturas pendentes"
+      action={(
+        <Button asChild size="sm" variant="ghost">
+          <Link href="/faturacao">Ver todas</Link>
+        </Button>
+      )}
+    >
+      {facturas.length ? (
+        <div className="flex flex-col divide-y divide-slate-100">
+          {facturas.slice(0, 4).map((factura) => (
+            <Link key={factura.id} href={`/faturacao/${factura.id}`} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-[#2c2f31]">
+                  {factura.customerName || 'Cliente sem nome'}
+                </p>
+                <p className="text-xs text-slate-500">{factura.documentNo} · {formatDate(factura.documentDate)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-semibold text-[#2c2f31]">{formatShortKz(factura.grossTotal)}</p>
+                <Badge variant={factura.agtValidationStatus === 'I' ? 'destructive' : 'default'}>
+                  {getFacturaStatusLabel(factura.agtValidationStatus)}
+                </Badge>
+              </div>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-lg border border-slate-100 bg-slate-50 p-4 text-sm text-slate-500">
+          Sem faturas pendentes no período.
+        </p>
+      )}
+    </SectionCard>
   );
 }
 
 function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof getCurrentUser>> }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const viewStorageKey = getStorageKey(VIEW_STORAGE_PREFIX, currentUser.id);
-  const filterStorageKey = getStorageKey(FILTER_STORAGE_PREFIX, currentUser.id);
-  const [view, setView] = useState<VistaDashboard>(DEFAULT_VIEW);
-  const [filters, setFilters] = useState<DashboardFiltersState>(DEFAULT_FILTERS);
-  const [pipelineExpanded, setPipelineExpanded] = useState(false);
-  const [goalDraft, setGoalDraft] = useState('');
+  const storageKey = dashboardWidgetStorageKey(currentUser.id);
+  const [period, setPeriod] = useState<PeriodoDashboard>('month');
+  const [customizing, setCustomizing] = useState(false);
+  const [widgetVisibility, setWidgetVisibility] = useState(DEFAULT_WIDGET_VISIBILITY);
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
 
   useEffect(() => {
-    setView(readStoredView(viewStorageKey));
-  }, [viewStorageKey]);
+    setWidgetVisibility(readWidgetVisibility(storageKey));
+  }, [storageKey]);
 
-  useEffect(() => {
-    setFilters(readStoredFilters(filterStorageKey));
-  }, [filterStorageKey]);
-
-  const queryParams = useMemo(() => ({
-    period: filters.period,
-    responsibleUserId: filters.responsibleUserId === ALL_VALUE ? null : filters.responsibleUserId,
-    stage: filters.stage === ALL_VALUE ? null : filters.stage,
-    leadOrigin: filters.leadOrigin === ALL_VALUE ? null : filters.leadOrigin,
-    segment: filters.segment === ALL_VALUE ? null : filters.segment,
-  }), [filters]);
+  const dateRange = useMemo(() => getDateRange(period), [period]);
 
   const {
     data: serviceDashboard,
@@ -825,28 +557,25 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
     isError: serviceDashboardError,
     refetch: refetchServiceDashboard,
   } = useQuery({
-    queryKey: ['services-dashboard-base', queryParams],
-    queryFn: () => getServicesDashboardBase(queryParams),
+    queryKey: ['services-dashboard-base', { period }],
+    queryFn: () => getServicesDashboardBase({ period }),
     retry: false,
   });
 
-  useEffect(() => {
-    if (serviceDashboard?.goal.monthlyRevenueGoalKz !== undefined) {
-      setGoalDraft(serviceDashboard.goal.monthlyRevenueGoalKz ? String(serviceDashboard.goal.monthlyRevenueGoalKz) : '');
-    }
-  }, [serviceDashboard?.goal.monthlyRevenueGoalKz]);
+  const { data: faturacaoDashboard } = useQuery({
+    queryKey: ['faturacao-dashboard'],
+    queryFn: getFaturacaoDashboard,
+  });
 
-  const goalMutation = useMutation({
-    mutationFn: () => updateServicesDashboardSettings({
-      monthlyRevenueGoalKz: goalDraft === '' ? null : Number(goalDraft),
+  const { data: pendingFacturas } = useQuery({
+    queryKey: ['dashboard-facturas-pendentes', period, dateRange],
+    queryFn: () => getFacturas({
+      agtStatus: 'P',
+      documentStatus: 'N',
+      limit: 4,
+      startDate: dateRange.dateFrom,
+      endDate: dateRange.dateTo,
     }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services-dashboard-base'] });
-      toast({ variant: 'success', title: 'Meta atualizada', description: 'A previsão do painel foi recalculada.' });
-    },
-    onError: (error: Error) => {
-      toast({ variant: 'error', title: 'Não foi possível guardar a meta', description: error.message || 'Tenta novamente.' });
-    },
   });
 
   const completeTaskMutation = useMutation({
@@ -861,114 +590,85 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
     },
   });
 
-  const createTaskMutation = useMutation({
-    mutationFn: (item: DashboardActionItem) => {
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 1);
-      dueDate.setHours(9, 0, 0, 0);
-      return createTask({
-        title: item.type === 'birthday' ? item.title : `Follow-up: ${item.title}`,
-        notes: item.detail,
-        contactId: item.contact?.id ?? null,
-        dueDate: dueDate.toISOString(),
-        priority: item.priority,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services-dashboard-base'] });
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      toast({ variant: 'success', title: 'Tarefa criada' });
-    },
-    onError: (error: Error) => {
-      toast({ variant: 'error', title: 'Não foi possível criar tarefa', description: error.message || 'Tenta novamente.' });
-    },
-  });
+  const pendingFacturaList = pendingFacturas?.facturas ?? [];
+  const pendingInvoiceCount = faturacaoDashboard?.pendentesAGT ?? pendingFacturas?.total ?? pendingFacturaList.length;
+  const pendingInvoiceAmount = pendingFacturaList.reduce((sum, factura) => sum + Number(factura.grossTotal || 0), 0);
+  const accentColor = '#0A2540';
 
-  const createFollowUpMutation = useMutation({
-    mutationFn: (item: DashboardActionItem) => {
-      const start = new Date();
-      start.setDate(start.getDate() + 1);
-      start.setHours(9, 0, 0, 0);
-      const end = new Date(start);
-      end.setMinutes(end.getMinutes() + 30);
-      return createLocalCalendarEvent({
-        title: item.type === 'birthday' ? item.title : `Follow-up: ${item.title}`,
-        notes: item.detail,
-        startDate: start.toISOString(),
-        endDate: end.toISOString(),
-        contactId: item.contact?.id ?? null,
-        assignedToUserId: currentUser.id,
-        syncWithGoogle: false,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['localCalendarEvents'] });
-      toast({ variant: 'success', title: 'Follow-up agendado' });
-    },
-    onError: (error: Error) => {
-      toast({ variant: 'error', title: 'Não foi possível agendar follow-up', description: error.message || 'Tenta novamente.' });
-    },
-  });
-
-  const handleViewChange = (nextView: VistaDashboard) => {
-    setView(nextView);
-    if (viewStorageKey && typeof window !== 'undefined') {
-      window.localStorage.setItem(viewStorageKey, nextView);
-    }
-  };
-
-  const handleFiltersChange = (patch: Partial<DashboardFiltersState>) => {
-    setFilters((current) => {
-      const next = { ...current, ...patch };
-      if (filterStorageKey && typeof window !== 'undefined') {
-        window.localStorage.setItem(filterStorageKey, JSON.stringify(next));
+  const handleWidgetToggle = (id: DashboardWidgetId) => {
+    setWidgetVisibility((current) => {
+      const next = { ...current, [id]: !current[id] };
+      if (storageKey && typeof window !== 'undefined') {
+        window.localStorage.setItem(storageKey, JSON.stringify(next));
       }
       return next;
     });
   };
 
-  const handleFiltersReset = () => {
-    setFilters(DEFAULT_FILTERS);
-    if (filterStorageKey && typeof window !== 'undefined') {
-      window.localStorage.setItem(filterStorageKey, JSON.stringify(DEFAULT_FILTERS));
-    }
-  };
-
-  const currentViewLabel = VIEW_OPTIONS.find((option) => option.value === view)?.label || 'Vista Comercial';
-  const metrics = serviceDashboard ? getMetricsForView(view, serviceDashboard) : [];
-  const canEditGoal = !!(currentUser.isSuperAdmin || currentUser.role === 'admin' || !currentUser.accountOwnerId);
+  const kpiCards = serviceDashboard ? [
+    {
+      id: 'receita' as const,
+      label: 'Receita',
+      value: formatShortKz(serviceDashboard.kpis.closedRevenue),
+      variation: 'Total fechado no período',
+    },
+    {
+      id: 'pipeline' as const,
+      label: 'Pipeline',
+      value: formatShortKz(serviceDashboard.kpis.pipelineOpenValue),
+      variation: serviceDashboard.kpiContext.pipelineOpenValue,
+    },
+    {
+      id: 'clientes' as const,
+      label: 'Clientes activos',
+      value: formatNumber(serviceDashboard.kpis.openOpportunities),
+      variation: 'Negócios activos no período',
+    },
+    {
+      id: 'conversao' as const,
+      label: 'Taxa conversão',
+      value: serviceDashboard.kpis.winRate === null || serviceDashboard.kpis.winRate === undefined
+        ? '—'
+        : `${serviceDashboard.kpis.winRate}%`,
+      variation: `${formatNumber(serviceDashboard.kpis.wonCount)} ganhos / ${formatNumber((serviceDashboard.kpis.wonCount ?? 0) + (serviceDashboard.kpis.lostCount ?? 0))} total`,
+    },
+    {
+      id: 'facturas_atraso' as const,
+      label: 'Faturas pendentes',
+      value: `${formatNumber(pendingInvoiceCount)} · ${formatShortKz(pendingInvoiceAmount)}`,
+      variation: 'Documentos ainda pendentes',
+      danger: pendingInvoiceCount > 0,
+    },
+    {
+      id: 'ticket_medio' as const,
+      label: 'Ticket médio',
+      value: formatShortKz(serviceDashboard.kpis.averageDealValue),
+      variation: serviceDashboard.kpiContext.averageDealValue,
+    },
+  ].filter((card) => widgetVisibility[card.id]).slice(0, 6) : [];
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Painel</h1>
-          <p className="mt-1 text-sm text-[#595c5e]">
-            {new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-          </p>
-        </div>
-        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-[#64748B] shadow-sm">
-          Vista ativa: <span className="font-semibold text-[#0A2540]">{currentViewLabel}</span>
-        </div>
-      </div>
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 p-4 md:p-6">
+      <TopBar
+        userName={currentUser.name}
+        period={period}
+        customizing={customizing}
+        onPeriodChange={setPeriod}
+        onToggleCustomizing={() => setCustomizing((current) => !current)}
+      />
 
       <BillingAccessBanner subscription={currentUser.subscription} />
       <StartupModelSelector currentUser={currentUser} />
       <OnboardingChecklist currentUser={currentUser} />
 
-      <ViewSelector value={view} onChange={handleViewChange} />
-
-      <FiltersBar
-        filters={filters}
-        options={serviceDashboard?.filters}
-        onChange={handleFiltersChange}
-        onReset={handleFiltersReset}
-      />
+      {customizing ? (
+        <WidgetPicker visible={widgetVisibility} onToggle={handleWidgetToggle} />
+      ) : null}
 
       {serviceDashboardError ? (
         <ErrorState
           compact
-          title="Não foi possível carregar os indicadores comerciais"
+          title="Não foi possível carregar o dashboard"
           message="O painel base não respondeu como esperado."
           onRetry={() => refetchServiceDashboard()}
         />
@@ -976,50 +676,42 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
         <DashboardSkeleton />
       ) : (
         <>
-          <HeadlinePanel
-            data={serviceDashboard}
-            goalDraft={goalDraft}
-            canEditGoal={canEditGoal}
-            isSavingGoal={goalMutation.isPending}
-            onGoalDraftChange={setGoalDraft}
-            onGoalSave={() => goalMutation.mutate()}
-          />
-
-          <section>
-            <div className="mb-3 flex items-center gap-2">
-              <Banknote className="h-4 w-4 text-[var(--workspace-primary)]" />
-              <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-[#64748B]">Indicadores principais</h2>
-            </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {metrics.map((metric) => (
-                <MetricCard key={metric.title} metric={metric} />
-              ))}
-            </div>
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:[grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
+            {kpiCards.map((card) => (
+              <KpiCard
+                key={card.id}
+                label={card.label}
+                value={card.value}
+                variation={card.variation}
+                danger={card.danger}
+              />
+            ))}
           </section>
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <PipelineHealthCard
-              data={serviceDashboard}
-              expanded={pipelineExpanded}
-              onToggleExpanded={() => setPipelineExpanded((current) => !current)}
-            />
-            <NextActionsCard
-              data={serviceDashboard}
-              completingTaskId={completeTaskMutation.variables ?? null}
-              onCompleteTask={(taskId) => completeTaskMutation.mutate(taskId)}
-              onCreateFollowUp={(item) => createFollowUpMutation.mutate(item)}
-            />
+          <section className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            {widgetVisibility.funil ? (
+              <PipelineFunnelCard data={serviceDashboard} accentColor={accentColor} />
+            ) : null}
+            {widgetVisibility.tarefas ? (
+              <TasksCard
+                data={serviceDashboard}
+                completingTaskId={completeTaskMutation.variables ?? null}
+                onComplete={(taskId) => completeTaskMutation.mutate(taskId)}
+                onCreate={() => setTaskModalOpen(true)}
+              />
+            ) : null}
           </section>
 
-          <section>
-            <AlertsCard
-              data={serviceDashboard}
-              onCreateTask={(item) => createTaskMutation.mutate(item)}
-              onCreateFollowUp={(item) => createFollowUpMutation.mutate(item)}
-            />
+          <section className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            {widgetVisibility.actividade ? <ActivityCard data={serviceDashboard} /> : null}
+            {widgetVisibility.facturas_pendentes ? (
+              <PendingInvoicesCard facturas={pendingFacturaList} />
+            ) : null}
           </section>
         </>
       )}
+
+      <TaskFormModal open={taskModalOpen} onClose={() => setTaskModalOpen(false)} />
     </div>
   );
 }

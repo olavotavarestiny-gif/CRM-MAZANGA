@@ -47,8 +47,11 @@ Não usar `prisma db push` no build nem no start command de produção.
 | Super admin | `SUPER_ADMIN_EMAIL` |
 | Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` |
 | WhatsApp | `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WEBHOOK_VERIFY_TOKEN`, `WABA_ID` |
-| Google Calendar | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `FRONTEND_CALENDAR_URL` |
+| WhatsApp API | `WHATSAPP_API_VERSION` |
+| Google Calendar | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `FRONTEND_CALENDAR_URL`, `GOOGLE_TOKEN_ENCRYPTION_KEY`, `GOOGLE_WEBHOOK_ADDRESS` |
 | AGT | `AGT_API_URL`, `AGT_MOCK_MODE`, `AGT_CERT_NUMBER`, `SOFTWARE_PRODUCT_ID`, `SOFTWARE_VERSION`, `NIF_EMPRESA`, `COMPANY_NAME` |
+| Lead público Mazanga | `MAZANGA_WEBHOOK_SECRET`, `MAZANGA_LEAD_OWNER_EMAIL` |
+| SMS/Ziett | `ZIETT_ENABLE`, `ZIETT_BASE_URL`, `ZIETT_API_KEY`, `ZIETT_DEFAULT_CHANNEL`, `ZIETT_DEFAULT_COUNTRY`, `ZIETT_TEST_ALLOWED_RECIPIENTS` |
 
 ## Frontend no Vercel
 
@@ -75,6 +78,7 @@ O projeto já tem `vercel.json` preparado para construir a app dentro de `fronte
 |----------|------------|
 | `UPSTASH_REDIS_REST_URL` | rate limit no frontend |
 | `UPSTASH_REDIS_REST_TOKEN` | rate limit no frontend |
+| `BLOB_READ_WRITE_TOKEN` | uploads via Vercel Blob |
 
 ## Ordem recomendada
 
@@ -95,6 +99,20 @@ Depois do deploy, validar:
 5. o login carrega a sessão e redireciona
 6. uma rota autenticada como `/contacts` responde normalmente
 7. um formulário público em `/f/[id]` abre sem autenticação
+8. um upload de anexo/avatar/fatura funciona se `BLOB_READ_WRITE_TOKEN` estiver configurado
+9. `POST /api/public/lead` devolve `201` ou `200` com `MAZANGA_LEAD_OWNER_EMAIL` configurado para um utilizador real
+
+## Checklist beta
+
+Antes de abrir a beta a utilizadores reais:
+
+- `NODE_ENV=production` no Render
+- `BYPASS_AUTH` ausente ou `false`
+- `SETUP_SECRET` removido depois do bootstrap, ou mantido como segredo forte
+- `AGT_MOCK_MODE=true` enquanto a integração fiscal não estiver certificada para produção real
+- `MAZANGA_LEAD_OWNER_EMAIL` aponta para o dono correcto da organização que deve receber leads públicos
+- `FRONTEND_URL` no backend é exactamente a origem do Vercel/domínio final
+- `NEXT_PUBLIC_API_URL` no frontend é exactamente a URL pública do Render, sem chave Supabase
 
 ## Erros comuns
 

@@ -126,40 +126,6 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
     },
   });
 
-  const isValidForm = () => {
-    if (['contact_tag', 'contact_revenue', 'contact_sector', 'stage_changed', 'contact_inactivity'].includes(formData.trigger) && !formData.triggerValue) {
-      return false;
-    }
-
-    if (formData.trigger === 'form_submission' && formData.formId && !forms.some((form) => form.id === formData.formId)) {
-      return false;
-    }
-
-    if (formData.action === 'update_stage') {
-      return !!formData.targetStage;
-    }
-
-    if (formData.action === 'create_task') {
-      if (!formData.taskTitle.trim() || !formData.taskAssignedToUserId) {
-        return false;
-      }
-
-      if (formData.taskDueDays !== '' && Number.isNaN(Number(formData.taskDueDays))) {
-        return false;
-      }
-
-      if (formData.taskDueDays !== '' && Number(formData.taskDueDays) < 0) {
-        return false;
-      }
-    }
-
-    if (formData.action === 'create_alert') {
-      return !!formData.taskTitle.trim();
-    }
-
-    return true;
-  };
-
   const getValidationMessage = () => {
     if (['contact_tag', 'contact_revenue', 'contact_sector', 'stage_changed', 'contact_inactivity'].includes(formData.trigger) && !formData.triggerValue) {
       return 'Preencha a condição do evento para continuar.';

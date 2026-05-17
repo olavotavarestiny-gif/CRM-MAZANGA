@@ -2,10 +2,10 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 
-async function touchContactActivity(contactId) {
+async function touchContactActivity(contactId, userId) {
   if (!contactId) return;
   await prisma.contact.updateMany({
-    where: { id: Number(contactId) },
+    where: { id: Number(contactId), userId },
     data: { lastActivityAt: new Date() },
   });
 }
@@ -56,7 +56,7 @@ router.post('/contacts/:id/notes', async (req, res) => {
       },
       include: { user: { select: { id: true, name: true } } },
     });
-    await touchContactActivity(contactId);
+    await touchContactActivity(contactId, userId);
 
     res.status(201).json(note);
   } catch (error) {
@@ -74,10 +74,16 @@ router.put('/notes/:id', async (req, res) => {
       return res.status(400).json({ error: 'Conteúdo é obrigatório' });
     }
 
-    const note = await prisma.contactNote.findUnique({ where: { id: noteId } });
+    const note = await prisma.contactNote.findUnique({
+      where: { id: noteId },
+      include: { contact: { select: { userId: true } } },
+    });
     if (!note) return res.status(404).json({ error: 'Nota não encontrada' });
+    if (note.contact?.userId !== req.user.effectiveUserId) {
+      return res.status(404).json({ error: 'Nota não encontrada' });
+    }
 
-    // Only author or admin can edit
+    // Only author or an admin within the same organization can edit.
     if (note.userId !== req.user.id && !req.user.isAccountOwner && !req.user.isSuperAdmin && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Sem permissão para editar esta nota' });
     }
@@ -87,7 +93,7 @@ router.put('/notes/:id', async (req, res) => {
       data: { content: content.trim() },
       include: { user: { select: { id: true, name: true } } },
     });
-    await touchContactActivity(note.contactId);
+    await touchContactActivity(note.contactId, req.user.effectiveUserId);
 
     res.json(updated);
   } catch (error) {
@@ -100,8 +106,14 @@ router.delete('/notes/:id', async (req, res) => {
   try {
     const noteId = parseInt(req.params.id);
 
-    const note = await prisma.contactNote.findUnique({ where: { id: noteId } });
+    const note = await prisma.contactNote.findUnique({
+      where: { id: noteId },
+      include: { contact: { select: { userId: true } } },
+    });
     if (!note) return res.status(404).json({ error: 'Nota não encontrada' });
+    if (note.contact?.userId !== req.user.effectiveUserId) {
+      return res.status(404).json({ error: 'Nota não encontrada' });
+    }
 
     if (note.userId !== req.user.id && !req.user.isAccountOwner && !req.user.isSuperAdmin && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Sem permissão para apagar esta nota' });

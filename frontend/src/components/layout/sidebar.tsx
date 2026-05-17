@@ -30,12 +30,10 @@ export default function Sidebar({
   open = false,
   onClose = () => {},
   currentUser = null,
-  onStartTour,
 }: {
   open?: boolean;
   onClose?: () => void;
   currentUser?: User | null;
-  onStartTour?: () => void;
 }) {
   const pathname = usePathname();
   const queryClient = useQueryClient();

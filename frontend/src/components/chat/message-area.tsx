@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Settings2, Trash2, Users, Hash, MessageSquare } from 'lucide-react';
-import { deleteChatChannel, getChatMessages, markChannelRead, getChatUsers, User } from '@/lib/api';
+import { deleteChatChannel, getChatMessages, markChannelRead, User } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
+import { getSupabaseEnv } from '@/lib/supabase/env';
 import { MessageBubble, DaySeparator } from './message-bubble';
 import { MessageInput } from './message-input';
 import { CreateChannelModal } from './create-channel-modal';
@@ -33,11 +34,6 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showManageModal, setShowManageModal] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const { data: orgUsers = [] } = useQuery({
-    queryKey: ['chat-users'],
-    queryFn: getChatUsers,
-  });
 
   const loadMessages = useCallback(async () => {
     setMessages([]);
@@ -68,6 +64,8 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
 
   // Supabase Realtime broadcast
   useEffect(() => {
+    if ((currentUser as any).isDevAuthBypass || !getSupabaseEnv()) return;
+
     const supabase = createClient();
     const ch = supabase.channel(`chat-${channel.id}`, {
       config: { broadcast: { self: false } },
@@ -86,7 +84,7 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
     }).subscribe();
 
     return () => { supabase.removeChannel(ch); };
-  }, [channel.id]);
+  }, [channel.id, currentUser]);
 
   // Scroll-to-top to load older messages
   const handleScroll = useCallback(async () => {
@@ -296,7 +294,6 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
                 message={msg}
                 isOwn={isOwn}
                 showAvatar={!isSameSender}
-                orgUsers={orgUsers}
               />
             </div>
           );

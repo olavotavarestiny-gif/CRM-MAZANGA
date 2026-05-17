@@ -6,7 +6,9 @@ const requireAuth = require('../middleware/auth');
 const { requirePermission, requireDeletePermission } = require('../lib/permissions');
 const { requirePlanFeature, canCreateContact, getPlanContext, hasPlanFeature } = require('../lib/plan-limits');
 const { getDefaultStageName } = require('../lib/pipeline-stages');
+const { serialiseSubmission } = require('../lib/form-submissions');
 
+const FORM_FIELD_TYPES = new Set(['text', 'number', 'multiple_choice']);
 const STANDARD_CONTACT_FIELDS = [
   { key: 'name', binding: 'standard:name', label: 'Nome', type: 'text', required: true },
   { key: 'phone', binding: 'standard:phone', label: 'Telefone', type: 'text', required: true },
@@ -72,27 +74,17 @@ function formatDateValue(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function normalizeFormFieldType(type) {
+  return FORM_FIELD_TYPES.has(type) ? type : 'text';
+}
+
 function serialiseFormField(field) {
   return {
     ...field,
+    type: normalizeFormFieldType(field.type),
     contactField: normalizeBinding(field.contactField) || field.contactField,
     options: field.options ? safeParseJson(field.options, []) : undefined,
   };
-}
-
-async function getCustomFieldMap(userId) {
-  const fields = await prisma.contactFieldDef.findMany({
-    where: { userId, active: true },
-    orderBy: { order: 'asc' },
-  });
-
-  return new Map(fields.map((field) => [
-    field.key,
-    {
-      ...field,
-      options: safeParseJson(field.options, []),
-    },
-  ]));
 }
 
 async function resolveFieldPersistenceData({ userId, type, options, contactField, contactFieldProvided = false }) {
@@ -118,10 +110,22 @@ async function resolveFieldPersistenceData({ userId, type, options, contactField
       data.options = JSON.stringify(safeParseJson(customField.options, []));
       return data;
     }
+
+    if (customField.type === 'number') {
+      data.type = 'number';
+      data.options = null;
+      return data;
+    }
   }
 
-  if (type !== undefined) data.type = type;
-  if (options !== undefined) data.options = options ? JSON.stringify(options) : null;
+  if (type !== undefined) {
+    const fieldType = normalizeFormFieldType(type);
+    data.type = fieldType;
+    if (fieldType !== 'multiple_choice' && options === undefined) {
+      data.options = null;
+    }
+  }
+  if (options !== undefined) data.options = Array.isArray(options) ? JSON.stringify(options) : null;
   return data;
 }
 
@@ -172,6 +176,29 @@ function normaliseSubmittedValue(value) {
   return String(value).trim();
 }
 
+function normaliseEmailValue(value) {
+  return normaliseSubmittedValue(value).toLowerCase();
+}
+
+function validateAnswerValue(field, value) {
+  const submittedValue = normaliseSubmittedValue(value);
+  if (!submittedValue) return null;
+
+  const fieldType = normalizeFormFieldType(field.type);
+  if (fieldType === 'number' && !/^-?\d+([.,]\d+)?$/.test(submittedValue)) {
+    return `O campo "${field.label}" deve conter apenas números.`;
+  }
+
+  if (fieldType === 'multiple_choice') {
+    const options = safeParseJson(field.options, []);
+    if (Array.isArray(options) && options.length > 0 && !options.includes(submittedValue)) {
+      return `O campo "${field.label}" deve conter uma opção válida.`;
+    }
+  }
+
+  return null;
+}
+
 function buildAnswersSnapshot(fields, submittedAnswers) {
   const answersByFieldId = new Map(
     Array.isArray(submittedAnswers)
@@ -205,24 +232,6 @@ function buildContactDataFromAnswers(answerSnapshots) {
     }
     return acc;
   }, { standard: {}, custom: {} });
-}
-
-function serialiseSubmissionAnswer(answer) {
-  return {
-    ...answer,
-    fieldLabel: answer.fieldLabel || answer.field?.label || 'Campo removido',
-    contactField: answer.contactField || inferContactField({
-      label: answer.fieldLabel || answer.field?.label || '',
-      contactField: answer.contactField,
-    }, answer.value),
-  };
-}
-
-function serialiseSubmission(submission) {
-  return {
-    ...submission,
-    answers: (submission.answers || []).map(serialiseSubmissionAnswer),
-  };
 }
 
 // GET /api/forms - lista todos os formulários com contagem de submissões
@@ -612,6 +621,17 @@ router.post('/:id/submit', async (req, res) => {
       return res.status(400).json({ error: `O campo "${missingRequiredField.label}" é obrigatório.` });
     }
 
+    let invalidAnswerError = null;
+    form.fields.find((field) => {
+      const answer = answerSnapshots.find((item) => item.fieldId === field.id);
+      invalidAnswerError = validateAnswerValue(field, answer?.value);
+      return invalidAnswerError;
+    });
+
+    if (invalidAnswerError) {
+      return res.status(400).json({ error: invalidAnswerError });
+    }
+
     let linkedContactId = null;
     let contactSyncStatus = 'skipped';
     let syncedContact = null;
@@ -633,25 +653,42 @@ router.post('/:id/submit', async (req, res) => {
       const contactData = buildContactDataFromAnswers(answerSnapshots);
       const standardData = contactData.standard;
       const customData = contactData.custom;
+      const submittedPhone = normaliseSubmittedValue(standardData.phone);
+      const submittedEmail = normaliseEmailValue(standardData.email);
       automationContact = {
         ...automationContact,
         name: standardData.name || '',
-        phone: standardData.phone || '',
-        email: standardData.email || '',
+        phone: submittedPhone,
+        email: submittedEmail,
         company: standardData.company || '',
         revenue: standardData.revenue || null,
         sector: standardData.sector || null,
         location: standardData.location || null,
       };
 
-      if (standardData.phone) {
-        const defaultStage = await getDefaultStageName(form.userId);
-        const existingContact = await prisma.contact.findFirst({
-          where: {
-            userId: form.userId,
-            phone: standardData.phone,
-          },
-        });
+      if (submittedPhone || submittedEmail) {
+        let existingContact = null;
+
+        if (submittedPhone) {
+          existingContact = await prisma.contact.findFirst({
+            where: {
+              userId: form.userId,
+              phone: submittedPhone,
+            },
+          });
+        }
+
+        if (!existingContact && submittedEmail) {
+          existingContact = await prisma.contact.findFirst({
+            where: {
+              userId: form.userId,
+              email: {
+                equals: submittedEmail,
+                mode: 'insensitive',
+              },
+            },
+          });
+        }
 
         if (existingContact) {
           const existingCustomFields = safeParseJson(existingContact.customFields, {});
@@ -661,7 +698,8 @@ router.post('/:id/submit', async (req, res) => {
           };
 
           if (standardData.name) updateData.name = standardData.name;
-          if (standardData.email) updateData.email = standardData.email;
+          if (submittedPhone) updateData.phone = submittedPhone;
+          if (submittedEmail) updateData.email = submittedEmail;
           if (standardData.company) updateData.company = standardData.company;
           if (standardData.sector) updateData.sector = standardData.sector;
           if (standardData.revenue) updateData.revenue = standardData.revenue;
@@ -685,15 +723,16 @@ router.post('/:id/submit', async (req, res) => {
           };
           linkedContactId = syncedContact.id;
           contactSyncStatus = 'updated';
-        } else {
+        } else if (submittedPhone) {
+          const defaultStage = await getDefaultStageName(form.userId);
           const contactLimit = await canCreateContact(form.userId);
           if (contactLimit.allowed) {
             syncedContact = await prisma.contact.create({
               data: {
                 userId: form.userId,
                 name: standardData.name || 'Sem nome',
-                phone: standardData.phone,
-                email: standardData.email || '',
+                phone: submittedPhone,
+                email: submittedEmail,
                 company: standardData.company || '',
                 revenue: standardData.revenue || null,
                 sector: standardData.sector || null,

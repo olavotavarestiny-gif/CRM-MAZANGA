@@ -80,15 +80,40 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
 
   function canProceed(): boolean {
     if (isStepByStep && currentField) {
-      return !currentField.required || !!answers[currentField.id]?.trim();
+      return (!currentField.required || !!answers[currentField.id]?.trim()) && isFieldAnswerValid(currentField);
     }
     return true;
+  }
+
+  function isFieldAnswerValid(field: typeof fields[number]): boolean {
+    const value = answers[field.id]?.trim() || '';
+    if (!value) return true;
+    if (field.type === 'number') {
+      return /^-?\d+([.,]\d+)?$/.test(value);
+    }
+    return true;
+  }
+
+  function getFieldError(field: typeof fields[number]): string | null {
+    if (!isFieldAnswerValid(field)) {
+      return `O campo "${field.label}" deve conter apenas números.`;
+    }
+    return null;
+  }
+
+  function getInputType(field: typeof fields[number]): string {
+    return field.type === 'number' ? 'number' : 'text';
   }
 
   function handleSubmit() {
     const allRequired = fields.filter((f) => f.required).every((f) => answers[f.id]?.trim());
     if (!allRequired) {
       alert('Por favor, preencha todos os campos obrigatórios');
+      return;
+    }
+    const invalidField = fields.find((field) => !isFieldAnswerValid(field));
+    if (invalidField) {
+      alert(getFieldError(invalidField));
       return;
     }
     submitMutation.mutate();
@@ -213,13 +238,15 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                     {currentField.required && <span className="text-red-400 ml-1">*</span>}
                   </Label>
 
-                  {currentField.type === 'text' ? (
+                  {currentField.type !== 'multiple_choice' ? (
                     <input
+                      type={getInputType(currentField)}
+                      inputMode={currentField.type === 'number' ? 'decimal' : undefined}
                       className="w-full rounded-lg border px-4 py-3 text-sm outline-none transition-all"
                       style={{ background: inputBg, borderColor: cardBorder, color: textColor }}
                       onFocus={(e) => { e.target.style.borderColor = brandColor; e.target.style.boxShadow = `0 0 0 3px ${brandColor}22`; }}
                       onBlur={(e) => { e.target.style.borderColor = cardBorder; e.target.style.boxShadow = 'none'; }}
-                      placeholder="Escrever resposta..."
+                      placeholder={currentField.type === 'number' ? 'Escrever número...' : 'Escrever resposta...'}
                       value={answers[currentField.id] || ''}
                       onChange={(e) => setAnswers({ ...answers, [currentField.id]: e.target.value })}
                       onKeyDown={(e) => {
@@ -280,13 +307,15 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                       {field.label}
                       {field.required && <span className="text-red-400 ml-1">*</span>}
                     </Label>
-                    {field.type === 'text' ? (
+                    {field.type !== 'multiple_choice' ? (
                       <input
+                        type={getInputType(field)}
+                        inputMode={field.type === 'number' ? 'decimal' : undefined}
                         className="w-full rounded-lg border px-4 py-3 text-sm outline-none transition-all"
                         style={{ background: inputBg, borderColor: cardBorder, color: textColor }}
                         onFocus={(e) => { e.target.style.borderColor = brandColor; e.target.style.boxShadow = `0 0 0 3px ${brandColor}22`; }}
                         onBlur={(e) => { e.target.style.borderColor = cardBorder; e.target.style.boxShadow = 'none'; }}
-                        placeholder="Escrever resposta..."
+                        placeholder={field.type === 'number' ? 'Escrever número...' : 'Escrever resposta...'}
                         value={answers[field.id] || ''}
                         onChange={(e) => setAnswers({ ...answers, [field.id]: e.target.value })}
                       />

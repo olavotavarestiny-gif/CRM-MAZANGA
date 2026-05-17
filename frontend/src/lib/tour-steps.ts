@@ -177,5 +177,5 @@ export const TOUR_KEYS = {
 
 export const TOTAL_STEPS = TOUR_GROUPS.reduce((s, g) => s + g.steps.length, 0); // 14
 
-export const GROUP_OFFSETS = TOUR_GROUPS.reduce<number[]>((acc, g, i) =>
+export const GROUP_OFFSETS = TOUR_GROUPS.reduce<number[]>((acc, _group, i) =>
   [...acc, i === 0 ? 0 : acc[i - 1] + TOUR_GROUPS[i - 1].steps.length], []);

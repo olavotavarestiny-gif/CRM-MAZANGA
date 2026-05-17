@@ -1,13 +1,12 @@
 'use client';
 
-import { FileText, Image as ImageIcon } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import type { ChatMessage } from '@/lib/types';
 
 interface MessageBubbleProps {
   message: ChatMessage;
   isOwn: boolean;
   showAvatar: boolean;
-  orgUsers: { id: number; name: string }[];
 }
 
 function formatTime(dateStr: string) {
@@ -25,7 +24,7 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
-function renderTextWithMentions(text: string, orgUsers: { id: number; name: string }[]) {
+function renderTextWithMentions(text: string) {
   const parts = text.split(/(@\w[\w\s]*)/g);
   return parts.map((part, i) => {
     if (part.startsWith('@')) {
@@ -85,7 +84,7 @@ export function DaySeparator({ dateStr }: DaySeparatorProps) {
   );
 }
 
-export function MessageBubble({ message, isOwn, showAvatar, orgUsers }: MessageBubbleProps) {
+export function MessageBubble({ message, isOwn, showAvatar }: MessageBubbleProps) {
   const initials = message.senderName
     .split(' ')
     .map((n) => n[0])
@@ -117,7 +116,7 @@ export function MessageBubble({ message, isOwn, showAvatar, orgUsers }: MessageB
                 : 'rounded-tl-md border border-slate-200 bg-white text-[#0A2540]'
             }`}
           >
-            {renderTextWithMentions(message.text, orgUsers)}
+            {renderTextWithMentions(message.text)}
           </div>
         )}
 

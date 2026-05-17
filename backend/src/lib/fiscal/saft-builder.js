@@ -4,7 +4,7 @@
  * Gera ficheiro SAF-T AO (Standard Audit File for Tax — Angola)
  * conforme especificação AGT versão 1.01_01.
  *
- * Diferenças face ao saft-generator.js original:
+ * Regras principais:
  *  - Validação de completude antes de gerar (função `validateSaftReadiness`)
  *  - Hash dos documentos via hashCode (não jwsSignature)
  *  - ProductID corrigido para 'KukuGest'

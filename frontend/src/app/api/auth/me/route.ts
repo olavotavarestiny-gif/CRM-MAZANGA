@@ -12,9 +12,21 @@ import {
   mapFetchErrorToLoginCode,
   readJsonSafely,
 } from '@/lib/server-auth-utils';
+import { DEV_AUTH_USER, isServerDevAuthBypassEnabled } from '@/lib/dev-auth';
 
 export async function GET(req: NextRequest) {
   const requestId = makeAuthRequestId('me');
+
+  if (isServerDevAuthBypassEnabled()) {
+    return NextResponse.json(DEV_AUTH_USER, {
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-store',
+        'X-KukuGest-Dev-Auth': 'true',
+      },
+    });
+  }
+
   const apiUrl = getConfiguredApiUrl();
 
   if (!apiUrl) {

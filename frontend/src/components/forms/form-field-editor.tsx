@@ -52,7 +52,7 @@ export const FormFieldEditor = memo(function FormFieldEditor({
   const createCustomFieldMutation = useMutation({
     mutationFn: () => createFormContactField({
       label: newCustomLabel.trim(),
-      type: draft?.type === 'multiple_choice' ? 'select' : 'text',
+      type: draft?.type === 'multiple_choice' ? 'select' : draft?.type === 'number' ? 'number' : 'text',
       options: draft?.type === 'multiple_choice' ? draft.options : undefined,
     }),
     onSuccess: (created) => {
@@ -62,6 +62,7 @@ export const FormFieldEditor = memo(function FormFieldEditor({
       updateDraft({
         contactField: binding,
         ...(created.type === 'select' ? { type: 'multiple_choice' as const, options: created.options || [] } : {}),
+        ...(created.type === 'number' ? { type: 'number' as const, options: [] } : {}),
       }, true);
     },
   });
@@ -119,6 +120,9 @@ export const FormFieldEditor = memo(function FormFieldEditor({
     if (selected?.type === 'select') {
       updates.type = 'multiple_choice';
       updates.options = selected.options || [];
+    } else if (selected?.type === 'number') {
+      updates.type = 'number';
+      updates.options = [];
     }
     updateDraft(updates, true);
   };
@@ -153,6 +157,7 @@ export const FormFieldEditor = memo(function FormFieldEditor({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="text">Texto</SelectItem>
+                  <SelectItem value="number">Número</SelectItem>
                   <SelectItem value="multiple_choice">Múltipla Escolha</SelectItem>
                 </SelectContent>
               </Select>

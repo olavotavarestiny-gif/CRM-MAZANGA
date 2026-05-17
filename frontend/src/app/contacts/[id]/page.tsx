@@ -6,22 +6,22 @@ import {
   getContact, updateTask, deleteTask, updateContact,
   getContactFieldConfigs, getContactFieldDefs, getPipelineStages,
   getContactNotes, createContactNote, updateContactNote, deleteContactNote,
-  getContactSummary, getContactGroups,
+  getContactSummary, getContactGroups, getContactFormSubmissions,
 } from '@/lib/api';
-import type { ContactFieldConfig, ContactFieldDef, ContactNote, Task } from '@/lib/types';
+import type { ContactFieldConfig, ContactFieldDef, ContactNote, FormSubmission, Task } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import TaskItem from '@/components/tasks/task-item';
 import TaskFormModal from '@/components/tasks/task-form-modal';
-import { Badge } from '@/components/ui/badge';
 import { ContactHistoryTimeline } from '@/components/contacts/contact-history-timeline';
 import ContactGroupsManager from '@/components/contacts/contact-groups-manager';
 import {
-  Pencil, Check, X, ExternalLink, Phone, Download, Trash2,
+  Pencil, Check, X, ExternalLink, Phone, Download, Trash2, ChevronDown, ChevronUp,
   Upload, Loader2, Send, FileText, TrendingUp, Clock,
 } from 'lucide-react';
 import { useFileUpload } from '@/hooks/use-file-upload';
@@ -35,6 +35,12 @@ const REVENUE_OPTIONS = [
   'Entre 100 Milhões - 500 Milhões','+ 500 M',
 ];
 const NO_GROUP_VALUE = '__NONE__';
+const CONTACT_SYNC_LABELS: Record<FormSubmission['contactSyncStatus'], string> = {
+  created: 'Criado',
+  updated: 'Atualizado',
+  skipped: 'Sem contacto',
+};
+const PRIMARY_CONTACT_FIELDS = ['name', 'phone', 'email', 'company'];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -78,6 +84,22 @@ function normalizeDocuments(
     }
   }
   return [];
+}
+
+function getAnswerContactFieldKey(answer: FormSubmission['answers'][number]): string {
+  const contactField = answer.contactField || '';
+  return contactField.startsWith('standard:') ? contactField.slice('standard:'.length) : contactField;
+}
+
+function getPrimarySubmissionAnswers(submission: FormSubmission) {
+  const filledAnswers = submission.answers.filter((answer) => answer.value?.trim());
+  const byContactField = new Map(filledAnswers.map((answer) => [getAnswerContactFieldKey(answer), answer]));
+  const primary = PRIMARY_CONTACT_FIELDS
+    .map((key) => byContactField.get(key))
+    .filter((answer): answer is FormSubmission['answers'][number] => Boolean(answer));
+  const remaining = filledAnswers.filter((answer) => !primary.some((item) => item.id === answer.id));
+
+  return [...primary, ...remaining].slice(0, 4);
 }
 
 // ── Inline text field ──────────────────────────────────────────────────────────
@@ -415,6 +437,97 @@ function NoteItem({
         )}
       </div>
     </div>
+  );
+}
+
+function ContactFormSubmissionsCard({ contactId }: { contactId: number }) {
+  const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
+  const { data: submissions = [], isLoading } = useQuery({
+    queryKey: ['contact-form-submissions', contactId],
+    queryFn: () => getContactFormSubmissions(contactId),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Formulários preenchidos</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 2 }).map((_, index) => (
+              <div key={index} className="h-20 animate-pulse rounded-xl bg-slate-100" />
+            ))}
+          </div>
+        ) : submissions.length === 0 ? (
+          <p className="text-center text-[#6b7e9a] text-sm py-6">
+            Nenhuma submissão de formulário associada a este contacto.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {submissions.map((submission) => {
+              const isExpanded = expandedSubmissionId === submission.id;
+              const primaryAnswers = getPrimarySubmissionAnswers(submission);
+
+              return (
+                <div key={submission.id} className="rounded-xl border border-[#dde3ec] bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedSubmissionId(isExpanded ? null : submission.id)}
+                    className="w-full px-4 py-3 text-left"
+                  >
+                    <span className="flex flex-wrap items-start justify-between gap-3">
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-[#0A2540]">
+                            {submission.form?.title || 'Formulário'}
+                          </span>
+                          <Badge variant="outline">{CONTACT_SYNC_LABELS[submission.contactSyncStatus]}</Badge>
+                        </span>
+                        <span className="mt-1 block text-xs text-[#6b7e9a]">{formatTime(submission.submittedAt)}</span>
+                      </span>
+                      {isExpanded ? (
+                        <ChevronUp className="mt-1 h-4 w-4 text-[#6b7e9a]" />
+                      ) : (
+                        <ChevronDown className="mt-1 h-4 w-4 text-[#6b7e9a]" />
+                      )}
+                    </span>
+
+                    {primaryAnswers.length > 0 ? (
+                      <span className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {primaryAnswers.map((answer) => (
+                          <span key={answer.id} className="min-w-0 rounded-lg bg-[#f5f7fa] px-3 py-2">
+                            <span className="block truncate text-[11px] font-semibold uppercase text-[#6b7e9a]">{answer.fieldLabel}</span>
+                            <span className="mt-0.5 block truncate text-sm text-[#0A2540]">{answer.value}</span>
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
+                  </button>
+
+                  {isExpanded ? (
+                    <div className="border-t border-[#dde3ec] bg-[#FAFCFF] px-4 py-4">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {submission.answers.map((answer) => (
+                          <div key={answer.id} className="rounded-lg border border-[#E2E8F0] bg-white p-3">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-[#6b7e9a]">
+                              {answer.fieldLabel}
+                            </div>
+                            <div className="mt-1 text-sm text-[#0A2540] break-words">
+                              {answer.value || '—'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -823,6 +936,8 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
 
         {/* Right column — Notes + Documents + Tasks */}
         <div className="lg:col-span-2 space-y-6">
+
+          <ContactFormSubmissionsCard contactId={contact.id} />
 
           {/* Notes card */}
           <Card>

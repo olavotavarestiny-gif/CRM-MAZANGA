@@ -14,7 +14,6 @@ import {
 } from '@/lib/api';
 import { Transaction, ClientProfitability } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,

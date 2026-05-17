@@ -8,6 +8,8 @@ const { intersectPermissions, parsePermissions } = require('../lib/permissions')
 const { normalizePlan } = require('../lib/plans');
 const { getSerializedPlanCatalog } = require('../lib/plan-limits');
 const { getSubscriptionState } = require('../lib/subscription-access');
+const { DEV_AUTH_PUBLIC_USER } = require('../lib/dev-auth');
+const { getAccessRole } = require('../lib/roles');
 
 const DIAGNOSTIC_TIMEOUT_MS = 3500;
 
@@ -348,6 +350,7 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
 
   return {
     ...user,
+    accessRole: getAccessRole(user),
     plan: effectivePlan,
     workspaceMode: effectiveWorkspaceMode,
     planDetails: {
@@ -422,6 +425,10 @@ router.post('/sync', async (req, res) => {
 // GET /api/auth/me - Dados do utilizador autenticado
 router.get('/me', requireAuth, async (req, res) => {
   try {
+    if (req.user?.isDevAuthBypass) {
+      return res.json(DEV_AUTH_PUBLIC_USER);
+    }
+
     const payload = await getCurrentUserPayload(req.user.id, req.user.impersonatedBy || null);
     if (!payload) {
       return res.status(404).json({ error: 'Utilizador não encontrado' });
@@ -435,6 +442,10 @@ router.get('/me', requireAuth, async (req, res) => {
 
 router.post('/log-login', requireAuth, async (req, res) => {
   try {
+    if (req.user?.isDevAuthBypass) {
+      return res.status(204).send();
+    }
+
     const ip = getRequestIp(req);
     const userAgent = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null;
     const dedupeWindowStart = new Date(Date.now() - (2 * 60 * 1000));

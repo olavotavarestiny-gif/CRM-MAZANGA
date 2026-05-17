@@ -3,6 +3,7 @@ import './globals.css';
 import Providers from '@/components/providers';
 import LayoutWrapper from '@/components/layout/layout-wrapper';
 import { Analytics } from '@vercel/analytics/react';
+import { isServerDevAuthBypassEnabled } from '@/lib/dev-auth';
 
 export const metadata: Metadata = {
   title: 'KukuGest',
@@ -14,11 +15,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const devAuthBypassEnabled = isServerDevAuthBypassEnabled();
+
   return (
     <html lang="pt">
       <body>
         <Providers>
-          <LayoutWrapper>
+          <LayoutWrapper devAuthBypassEnabled={devAuthBypassEnabled}>
             {children}
           </LayoutWrapper>
         </Providers>

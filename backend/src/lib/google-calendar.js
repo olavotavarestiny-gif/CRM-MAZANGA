@@ -36,6 +36,7 @@ function ensureGoogleCalendarConfigured() {
     'GOOGLE_CLIENT_SECRET',
     'GOOGLE_REDIRECT_URI',
     'GOOGLE_TOKEN_ENCRYPTION_KEY',
+    'JWT_SECRET',
   ].filter((key) => !process.env[key]);
 
   if (missing.length > 0) {
@@ -199,14 +200,18 @@ function signOAuthState({ userId, returnTo }) {
       nonce: crypto.randomUUID(),
       ...(safeReturnTo ? { returnTo: safeReturnTo } : {}),
     },
-    process.env.JWT_SECRET || 'fallback-secret',
+    process.env.JWT_SECRET,
     { expiresIn: '10m' }
   );
 }
 
 function verifyOAuthState(state) {
   try {
-    const payload = jwt.verify(state, process.env.JWT_SECRET || 'fallback-secret');
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET em falta');
+    }
+
+    const payload = jwt.verify(state, process.env.JWT_SECRET);
     if (payload.purpose !== GOOGLE_STATE_PURPOSE || !payload.userId) {
       throw new Error('state payload inválido');
     }

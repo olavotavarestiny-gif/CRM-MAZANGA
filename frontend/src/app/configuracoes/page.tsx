@@ -19,7 +19,6 @@ import {
   getCurrentUser, updateCurrentUserProfile, changePassword,
   getTeamMembers, addTeamMember, removeTeamMember,
 } from '@/lib/api';
-import { isComercio } from '@/lib/business-modes';
 import type { PlanName, User } from '@/lib/api';
 import type { IBANEntry } from '@/lib/types';
 import MemberPermissionsModal from '@/components/configuracoes/member-permissions-modal';

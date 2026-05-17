@@ -1,18 +1,10 @@
 'use client';
 
 import {
-  createContext, useContext, useCallback, useEffect, useRef, ReactNode,
+  useCallback, useEffect, useRef, ReactNode,
 } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { TOUR_GROUPS, TOUR_KEYS, TOTAL_STEPS, GROUP_OFFSETS } from '@/lib/tour-steps';
-
-interface TourContextValue {
-  startTour: () => void;
-  stopTour: () => void;
-}
-
-const TourContext = createContext<TourContextValue>({ startTour: () => {}, stopTour: () => {} });
-export const useTour = () => useContext(TourContext);
 
 function isActive() {
   return typeof window !== 'undefined' && sessionStorage.getItem(TOUR_KEYS.ACTIVE) === 'true';
@@ -89,22 +81,6 @@ export default function ProductTourProvider({ children }: { children: ReactNode 
     }
   }, [pathname, router]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const startTour = useCallback(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) return; // desktop only
-    sessionStorage.setItem(TOUR_KEYS.ACTIVE, 'true');
-    sessionStorage.setItem(TOUR_KEYS.GROUP, '0');
-    if (pathname === '/') {
-      setTimeout(() => driveGroup(0), 150);
-    } else {
-      router.push('/');
-    }
-  }, [pathname, router, driveGroup]);
-
-  const stopTour = useCallback(() => {
-    driverRef.current?.destroy();
-    clearTour();
-  }, []);
-
   // Resume tour after page navigation
   useEffect(() => {
     if (!isActive()) return;
@@ -118,9 +94,5 @@ export default function ProductTourProvider({ children }: { children: ReactNode 
   // Cleanup on unmount
   useEffect(() => () => driverRef.current?.destroy(), []);
 
-  return (
-    <TourContext.Provider value={{ startTour, stopTour }}>
-      {children}
-    </TourContext.Provider>
-  );
+  return children;
 }

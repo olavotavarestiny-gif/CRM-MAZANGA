@@ -1,4 +1,5 @@
 import type { PlanFeatureName, PlanFeatures, User, UserPermissions } from './api';
+import { hasOrgAdminAccess } from './roles';
 
 export type ModuleKey =
   | 'contacts'
@@ -29,8 +30,7 @@ function parsePermissions(permissions?: UserPermissions | null): UserPermissions
 }
 
 function hasFullAccess(user?: User | null): boolean {
-  if (!user) return false;
-  return !!(user.isSuperAdmin || user.role === 'admin' || !user.accountOwnerId);
+  return hasOrgAdminAccess(user);
 }
 
 type WorkspaceMode = User['workspaceMode'];

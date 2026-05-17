@@ -8,6 +8,7 @@ const { canCreateContact, getLimitState, buildLimitErrorPayload } = require('../
 const { validateNIF } = require('../lib/fiscal/nif-validator');
 const { cleanNifValue, parseCustomFields, resolveContactNif, stripNifKeysFromCustomFields } = require('../lib/contact-nif');
 const { getDefaultStageName, isValidStageName } = require('../lib/pipeline-stages');
+const { serialiseSubmission } = require('../lib/form-submissions');
 const VALID_FIELD_TYPES = ['text', 'number', 'date', 'select', 'url'];
 const UNGROUPED_GROUP_ID = 'UNGROUPED';
 const WON_STAGE = 'Fechado';
@@ -1002,6 +1003,56 @@ router.get('/:id/summary', requirePermission('contacts', 'view'), async (req, re
     });
   } catch (error) {
     console.error('Error fetching contact summary:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /:id/form-submissions — form submissions linked to this contact
+router.get('/:id/form-submissions', requirePermission('contacts', 'view'), async (req, res) => {
+  try {
+    const contactId = parseInt(req.params.id, 10);
+    const userId = req.user.effectiveUserId;
+
+    if (!Number.isInteger(contactId)) {
+      return res.status(400).json({ error: 'Contacto inválido' });
+    }
+
+    const contact = await prisma.contact.findFirst({
+      where: { id: contactId, userId },
+      select: { id: true },
+    });
+
+    if (!contact) {
+      return res.status(404).json({ error: 'Contacto não encontrado' });
+    }
+
+    const submissions = await prisma.formSubmission.findMany({
+      where: {
+        contactId,
+        form: { userId },
+      },
+      include: {
+        form: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        answers: {
+          include: {
+            field: {
+              select: { label: true },
+            },
+          },
+          orderBy: { fieldLabel: 'asc' },
+        },
+      },
+      orderBy: { submittedAt: 'desc' },
+    });
+
+    res.json(submissions.map(serialiseSubmission));
+  } catch (error) {
+    console.error('Error fetching contact form submissions:', error);
     res.status(500).json({ error: error.message });
   }
 });

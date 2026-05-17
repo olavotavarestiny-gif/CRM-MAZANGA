@@ -7,6 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/lib/types';
 
+const FIELD_TYPE_LABELS: Record<FormField['type'], string> = {
+  text: 'Texto',
+  number: 'Número',
+  multiple_choice: 'Múltipla Escolha',
+};
+
 interface FormFieldListProps {
   fields: FormField[];
   selectedFieldId: string | null;
@@ -48,7 +54,7 @@ const FormFieldListItem = memo(function FormFieldListItem({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm text-[#0A2540] truncate font-medium">{field.label}</p>
-              <p className="text-xs text-[#6b7e9a]">{field.type === 'text' ? 'Texto' : 'Múltipla Escolha'}</p>
+              <p className="text-xs text-[#6b7e9a]">{FIELD_TYPE_LABELS[field.type] || 'Texto'}</p>
             </div>
           </div>
         </div>

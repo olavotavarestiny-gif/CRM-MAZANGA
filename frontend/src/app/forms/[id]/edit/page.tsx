@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getForm,
@@ -46,12 +46,29 @@ const CONTACT_SYNC_LABELS: Record<FormSubmission['contactSyncStatus'], string> =
   updated: 'Atualizado',
   skipped: 'Sem contacto',
 };
+const PRIMARY_CONTACT_FIELDS = ['name', 'phone', 'email', 'company'];
 
 function getSubmissionAnswerValue(submission: FormSubmission, contactField: string) {
   const answer = submission.answers.find((item) => (
     item.value && (item.contactField === contactField || item.contactField === `standard:${contactField}`)
   ));
   return answer?.value || '';
+}
+
+function getAnswerContactFieldKey(answer: FormSubmission['answers'][number]) {
+  const contactField = answer.contactField || '';
+  return contactField.startsWith('standard:') ? contactField.slice('standard:'.length) : contactField;
+}
+
+function getPrimarySubmissionAnswers(submission: FormSubmission) {
+  const filledAnswers = submission.answers.filter((answer) => answer.value?.trim());
+  const byContactField = new Map(filledAnswers.map((answer) => [getAnswerContactFieldKey(answer), answer]));
+  const primary = PRIMARY_CONTACT_FIELDS
+    .map((key) => byContactField.get(key))
+    .filter((answer): answer is FormSubmission['answers'][number] => Boolean(answer));
+  const remaining = filledAnswers.filter((answer) => !primary.some((item) => item.id === answer.id));
+
+  return [...primary, ...remaining].slice(0, 4);
 }
 
 function ColorSwatch({ colors, value, onChange, label }: {
@@ -1104,94 +1121,83 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
                     Nenhuma submissão corresponde aos filtros atuais.
                   </p>
                 ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
-                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Data / Hora</th>
-                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Nome</th>
-                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Número</th>
-                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Email</th>
-                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Empresa</th>
-                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Contacto ligado</th>
-                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Resultado</th>
-                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Etapa atual</th>
-                      <th className="px-4 py-2 text-left text-[#0A2540] font-semibold">Detalhes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                  <div className="space-y-3">
                     {filteredSubmissions.map((submission: FormSubmission) => {
                       const isExpanded = expandedSubmissionId === submission.id;
                       const submittedAt = new Date(submission.submittedAt);
                       const name = getSubmissionAnswerValue(submission, 'name') || submission.contact?.name || '—';
                       const phone = getSubmissionAnswerValue(submission, 'phone') || submission.contact?.phone || '—';
-                      const email = getSubmissionAnswerValue(submission, 'email') || submission.contact?.email || '—';
-                      const company = getSubmissionAnswerValue(submission, 'company') || submission.contact?.company || '—';
+                      const primaryAnswers = getPrimarySubmissionAnswers(submission);
 
                       return (
-                        <Fragment key={submission.id}>
-                          <tr className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC]">
-                            <td className="px-4 py-3 text-[#6b7e9a] min-w-56">
-                              <div className="font-medium text-[#0A2540]">
-                                {format(submittedAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                              </div>
-                              <div className="text-xs text-[#6b7e9a]">
-                                {formatDistanceToNow(submittedAt, { locale: ptBR, addSuffix: true })}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-[#0A2540]">{name}</td>
-                            <td className="px-4 py-3 text-[#0A2540]">{phone}</td>
-                            <td className="px-4 py-3 text-[#0A2540]">{email}</td>
-                            <td className="px-4 py-3 text-[#0A2540]">{company}</td>
-                            <td className="px-4 py-3 text-[#0A2540]">
-                              {submission.contact ? (
-                                <div>
-                                  <div className="font-medium">{submission.contact.name}</div>
-                                  <div className="text-xs text-[#6b7e9a]">#{submission.contact.id} • {submission.contact.phone}</div>
-                                </div>
-                              ) : (
-                                '—'
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              <Badge variant="outline">{CONTACT_SYNC_LABELS[submission.contactSyncStatus]}</Badge>
-                            </td>
-                            <td className="px-4 py-3 text-[#0A2540]">{submission.contact?.stage || '—'}</td>
-                            <td className="px-4 py-3">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setExpandedSubmissionId(isExpanded ? null : submission.id)}
-                              >
-                                {isExpanded ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
-                                {isExpanded ? 'Fechar' : 'Ver'}
-                              </Button>
-                            </td>
-                          </tr>
-                          {isExpanded && (
-                            <tr className="border-b border-[#E2E8F0] bg-[#FAFCFF]">
-                              <td colSpan={9} className="px-4 py-4">
-                                <div className="grid gap-3 md:grid-cols-2">
-                                  {submission.answers.map((answer) => (
-                                    <div key={answer.id} className="rounded-lg border border-[#E2E8F0] bg-white p-3">
-                                      <div className="text-xs font-semibold uppercase tracking-wide text-[#6b7e9a]">
-                                        {answer.fieldLabel}
-                                      </div>
-                                      <div className="mt-1 text-sm text-[#0A2540] break-words">
-                                        {answer.value || '—'}
-                                      </div>
+                        <div key={submission.id} className="rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedSubmissionId(isExpanded ? null : submission.id)}
+                            className="w-full px-4 py-4 text-left"
+                          >
+                            <span className="flex flex-wrap items-start justify-between gap-3">
+                              <span className="min-w-0 flex-1">
+                                <span className="flex flex-wrap items-center gap-2">
+                                  <span className="font-semibold text-[#0A2540]">{name}</span>
+                                  <Badge variant="outline">{CONTACT_SYNC_LABELS[submission.contactSyncStatus]}</Badge>
+                                  {submission.contact?.stage ? (
+                                    <Badge variant="outline">{submission.contact.stage}</Badge>
+                                  ) : null}
+                                </span>
+                                <span className="mt-1 block text-xs text-[#6b7e9a]">
+                                  {format(submittedAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })} · {formatDistanceToNow(submittedAt, { locale: ptBR, addSuffix: true })}
+                                </span>
+                                <span className="mt-1 block text-xs text-[#6b7e9a]">
+                                  {submission.contact ? (
+                                    <span>Contacto #{submission.contact.id} · {submission.contact.name} · {submission.contact.phone}</span>
+                                  ) : (
+                                    <span>Sem contacto ligado</span>
+                                  )}
+                                </span>
+                              </span>
+                              <span className="flex items-center gap-2 text-sm font-medium text-[#0A2540]">
+                                <span>{phone}</span>
+                                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                              </span>
+                            </span>
+
+                            {primaryAnswers.length > 0 ? (
+                              <span className="mt-3 grid gap-2 md:grid-cols-4">
+                                {primaryAnswers.map((answer) => (
+                                  <span key={answer.id} className="min-w-0 rounded-lg bg-[#F8FAFC] px-3 py-2">
+                                    <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-[#6b7e9a]">
+                                      {answer.fieldLabel}
+                                    </span>
+                                    <span className="mt-0.5 block truncate text-sm text-[#0A2540]">
+                                      {answer.value || '—'}
+                                    </span>
+                                  </span>
+                                ))}
+                              </span>
+                            ) : null}
+                          </button>
+
+                          {isExpanded ? (
+                            <div className="border-t border-[#E2E8F0] bg-[#FAFCFF] px-4 py-4">
+                              <div className="grid gap-3 md:grid-cols-2">
+                                {submission.answers.map((answer) => (
+                                  <div key={answer.id} className="rounded-lg border border-[#E2E8F0] bg-white p-3">
+                                    <div className="text-xs font-semibold uppercase tracking-wide text-[#6b7e9a]">
+                                      {answer.fieldLabel}
                                     </div>
-                                  ))}
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </Fragment>
+                                    <div className="mt-1 text-sm text-[#0A2540] break-words">
+                                      {answer.value || '—'}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
                 )}
               </div>
             )}
