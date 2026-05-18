@@ -7,13 +7,14 @@ const {
   logBillingCustomerCreatedActivity,
   logFieldChangesActivity,
 } = require('../lib/activity-log');
+const { requirePermission } = require('../lib/permissions');
 
 function normaliseBillingCustomerName(contact) {
   return contact.company?.trim() || contact.name;
 }
 
 // GET /api/faturacao/clientes
-router.get('/clientes', async (req, res) => {
+router.get('/clientes', requirePermission('finances', 'view_invoices'), async (req, res) => {
   try {
     const { search, page = 1, limit = 50 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
@@ -37,7 +38,7 @@ router.get('/clientes', async (req, res) => {
 });
 
 // POST /api/faturacao/clientes
-router.post('/clientes', async (req, res) => {
+router.post('/clientes', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const { customerTaxID, customerName, customerAddress, customerPhone, customerEmail, contactId } = req.body;
     if (!customerTaxID || !customerName) return res.status(400).json({ error: 'NIF e nome obrigatórios' });
@@ -58,7 +59,7 @@ router.post('/clientes', async (req, res) => {
 });
 
 // PUT /api/faturacao/clientes/:id
-router.put('/clientes/:id', async (req, res) => {
+router.put('/clientes/:id', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const existing = await prisma.clienteFaturacao.findUnique({
       where: { id: req.params.id },
@@ -120,7 +121,7 @@ router.put('/clientes/:id', async (req, res) => {
 });
 
 // POST /api/faturacao/clientes/from-contact — importar contacto CRM
-router.post('/clientes/from-contact', async (req, res) => {
+router.post('/clientes/from-contact', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const { contactId, customerTaxID } = req.body;
     const contact = await prisma.contact.findFirst({

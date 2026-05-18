@@ -14,7 +14,6 @@ import { isComercio } from '@/lib/business-modes';
 import type { Factura, ServicesDashboardBase, Task } from '@/lib/types';
 import PainelComercialPage from '@/components/comercial/painel-comercial';
 import OnboardingChecklist from '@/components/onboarding/onboarding-checklist';
-import StartupModelSelector from '@/components/onboarding/startup-model-selector';
 import TaskFormModal from '@/components/tasks/task-form-modal';
 import { BillingAccessBanner } from '@/components/billing/access-notice';
 import { Badge } from '@/components/ui/badge';
@@ -658,7 +657,6 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
       />
 
       <BillingAccessBanner subscription={currentUser.subscription} />
-      <StartupModelSelector currentUser={currentUser} />
       <OnboardingChecklist currentUser={currentUser} />
 
       {customizing ? (

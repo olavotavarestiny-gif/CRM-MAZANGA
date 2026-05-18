@@ -3,9 +3,10 @@ const router = express.Router();
 const prisma = require('../lib/prisma');
 const { log: logActivity } = require('../services/activity-log.service.js');
 const { ensureDefaultStages } = require('../lib/pipeline-stages');
+const { requirePermission, requireDeletePermission } = require('../lib/permissions');
 
 // GET /api/pipeline-stages
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('pipeline', 'view'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     await ensureDefaultStages(userId);
@@ -20,7 +21,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/pipeline-stages
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('pipeline', 'edit'), async (req, res) => {
   try {
     const { name, color } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
@@ -43,7 +44,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/pipeline-stages/reorder — MUST be before /:id
-router.put('/reorder', async (req, res) => {
+router.put('/reorder', requirePermission('pipeline', 'edit'), async (req, res) => {
   try {
     const { order } = req.body;
     if (!Array.isArray(order)) return res.status(400).json({ error: 'Invalid order array' });
@@ -61,7 +62,7 @@ router.put('/reorder', async (req, res) => {
 });
 
 // PUT /api/pipeline-stages/:id
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('pipeline', 'edit'), async (req, res) => {
   try {
     const { name, color } = req.body;
     const existing = await prisma.pipelineStage.findUnique({ where: { id: req.params.id } });
@@ -80,7 +81,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/pipeline-stages/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireDeletePermission, async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const existing = await prisma.pipelineStage.findUnique({ where: { id: req.params.id } });

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { requirePermission } = require('../lib/permissions');
 
 async function touchContactActivity(contactId, userId) {
   if (!contactId) return;
@@ -11,7 +12,7 @@ async function touchContactActivity(contactId, userId) {
 }
 
 // GET /api/contacts/:id/notes
-router.get('/contacts/:id/notes', async (req, res) => {
+router.get('/contacts/:id/notes', requirePermission('contacts', 'view'), async (req, res) => {
   try {
     const contactId = parseInt(req.params.id);
     const skip = parseInt(req.query.skip) || 0;
@@ -35,7 +36,7 @@ router.get('/contacts/:id/notes', async (req, res) => {
 });
 
 // POST /api/contacts/:id/notes
-router.post('/contacts/:id/notes', async (req, res) => {
+router.post('/contacts/:id/notes', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const contactId = parseInt(req.params.id);
     const { content } = req.body;
@@ -65,7 +66,7 @@ router.post('/contacts/:id/notes', async (req, res) => {
 });
 
 // PUT /api/notes/:id
-router.put('/notes/:id', async (req, res) => {
+router.put('/notes/:id', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const noteId = parseInt(req.params.id);
     const { content } = req.body;
@@ -102,7 +103,7 @@ router.put('/notes/:id', async (req, res) => {
 });
 
 // DELETE /api/notes/:id
-router.delete('/notes/:id', async (req, res) => {
+router.delete('/notes/:id', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const noteId = parseInt(req.params.id);
 

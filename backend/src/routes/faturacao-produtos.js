@@ -20,7 +20,7 @@ function calcMargin(cost, salePrice) {
 }
 
 // GET /api/faturacao/produtos
-router.get('/produtos', async (req, res) => {
+router.get('/produtos', requireStockPermission('view'), async (req, res) => {
   try {
     const { search, active } = req.query;
     const where = {
@@ -53,7 +53,7 @@ router.get('/produtos', async (req, res) => {
 });
 
 // POST /api/faturacao/produtos
-router.post('/produtos', async (req, res) => {
+router.post('/produtos', requireStockPermission('edit'), async (req, res) => {
   try {
     const {
       productCode,
@@ -114,7 +114,7 @@ router.post('/produtos', async (req, res) => {
 });
 
 // PUT /api/faturacao/produtos/:id
-router.put('/produtos/:id', async (req, res) => {
+router.put('/produtos/:id', requireStockPermission('edit'), async (req, res) => {
   try {
     const existing = await prisma.produto.findUnique({
       where: { id: req.params.id },
@@ -240,7 +240,7 @@ router.put('/produtos/:id', async (req, res) => {
 });
 
 // DELETE /api/faturacao/produtos/:id — soft delete
-router.delete('/produtos/:id', async (req, res) => {
+router.delete('/produtos/:id', requireStockPermission('edit'), async (req, res) => {
   try {
     const existing = await prisma.produto.findUnique({
       where: { id: req.params.id },

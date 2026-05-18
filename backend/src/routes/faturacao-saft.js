@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { buildSAFT, validateSaftReadiness } = require('../lib/fiscal/saft-builder');
+const { requirePermission } = require('../lib/permissions');
 
 // GET /api/faturacao/saft — listar períodos gerados
-router.get('/saft', async (req, res) => {
+router.get('/saft', requirePermission('finances', 'saft'), async (req, res) => {
   try {
     const periodos = await prisma.saftPeriodo.findMany({
       where: { userId: req.user.effectiveUserId },
@@ -18,7 +19,7 @@ router.get('/saft', async (req, res) => {
 });
 
 // POST /api/faturacao/saft/validate — pré-validar período antes de gerar
-router.post('/saft/validate', async (req, res) => {
+router.post('/saft/validate', requirePermission('finances', 'saft'), async (req, res) => {
   try {
     const { periodo } = req.body;
     if (!periodo || !/^\d{4}-\d{2}$/.test(periodo)) {
@@ -33,7 +34,7 @@ router.post('/saft/validate', async (req, res) => {
 });
 
 // POST /api/faturacao/saft/generate — gerar SAF-T para um período
-router.post('/saft/generate', async (req, res) => {
+router.post('/saft/generate', requirePermission('finances', 'saft'), async (req, res) => {
   try {
     const { periodo } = req.body;
     if (!periodo || !/^\d{4}-\d{2}$/.test(periodo)) {
@@ -75,7 +76,7 @@ router.post('/saft/generate', async (req, res) => {
 });
 
 // GET /api/faturacao/saft/:id/download — descarregar XML
-router.get('/saft/:id/download', async (req, res) => {
+router.get('/saft/:id/download', requirePermission('finances', 'saft'), async (req, res) => {
   try {
     const periodo = await prisma.saftPeriodo.findUnique({ where: { id: req.params.id } });
     if (!periodo || periodo.userId !== req.user.effectiveUserId) {

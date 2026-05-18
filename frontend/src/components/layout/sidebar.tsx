@@ -82,8 +82,7 @@ export default function Sidebar({
   const showOnboardingBadge =
     isOnboardingEligible &&
     onboarding &&
-    !onboarding.dismissed &&
-    !onboarding.allDone &&
+    onboarding.show &&
     onboarding.totalCount > 0;
 
   const navItemClass = (active: boolean) => cn(

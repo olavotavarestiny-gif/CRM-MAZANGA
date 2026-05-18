@@ -5,6 +5,7 @@ const router = express.Router();
 const prisma = require('../lib/prisma');
 const { processRecorrentes } = require('../lib/faturacao/scheduler');
 const { normalizeInvoiceCurrencyInput } = require('../lib/faturacao/currency');
+const { requirePermission } = require('../lib/permissions');
 
 const INCLUDE = {
   serie:            { select: { seriesCode: true, seriesYear: true, documentType: true } },
@@ -13,7 +14,7 @@ const INCLUDE = {
 };
 
 // GET /api/faturacao/recorrentes
-router.get('/recorrentes', async (req, res) => {
+router.get('/recorrentes', requirePermission('finances', 'view_invoices'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const items = await prisma.facturaRecorrente.findMany({
@@ -29,7 +30,7 @@ router.get('/recorrentes', async (req, res) => {
 });
 
 // POST /api/faturacao/recorrentes
-router.post('/recorrentes', async (req, res) => {
+router.post('/recorrentes', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const {
@@ -112,7 +113,7 @@ router.post('/recorrentes', async (req, res) => {
 });
 
 // PUT /api/faturacao/recorrentes/:id
-router.put('/recorrentes/:id', async (req, res) => {
+router.put('/recorrentes/:id', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const existing = await prisma.facturaRecorrente.findFirst({ where: { id: req.params.id, userId } });
@@ -140,7 +141,7 @@ router.put('/recorrentes/:id', async (req, res) => {
 });
 
 // DELETE /api/faturacao/recorrentes/:id
-router.delete('/recorrentes/:id', async (req, res) => {
+router.delete('/recorrentes/:id', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const existing = await prisma.facturaRecorrente.findFirst({ where: { id: req.params.id, userId } });
@@ -158,7 +159,7 @@ router.delete('/recorrentes/:id', async (req, res) => {
 });
 
 // POST /api/faturacao/recorrentes/:id/trigger  — emit now
-router.post('/recorrentes/:id/trigger', async (req, res) => {
+router.post('/recorrentes/:id/trigger', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const existing = await prisma.facturaRecorrente.findFirst({ where: { id: req.params.id, userId } });

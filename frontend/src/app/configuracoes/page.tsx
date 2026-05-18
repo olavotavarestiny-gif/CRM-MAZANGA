@@ -61,7 +61,7 @@ function ConfiguracoesContent() {
   const isOwner = currentUser && !currentUser.accountOwnerId;
   const isSuperAdmin = !!currentUser?.isSuperAdmin;
   const isComercioWorkspace = currentUser?.workspaceMode === 'comercio';
-  const platformAdminHref = isSuperAdmin ? '/superadmin?section=organizations' : null;
+  const platformAdminHref = isSuperAdmin ? '/superadmin?section=clientes' : null;
   const currentPlan = (currentUser?.plan || 'essencial') as PlanName;
   const canManageTeam = !!isOwner && (!isComercioWorkspace || currentPlan !== 'essencial');
   const currentTier = getPricingTierDetails(currentUser?.workspaceMode || 'servicos', currentPlan);
@@ -91,7 +91,7 @@ function ConfiguracoesContent() {
       return;
     }
     if (requestedTab === 'superadmin' && isSuperAdmin) {
-      router.replace('/superadmin?section=organizations');
+      router.replace('/superadmin?section=clientes');
     }
   }, [isSuperAdmin, requestedTab, router]);
 

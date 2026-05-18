@@ -72,7 +72,12 @@ const USER_SELECT = {
 
 // Bootstrap: emails that always get superadmin regardless of DB field value
 const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'olavo@kukugest.ao';
-const SUPER_ADMIN_EMAILS = [...new Set([SUPER_ADMIN_EMAIL, 'olavo@kukugest.ao'])];
+const SUPER_ADMIN_EMAILS = [...new Set([SUPER_ADMIN_EMAIL, 'olavo@kukugest.ao'])]
+  .map((email) => String(email).trim().toLowerCase())
+  .filter(Boolean);
+function isBootstrapSuperAdminEmail(email) {
+  return SUPER_ADMIN_EMAILS.includes(String(email || '').trim().toLowerCase());
+}
 
 async function requireAuth(req, res, next) {
   if (isDevAuthBypassEnabled() && hasValidDevAuthHeader(req)) {
@@ -114,7 +119,7 @@ async function requireAuth(req, res, next) {
           email: targetUser.email,
           name: targetUser.name,
           role: targetUser.role,
-          isSuperAdmin: targetUser.isSuperAdmin || SUPER_ADMIN_EMAILS.includes(targetUser.email),
+          isSuperAdmin: targetUser.isSuperAdmin || isBootstrapSuperAdminEmail(targetUser.email),
           permissionsJson: targetUser.permissions,
           accountOwnerId: targetUser.accountOwnerId || null,
           supabaseUid: targetUser.supabaseUid || null,
@@ -175,7 +180,7 @@ async function requireAuth(req, res, next) {
       email: user.email,
       name: user.name,
       role: user.role,
-      isSuperAdmin: user.isSuperAdmin || SUPER_ADMIN_EMAILS.includes(user.email),
+      isSuperAdmin: user.isSuperAdmin || isBootstrapSuperAdminEmail(user.email),
       permissionsJson: user.permissions,
       accountOwnerId: user.accountOwnerId || null,
       supabaseUid,
@@ -226,5 +231,7 @@ module.exports.requireAccountOwner = requireAccountOwner;
 module.exports.requireAccountOwnerOrAdmin = requireAccountOwnerOrAdmin;
 module.exports.requireSuperAdmin = requireSuperAdmin;
 module.exports.SUPER_ADMIN_EMAIL = SUPER_ADMIN_EMAIL;
+module.exports.SUPER_ADMIN_EMAILS = SUPER_ADMIN_EMAILS;
+module.exports.isBootstrapSuperAdminEmail = isBootstrapSuperAdminEmail;
 module.exports.ACCESS_ROLES = ACCESS_ROLES;
 module.exports.verifySupabaseJwt = verifySupabaseJwt;

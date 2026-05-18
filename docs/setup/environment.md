@@ -53,6 +53,7 @@ Este documento organiza as variáveis de ambiente do projeto por aplicação e p
 | `WHATSAPP_ACCESS_TOKEN` | não | token da Meta |
 | `WHATSAPP_API_VERSION` | não | ex: `v21.0` |
 | `WHATSAPP_PHONE_NUMBER_ID` | não | phone number id |
+| `WHATSAPP_OWNER_EMAIL` | não | email da conta dona dos contactos criados pelo webhook inbound; se ausente, usa `MAZANGA_LEAD_OWNER_EMAIL` |
 | `WEBHOOK_VERIFY_TOKEN` | não | challenge do webhook Meta |
 | `WABA_ID` | não | usado para templates |
 
@@ -115,3 +116,4 @@ Este documento organiza as variáveis de ambiente do projeto por aplicação e p
 - `JWT_SECRET` não substitui o login normal do Supabase
 - `GOOGLE_TOKEN_ENCRYPTION_KEY` e `GOOGLE_WEBHOOK_ADDRESS` estavam ausentes da documentação antiga e passaram a estar documentados aqui
 - `WHATSAPP_API_VERSION` também passa a ser parte da referência oficial porque é usada diretamente na construção das URLs da Meta
+- `WHATSAPP_OWNER_EMAIL` deve apontar para uma conta cliente real; sem dono resolvido, o webhook inbound ignora a criação de contactos/mensagens para evitar fuga multi-tenant

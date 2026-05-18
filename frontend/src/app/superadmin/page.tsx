@@ -1342,7 +1342,7 @@ export default function SuperAdminPage() {
                 >
                   <option value="">Nenhuma (Independente)</option>
                   {users
-                    .filter((user) => !user.accountOwnerId && user.role !== 'admin')
+                    .filter((user) => !user.accountOwnerId && user.role !== 'admin' && !user.isSuperAdmin)
                     .map((user) => (
                       <option key={user.id} value={user.id}>
                         {user.name}

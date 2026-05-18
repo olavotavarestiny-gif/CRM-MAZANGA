@@ -3,16 +3,17 @@ const router = express.Router();
 const prisma = require('../lib/prisma');
 const whatsapp = require('../lib/whatsapp');
 const email = require('../lib/email');
+const { requirePermission } = require('../lib/permissions');
 
-async function touchContactActivity(contactId) {
+async function touchContactActivity(contactId, userId) {
   await prisma.contact.updateMany({
-    where: { id: Number(contactId) },
+    where: { id: Number(contactId), userId },
     data: { lastActivityAt: new Date() },
   });
 }
 
 // POST - Send WhatsApp message (text or template)
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const { contactId, text, templateName } = req.body;
 
@@ -27,8 +28,8 @@ router.post('/', async (req, res) => {
     }
 
     // Get contact by id
-    const contact = await prisma.contact.findUnique({
-      where: { id },
+    const contact = await prisma.contact.findFirst({
+      where: { id, userId: req.user.effectiveUserId },
     });
 
     if (!contact) {
@@ -69,7 +70,7 @@ router.post('/', async (req, res) => {
         channel: 'whatsapp',
       },
     });
-    await touchContactActivity(id);
+    await touchContactActivity(id, req.user.effectiveUserId);
 
     // Return message + warning if delivery failed
     if (deliveryError) {
@@ -88,7 +89,7 @@ router.post('/', async (req, res) => {
 });
 
 // POST - Send email message
-router.post('/email', async (req, res) => {
+router.post('/email', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const { contactId, subject, text } = req.body;
 
@@ -103,8 +104,8 @@ router.post('/email', async (req, res) => {
     }
 
     // Get contact by id
-    const contact = await prisma.contact.findUnique({
-      where: { id },
+    const contact = await prisma.contact.findFirst({
+      where: { id, userId: req.user.effectiveUserId },
     });
 
     if (!contact) {
@@ -128,7 +129,7 @@ router.post('/email', async (req, res) => {
         subject,
       },
     });
-    await touchContactActivity(id);
+    await touchContactActivity(id, req.user.effectiveUserId);
 
     res.json(message);
   } catch (error) {

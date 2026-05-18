@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { requirePermission } = require('../lib/permissions');
 
 // GET messages for a contact
-router.get('/:contactId', async (req, res) => {
+router.get('/:contactId', requirePermission('contacts', 'view'), async (req, res) => {
   try {
     const contactId = parseInt(req.params.contactId);
     if (!Number.isInteger(contactId)) {

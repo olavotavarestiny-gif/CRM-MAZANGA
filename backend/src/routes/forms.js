@@ -506,6 +506,14 @@ router.put('/:id/fields/:fieldId', requireAuth, requirePlanFeature('formularios'
     }
 
     const { type, label, required, order, options, contactField } = req.body;
+    const existingField = await prisma.formField.findFirst({
+      where: { id: req.params.fieldId, formId: req.params.id },
+      select: { id: true },
+    });
+    if (!existingField) {
+      return res.status(404).json({ error: 'Field not found' });
+    }
+
     const fieldData = await resolveFieldPersistenceData({
       userId: req.user.effectiveUserId,
       type,
@@ -541,6 +549,14 @@ router.delete('/:id/fields/:fieldId', requireAuth, requirePlanFeature('formulari
       return res.status(404).json({ error: 'Form not found' });
     }
 
+    const existingField = await prisma.formField.findFirst({
+      where: { id: req.params.fieldId, formId: req.params.id },
+      select: { id: true },
+    });
+    if (!existingField) {
+      return res.status(404).json({ error: 'Field not found' });
+    }
+
     await prisma.formField.delete({
       where: { id: req.params.fieldId },
     });
@@ -564,6 +580,23 @@ router.post('/:id/fields/reorder', requireAuth, requirePlanFeature('formularios'
     }
 
     const { fields } = req.body; // [{id, order}, ...]
+    if (!Array.isArray(fields)) {
+      return res.status(400).json({ error: 'fields must be an array' });
+    }
+
+    const fieldIds = fields.map((field) => field?.id).filter(Boolean);
+    const uniqueFieldIds = new Set(fieldIds);
+    if (fieldIds.length !== fields.length || uniqueFieldIds.size !== fieldIds.length) {
+      return res.status(400).json({ error: 'Existem campos inválidos para este formulário' });
+    }
+
+    const validFieldCount = await prisma.formField.count({
+      where: { formId: req.params.id, id: { in: fieldIds } },
+    });
+    if (validFieldCount !== fieldIds.length) {
+      return res.status(400).json({ error: 'Existem campos inválidos para este formulário' });
+    }
+
     await prisma.$transaction(
       fields.map((field) => prisma.formField.update({
         where: { id: field.id },

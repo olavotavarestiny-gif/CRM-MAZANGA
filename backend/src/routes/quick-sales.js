@@ -3,10 +3,11 @@ const router = express.Router();
 const prisma = require('../lib/prisma');
 const { createFactura } = require('../lib/faturacao/create-factura');
 const { logStockAdjustedActivity } = require('../lib/activity-log');
+const { requirePermission } = require('../lib/permissions');
 
 // GET /api/quick-sales/defaults
 // Returns the account's default serieId and estabelecimentoId for quick sale.
-router.get('/defaults', async (req, res) => {
+router.get('/defaults', requirePermission('finances', 'view_invoices'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const config = await prisma.configuracaoFaturacao.findUnique({
@@ -45,7 +46,7 @@ router.get('/defaults', async (req, res) => {
 // POST /api/quick-sales/emit
 // Emits a quick-sale invoice using the selected estabelecimento whenever provided.
 // Reuses the same createFactura engine — identical fiscal rules, hash chain, AGT.
-router.post('/emit', async (req, res) => {
+router.post('/emit', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const { items, customerTaxID, customerName, paymentMethod, estabelecimentoId, clienteFaturacaoId } = req.body;

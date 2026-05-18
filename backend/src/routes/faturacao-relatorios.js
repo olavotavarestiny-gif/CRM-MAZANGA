@@ -11,6 +11,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { requirePermission } = require('../lib/permissions');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ function toCSV(rows, columns) {
  *  - total base tributável
  *  - lista de facturas com breakdown de IVA
  */
-router.get('/relatorios/iva', async (req, res) => {
+router.get('/relatorios/iva', requirePermission('finances', 'view_reports'), async (req, res) => {
   try {
     const { periodo } = req.query;
     if (!periodo || !/^\d{4}-\d{2}$/.test(periodo)) {
@@ -141,7 +142,7 @@ router.get('/relatorios/iva', async (req, res) => {
 
 // ── IVA CSV export ────────────────────────────────────────────────────────────
 
-router.get('/relatorios/iva/export', async (req, res) => {
+router.get('/relatorios/iva/export', requirePermission('finances', 'view_reports'), async (req, res) => {
   try {
     const { periodo } = req.query;
     if (!periodo || !/^\d{4}-\d{2}$/.test(periodo)) {
@@ -192,7 +193,7 @@ router.get('/relatorios/iva/export', async (req, res) => {
  * GET /api/faturacao/relatorios/vendas?year=2026
  * Devolve volume mensal de vendas (grossTotal, netTotal, taxPayable, count)
  */
-router.get('/relatorios/vendas', async (req, res) => {
+router.get('/relatorios/vendas', requirePermission('finances', 'view_reports'), async (req, res) => {
   try {
     const year = req.query.year || new Date().getFullYear();
     const userId = req.user.effectiveUserId;
@@ -239,7 +240,7 @@ router.get('/relatorios/vendas', async (req, res) => {
 
 // ── Vendas CSV export ─────────────────────────────────────────────────────────
 
-router.get('/relatorios/vendas/export', async (req, res) => {
+router.get('/relatorios/vendas/export', requirePermission('finances', 'view_reports'), async (req, res) => {
   try {
     const year = req.query.year || new Date().getFullYear();
     const userId = req.user.effectiveUserId;

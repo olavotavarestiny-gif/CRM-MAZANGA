@@ -24,7 +24,7 @@ router.get('/team', requireAccountOwner, async (req, res) => {
     const accountOwnerId = req.user.effectiveUserId;
 
     const members = await prisma.user.findMany({
-      where: { accountOwnerId },
+      where: { accountOwnerId, active: true },
       select: {
         id: true,
         name: true,
@@ -62,8 +62,9 @@ router.post('/team', requireAccountOwner, async (req, res) => {
   try {
     const { name, email, password } = req.body;
     const accountOwnerId = req.user.effectiveUserId;
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
-    if (!name || !email || !password) {
+    if (!name || !normalizedEmail || !password) {
       return res.status(400).json({ error: 'Nome, email e password são obrigatórios' });
     }
 
@@ -76,18 +77,77 @@ router.post('/team', requireAccountOwner, async (req, res) => {
       return res.status(403).json(buildLimitErrorPayload(limitState));
     }
 
-    // Verificar se email já existe
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-      select: { id: true },
+    // Verificar se email já existe, incluindo membros removidos da própria conta.
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+      select: {
+        id: true,
+        active: true,
+        accountOwnerId: true,
+        supabaseUid: true,
+        isSuperAdmin: true,
+      },
     });
+
     if (existingUser) {
-      return res.status(400).json({ error: 'Email já está registado' });
+      if (existingUser.active || existingUser.accountOwnerId !== accountOwnerId || existingUser.isSuperAdmin) {
+        return res.status(400).json({ error: 'Email já está registado' });
+      }
+
+      let supabaseUid = existingUser.supabaseUid;
+      if (supabaseUid) {
+        const { error: updateAuthError } = await getSupabaseAdmin().auth.admin.updateUserById(supabaseUid, {
+          password,
+          user_metadata: { name },
+        });
+
+        if (updateAuthError) {
+          return res.status(400).json({ error: updateAuthError.message });
+        }
+      } else {
+        const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
+          email: normalizedEmail,
+          password,
+          email_confirm: true,
+          user_metadata: { name },
+        });
+
+        if (authError) {
+          return res.status(400).json({ error: authError.message });
+        }
+
+        supabaseUid = authData.user.id;
+      }
+
+      const member = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name,
+          email: normalizedEmail,
+          supabaseUid,
+          accountOwnerId,
+          role: 'user',
+          active: true,
+          mustChangePassword: true,
+          permissions: null,
+          assignedEstabelecimentoId: null,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          accountOwnerId: true,
+          active: true,
+          createdAt: true,
+        },
+      });
+
+      return res.status(201).json(member);
     }
 
     // 1. Criar no Supabase Auth
     const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       password,
       email_confirm: true,
       user_metadata: { name },
@@ -101,7 +161,7 @@ router.post('/team', requireAccountOwner, async (req, res) => {
     const member = await prisma.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         supabaseUid: authData.user.id,
         accountOwnerId,
         role: 'user',
@@ -133,7 +193,7 @@ router.patch('/team/:memberId/permissions', requireAccountOwner, async (req, res
     const { permissions, assignedEstabelecimentoId } = req.body; // UserPermissions object | null
 
     const member = await prisma.user.findFirst({
-      where: { id: memberId, accountOwnerId },
+      where: { id: memberId, accountOwnerId, active: true },
     });
     if (!member) return res.status(404).json({ error: 'Membro não encontrado nesta conta' });
 
@@ -193,17 +253,17 @@ router.delete('/team/:memberId', requireAccountOwner, async (req, res) => {
     // Verificar que o membro pertence a esta conta
     const member = await prisma.user.findUnique({
       where: { id: memberId },
-      select: { accountOwnerId: true },
+      select: { accountOwnerId: true, active: true },
     });
 
-    if (!member || member.accountOwnerId !== accountOwnerId) {
+    if (!member || member.accountOwnerId !== accountOwnerId || !member.active) {
       return res.status(404).json({ error: 'Membro não encontrado nesta conta' });
     }
 
-    // Remover membro (set accountOwnerId = null)
+    // Remover membro sem o promover a conta independente.
     await prisma.user.update({
       where: { id: memberId },
-      data: { accountOwnerId: null },
+      data: { active: false },
     });
 
     res.json({ message: 'Membro removido da conta' });

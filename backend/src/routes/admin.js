@@ -4,6 +4,27 @@ const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
 const { DEFAULT_PLAN, isSupportedPlan, normalizePlan } = require('../lib/plans');
 const { canCreateUser, buildLimitErrorPayload } = require('../lib/plan-limits');
+const { SUPER_ADMIN_EMAILS, isBootstrapSuperAdminEmail } = require('../middleware/auth');
+
+function getClientAccountOwnerWhere(extra = {}) {
+  const where = {
+    ...extra,
+    accountOwnerId: null,
+    isSuperAdmin: false,
+  };
+
+  if (SUPER_ADMIN_EMAILS.length > 0) {
+    where.NOT = SUPER_ADMIN_EMAILS.map((email) => ({
+      email: { equals: email, mode: 'insensitive' },
+    }));
+  }
+
+  return where;
+}
+
+function isProtectedSuperAdminUser(user) {
+  return Boolean(user?.isSuperAdmin || isBootstrapSuperAdminEmail(user?.email));
+}
 
 // Lazy Supabase admin client — created on first use, not at startup
 let _supabaseAdmin = null;
@@ -26,6 +47,7 @@ router.get('/users', async (req, res) => {
         name: true,
         email: true,
         role: true,
+        isSuperAdmin: true,
         active: true,
         plan: true,
         permissions: true,
@@ -48,6 +70,7 @@ router.get('/users', async (req, res) => {
       name: u.name,
       email: u.email,
       role: u.role,
+      isSuperAdmin: u.isSuperAdmin || isBootstrapSuperAdminEmail(u.email),
       active: u.active,
       plan: normalizePlan(u.plan),
       permissions: u.permissions ? JSON.parse(u.permissions) : null,
@@ -68,7 +91,7 @@ router.get('/users', async (req, res) => {
 router.get('/accounts', async (req, res) => {
   try {
     const accounts = await prisma.user.findMany({
-      where: { accountOwnerId: null, isSuperAdmin: true },
+      where: getClientAccountOwnerWhere(),
       select: {
         id: true,
         name: true,
@@ -78,6 +101,7 @@ router.get('/accounts', async (req, res) => {
         permissions: true,
         createdAt: true,
         accountMembers: {
+          where: { active: true },
           select: {
             id: true,
             name: true,
@@ -87,7 +111,7 @@ router.get('/accounts', async (req, res) => {
           },
           orderBy: { name: 'asc' },
         },
-        _count: { select: { accountMembers: true } },
+        _count: { select: { accountMembers: { where: { active: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -124,6 +148,14 @@ router.patch('/accounts/:id', async (req, res) => {
       data.permissions = permissions ? JSON.stringify(permissions) : null;
     }
 
+    const account = await prisma.user.findFirst({
+      where: getClientAccountOwnerWhere({ id: userId }),
+      select: { id: true },
+    });
+    if (!account) {
+      return res.status(404).json({ error: 'Conta cliente não encontrada' });
+    }
+
     const updated = await prisma.user.update({
       where: { id: userId },
       data,
@@ -149,8 +181,9 @@ router.post('/users', async (req, res) => {
   try {
     const { name, email, password, role, accountOwnerId, plan, permissions } = req.body;
     let targetAccountOwnerId = null;
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
-    if (!name || !email || !password) {
+    if (!name || !normalizedEmail || !password) {
       return res.status(400).json({ error: 'Name, email e password são obrigatórios' });
     }
 
@@ -163,8 +196,8 @@ router.post('/users', async (req, res) => {
     }
 
     // Verificar se email já existe no PostgreSQL
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
       select: { id: true },
     });
     if (existingUser) {
@@ -174,12 +207,16 @@ router.post('/users', async (req, res) => {
     // Validar accountOwnerId se fornecido
     if (accountOwnerId) {
       targetAccountOwnerId = parseInt(accountOwnerId);
-      const accountOwner = await prisma.user.findUnique({
-        where: { id: targetAccountOwnerId },
+      if (!Number.isInteger(targetAccountOwnerId)) {
+        return res.status(400).json({ error: 'Account owner inválido' });
+      }
+
+      const accountOwner = await prisma.user.findFirst({
+        where: getClientAccountOwnerWhere({ id: targetAccountOwnerId, active: true }),
         select: { id: true },
       });
       if (!accountOwner) {
-        return res.status(400).json({ error: 'Account owner não encontrado' });
+        return res.status(400).json({ error: 'Conta cliente não encontrada' });
       }
 
       const limitState = await canCreateUser(targetAccountOwnerId);
@@ -198,7 +235,7 @@ router.post('/users', async (req, res) => {
 
     // 1. Criar no Supabase Auth
     const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       password,
       email_confirm: true,
       user_metadata: { name },
@@ -212,7 +249,7 @@ router.post('/users', async (req, res) => {
     const user = await prisma.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         supabaseUid: authData.user.id,
         role: role === 'admin' ? 'admin' : 'user',
         active: true,
@@ -263,6 +300,17 @@ router.patch('/users/:id', async (req, res) => {
       updateData.permissions = permissions ? JSON.stringify(permissions) : null;
     }
 
+    const existing = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, isSuperAdmin: true },
+    });
+    if (!existing) {
+      return res.status(404).json({ error: 'Utilizador não encontrado' });
+    }
+    if (isProtectedSuperAdminUser(existing)) {
+      return res.status(403).json({ error: 'Utilizadores superadmin não podem ser alterados nesta rota' });
+    }
+
     const user = await prisma.user.update({
       where: { id: userId },
       data: updateData,
@@ -299,11 +347,19 @@ router.delete('/users/:id', async (req, res) => {
     // Buscar supabaseUid antes de eliminar
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { supabaseUid: true },
+      select: { email: true, supabaseUid: true, accountOwnerId: true, isSuperAdmin: true },
     });
 
     if (!user) {
       return res.status(404).json({ error: 'Utilizador não encontrado' });
+    }
+
+    if (isProtectedSuperAdminUser(user)) {
+      return res.status(403).json({ error: 'Utilizadores superadmin não podem ser eliminados nesta rota' });
+    }
+
+    if (user.accountOwnerId === null) {
+      return res.status(400).json({ error: 'Use a eliminação de organização para remover uma conta cliente' });
     }
 
     // Eliminar do Supabase Auth (se tiver uid)

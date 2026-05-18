@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { canCaixaClose, canCaixaOpen, canCaixaView, canEmitInvoices } from '@/lib/permissions';
 
 interface CartItem extends QuickSaleItem {
   id: string;
@@ -133,6 +134,11 @@ export default function VendasRapidasPage() {
     queryFn: getCurrentUser,
     retry: false,
   });
+  const podeVerCaixa = currentUser ? canCaixaView(currentUser) : false;
+  const podeAbrirCaixa = currentUser ? canCaixaOpen(currentUser) : false;
+  const podeFecharCaixa = currentUser ? canCaixaClose(currentUser) : false;
+  const podeEmitirFaturas = currentUser ? canEmitInvoices(currentUser) : false;
+  const podeAcederVendaRapida = podeVerCaixa && podeEmitirFaturas;
   const isRestrictedTeamMember = !!currentUser?.accountOwnerId && currentUser.role !== 'admin' && !currentUser.isSuperAdmin;
   const assignedEstabelecimentoId = isRestrictedTeamMember ? currentUser?.assignedEstabelecimentoId ?? null : null;
 
@@ -140,6 +146,7 @@ export default function VendasRapidasPage() {
   const { data: sessao = null, isLoading: loadingSessao } = useQuery<CaixaSessao | null>({
     queryKey: ['caixa-sessao-atual'],
     queryFn: () => getCaixaSessaoAtual(),
+    enabled: podeVerCaixa,
   });
 
   const sessaoAberta = sessao?.status === 'open';
@@ -199,6 +206,16 @@ export default function VendasRapidasPage() {
   // ── Config load ────────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
+
+    if (loadingUser) return () => { active = false; };
+    if (!podeAcederVendaRapida) {
+      setEstabelecimentos([]);
+      setEstabelecimentosError(null);
+      setLoadingConfig(false);
+      return () => { active = false; };
+    }
+
+    setLoadingConfig(true);
     getEstabelecimentos()
       .then((estabs) => {
         if (!active) return;
@@ -215,10 +232,12 @@ export default function VendasRapidasPage() {
       });
 
     return () => { active = false; };
-  }, []);
+  }, [loadingUser, podeAcederVendaRapida]);
 
   useEffect(() => {
     let active = true;
+    if (loadingUser || !podeAcederVendaRapida) return () => { active = false; };
+
     getQuickSaleDefaults()
       .then((defaults) => {
         if (!active) return;
@@ -231,11 +250,12 @@ export default function VendasRapidasPage() {
       });
 
     return () => { active = false; };
-  }, []);
+  }, [loadingUser, podeAcederVendaRapida]);
 
   useEffect(() => {
+    if (loadingUser || !podeAcederVendaRapida) return;
     getFaturacaoConfig().then(setFaturacaoConfig).catch(() => {});
-  }, []);
+  }, [loadingUser, podeAcederVendaRapida]);
 
   useEffect(() => {
     const selectedStillValid = estabelecimentos.some((e) => e.id === selectedEstabelecimentoId);
@@ -390,6 +410,10 @@ export default function VendasRapidasPage() {
   // ── Emit ───────────────────────────────────────────────────────────────────
   const handleEmit = async () => {
     if (cart.length === 0) return;
+    if (!podeEmitirFaturas) {
+      setError('Sem permissão para emitir faturas.');
+      return;
+    }
     setEmitting(true); setError(null);
     try {
       let clienteFaturacaoId: string | undefined;
@@ -457,8 +481,22 @@ export default function VendasRapidasPage() {
   };
 
   // ── Loading ────────────────────────────────────────────────────────────────
-  if (loadingConfig || loadingSessao || loadingUser) {
+  if (loadingUser || loadingConfig || (podeVerCaixa && loadingSessao)) {
     return <div className="min-h-screen bg-[#f5f7f9]" />;
+  }
+
+  if (!currentUser || !podeAcederVendaRapida) {
+    return (
+      <div className="mx-auto flex max-w-2xl flex-col items-center justify-center p-6 text-center min-h-[60vh]">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
+          <Lock className="h-7 w-7 text-red-500" />
+        </div>
+        <h1 className="mt-4 text-2xl font-extrabold tracking-tight text-[#2c2f31]">Sem acesso à Venda Rápida</h1>
+        <p className="mt-2 text-sm text-slate-500">
+          Esta área exige permissão para ver caixa e emitir faturas. Peça ao administrador da conta para ajustar as permissões do utilizador.
+        </p>
+      </div>
+    );
   }
 
   // ── GATE: sem caixa aberto ─────────────────────────────────────────────────
@@ -487,7 +525,12 @@ export default function VendasRapidasPage() {
               Precisa de abrir o caixa para começar a vender. Defina o saldo inicial e use o ponto de venda autorizado para este utilizador.
             </p>
           </div>
-          <Button onClick={() => { setAbrirErr(''); setShowAbrirCaixa(true); }} className="gap-2 px-6" size="lg">
+          <Button
+            onClick={() => { setAbrirErr(''); setShowAbrirCaixa(true); }}
+            className="gap-2 px-6"
+            size="lg"
+            disabled={!podeAbrirCaixa}
+          >
             <Unlock className="h-4 w-4" />
             Abrir caixa
           </Button>
@@ -601,6 +644,7 @@ export default function VendasRapidasPage() {
           size="sm"
           className="gap-1.5 text-slate-600 border-slate-200 hover:border-red-300 hover:text-red-600 hover:bg-red-50"
           onClick={() => { setFecharErr(''); setFecharCounted(''); setFecharNotes(''); setShowFecharCaixa(true); }}
+          disabled={!podeFecharCaixa}
         >
           <Lock className="h-3.5 w-3.5" />
           Fechar caixa
@@ -852,7 +896,7 @@ export default function VendasRapidasPage() {
 
           <Button
             onClick={handleEmit}
-            disabled={!configReady || !selectedEstabelecimentoId || cart.length === 0 || emitting || !!selectedCustomer?.requiresContactFix}
+            disabled={!podeEmitirFaturas || !configReady || !selectedEstabelecimentoId || cart.length === 0 || emitting || !!selectedCustomer?.requiresContactFix}
             className="w-full gap-2"
             size="lg"
           >

@@ -3,7 +3,7 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
 const requireAuth = require('../middleware/auth');
-const { verifySupabaseJwt } = require('../middleware/auth');
+const { isBootstrapSuperAdminEmail, verifySupabaseJwt } = require('../middleware/auth');
 const { intersectPermissions, parsePermissions } = require('../lib/permissions');
 const { normalizePlan } = require('../lib/plans');
 const { getSerializedPlanCatalog } = require('../lib/plan-limits');
@@ -249,6 +249,15 @@ function mapPasswordProviderError(rawMessage) {
   return 'Não foi possível alterar a password. Tente novamente.';
 }
 
+function blockImpersonatedWrites(req, res) {
+  if (!req.user?.impersonatedBy) return false;
+  res.status(403).json({
+    error: 'Operação bloqueada durante impersonation.',
+    code: 'IMPERSONATION_WRITE_BLOCKED',
+  });
+  return true;
+}
+
 router.get('/diagnostics', async (req, res) => {
   const requestId = makeRequestId();
   const origin = req.headers.origin || null;
@@ -345,12 +354,14 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
     }
   }
 
+  const isSuperAdmin = Boolean(user.isSuperAdmin || isBootstrapSuperAdminEmail(user.email));
+  const userWithEffectiveRole = { ...user, isSuperAdmin };
   const currentPlanCatalog = getSerializedPlanCatalog(effectivePlan, effectiveWorkspaceMode);
   const subscription = await getSubscriptionState(user.accountOwnerId || user.id);
 
   return {
-    ...user,
-    accessRole: getAccessRole(user),
+    ...userWithEffectiveRole,
+    accessRole: getAccessRole(userWithEffectiveRole),
     plan: effectivePlan,
     workspaceMode: effectiveWorkspaceMode,
     planDetails: {
@@ -480,6 +491,8 @@ router.post('/log-login', requireAuth, async (req, res) => {
 
 router.patch('/me', requireAuth, async (req, res) => {
   try {
+    if (blockImpersonatedWrites(req, res)) return;
+
     const { name, jobTitle } = req.body || {};
     const data = {};
 
@@ -527,6 +540,8 @@ router.patch('/me', requireAuth, async (req, res) => {
 // For first-time password change (mustChangePassword=true) or regular password change
 router.post('/change-password', requireAuth, async (req, res) => {
   try {
+    if (blockImpersonatedWrites(req, res)) return;
+
     const { newPassword } = req.body;
 
     const passwordValidationError = getPasswordValidationError(newPassword);
@@ -571,6 +586,8 @@ router.post('/change-password', requireAuth, async (req, res) => {
 // to clear the mustChangePassword flag without re-setting the password.
 router.post('/acknowledge-password-change', requireAuth, async (req, res) => {
   try {
+    if (blockImpersonatedWrites(req, res)) return;
+
     await prisma.user.update({
       where: { id: req.user.id },
       data: { mustChangePassword: false },

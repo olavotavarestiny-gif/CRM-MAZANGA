@@ -7,6 +7,7 @@ const router = express.Router();
 const FLOW_KEY = 'onboarding_v2';
 const WELCOME_FLOW_KEY = 'welcome_v1';
 const GLOBAL_WORKSPACE_MODE = 'global';
+const AUTO_SHOW_WINDOW_MS = 5 * 60_000;
 
 const SERVICOS_STEPS = [
   { id: 'setup_company', label: 'Complete os dados da empresa', href: '/faturacao/configuracao' },
@@ -96,6 +97,14 @@ function getWelcomeCacheKey(orgId, viewerScope) {
 
 function getStepDefinitions(workspaceMode) {
   return workspaceMode === 'comercio' ? COMERCIO_STEPS : SERVICOS_STEPS;
+}
+
+function wasCreatedRecently(record) {
+  const createdAt = record?.created_at instanceof Date
+    ? record.created_at.getTime()
+    : new Date(record?.created_at || 0).getTime();
+
+  return Number.isFinite(createdAt) && Date.now() - createdAt <= AUTO_SHOW_WINDOW_MS;
 }
 
 async function getWorkspaceMode(orgId) {
@@ -191,23 +200,49 @@ router.get('/', requireAuth, async (req, res) => {
     const completedCount = completedSteps.length;
     const totalCount = steps.length;
     const allDone = totalCount > 0 && completedCount === totalCount;
+    const shouldShowOnboarding = !accountDismissed && !allDone && (
+      Boolean(record.reopened_at) || wasCreatedRecently(record)
+    );
+    const shouldAutoDismissOnboarding = shouldShowOnboarding && !record.reopened_at;
+    const shouldShowWelcome = !welcomeRecord.dismissed && wasCreatedRecently(welcomeRecord);
 
-    await prisma.onboardingProgress.update({
-      where: {
-        organization_id_workspace_mode_flow_key: {
-          organization_id: String(orgId),
-          workspace_mode: workspaceMode,
-          flow_key: FLOW_KEY,
+    await Promise.all([
+      prisma.onboardingProgress.update({
+        where: {
+          organization_id_workspace_mode_flow_key: {
+            organization_id: String(orgId),
+            workspace_mode: workspaceMode,
+            flow_key: FLOW_KEY,
+          },
         },
-      },
-      data: {
-        completed_steps: completedSteps,
-        completed_at: allDone ? record.completed_at ?? new Date() : null,
-      },
-    });
+        data: {
+          completed_steps: completedSteps,
+          completed_at: allDone ? record.completed_at ?? new Date() : null,
+          ...(shouldAutoDismissOnboarding ? {
+            dismissed: true,
+            dismissed_at: record.dismissed_at ?? new Date(),
+          } : {}),
+        },
+      }),
+      shouldShowWelcome
+        ? prisma.onboardingProgress.update({
+          where: {
+            organization_id_workspace_mode_flow_key: {
+              organization_id: String(orgId),
+              workspace_mode: GLOBAL_WORKSPACE_MODE,
+              flow_key: WELCOME_FLOW_KEY,
+            },
+          },
+          data: {
+            dismissed: true,
+            dismissed_at: welcomeRecord.dismissed_at ?? new Date(),
+          },
+        })
+        : Promise.resolve(),
+    ]);
 
     const payload = {
-      show: !accountDismissed && !allDone,
+      show: shouldShowOnboarding,
       dismissed: accountDismissed,
       completedCount,
       totalCount,
@@ -216,15 +251,26 @@ router.get('/', requireAuth, async (req, res) => {
       workspaceMode,
       flowKey: FLOW_KEY,
       welcome: {
-        show: !welcomeRecord.dismissed,
+        show: shouldShowWelcome,
         dismissed: welcomeRecord.dismissed,
         flowKey: WELCOME_FLOW_KEY,
       },
       steps,
     };
 
-    cache.set(cacheKey, { data: payload, expiresAt: Date.now() + CACHE_TTL });
-    cache.set(welcomeCacheKey, { data: payload.welcome, expiresAt: Date.now() + CACHE_TTL });
+    const cachedPayload = {
+      ...payload,
+      show: shouldAutoDismissOnboarding ? false : payload.show,
+      dismissed: shouldAutoDismissOnboarding ? true : payload.dismissed,
+      welcome: {
+        ...payload.welcome,
+        show: shouldShowWelcome ? false : payload.welcome.show,
+        dismissed: shouldShowWelcome ? true : payload.welcome.dismissed,
+      },
+    };
+
+    cache.set(cacheKey, { data: cachedPayload, expiresAt: Date.now() + CACHE_TTL });
+    cache.set(welcomeCacheKey, { data: cachedPayload.welcome, expiresAt: Date.now() + CACHE_TTL });
     return res.json(payload);
   } catch (err) {
     console.error('[onboarding] GET error:', err);

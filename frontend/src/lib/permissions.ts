@@ -204,6 +204,11 @@ export function canAccessBilling(user: User): boolean {
   return canViewInvoices(user);
 }
 
+export function canAccessQuickSales(user: User): boolean {
+  if (!hasFeature(user, 'vendas')) return false;
+  return canCaixaView(user) && canEmitInvoices(user);
+}
+
 export function canComercialDashboardBasic(user: User): boolean {
   if (!hasFeature(user, 'vendas')) return false;
   if (isCommerceWorkspace(user) && !isPlanAtLeast(user, 'profissional')) return false;
@@ -307,7 +312,7 @@ export function canAccessCommerceRoute(user: User, pathname: string): boolean {
 
   if (path === '/' || path.startsWith('/dashboard')) return true;
   if (path.startsWith('/caixa')) return canCaixaView(user);
-  if (path.startsWith('/vendas-rapidas')) return canView(user, 'vendas');
+  if (path.startsWith('/vendas-rapidas')) return canAccessQuickSales(user);
   if (path.startsWith('/contacts')) return canView(user, 'contacts');
   if (path.startsWith('/tasks')) return canView(user, 'tasks');
   if (path.startsWith('/produtos')) return canStockView(user);

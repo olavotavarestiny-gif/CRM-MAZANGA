@@ -5,10 +5,27 @@ const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
 const { DEFAULT_PLAN, isSupportedPlan, normalizePlan } = require('../lib/plans');
 const superadminMessagingRouter = require('./superadmin-messaging');
+const { SUPER_ADMIN_EMAILS, isBootstrapSuperAdminEmail } = require('../middleware/auth');
 
 const BILLING_TYPES = new Set(['trial', 'paid']);
 const ACCOUNT_STATUSES = new Set(['active', 'grace_period', 'suspended']);
 const DURATIONS = new Set([30, 90, 180, 365]);
+
+function getClientAccountOwnerWhere(extra = {}) {
+  const where = {
+    ...extra,
+    accountOwnerId: null,
+    isSuperAdmin: false,
+  };
+
+  if (SUPER_ADMIN_EMAILS.length > 0) {
+    where.NOT = SUPER_ADMIN_EMAILS.map((email) => ({
+      email: { equals: email, mode: 'insensitive' },
+    }));
+  }
+
+  return where;
+}
 
 function addDays(date, days) {
   const next = new Date(date);
@@ -72,16 +89,17 @@ router.use('/messaging', superadminMessagingRouter);
 router.get('/orgs', async (req, res) => {
   try {
     const orgs = await prisma.user.findMany({
-      where: { accountOwnerId: null, isSuperAdmin: false },
+      where: getClientAccountOwnerWhere(),
       select: {
         id: true, name: true, email: true, active: true, plan: true,
         permissions: true, workspaceMode: true, billingType: true, trialEndsAt: true,
         expiresAt: true, graceEndsAt: true, accountStatus: true, createdAt: true,
         accountMembers: {
+          where: { active: true },
           select: { id: true, name: true, email: true, active: true },
           orderBy: { name: 'asc' },
         },
-        _count: { select: { accountMembers: true } },
+        _count: { select: { accountMembers: { where: { active: true } } } },
         loginLogs: { take: 1, orderBy: { createdAt: 'desc' }, select: { createdAt: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -127,6 +145,14 @@ router.patch('/orgs/:id', async (req, res) => {
     if (billingUpdate.error) return res.status(400).json({ error: billingUpdate.error });
     Object.assign(data, billingUpdate.data);
 
+    const account = await prisma.user.findFirst({
+      where: getClientAccountOwnerWhere({ id: userId }),
+      select: { id: true },
+    });
+    if (!account) {
+      return res.status(404).json({ error: 'Conta cliente não encontrada' });
+    }
+
     const updated = await prisma.user.update({
       where: { id: userId },
       data,
@@ -164,10 +190,16 @@ router.delete('/orgs/:id', async (req, res) => {
     });
     const owner = await prisma.user.findUnique({
       where: { id: ownerId },
-      select: { id: true, supabaseUid: true, role: true, accountOwnerId: true },
+      select: { id: true, email: true, supabaseUid: true, role: true, accountOwnerId: true, isSuperAdmin: true },
     });
 
-    if (!owner || owner.accountOwnerId !== null || owner.role === 'admin') {
+    if (
+      !owner ||
+      owner.accountOwnerId !== null ||
+      owner.role === 'admin' ||
+      owner.isSuperAdmin ||
+      isBootstrapSuperAdminEmail(owner.email)
+    ) {
       return res.status(404).json({ error: 'Org não encontrada' });
     }
 
@@ -202,11 +234,15 @@ router.post('/impersonate/:userId', async (req, res) => {
 
     const target = await prisma.user.findUnique({
       where: { id: targetId },
-      select: { id: true, name: true, email: true, active: true },
+      select: { id: true, name: true, email: true, active: true, isSuperAdmin: true },
     });
 
     if (!target || !target.active) {
       return res.status(404).json({ error: 'Utilizador não encontrado ou inactivo' });
+    }
+
+    if (target.isSuperAdmin || isBootstrapSuperAdminEmail(target.email)) {
+      return res.status(400).json({ error: 'Não pode impersonar outro super-administrador' });
     }
 
     if (!process.env.JWT_SECRET) {
@@ -235,8 +271,9 @@ router.post('/impersonate/:userId', async (req, res) => {
 router.post('/users', async (req, res) => {
   try {
     const { name, email, password, plan, permissions, workspaceMode, billingType, durationDays, accountStatus } = req.body;
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
-    if (!name || !email || !password) {
+    if (!name || !normalizedEmail || !password) {
       return res.status(400).json({ error: 'Nome, email e password são obrigatórios' });
     }
     if (password.length < 6) {
@@ -250,20 +287,20 @@ router.post('/users', async (req, res) => {
       return res.status(400).json({ error: 'Workspace inválido. Use servicos ou comercio.' });
     }
 
-    const existing = await prisma.user.findUnique({
-      where: { email },
+    const existing = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
       select: { id: true },
     });
     if (existing) return res.status(400).json({ error: 'Email já está registado' });
 
     const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
-      email, password, email_confirm: true, user_metadata: { name },
+      email: normalizedEmail, password, email_confirm: true, user_metadata: { name },
     });
     if (authError) return res.status(400).json({ error: authError.message });
 
     const user = await prisma.user.create({
       data: {
-        name, email,
+        name, email: normalizedEmail,
         supabaseUid: authData.user.id,
         role: 'user',
         active: true,
@@ -294,7 +331,7 @@ router.get('/usage', async (req, res) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const orgs = await prisma.user.findMany({
-      where: { accountOwnerId: null, isSuperAdmin: false },
+      where: getClientAccountOwnerWhere(),
       select: { id: true, name: true, accountMembers: { select: { id: true } } },
       orderBy: { createdAt: 'desc' },
     });
@@ -343,7 +380,7 @@ router.get('/usage', async (req, res) => {
 router.get('/storage', async (req, res) => {
   try {
     const orgs = await prisma.user.findMany({
-      where: { accountOwnerId: null, isSuperAdmin: false },
+      where: getClientAccountOwnerWhere(),
       select: { id: true, name: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -389,7 +426,7 @@ router.get('/dashboard', async (req, res) => {
     startOfMonth.setHours(0, 0, 0, 0);
 
     const orgs = await prisma.user.findMany({
-      where: { accountOwnerId: null, isSuperAdmin: false },
+      where: getClientAccountOwnerWhere(),
       select: {
         id: true, active: true, plan: true, workspaceMode: true, createdAt: true,
         accountMembers: { select: { id: true } },

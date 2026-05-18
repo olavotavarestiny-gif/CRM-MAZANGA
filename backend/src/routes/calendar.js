@@ -20,6 +20,7 @@ const {
   mapStoredEventToCalendarEvent,
   parseSyncWindow,
   getGoogleErrorDetails,
+  deleteEventFromGoogle,
   ensureCalendarWatch,
   handleWebhookNotification,
   stopCalendarWatch,

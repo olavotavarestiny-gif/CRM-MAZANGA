@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { logFieldChangesActivity } = require('../lib/activity-log');
+const { requirePermission } = require('../lib/permissions');
 
 // GET /api/faturacao/config
-router.get('/config', async (req, res) => {
+router.get('/config', requirePermission('finances', 'view_invoices'), async (req, res) => {
   try {
     let config = await prisma.configuracaoFaturacao.findUnique({
       where: { userId: req.user.effectiveUserId },
@@ -21,7 +22,7 @@ router.get('/config', async (req, res) => {
 });
 
 // PUT /api/faturacao/config
-router.put('/config', async (req, res) => {
+router.put('/config', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const {
@@ -171,7 +172,7 @@ router.put('/config', async (req, res) => {
 });
 
 // GET /api/faturacao/config/status
-router.get('/config/status', async (req, res) => {
+router.get('/config/status', requirePermission('finances', 'view_invoices'), async (req, res) => {
   try {
     const config = await prisma.configuracaoFaturacao.findUnique({
       where: { userId: req.user.effectiveUserId },

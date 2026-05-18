@@ -6,9 +6,10 @@ const {
   logProductCategoryCreatedActivity,
   logProductCategoryDeletedActivity,
 } = require('../lib/activity-log');
+const { requireStockPermission } = require('../lib/permissions');
 
 // GET /api/produto-categorias
-router.get('/', async (req, res) => {
+router.get('/', requireStockPermission('view'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const categorias = await prisma.produtoCategoria.findMany({
@@ -23,7 +24,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/produto-categorias
-router.post('/', async (req, res) => {
+router.post('/', requireStockPermission('edit'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const { nome, cor } = req.body || {};
@@ -51,7 +52,7 @@ router.post('/', async (req, res) => {
 });
 
 // PATCH /api/produto-categorias/:id
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireStockPermission('edit'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const categoria = await prisma.produtoCategoria.findFirst({
@@ -102,7 +103,7 @@ router.patch('/:id', async (req, res) => {
 });
 
 // DELETE /api/produto-categorias/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireStockPermission('edit'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const categoria = await prisma.produtoCategoria.findFirst({

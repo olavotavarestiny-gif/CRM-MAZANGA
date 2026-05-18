@@ -25,6 +25,7 @@ O projeto já comunica com a WhatsApp Cloud API via Meta Graph para envio de men
 - `WHATSAPP_ACCESS_TOKEN`
 - `WHATSAPP_PHONE_NUMBER_ID`
 - `WHATSAPP_API_VERSION`
+- `WHATSAPP_OWNER_EMAIL`
 - `WABA_ID`
 - `WEBHOOK_VERIFY_TOKEN`
 
@@ -38,4 +39,4 @@ O projeto já comunica com a WhatsApp Cloud API via Meta Graph para envio de men
 
 - o webhook trata apenas mensagens de texto no fluxo MVP
 - media, templates inbound complexos e outras mensagens não estão documentados como fluxo maduro
-- o webhook atual cria contacto por telefone quando ainda não existe e grava a mensagem inbound
+- o webhook atual cria contacto por telefone quando ainda não existe e grava a mensagem inbound na conta definida por `WHATSAPP_OWNER_EMAIL`

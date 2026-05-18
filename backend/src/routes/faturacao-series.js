@@ -9,9 +9,10 @@ const {
   logSerieDeletedActivity,
   logStoreCreatedActivity,
 } = require('../lib/activity-log');
+const { requirePermission } = require('../lib/permissions');
 
 // GET /api/faturacao/series
-router.get('/series', async (req, res) => {
+router.get('/series', requirePermission('finances', 'view_invoices'), async (req, res) => {
   try {
     const series = await prisma.serie.findMany({
       where: { userId: req.user.effectiveUserId },
@@ -25,7 +26,7 @@ router.get('/series', async (req, res) => {
 });
 
 // POST /api/faturacao/series
-router.post('/series', async (req, res) => {
+router.post('/series', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const { estabelecimentoId, seriesCode, seriesYear, documentType, firstDocumentNumber } = req.body;
     if (!estabelecimentoId || !seriesCode || !seriesYear || !documentType) {
@@ -53,7 +54,7 @@ router.post('/series', async (req, res) => {
 });
 
 // PUT /api/faturacao/series/:id
-router.put('/series/:id', async (req, res) => {
+router.put('/series/:id', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const serie = await prisma.serie.findUnique({
       where: { id: req.params.id },
@@ -96,7 +97,7 @@ router.put('/series/:id', async (req, res) => {
 });
 
 // DELETE /api/faturacao/series/:id — só fecha (não apaga)
-router.delete('/series/:id', async (req, res) => {
+router.delete('/series/:id', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const serie = await prisma.serie.findUnique({
       where: { id: req.params.id },
@@ -121,7 +122,7 @@ router.delete('/series/:id', async (req, res) => {
 });
 
 // GET /api/faturacao/estabelecimentos
-router.get('/estabelecimentos', async (req, res) => {
+router.get('/estabelecimentos', requirePermission('finances', 'view_invoices'), async (req, res) => {
   try {
     const estabs = await prisma.estabelecimento.findMany({
       where: { userId: req.user.effectiveUserId },
@@ -153,7 +154,7 @@ router.get('/estabelecimentos', async (req, res) => {
 });
 
 // POST /api/faturacao/estabelecimentos
-router.post('/estabelecimentos', async (req, res) => {
+router.post('/estabelecimentos', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const { nome, nif, morada, telefone, email, isPrincipal } = req.body;
     if (!nome) return res.status(400).json({ error: 'Nome obrigatório' });

@@ -512,6 +512,7 @@ function LayoutInner({
         open={showWelcome && !devAuthBypassEnabled}
         onClose={dismissWelcomeForAccount}
         onStartTour={handleStartChecklist}
+        comercio={comercio}
       />
       <BillingSuspendedModal subscription={currentUser?.subscription} />
     </div>

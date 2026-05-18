@@ -11,9 +11,10 @@ const {
   isInvoicePaid,
   reconcileInvoicePayment,
 } = require('../services/reconciliation.service');
+const { requirePermission } = require('../lib/permissions');
 
 // GET /api/faturacao/dashboard
-router.get('/dashboard', async (req, res) => {
+router.get('/dashboard', requirePermission('finances', 'view_invoices'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const now = new Date();
@@ -51,7 +52,7 @@ router.get('/dashboard', async (req, res) => {
 });
 
 // GET /api/faturacao/facturas
-router.get('/facturas', async (req, res) => {
+router.get('/facturas', requirePermission('finances', 'view_invoices'), async (req, res) => {
   try {
     const { page = 1, limit = 20, documentType, documentStatus, agtStatus, search, startDate, endDate } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
@@ -87,7 +88,7 @@ router.get('/facturas', async (req, res) => {
 });
 
 // GET /api/faturacao/facturas/:id
-router.get('/facturas/:id', async (req, res) => {
+router.get('/facturas/:id', requirePermission('finances', 'view_invoices'), async (req, res) => {
   try {
     const factura = await prisma.factura.findUnique({
       where: { id: req.params.id },
@@ -113,7 +114,7 @@ router.get('/facturas/:id', async (req, res) => {
 });
 
 // POST /api/faturacao/facturas — CRIAR (imutável após criação)
-router.post('/facturas', async (req, res) => {
+router.post('/facturas', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const factura = await createFactura(userId, req.body, req);
@@ -142,7 +143,7 @@ router.post('/facturas', async (req, res) => {
 });
 
 // POST /api/faturacao/facturas/:id/anular — ANULAR (nunca DELETE)
-router.post('/facturas/:id/anular', async (req, res) => {
+router.post('/facturas/:id/anular', requirePermission('finances', 'emit_invoices'), async (req, res) => {
   try {
     const userId = req.user.effectiveUserId;
     const { motivo } = req.body;
@@ -179,7 +180,7 @@ router.post('/facturas/:id/anular', async (req, res) => {
 });
 
 // GET /api/faturacao/facturas/:id/pdf
-router.get('/facturas/:id/pdf', async (req, res) => {
+router.get('/facturas/:id/pdf', requirePermission('finances', 'view_invoices'), async (req, res) => {
   try {
     const factura = await prisma.factura.findUnique({
       where: { id: req.params.id },

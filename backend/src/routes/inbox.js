@@ -1,12 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { requirePermission } = require('../lib/permissions');
 
 // GET all conversations (contacts with messages, ordered by latest)
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
   try {
     const contacts = await prisma.contact.findMany({
-      where: { messages: { some: {} } },
+      where: {
+        userId: req.user.effectiveUserId,
+        messages: { some: {} },
+      },
       include: {
         messages: {
           orderBy: { timestamp: 'desc' },

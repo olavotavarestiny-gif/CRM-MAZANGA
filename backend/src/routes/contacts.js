@@ -79,7 +79,7 @@ async function getSystemFieldConfigs(userId) {
 // ── System Field Config ───────────────────────────────────────────────────────
 
 // GET /contacts/field-config — returns system field visibility/label config
-router.get('/field-config', async (req, res) => {
+router.get('/field-config', requirePermission('contacts', 'view'), async (req, res) => {
   try {
     const configs = await getSystemFieldConfigs(req.user.effectiveUserId);
     res.json(configs);
@@ -89,7 +89,7 @@ router.get('/field-config', async (req, res) => {
 });
 
 // PUT /contacts/field-config/:key — update a system field config
-router.put('/field-config/:key', async (req, res) => {
+router.put('/field-config/:key', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const { label, visible, required, order } = req.body;
     const { key } = req.params;
@@ -128,7 +128,7 @@ router.put('/field-config/:key', async (req, res) => {
 // ── Custom Field Definitions ─────────────────────────────────────────────────
 
 // GET /contacts/fields — list custom field defs only
-router.get('/fields', async (req, res) => {
+router.get('/fields', requirePermission('contacts', 'view'), async (req, res) => {
   try {
     const fields = await prisma.contactFieldDef.findMany({
       where: { userId: req.user.effectiveUserId, active: true },
@@ -141,7 +141,7 @@ router.get('/fields', async (req, res) => {
 });
 
 // POST /contacts/fields — create new field def
-router.post('/fields', async (req, res) => {
+router.post('/fields', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const { label, type, options, required } = req.body;
     if (!label || !label.trim()) return res.status(400).json({ error: 'Label is required' });
@@ -179,7 +179,7 @@ router.post('/fields', async (req, res) => {
 });
 
 // PUT /contacts/fields/reorder — MUST be before /fields/:id to avoid route conflict
-router.put('/fields/reorder', async (req, res) => {
+router.put('/fields/reorder', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const { order } = req.body; // [{ id, order }, ...]
     if (!Array.isArray(order)) return res.status(400).json({ error: 'Invalid order array' });
@@ -198,7 +198,7 @@ router.put('/fields/reorder', async (req, res) => {
 });
 
 // PUT /contacts/fields/:id — update field def
-router.put('/fields/:id', async (req, res) => {
+router.put('/fields/:id', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const { label, type, options, required, order } = req.body;
     const existing = await prisma.contactFieldDef.findUnique({ where: { id: req.params.id } });
@@ -220,7 +220,7 @@ router.put('/fields/:id', async (req, res) => {
 });
 
 // DELETE /contacts/fields/:id — hide field (active=false). System fields are hidden; custom fields are hard-deleted.
-router.delete('/fields/:id', async (req, res) => {
+router.delete('/fields/:id', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const existing = await prisma.contactFieldDef.findUnique({ where: { id: req.params.id } });
     if (!existing || existing.userId !== req.user.effectiveUserId) {

@@ -2,6 +2,31 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 
+async function getWebhookOwnerId() {
+  const ownerEmail = (
+    process.env.WHATSAPP_OWNER_EMAIL ||
+    process.env.MAZANGA_LEAD_OWNER_EMAIL ||
+    ''
+  ).trim().toLowerCase();
+
+  if (!ownerEmail) {
+    console.error('[webhook] WHATSAPP_OWNER_EMAIL não configurado');
+    return null;
+  }
+
+  const owner = await prisma.user.findUnique({
+    where: { email: ownerEmail },
+    select: { id: true },
+  });
+
+  if (!owner) {
+    console.error(`[webhook] Owner não encontrado para WHATSAPP_OWNER_EMAIL=${ownerEmail}`);
+    return null;
+  }
+
+  return owner.id;
+}
+
 // GET - Meta verification challenge
 router.get('/', (req, res) => {
   const mode = req.query['hub.mode'];
@@ -48,17 +73,25 @@ router.post('/', async (req, res) => {
           const timestamp = new Date(Number(msg.timestamp) * 1000);
 
           console.log(`Received message from ${phone}: ${text}`);
+          const userId = await getWebhookOwnerId();
+          if (!userId) {
+            console.error('[webhook] Mensagem ignorada por falta de owner configurado');
+            continue;
+          }
 
           // Find or create contact by phone
-          let contact = await prisma.contact.findUnique({
-            where: { phone },
+          let contact = await prisma.contact.findFirst({
+            where: { userId, phone },
           });
 
           if (!contact) {
             contact = await prisma.contact.create({
               data: {
+                userId,
                 name: phone,
+                email: '',
                 phone,
+                company: '',
               },
             });
             console.log('Created new contact:', contact.id);

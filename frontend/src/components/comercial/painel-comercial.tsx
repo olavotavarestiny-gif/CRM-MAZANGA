@@ -18,7 +18,6 @@ import {
 import { getCaixaSessaoAtual, getComercialAnalise, getComercialResumo, getCurrentUser } from '@/lib/api';
 import type { User } from '@/lib/api';
 import OnboardingChecklist from '@/components/onboarding/onboarding-checklist';
-import StartupModelSelector from '@/components/onboarding/startup-model-selector';
 import WidgetWrapper from '@/components/dashboard/widget-wrapper';
 import { BillingAccessBanner } from '@/components/billing/access-notice';
 import { CommerceButton as Button } from '@/components/ui/button-commerce';
@@ -27,6 +26,7 @@ import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
 import {
   canAccessBilling,
+  canAccessQuickSales,
   canCaixaOpen,
   canCaixaView,
   canComercialDashboardAnalysis,
@@ -302,7 +302,7 @@ function PainelAnalise() {
 function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
   const podeVerCaixa = canCaixaView(currentUser);
   const podeAbrirCaixa = podeVerCaixa && canCaixaOpen(currentUser);
-  const podeVerVendas = canView(currentUser, 'vendas');
+  const podeVerVendasRapidas = canAccessQuickSales(currentUser);
   const podeVerProdutos = canStockView(currentUser);
   const podeVerContactos = canView(currentUser, 'contacts');
   const podeVerFinancas = canFinanceTransactionsView(currentUser);
@@ -319,7 +319,7 @@ function PainelOperacionalReduzido({ currentUser }: { currentUser: User }) {
 
   const links = [
     podeVerCaixa ? { href: '/caixa', label: 'Ir para Caixa', icon: CreditCard } : null,
-    podeVerVendas ? { href: '/vendas-rapidas', label: 'Ir para Venda Rápida', icon: ShoppingCart } : null,
+    podeVerVendasRapidas ? { href: '/vendas-rapidas', label: 'Ir para Venda Rápida', icon: ShoppingCart } : null,
     podeVerFinancas ? { href: '/finances', label: 'Abrir finanças', icon: DollarSign } : null,
     podeVerProdutos ? { href: '/produtos', label: 'Rever inventário', icon: PackageX } : null,
     podeVerContactos ? { href: '/contacts', label: 'Ver contactos', icon: Store } : null,
@@ -513,7 +513,6 @@ export default function PainelComercialPage({ currentUser: currentUserProp }: { 
       </div>
 
       <BillingAccessBanner subscription={currentUser?.subscription} />
-      <StartupModelSelector currentUser={currentUser} />
       <OnboardingChecklist currentUser={currentUser} />
 
       {modo === 'analise' && podeAnalise ? (
