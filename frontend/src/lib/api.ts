@@ -644,25 +644,26 @@ export async function updateServicesDashboardSettings(data: ServicesDashboardSet
 }
 
 export async function getCurrentUser() {
-  try {
-    const response = await api.get<User>('/api/auth/me', {
-      headers: {
-        'Cache-Control': 'no-store',
-      },
-    });
-    const payload = response.data;
-
-    if (isDevAuthUserPayload(payload)) {
-      writeDevAuthSession(payload);
-    } else {
-      clearDevAuthSession();
-    }
-
-    return payload;
-  } catch (err) {
+  const response = await fetch('/api/auth/me', {
+    headers: { 'Cache-Control': 'no-store' },
+    cache: 'no-store',
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
     clearDevAuthSession();
+    const err: any = new Error(data?.error || data?.message || 'Não foi possível carregar a conta.');
+    err.code = data?.code;
+    err.requestId = data?.requestId;
+    err.response = { status: response.status, data };
     throw err;
   }
+  const payload = data as User;
+  if (isDevAuthUserPayload(payload)) {
+    writeDevAuthSession(payload);
+  } else {
+    clearDevAuthSession();
+  }
+  return payload;
 }
 
 export async function updateCurrentUserProfile(data: { name?: string; jobTitle?: string | null }) {

@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
   let backendRes: Response | null = null;
   let lastBackendError: unknown = null;
 
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       backendRes = await fetchWithTimeout(`${apiUrl}/api/auth/me`, {
         method: 'GET',
@@ -90,10 +90,18 @@ export async function GET(req: NextRequest) {
         },
         cache: 'no-store',
       }, AUTH_FETCH_TIMEOUT_MS);
+
+      // Retry on 502/503 (Render cold start returning gateway errors)
+      if ((backendRes.status === 502 || backendRes.status === 503) && attempt < 3) {
+        backendRes = null;
+        await delay(AUTH_RETRY_DELAY_MS * 4);
+        continue;
+      }
+
       break;
     } catch (error) {
       lastBackendError = error;
-      if (attempt < 2) {
+      if (attempt < 3) {
         await delay(AUTH_RETRY_DELAY_MS);
       }
     }
@@ -102,8 +110,8 @@ export async function GET(req: NextRequest) {
   if (!backendRes) {
     const code = mapFetchErrorToLoginCode(lastBackendError);
     return createJsonError(
-      code === 'LOGIN_TIMEOUT' ? 'LOGIN_TIMEOUT' : 'LOGIN_PROFILE_LOAD_FAILED',
-      'Não foi possível carregar a conta.',
+      code === 'LOGIN_TIMEOUT' ? 'LOGIN_TIMEOUT' : 'LOGIN_BACKEND_UNAVAILABLE',
+      'Não foi possível carregar a conta. O servidor pode estar a iniciar.',
       code === 'LOGIN_TIMEOUT' ? 504 : 503,
       requestId,
       { backendHost: new URL(apiUrl).host, reason: code },
@@ -115,9 +123,12 @@ export async function GET(req: NextRequest) {
 
   if (!backendRes.ok) {
     const message = payload?.error || payload?.message || 'Não foi possível carregar a conta.';
-    const code = backendRes.status === 401 || backendRes.status === 403
-      ? 'LOGIN_UNAUTHENTICATED'
-      : 'LOGIN_PROFILE_LOAD_FAILED';
+    const code =
+      backendRes.status === 401 || backendRes.status === 403
+        ? 'LOGIN_UNAUTHENTICATED'
+        : backendRes.status === 502 || backendRes.status === 503
+          ? 'LOGIN_BACKEND_UNAVAILABLE'
+          : 'LOGIN_PROFILE_LOAD_FAILED';
 
     return createJsonError(
       code,
