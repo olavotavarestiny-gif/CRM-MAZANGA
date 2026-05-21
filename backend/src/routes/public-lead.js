@@ -67,7 +67,6 @@ router.post('/lead', async (req, res) => {
           revenue: revenue?.trim() || null,
           inPipeline: true,
           customFields,
-          lastActivityAt: new Date(),
         },
       });
       return res.status(200).json({ success: true, contactId: contact.id, existing: true, updated: true });
@@ -94,7 +93,6 @@ router.post('/lead', async (req, res) => {
         tags: JSON.stringify(['Mazanga Website', 'Lead']),
         contactType: 'interessado',
         customFields,
-        lastActivityAt: new Date(),
       },
     });
 
