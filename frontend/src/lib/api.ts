@@ -692,10 +692,16 @@ export async function logLoginWithToken(accessToken: string): Promise<void> {
 }
 
 export async function changePassword(newPassword: string) {
-  const response = await api.post<{ message: string }>('/api/auth/change-password', {
-    newPassword,
+  const response = await fetch('/api/auth/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ newPassword }),
   });
-  return response.data;
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || data?.message || 'Erro ao alterar a password. Tente novamente.');
+  }
+  return data as { message: string };
 }
 
 export async function acknowledgePasswordChange(): Promise<void> {
