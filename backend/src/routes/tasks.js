@@ -478,7 +478,9 @@ router.post('/', requirePermission('tasks', 'edit'), async (req, res) => {
 });
 
 // PUT update a task
-router.put('/:id', requirePermission('tasks', 'edit'), async (req, res) => {
+// Requires at minimum "view" permission; assignees can always edit their own tasks.
+// Users without "edit" permission who are not the assignee are blocked below.
+router.put('/:id', requirePermission('tasks', 'view'), async (req, res) => {
   try {
     const { id } = req.params;
     const { title, notes, dueDate, priority, done, contactId, assignedToUserId: rawAssignedToUserId } = req.body;
@@ -502,7 +504,10 @@ router.put('/:id', requirePermission('tasks', 'edit'), async (req, res) => {
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
-    if (!isPrivilegedTaskManager(req) && task.assignedToUserId !== req.user.id) {
+
+    const userIsAssignee = task.assignedToUserId === req.user.id;
+    const canEditAll = isPrivilegedTaskManager(req) || canPerform(req.user.permissionsJson, 'tasks', 'edit');
+    if (!canEditAll && !userIsAssignee) {
       return res.status(403).json({ error: 'Sem acesso a esta tarefa' });
     }
 
