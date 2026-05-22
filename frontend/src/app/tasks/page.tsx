@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import TaskItem from '@/components/tasks/task-item';
 import TaskFormModal from '@/components/tasks/task-form-modal';
+import TaskDetailModal from '@/components/tasks/task-detail-modal';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FilterBar } from '@/components/ui/filter-bar';
@@ -30,6 +31,7 @@ export default function TasksPage() {
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [viewingTask, setViewingTask] = useState<Task | null>(null);
   const [settlingTaskIds, setSettlingTaskIds] = useState<number[]>([]);
   const [pendingToggleIds, setPendingToggleIds] = useState<number[]>([]);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<number[]>([]);
@@ -141,6 +143,9 @@ export default function TasksPage() {
     const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     return isSameDay(dd, today);
   }).length;
+
+  const handleView = (task: Task) => setViewingTask(task);
+  const handleCloseDetail = () => setViewingTask(null);
 
   const handleEdit = (task: Task) => {
     setEditingTask(task);
@@ -265,6 +270,7 @@ export default function TasksPage() {
                       onToggleDone={handleToggleDone}
                       onEdit={handleEdit}
                       onDelete={(id) => deleteTaskMutation.mutate(id)}
+                      onView={handleView}
                       isLoading={pendingToggleIds.includes(task.id) || pendingDeleteIds.includes(task.id)}
                       canDelete={canDeleteTasks}
                       isSettlingDone={task.done && settlingTaskIds.includes(task.id)}
@@ -290,6 +296,7 @@ export default function TasksPage() {
                         onToggleDone={handleToggleDone}
                         onEdit={handleEdit}
                         onDelete={(id) => deleteTaskMutation.mutate(id)}
+                        onView={handleView}
                         isLoading={pendingToggleIds.includes(task.id) || pendingDeleteIds.includes(task.id)}
                         canDelete={canDeleteTasks}
                       />
@@ -330,6 +337,14 @@ export default function TasksPage() {
         open={isFormOpen}
         onClose={handleClose}
         task={editingTask}
+      />
+
+      <TaskDetailModal
+        task={viewingTask}
+        open={!!viewingTask}
+        onClose={handleCloseDetail}
+        onEdit={handleEdit}
+        onToggleDone={handleToggleDone}
       />
     </div>
   );

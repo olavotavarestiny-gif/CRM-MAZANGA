@@ -12,6 +12,7 @@ interface TaskItemProps {
   onToggleDone: (taskId: number, done: boolean) => void;
   onEdit: (task: Task) => void;
   onDelete: (taskId: number) => void;
+  onView?: (task: Task) => void;
   isLoading?: boolean;
   canDelete?: boolean;
   isSettlingDone?: boolean;
@@ -58,6 +59,7 @@ export default function TaskItem({
   onToggleDone,
   onEdit,
   onDelete,
+  onView,
   isLoading,
   canDelete = true,
   isSettlingDone = false,
@@ -68,18 +70,25 @@ export default function TaskItem({
 
   return (
     <div
+      role={onView ? 'button' : undefined}
+      tabIndex={onView ? 0 : undefined}
+      title={onView ? 'Ver detalhes' : undefined}
+      onClick={() => onView?.(task)}
+      onKeyDown={(e) => { if (onView && (e.key === 'Enter' || e.key === ' ')) onView(task); }}
       className={`flex items-start gap-3 rounded-2xl border p-3 transition-[background-color,border-color,opacity,transform] duration-300 ease-out ${
         task.done
           ? 'border-emerald-200 bg-emerald-50/70 opacity-90'
           : 'border-[#E2E8F0] bg-white hover:bg-[#F8FAFC]'
-      } ${isSettlingDone ? 'translate-y-0.5' : 'translate-y-0'}`}
+      } ${isSettlingDone ? 'translate-y-0.5' : 'translate-y-0'} ${onView ? 'cursor-pointer hover:shadow-sm' : ''}`}
     >
-      <Checkbox
-        checked={task.done}
-        onCheckedChange={(checked) => onToggleDone(task.id, checked as boolean)}
-        disabled={isLoading}
-        className="mt-0.5"
-      />
+      <div onClick={(e) => e.stopPropagation()}>
+        <Checkbox
+          checked={task.done}
+          onCheckedChange={(checked) => onToggleDone(task.id, checked as boolean)}
+          disabled={isLoading}
+          className="mt-0.5"
+        />
+      </div>
 
       <div className="flex-1 min-w-0">
         <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -149,7 +158,7 @@ export default function TaskItem({
           variant="ghost"
           size="sm"
           className="h-7 w-7 p-0 text-[#6b7e9a] hover:text-[var(--workspace-primary)]"
-          onClick={() => onEdit(task)}
+          onClick={(e) => { e.stopPropagation(); onEdit(task); }}
         >
           <Pencil className="w-3.5 h-3.5" />
         </Button>
@@ -157,13 +166,13 @@ export default function TaskItem({
           <Button
             variant="ghost"
             size="sm"
-          className="h-7 w-7 p-0 text-[#6b7e9a] hover:text-red-500"
-          onClick={() => onDelete(task.id)}
-          disabled={isLoading}
-        >
-          {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-        </Button>
-      )}
+            className="h-7 w-7 p-0 text-[#6b7e9a] hover:text-red-500"
+            onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
+            disabled={isLoading}
+          >
+            {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+          </Button>
+        )}
       </div>
     </div>
   );

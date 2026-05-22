@@ -311,6 +311,12 @@ export default function TaskFormModal({ open, onClose, task, defaultContactId, d
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
+            <p className="mt-1 text-xs text-[#94A3B8]">
+              Suporta Markdown: <code className="rounded bg-slate-100 px-1 text-[11px]">**negrito**</code>{' '}
+              <code className="rounded bg-slate-100 px-1 text-[11px]">_itálico_</code>{' '}
+              <code className="rounded bg-slate-100 px-1 text-[11px]">[link](url)</code>{' '}
+              <code className="rounded bg-slate-100 px-1 text-[11px]">- lista</code>
+            </p>
           </div>
 
           {/* Contacto (opcional) */}
