@@ -67,7 +67,6 @@ router.post('/lead', async (req, res) => {
           revenue: revenue?.trim() || null,
           inPipeline: true,
           customFields,
-          lastActivityAt: new Date(),
         },
       });
       return res.status(200).json({ success: true, contactId: contact.id, existing: true, updated: true });
@@ -94,7 +93,22 @@ router.post('/lead', async (req, res) => {
         tags: JSON.stringify(['Mazanga Website', 'Lead']),
         contactType: 'interessado',
         customFields,
-        lastActivityAt: new Date(),
+      },
+    });
+
+    await prisma.contactNote.create({
+      data: {
+        contactId: contact.id,
+        userId,
+        content: [
+          '📋 Lead recebido via mazangamarketing.com',
+          '',
+          role?.trim()             ? `• Cargo: ${role.trim()}`                         : null,
+          revenue?.trim()          ? `• Facturamento: ${revenue.trim()}`               : null,
+          service_interest?.trim() ? `• Serviço de interesse: ${service_interest.trim()}` : null,
+          source?.trim()           ? `• Como nos encontrou: ${source.trim()}`          : null,
+          main_challenge?.trim()   ? `\n💬 Desafio principal:\n${main_challenge.trim()}` : null,
+        ].filter(Boolean).join('\n'),
       },
     });
 
