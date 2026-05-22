@@ -4,6 +4,7 @@ const prisma = require('../lib/prisma');
 const { log: logActivity } = require('../services/activity-log.service.js');
 const { ensureDefaultStages } = require('../lib/pipeline-stages');
 const { requirePermission, requireDeletePermission } = require('../lib/permissions');
+const { logRouteError } = require('../lib/request-log');
 
 // GET /api/pipeline-stages
 router.get('/', requirePermission('pipeline', 'view'), async (req, res) => {
@@ -16,6 +17,7 @@ router.get('/', requirePermission('pipeline', 'view'), async (req, res) => {
     });
     res.json(stages);
   } catch (error) {
+    logRouteError('[pipeline-stages.list] error', req, error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -12,6 +12,7 @@ const {
   reconcileInvoicePayment,
 } = require('../services/reconciliation.service');
 const { requirePermission } = require('../lib/permissions');
+const { logRouteError } = require('../lib/request-log');
 
 // GET /api/faturacao/dashboard
 router.get('/dashboard', requirePermission('finances', 'view_invoices'), async (req, res) => {
@@ -47,6 +48,7 @@ router.get('/dashboard', requirePermission('finances', 'view_invoices'), async (
       mockMode: isMock(),
     });
   } catch (err) {
+    logRouteError('[faturacao.dashboard] error', req, err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -83,6 +85,7 @@ router.get('/facturas', requirePermission('finances', 'view_invoices'), async (r
     ]);
     res.json({ facturas, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
   } catch (err) {
+    logRouteError('[faturacao.facturas.list] error', req, err);
     res.status(500).json({ error: err.message });
   }
 });

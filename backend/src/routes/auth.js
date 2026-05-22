@@ -10,6 +10,7 @@ const { getSerializedPlanCatalog } = require('../lib/plan-limits');
 const { getSubscriptionState } = require('../lib/subscription-access');
 const { DEV_AUTH_PUBLIC_USER } = require('../lib/dev-auth');
 const { getAccessRole } = require('../lib/roles');
+const { logRouteError } = require('../lib/request-log');
 
 const DIAGNOSTIC_TIMEOUT_MS = 3500;
 
@@ -446,7 +447,7 @@ router.get('/me', requireAuth, async (req, res) => {
     }
     res.json(payload);
   } catch (error) {
-    console.error('Error fetching user:', error);
+    logRouteError('[auth.me] error', req, error);
     res.status(500).json({ error: error.message });
   }
 });

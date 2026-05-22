@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  getContacts,
+  getContactsPage,
   bulkUpdateContacts,
   updateContact,
   deleteContact,
@@ -11,6 +11,7 @@ import {
   getPipelineStages,
   getContactGroups,
 } from '@/lib/api';
+import { getApiErrorMessage } from '@/lib/api-error-message';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
@@ -53,6 +54,7 @@ function formatWA(phone: string): string | null {
 
 const ALL_GROUPS_VALUE = 'ALL';
 const UNGROUPED_GROUP_VALUE = 'UNGROUPED';
+const CONTACTS_PAGE_SIZE = 50;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object';
@@ -75,6 +77,7 @@ export default function ContactsPage() {
   const [isBulkActionsOpen, setIsBulkActionsOpen] = useState(false);
   const [selectedContactIds, setSelectedContactIds] = useState<number[]>([]);
   const [contactTypeTab, setContactTypeTab] = useState<'interessado' | 'cliente'>('interessado');
+  const [page, setPage] = useState(1);
   const { toast } = useToast();
 
   const {
@@ -138,10 +141,16 @@ export default function ContactsPage() {
     }
   }, [contactGroups, groupFilter]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, stageFilter, revenueFilter, groupFilter, effectiveContactType]);
+
   const contactsQuery = useQuery({
-    queryKey: ['contacts', debouncedSearch, canShowPipelineUi ? stageFilter : 'ALL', revenueFilter, groupFilter, effectiveContactType],
+    queryKey: ['contacts', debouncedSearch, canShowPipelineUi ? stageFilter : 'ALL', revenueFilter, groupFilter, effectiveContactType, page],
     queryFn: () =>
-      getContacts({
+      getContactsPage({
+        page,
+        limit: CONTACTS_PAGE_SIZE,
         search: debouncedSearch || undefined,
         stage: canShowPipelineUi && stageFilter !== 'ALL' ? stageFilter : undefined,
         revenue: revenueFilter === 'ALL' ? undefined : revenueFilter,
@@ -152,15 +161,17 @@ export default function ContactsPage() {
     retry: false,
     enabled: canLoadContactData,
   });
+  const contactsPage = contactsQuery.data;
+  const pagination = contactsPage?.pagination;
   const contacts: Contact[] = useMemo(
-    () => Array.isArray(contactsQuery.data)
-      ? contactsQuery.data.filter((contact): contact is Contact => (
+    () => Array.isArray(contactsPage?.data)
+      ? contactsPage.data.filter((contact): contact is Contact => (
         isRecord(contact) &&
         typeof contact.id === 'number' &&
         typeof contact.name === 'string'
       ))
       : [],
-    [contactsQuery.data]
+    [contactsPage?.data]
   );
   const visibleContactIds = useMemo(() => contacts.map((contact) => contact.id), [contacts]);
   const selectedVisibleCount = useMemo(
@@ -184,6 +195,10 @@ export default function ContactsPage() {
     groupFilter !== ALL_GROUPS_VALUE ||
     (canShowPipelineUi && stageFilter !== 'ALL');
   const isSearching = workspaceResolved && contactsQuery.isFetching && !contactsQuery.isLoading;
+  const contactsErrorMessage = getApiErrorMessage(
+    contactsQuery.error,
+    'A lista de contactos não respondeu como esperado com os filtros atuais.'
+  );
 
   useEffect(() => {
     setSelectedContactIds((currentIds) => {
@@ -191,6 +206,12 @@ export default function ContactsPage() {
       return sameNumberArray(currentIds, nextIds) ? currentIds : nextIds;
     });
   }, [visibleContactIds]);
+
+  useEffect(() => {
+    if (pagination && page > pagination.totalPages) {
+      setPage(pagination.totalPages);
+    }
+  }, [page, pagination]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteContact,
@@ -372,6 +393,7 @@ export default function ContactsPage() {
           setStageFilter('ALL');
           setRevenueFilter('ALL');
           setGroupFilter(ALL_GROUPS_VALUE);
+          setPage(1);
         }}
       >
         {canShowPipelineUi ? (
@@ -448,7 +470,7 @@ export default function ContactsPage() {
           <div className="p-6">
             <ErrorState
               title="Não foi possível carregar os contactos"
-              message="A lista de contactos não respondeu como esperado com os filtros atuais."
+              message={contactsErrorMessage}
               onRetry={() => contactsQuery.refetch()}
               secondaryAction={{ label: 'Voltar ao Painel', href: '/' }}
             />
@@ -462,7 +484,7 @@ export default function ContactsPage() {
                 ? 'Experimenta outro termo ou remove os filtros activos.'
                 : 'Começa por criar o primeiro contacto ou importa a tua base via CSV.'
             }
-            action={{ label: hasActiveFilters ? 'Limpar filtros' : 'Criar primeiro contacto', onClick: hasActiveFilters ? () => { setSearch(''); setDebouncedSearch(''); setStageFilter('ALL'); setRevenueFilter('ALL'); setGroupFilter(ALL_GROUPS_VALUE); } : () => setIsFormOpen(true) }}
+            action={{ label: hasActiveFilters ? 'Limpar filtros' : 'Criar primeiro contacto', onClick: hasActiveFilters ? () => { setSearch(''); setDebouncedSearch(''); setStageFilter('ALL'); setRevenueFilter('ALL'); setGroupFilter(ALL_GROUPS_VALUE); setPage(1); } : () => setIsFormOpen(true) }}
             secondaryAction={!hasActiveFilters ? { label: 'Importar CSV', onClick: () => setIsImportOpen(true) } : undefined}
           />
         ) : (
@@ -563,6 +585,33 @@ export default function ContactsPage() {
                 ))}
               </TableBody>
             </Table>
+            {pagination && pagination.totalPages > 1 ? (
+              <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-sm text-[#6b7e9a] sm:flex-row sm:items-center sm:justify-between">
+                <span>
+                  Página {pagination.page} de {pagination.totalPages} · {pagination.total} contacto(s)
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={pagination.page <= 1 || contactsQuery.isFetching}
+                    onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={pagination.page >= pagination.totalPages || contactsQuery.isFetching}
+                    onClick={() => setPage((currentPage) => currentPage + 1)}
+                  >
+                    Próxima
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </Card>

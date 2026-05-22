@@ -74,6 +74,9 @@ import type { AccessRole } from './roles';
 
 const DEFAULT_API_URL = 'http://localhost:3001';
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL?.trim() || '';
+const API_TIMEOUT_MS = 30_000;
+const CONTACTS_BATCH_PAGE_SIZE = 100;
+const CONTACTS_PAGE_FETCH_CONCURRENCY = 4;
 
 function isAbsoluteHttpUrl(value: string): boolean {
   try {
@@ -106,25 +109,13 @@ const API_URL = API_URL_CONFIG_ERROR ? DEFAULT_API_URL : RAW_API_URL || DEFAULT_
 
 const api = axios.create({
   baseURL: API_URL,
+  timeout: API_TIMEOUT_MS,
 });
 
 function asArray<T>(payload: unknown): T[] {
   return Array.isArray(payload) ? payload : [];
 }
 
-function getArrayPayload<T>(payload: unknown, label: string): T[] {
-  if (Array.isArray(payload)) return payload;
-
-  if (
-    payload &&
-    typeof payload === 'object' &&
-    Array.isArray((payload as { data?: unknown }).data)
-  ) {
-    return (payload as { data: T[] }).data;
-  }
-
-  throw new Error(`Resposta inválida ao carregar ${label}.`);
-}
 let _supabaseClient: ReturnType<typeof createClient> | null = null;
 function getSupabaseClient() {
   if (!_supabaseClient) _supabaseClient = createClient();
@@ -179,6 +170,9 @@ api.interceptors.response.use(
     const message =
       error.response?.data?.error ||
       error.response?.data?.message ||
+      (error.code === 'ECONNABORTED'
+        ? 'A API demorou demasiado a responder. Verifique o backend e a base de dados.'
+        : null) ||
       error.message;
     const friendlyError = new Error(message);
     (friendlyError as any).response = error.response;
@@ -232,8 +226,35 @@ export async function getContactsPage(params?: ContactsQueryParams) {
 }
 
 export async function getContacts(params?: Omit<ContactsQueryParams, 'page' | 'limit'>) {
-  const response = await api.get<Contact[] | ContactsPageResponse>('/api/contacts', { params });
-  return getArrayPayload<Contact>(response.data, 'contactos');
+  const firstPage = await getContactsPage({
+    ...params,
+    page: 1,
+    limit: CONTACTS_BATCH_PAGE_SIZE,
+  });
+  const contacts = [...firstPage.data];
+  const totalPages = firstPage.pagination.totalPages;
+
+  for (let page = 2; page <= totalPages; page += CONTACTS_PAGE_FETCH_CONCURRENCY) {
+    const pages = Array.from(
+      { length: Math.min(CONTACTS_PAGE_FETCH_CONCURRENCY, totalPages - page + 1) },
+      (_, index) => page + index
+    );
+    const responses = await Promise.all(
+      pages.map((pageNumber) =>
+        getContactsPage({
+          ...params,
+          page: pageNumber,
+          limit: CONTACTS_BATCH_PAGE_SIZE,
+        })
+      )
+    );
+
+    responses.forEach((response) => {
+      contacts.push(...response.data);
+    });
+  }
+
+  return contacts;
 }
 
 export async function searchContacts(params?: Omit<ContactsQueryParams, 'page' | 'limit'> & { limit?: number }) {

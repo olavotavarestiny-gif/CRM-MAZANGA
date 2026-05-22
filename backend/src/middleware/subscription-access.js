@@ -1,4 +1,5 @@
 const { getSubscriptionState, STATUS_SUSPENDED } = require('../lib/subscription-access');
+const { logRouteWarning } = require('../lib/request-log');
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -28,6 +29,11 @@ async function checkSubscriptionAccess(req, res, next) {
     res.setHeader('X-KukuGest-Account-Status', state.accountStatus);
 
     if (state.accountStatus === STATUS_SUSPENDED && WRITE_METHODS.has(req.method)) {
+      logRouteWarning('[subscription-access] write denied', req, {
+        status: 402,
+        message: state.message || 'Acesso suspenso. Renove para continuar.',
+        code: state.accountStatus,
+      });
       return res.status(402).json({
         error: state.message || 'Acesso suspenso. Renove para continuar.',
         accountStatus: state.accountStatus,

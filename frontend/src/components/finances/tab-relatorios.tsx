@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { ErrorState } from '@/components/ui/error-state';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download, BarChart2, FileText, RefreshCw } from 'lucide-react';
 import { getIvaReport, getVendasReport, getIvaExportUrl, getVendasExportUrl } from '@/lib/api';
+import { getApiErrorMessage } from '@/lib/api-error-message';
 
 const MONTHS = ['01','02','03','04','05','06','07','08','09','10','11','12'];
 const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -41,12 +43,14 @@ export function TabRelatorios() {
     queryKey: ['relatorio-iva', periodo],
     queryFn: () => getIvaReport(periodo),
     enabled: activeReport === 'iva',
+    retry: false,
   });
 
   const vendasQuery = useQuery({
     queryKey: ['relatorio-vendas', year],
     queryFn: () => getVendasReport(Number(year)),
     enabled: activeReport === 'vendas',
+    retry: false,
   });
 
   const handleExport = async (type: 'iva' | 'vendas') => {
@@ -125,7 +129,17 @@ export function TabRelatorios() {
           </div>
 
           {ivaQuery.isLoading && <div className="py-12 text-center text-gray-400">A carregar relatório...</div>}
-          {ivaQuery.isError && <div className="py-6 text-center text-red-500 text-sm">Erro ao carregar relatório.</div>}
+          {ivaQuery.isError && (
+            <ErrorState
+              compact
+              title="Falha ao carregar relatório IVA"
+              message={getApiErrorMessage(
+                ivaQuery.error,
+                'Não foi possível carregar o relatório IVA.'
+              )}
+              onRetry={() => ivaQuery.refetch()}
+            />
+          )}
 
           {ivaQuery.data && (
             <div className="space-y-4">
@@ -232,7 +246,17 @@ export function TabRelatorios() {
           </div>
 
           {vendasQuery.isLoading && <div className="py-12 text-center text-gray-400">A carregar relatório...</div>}
-          {vendasQuery.isError && <div className="py-6 text-center text-red-500 text-sm">Erro ao carregar relatório.</div>}
+          {vendasQuery.isError && (
+            <ErrorState
+              compact
+              title="Falha ao carregar relatório de vendas"
+              message={getApiErrorMessage(
+                vendasQuery.error,
+                'Não foi possível carregar o relatório de vendas.'
+              )}
+              onRetry={() => vendasQuery.refetch()}
+            />
+          )}
 
           {vendasQuery.data && (
             <div className="space-y-4">

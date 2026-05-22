@@ -9,6 +9,7 @@ const { validateNIF } = require('../lib/fiscal/nif-validator');
 const { cleanNifValue, parseCustomFields, resolveContactNif, stripNifKeysFromCustomFields } = require('../lib/contact-nif');
 const { getDefaultStageName, isValidStageName } = require('../lib/pipeline-stages');
 const { serialiseSubmission } = require('../lib/form-submissions');
+const { logRouteError } = require('../lib/request-log');
 const VALID_FIELD_TYPES = ['text', 'number', 'date', 'select', 'url'];
 const UNGROUPED_GROUP_ID = 'UNGROUPED';
 const WON_STAGE = 'Fechado';
@@ -239,6 +240,7 @@ const VALID_REVENUES = [
   'Entre 100 Milhões - 500 Milhões',
   '+ 500 M',
 ];
+const MAX_CONTACTS_PAGE_LIMIT = 100;
 
 // Phone format validation (basic: only digits and common symbols)
 function isValidPhone(phone) {
@@ -568,11 +570,18 @@ router.delete('/groups/:id', requirePermission('contacts', 'edit'), async (req, 
 
 // GET all contacts with optional filters
 router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
+  const startedAt = Date.now();
   try {
-    const { stage, search, inPipeline, revenue, contactType, groupId } = req.query;
+    const { stage, search, inPipeline, revenue, contactType, groupId, page, limit } = req.query;
     const userId = req.user.effectiveUserId;
     const where = { userId };
     const workspaceMode = await getWorkspaceModeForUser(userId);
+    const shouldPaginate = page !== undefined || limit !== undefined;
+    const pageNumber = Math.max(1, Number.parseInt(String(page || '1'), 10) || 1);
+    const limitNumber = Math.min(
+      MAX_CONTACTS_PAGE_LIMIT,
+      Math.max(1, Number.parseInt(String(limit || '50'), 10) || 50)
+    );
 
     if (stage && await isValidStageName(userId, stage)) {
       where.stage = stage;
@@ -610,8 +619,7 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
       ];
     }
 
-    const contacts = await prisma.contact.findMany({
-      where,
+    const include = {
       include: {
         contactGroup: {
           select: {
@@ -620,12 +628,67 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
           },
         },
       },
+    };
+
+    if (shouldPaginate) {
+      const skip = (pageNumber - 1) * limitNumber;
+      const [contacts, total] = await Promise.all([
+        prisma.contact.findMany({
+          where,
+          ...include,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limitNumber,
+        }),
+        prisma.contact.count({ where }),
+      ]);
+      const durationMs = Date.now() - startedAt;
+
+      if (durationMs > 3000) {
+        console.warn('[contacts.list] slow query', {
+          route: req.originalUrl,
+          userId: req.user?.id,
+          effectiveUserId: req.user?.effectiveUserId,
+          status: 200,
+          durationMs,
+          total,
+          page: pageNumber,
+          limit: limitNumber,
+        });
+      }
+
+      return res.json({
+        data: contacts.map(serialiseContact),
+        pagination: {
+          page: pageNumber,
+          limit: limitNumber,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / limitNumber)),
+        },
+      });
+    }
+
+    const contacts = await prisma.contact.findMany({
+      where,
+      ...include,
       orderBy: { createdAt: 'desc' },
     });
+    const durationMs = Date.now() - startedAt;
+
+    if (durationMs > 3000) {
+      console.warn('[contacts.list] slow query', {
+        route: req.originalUrl,
+        userId: req.user?.id,
+        effectiveUserId: req.user?.effectiveUserId,
+        status: 200,
+        durationMs,
+        total: contacts.length,
+      });
+    }
 
     res.json(contacts.map(serialiseContact));
   } catch (error) {
-    console.error('Error fetching contacts:', error);
+    logRouteError('[contacts.list] error', req, error);
     res.status(500).json({ error: error.message });
   }
 });

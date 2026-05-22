@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { ErrorState } from '@/components/ui/error-state';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download, FileCode2, RefreshCw, ShieldCheck, ShieldAlert, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react';
 import { getSaftPeriodos, generateSaft, validateSaft, getSaftDownloadUrl } from '@/lib/api';
+import { getApiErrorMessage } from '@/lib/api-error-message';
 
 const MONTHS = ['01','02','03','04','05','06','07','08','09','10','11','12'];
 const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -21,10 +23,13 @@ export function TabSaft() {
   const [validation, setValidation] = useState<ValidationState>(null);
   const [err, setErr] = useState('');
 
-  const { data: periodos = [], isLoading } = useQuery({
+  const periodosQuery = useQuery({
     queryKey: ['saft-periodos'],
     queryFn: getSaftPeriodos,
+    retry: false,
   });
+  const periodos = periodosQuery.data ?? [];
+  const isLoading = periodosQuery.isLoading;
 
   const validateMutation = useMutation({
     mutationFn: () => validateSaft(`${year}-${month}`),
@@ -57,6 +62,18 @@ export function TabSaft() {
   return (
     <div className="space-y-6">
       <h2 className="text-base font-semibold text-[#2c2f31]">SAF-T — Ficheiro de Auditoria Fiscal</h2>
+
+      {periodosQuery.isError && (
+        <ErrorState
+          title="Falha ao carregar SAF-T"
+          message={getApiErrorMessage(
+            periodosQuery.error,
+            'Não foi possível carregar os períodos SAF-T gerados.'
+          )}
+          onRetry={() => periodosQuery.refetch()}
+          compact
+        />
+      )}
 
       {/* Generator */}
       <div className="p-5 rounded-xl bg-gray-50 border border-gray-200 space-y-4">

@@ -5,10 +5,12 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, FileText, TrendingUp, Clock } from 'lucide-react';
 import { getFacturas, getFaturacaoDashboard } from '@/lib/api';
+import { getApiErrorMessage } from '@/lib/api-error-message';
 import { formatInvoiceAmount, resolveInvoiceDisplayCurrency } from '@/lib/invoice-presentation';
 
 function fmtKz(n: number) {
@@ -40,18 +42,40 @@ export function TabFacturas() {
   const [docStatus, setDocStatus] = useState('');
   const [page, setPage] = useState(1);
 
-  const { data: dash } = useQuery({
+  const dashboardQuery = useQuery({
     queryKey: ['faturacao-dashboard'],
     queryFn: getFaturacaoDashboard,
+    retry: false,
   });
 
-  const { data, isLoading } = useQuery({
+  const facturasQuery = useQuery({
     queryKey: ['facturas', search, docType, docStatus, page],
     queryFn: () => getFacturas({ search: search || undefined, documentType: docType || undefined, documentStatus: docStatus || undefined, page, limit: 20 }),
+    retry: false,
   });
 
+  const dash = dashboardQuery.data;
+  const data = facturasQuery.data;
+  const isLoading = dashboardQuery.isLoading || facturasQuery.isLoading;
+  const loadError = dashboardQuery.error || facturasQuery.error;
   const facturas = data?.facturas ?? [];
   const totalPages = data?.pages ?? 1;
+
+  if (loadError) {
+    return (
+      <ErrorState
+        title="Falha ao carregar Vendas"
+        message={getApiErrorMessage(
+          loadError,
+          'Não foi possível carregar faturas e indicadores de faturação.'
+        )}
+        onRetry={() => {
+          dashboardQuery.refetch();
+          facturasQuery.refetch();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

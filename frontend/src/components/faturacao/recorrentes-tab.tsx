@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ErrorState } from '@/components/ui/error-state';
 import { Plus, Play, Pause, RotateCcw, Trash2, ExternalLink, RefreshCw } from 'lucide-react';
 import { getRecorrentes, updateRecorrente, deleteRecorrente, triggerRecorrente } from '@/lib/api';
+import { getApiErrorMessage } from '@/lib/api-error-message';
 import { RecorrenteForm } from './recorrente-form';
 import type { FacturaRecorrente } from '@/lib/types';
 
@@ -25,10 +27,13 @@ export function RecorrentesTab() {
   const [showForm, setShowForm] = useState(false);
   const [triggering, setTriggering] = useState<string | null>(null);
 
-  const { data: items = [], isLoading } = useQuery<FacturaRecorrente[]>({
+  const recorrentesQuery = useQuery<FacturaRecorrente[]>({
     queryKey: ['recorrentes'],
     queryFn: getRecorrentes,
+    retry: false,
   });
+  const items = recorrentesQuery.data ?? [];
+  const isLoading = recorrentesQuery.isLoading;
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
@@ -80,7 +85,17 @@ export function RecorrentesTab() {
       </div>
 
       {/* List */}
-      {isLoading ? (
+      {recorrentesQuery.isError ? (
+        <ErrorState
+          compact
+          title="Falha ao carregar recorrentes"
+          message={getApiErrorMessage(
+            recorrentesQuery.error,
+            'Não foi possível carregar as faturas recorrentes.'
+          )}
+          onRetry={() => recorrentesQuery.refetch()}
+        />
+      ) : isLoading ? (
         <div className="text-center py-12 text-gray-400 text-sm">A carregar...</div>
       ) : items.length === 0 ? (
         <div className="text-center py-16 space-y-3">

@@ -7,10 +7,12 @@ import { getContacts, updateContact, getPipelineStages, getCurrentUser } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ErrorState } from '@/components/ui/error-state';
 import KanbanBoard from '@/components/pipeline/kanban-board';
 import PipelineStageManager from '@/components/pipeline/pipeline-stage-manager';
 import PipelineAnalyticsView from '@/components/pipeline/pipeline-analytics-view';
 import { EmptyState } from '@/components/ui/empty-state';
+import { getApiErrorMessage } from '@/lib/api-error-message';
 import { Settings2, Users } from 'lucide-react';
 
 export default function PipelinePage() {
@@ -26,11 +28,19 @@ export default function PipelinePage() {
     requestedTab === 'analytics' ? 'analytics' : 'pipeline'
   );
 
-  const { data: currentUser } = useQuery({
+  const {
+    data: currentUser,
+    isLoading: currentUserLoading,
+    isError: currentUserError,
+    error: currentUserLoadError,
+    refetch: refetchCurrentUser,
+  } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
     staleTime: 30_000,
+    retry: false,
   });
+  const canLoadPipelineData = !!currentUser && currentUser.workspaceMode !== 'comercio';
 
   const canSeeAnalytics = !!(
     currentUser &&
@@ -47,20 +57,29 @@ export default function PipelinePage() {
     setActiveTab('pipeline');
   }, [canSeeAnalytics, requestedTab]);
 
-  const { data: stages = [] } = useQuery({
+  const stagesQuery = useQuery({
     queryKey: ['pipeline-stages'],
     queryFn: getPipelineStages,
+    enabled: canLoadPipelineData,
+    retry: false,
   });
+  const stages = stagesQuery.data ?? [];
 
-  const { data: pipelineContacts = [] } = useQuery({
+  const pipelineContactsQuery = useQuery({
     queryKey: ['contacts', 'pipeline'],
     queryFn: () => getContacts({ inPipeline: 'true' }),
+    enabled: canLoadPipelineData,
+    retry: false,
   });
+  const pipelineContacts = pipelineContactsQuery.data ?? [];
 
-  const { data: availableContacts = [] } = useQuery({
+  const availableContactsQuery = useQuery({
     queryKey: ['contacts', 'available'],
     queryFn: () => getContacts({ inPipeline: 'false' }),
+    enabled: canLoadPipelineData,
+    retry: false,
   });
+  const availableContacts = availableContactsQuery.data ?? [];
 
   const addMutation = useMutation({
     mutationFn: (id: number) =>
@@ -73,8 +92,24 @@ export default function PipelinePage() {
 
   const filteredContacts = availableContacts.filter((c) =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.company.toLowerCase().includes(searchTerm.toLowerCase())
+    (c.company || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
+  const pipelineLoadError =
+    currentUserLoadError ||
+    stagesQuery.error ||
+    pipelineContactsQuery.error ||
+    availableContactsQuery.error;
+
+  const refetchPipelineData = () => {
+    if (currentUserError) {
+      refetchCurrentUser();
+      return;
+    }
+
+    stagesQuery.refetch();
+    pipelineContactsQuery.refetch();
+    availableContactsQuery.refetch();
+  };
 
   const pageTitle = activeTab === 'analytics' ? 'Processos de Venda e Analytics' : 'Processos de Venda';
   const pageDescription = activeTab === 'analytics'
@@ -122,11 +157,21 @@ export default function PipelinePage() {
 
           {activeTab === 'pipeline' ? (
             <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
-              <Button variant="outline" onClick={() => setIsStageManagerOpen(true)} className="w-full border-slate-200 bg-white sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={() => setIsStageManagerOpen(true)}
+                disabled={currentUserLoading || Boolean(pipelineLoadError)}
+                className="w-full border-slate-200 bg-white sm:w-auto"
+              >
                 <Settings2 className="w-4 h-4 mr-2" />
                 Gerir Etapas
               </Button>
-              <Button className="w-full sm:w-auto" data-tour="pipeline-add" onClick={() => setIsAddModalOpen(true)}>
+              <Button
+                className="w-full sm:w-auto"
+                data-tour="pipeline-add"
+                onClick={() => setIsAddModalOpen(true)}
+                disabled={currentUserLoading || Boolean(pipelineLoadError)}
+              >
                 + Adicionar aos Processos
               </Button>
             </div>
@@ -134,10 +179,27 @@ export default function PipelinePage() {
         </div>
       </div>
 
-      {activeTab === 'pipeline' ? (
-        <div data-tour="pipeline-board" className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
-          <KanbanBoard contacts={pipelineContacts} stages={stages} />
+      {currentUserLoading ? (
+        <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-sm text-[#6b7e9a] shadow-sm">
+          A carregar Processos de Venda...
         </div>
+      ) : pipelineLoadError ? (
+        <ErrorState
+          title="Falha ao carregar Processos de Venda"
+          message={getApiErrorMessage(
+            pipelineLoadError,
+            'Não foi possível carregar etapas ou contactos dos processos de venda.'
+          )}
+          onRetry={refetchPipelineData}
+        />
+      ) : null}
+
+      {activeTab === 'pipeline' ? (
+        !currentUserLoading && !pipelineLoadError ? (
+          <div data-tour="pipeline-board" className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
+            <KanbanBoard contacts={pipelineContacts} stages={stages} />
+          </div>
+        ) : null
       ) : (
         <PipelineAnalyticsView />
       )}

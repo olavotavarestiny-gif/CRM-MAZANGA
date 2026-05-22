@@ -43,6 +43,7 @@
  */
 
 const { hasOrgAdminAccess } = require('./roles');
+const { logRouteWarning } = require('./request-log');
 
 const PERMISSION_LEVEL = { none: 0, view: 1, edit: 2 };
 const BOOLEAN_SCOPE_RULES = {
@@ -209,6 +210,12 @@ function requirePermission(module, action) {
   return (req, res, next) => {
     if (hasFullAccess(req)) return next();
     if (!canPerform(req.user.permissionsJson, module, action)) {
+      logRouteWarning('[permissions] denied', req, {
+        status: 403,
+        message: 'Sem permissão para esta acção',
+        module,
+        action,
+      });
       return res.status(403).json({ error: 'Sem permissão para esta acção' });
     }
     next();
@@ -219,6 +226,12 @@ function requireComercialPermission(key) {
   return (req, res, next) => {
     if (hasFullAccess(req)) return next();
     if (!canComercial(req.user.permissionsJson, key)) {
+      logRouteWarning('[permissions] comercial denied', req, {
+        status: 403,
+        message: 'Sem permissão para esta acção',
+        module: 'comercial',
+        action: key,
+      });
       return res.status(403).json({ error: 'Sem permissão para esta acção' });
     }
     next();
@@ -229,6 +242,12 @@ function requireCaixaPermission(key) {
   return (req, res, next) => {
     if (hasFullAccess(req)) return next();
     if (!canCaixa(req.user.permissionsJson, key)) {
+      logRouteWarning('[permissions] caixa denied', req, {
+        status: 403,
+        message: 'Sem permissão para esta acção',
+        module: 'caixa',
+        action: key,
+      });
       return res.status(403).json({ error: 'Sem permissão para esta acção' });
     }
     next();
@@ -239,6 +258,12 @@ function requireStockPermission(key) {
   return (req, res, next) => {
     if (hasFullAccess(req)) return next();
     if (!canStock(req.user.permissionsJson, key)) {
+      logRouteWarning('[permissions] stock denied', req, {
+        status: 403,
+        message: 'Sem permissão para esta acção',
+        module: 'stock',
+        action: key,
+      });
       return res.status(403).json({ error: 'Sem permissão para esta acção' });
     }
     next();
@@ -251,6 +276,11 @@ function requireStockPermission(key) {
  */
 function requireDeletePermission(req, res, next) {
   if (hasFullAccess(req)) return next();
+  logRouteWarning('[permissions] delete denied', req, {
+    status: 403,
+    message: 'Sem permissão para eliminar',
+    action: 'delete',
+  });
   return res.status(403).json({ error: 'Sem permissão para eliminar' });
 }
 

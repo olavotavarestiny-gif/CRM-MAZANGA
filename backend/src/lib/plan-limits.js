@@ -2,6 +2,7 @@
 
 const prisma = require('./prisma');
 const { DEFAULT_PLAN, SUPPORTED_PLANS, normalizePlan } = require('./plans');
+const { logRouteWarning } = require('./request-log');
 
 const DEFAULT_WORKSPACE_MODE = 'servicos';
 const PLAN_ORDER = ['essencial', 'profissional', 'enterprise'];
@@ -438,6 +439,12 @@ function requirePlanFeature(feature) {
 
       const state = await getFeatureState(req.user.effectiveUserId, feature);
       if (!state.allowed) {
+        logRouteWarning('[plan-feature] denied', req, {
+          status: 403,
+          message: 'Funcionalidade não disponível no seu plano',
+          feature,
+          code: state.plan,
+        });
         return res.status(403).json({ error: 'Funcionalidade não disponível no seu plano' });
       }
       next();
