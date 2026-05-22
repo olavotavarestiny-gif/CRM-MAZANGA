@@ -13,6 +13,8 @@ function buildSafeRequestContext(req, extra = {}) {
     module: extra.module,
     action: extra.action,
     feature: extra.feature,
+    durationMs: extra.durationMs,
+    total: extra.total,
   };
 }
 

@@ -5,6 +5,8 @@ const { getPipelineStages } = require('../../lib/pipeline-stages');
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WON_STAGE = 'Fechado';
 const LOST_STAGE = 'Perdido';
+const DASHBOARD_CONTACT_LIMIT = 2000;
+const DASHBOARD_ACTIVITY_LOG_LIMIT = 5000;
 
 const PERIOD_OPTIONS = [
   { value: 'month', label: 'Este mês' },
@@ -270,23 +272,28 @@ async function getDashboardContext(userId, currentUser, filters) {
   const segmentField = findField(fieldDefs, SEGMENT_FIELD_CANDIDATES);
   const contactWhere = buildContactWhere(userId, filters);
 
-  const contacts = await prisma.contact.findMany({
-    where: contactWhere,
-    select: {
-      id: true,
-      name: true,
-      company: true,
-      phone: true,
-      stage: true,
-      inPipeline: true,
-      contactType: true,
-      dealValueKz: true,
-      customFields: true,
-      createdAt: true,
-      updatedAt: true,
-      lastActivityAt: true,
-    },
-  });
+  const [contacts, totalContacts] = await Promise.all([
+    prisma.contact.findMany({
+      where: contactWhere,
+      select: {
+        id: true,
+        name: true,
+        company: true,
+        phone: true,
+        stage: true,
+        inPipeline: true,
+        contactType: true,
+        dealValueKz: true,
+        customFields: true,
+        createdAt: true,
+        updatedAt: true,
+        lastActivityAt: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: DASHBOARD_CONTACT_LIMIT,
+    }),
+    prisma.contact.count({ where: contactWhere }),
+  ]);
 
   const filteredContacts = filterContactsByCustomFields(contacts, {
     leadOrigin: leadOriginField,
@@ -300,6 +307,8 @@ async function getDashboardContext(userId, currentUser, filters) {
     optionContacts: contacts,
     contacts: filteredContacts,
     contactIds,
+    totalContacts,
+    truncated: totalContacts > contacts.length,
     customFields: {
       leadOrigin: leadOriginField,
       segment: segmentField,
@@ -439,6 +448,8 @@ async function buildPipelineKpis(userId, range, revenue, contacts) {
         created_at: { gte: range.start, lte: range.end },
       },
       select: { entity_id: true, created_at: true },
+      orderBy: { created_at: 'desc' },
+      take: DASHBOARD_ACTIVITY_LOG_LIMIT,
     }),
     prisma.activityLog.findMany({
       where: {
@@ -450,6 +461,8 @@ async function buildPipelineKpis(userId, range, revenue, contacts) {
         created_at: { gte: range.start, lte: range.end },
       },
       select: { entity_id: true },
+      orderBy: { created_at: 'desc' },
+      take: DASHBOARD_ACTIVITY_LOG_LIMIT,
     }),
   ]);
 
@@ -532,6 +545,7 @@ async function buildPipelineHealth(userId, pipelineData, stages) {
       },
       orderBy: { created_at: 'desc' },
       select: { entity_id: true, new_value: true, created_at: true },
+      take: DASHBOARD_ACTIVITY_LOG_LIMIT,
     }),
     prisma.task.findMany({
       where: {
@@ -785,6 +799,11 @@ async function getServicesDashboardBase({ user, query }) {
       segment: filters.segment,
     },
     filters: buildFilterOptions(context),
+    diagnostics: {
+      contactsLoaded: context.contacts.length,
+      totalContacts: context.totalContacts,
+      contactSampleLimited: context.truncated,
+    },
     goal,
     headline,
     healthScore,

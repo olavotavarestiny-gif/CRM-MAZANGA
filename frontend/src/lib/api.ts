@@ -75,6 +75,7 @@ import type { AccessRole } from './roles';
 const DEFAULT_API_URL = 'http://localhost:3001';
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL?.trim() || '';
 const API_TIMEOUT_MS = 30_000;
+const DASHBOARD_API_TIMEOUT_MS = 15_000;
 const CONTACTS_BATCH_PAGE_SIZE = 100;
 const CONTACTS_PAGE_FETCH_CONCURRENCY = 4;
 
@@ -650,7 +651,10 @@ export async function getServicesDashboardBase(params?: {
   leadOrigin?: string | null;
   segment?: string | null;
 }) {
-  const response = await api.get<ServicesDashboardBase>('/api/dashboard/servicos/base', { params });
+  const response = await api.get<ServicesDashboardBase>('/api/dashboard/servicos/base', {
+    params,
+    timeout: DASHBOARD_API_TIMEOUT_MS,
+  });
   return response.data;
 }
 

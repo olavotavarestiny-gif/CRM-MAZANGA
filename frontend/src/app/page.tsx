@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ErrorState } from '@/components/ui/error-state';
 import { useToast } from '@/components/ui/toast-provider';
+import { getApiErrorMessage } from '@/lib/api-error-message';
 import { cn } from '@/lib/utils';
 
 type PeriodoDashboard = '7d' | 'month' | '90d';
@@ -554,6 +555,7 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
     data: serviceDashboard,
     isLoading: serviceDashboardLoading,
     isError: serviceDashboardError,
+    error: serviceDashboardLoadError,
     refetch: refetchServiceDashboard,
   } = useQuery({
     queryKey: ['services-dashboard-base', { period }],
@@ -564,6 +566,8 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
   const { data: faturacaoDashboard } = useQuery({
     queryKey: ['faturacao-dashboard'],
     queryFn: getFaturacaoDashboard,
+    enabled: currentUser.planFeatures?.vendas === true,
+    retry: false,
   });
 
   const { data: pendingFacturas } = useQuery({
@@ -575,6 +579,8 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
       startDate: dateRange.dateFrom,
       endDate: dateRange.dateTo,
     }),
+    enabled: currentUser.planFeatures?.vendas === true,
+    retry: false,
   });
 
   const completeTaskMutation = useMutation({
@@ -667,7 +673,10 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
         <ErrorState
           compact
           title="Não foi possível carregar o dashboard"
-          message="O painel base não respondeu como esperado."
+          message={getApiErrorMessage(
+            serviceDashboardLoadError,
+            'O painel base não respondeu como esperado. Valide o backend e a base de dados.'
+          )}
           onRetry={() => refetchServiceDashboard()}
         />
       ) : serviceDashboardLoading || !serviceDashboard ? (
@@ -715,15 +724,37 @@ function DashboardCrm({ currentUser }: { currentUser: Awaited<ReturnType<typeof 
 }
 
 export default function Dashboard() {
-  const { data: currentUser, isLoading } = useQuery({
+  const {
+    data: currentUser,
+    isLoading,
+    isError: currentUserError,
+    error: currentUserLoadError,
+    refetch: refetchCurrentUser,
+  } = useQuery({
     queryKey: ['currentUser'],
     queryFn: getCurrentUser,
     retry: false,
     staleTime: 30_000,
   });
 
-  if (isLoading || !currentUser) {
+  if (isLoading) {
     return <DashboardSkeleton />;
+  }
+
+  if (currentUserError || !currentUser) {
+    return (
+      <div className="mx-auto max-w-7xl p-4 md:p-6">
+        <ErrorState
+          title="Não foi possível abrir o painel"
+          message={getApiErrorMessage(
+            currentUserLoadError,
+            'A sessão ou a API não respondeu como esperado.'
+          )}
+          onRetry={() => refetchCurrentUser()}
+          secondaryAction={{ label: 'Ir para Login', href: '/login' }}
+        />
+      </div>
+    );
   }
 
   if (isComercio(currentUser.workspaceMode)) {
