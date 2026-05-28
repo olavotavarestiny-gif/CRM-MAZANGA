@@ -1017,3 +1017,11 @@ model MessagingOptOut {
 
   @@index([isActive])
 }
+  @@index([userId, updatedAt])
+  @@index([userId, status, birthDate])
+  @@index([userId, done, dueDate])
+  @@index([userId, done, contactId, dueDate])
+  @@index([organization_id, entity_type, action, field_changed, new_value, created_at], map: "activity_log_org_stage_change_new_value_created_idx")
+  @@index([organization_id, entity_type, action, field_changed, created_at], map: "activity_log_org_stage_change_created_idx")
+  @@index([userId, type, status, deleted, date])
+  @@index([userId, clientId])

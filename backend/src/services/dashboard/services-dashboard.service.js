@@ -104,9 +104,11 @@ function isPrivilegedUser(user) {
   return !!(user?.isSuperAdmin || user?.isAccountOwner || user?.role === 'admin');
 }
 
-async function getServicesDashboardSettings({ user }) {
+async function getServicesDashboardSettings({ user, skipWorkspaceCheck = false }) {
   const userId = user.effectiveUserId;
-  await assertServicesWorkspace(userId);
+  if (!skipWorkspaceCheck) {
+    await assertServicesWorkspace(userId, user);
+  }
   const settings = await prisma.serviceDashboardSettings.findUnique({
     where: { userId },
   });
@@ -118,7 +120,7 @@ async function getServicesDashboardSettings({ user }) {
 
 async function updateServicesDashboardSettings({ user, data }) {
   const userId = user.effectiveUserId;
-  await assertServicesWorkspace(userId);
+  await assertServicesWorkspace(userId, user);
   if (!isPrivilegedUser(user)) {
     const error = new Error('Sem permissão para alterar a meta mensal');
     error.statusCode = 403;
@@ -229,7 +231,19 @@ function sanitizeFilters(query = {}) {
   };
 }
 
-async function assertServicesWorkspace(userId) {
+async function assertServicesWorkspace(userId, currentUser = null) {
+  if (
+    currentUser?.effectiveUserId === userId &&
+    currentUser.planContext?.workspaceMode
+  ) {
+    if (currentUser.planContext.workspaceMode === 'comercio') {
+      const error = new Error('Dashboard de serviços indisponível neste workspace');
+      error.statusCode = 404;
+      throw error;
+    }
+    return;
+  }
+
   const owner = await prisma.user.findUnique({
     where: { id: userId },
     select: { workspaceMode: true },
@@ -731,7 +745,7 @@ function buildFilterOptions(context) {
 
 async function getServicesDashboardBase({ user, query }) {
   const userId = user.effectiveUserId;
-  await assertServicesWorkspace(userId);
+  await assertServicesWorkspace(userId, user);
   const filters = sanitizeFilters(query);
   const range = getRange(filters.period);
   const monthRange = getMonthRange();
@@ -743,14 +757,15 @@ async function getServicesDashboardBase({ user, query }) {
   const contactFiltersActive = !!(filters.stage || filters.leadOrigin || filters.segment);
   const scopedContactIds = contactFiltersActive ? context.contactIds : null;
 
-  const [settings, revenue, monthRevenue] = await Promise.all([
-    getServicesDashboardSettings({ user }),
+  const [settings, revenue, monthRevenue, nextActions] = await Promise.all([
+    getServicesDashboardSettings({ user, skipWorkspaceCheck: true }),
     canSeeFinance
       ? buildRevenueKpis(userId, range, context.contactIds, contactFiltersActive)
       : Promise.resolve({ closedRevenue: null, paidRevenueCount: 0, averagePaidTicket: 0 }),
     canSeeFinance
       ? buildRevenueKpis(userId, monthRange, context.contactIds, contactFiltersActive)
       : Promise.resolve({ closedRevenue: null, paidRevenueCount: 0, averagePaidTicket: 0 }),
+    canSeeTasks ? buildNextActions(userId, user, filters, scopedContactIds) : Promise.resolve(null),
   ]);
   const normalizedRevenue = canSeeFinance
     ? revenue
@@ -759,10 +774,7 @@ async function getServicesDashboardBase({ user, query }) {
     ? await buildPipelineKpis(userId, range, normalizedRevenue, context.contacts)
     : null;
 
-  const [pipelineHealth, nextActions] = await Promise.all([
-    pipelineData ? buildPipelineHealth(userId, pipelineData, context.stages) : Promise.resolve(null),
-    canSeeTasks ? buildNextActions(userId, user, filters, scopedContactIds) : Promise.resolve(null),
-  ]);
+  const pipelineHealth = pipelineData ? await buildPipelineHealth(userId, pipelineData, context.stages) : null;
   const kpis = pipelineData?.kpis || {
     pipelineOpenValue: null,
     winRate: null,

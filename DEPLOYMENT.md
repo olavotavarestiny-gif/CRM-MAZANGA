@@ -71,6 +71,7 @@ O projeto já tem `vercel.json` preparado para construir a app dentro de `fronte
 | `NEXT_PUBLIC_APP_URL` | sim | origem pública do frontend, por exemplo `https://app.kukugest.ao` |
 | `NEXT_PUBLIC_SUPABASE_URL` | sim | URL pública do Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | sim | anon key do Supabase |
+| `CRON_SECRET` | sim | segredo usado pelo Vercel Cron para manter o backend acordado |
 
 ### Variáveis opcionais
 
@@ -101,6 +102,20 @@ Depois do deploy, validar:
 7. um formulário público em `/f/[id]` abre sem autenticação
 8. um upload de anexo/avatar/fatura funciona se `BLOB_READ_WRITE_TOKEN` estiver configurado
 9. `POST /api/public/lead` devolve `201` ou `200` com `MAZANGA_LEAD_OWNER_EMAIL` configurado para um utilizador real
+10. `GET /api/ready` no backend responde `{"status":"ready"}` quando a base está acessível
+11. o cron `/api/backend-warmup` responde `200` no Vercel com `CRON_SECRET` configurado
+
+## Performance da API
+
+O frontend chama `/api/backend-warmup` por Vercel Cron a cada 10 minutos. Esse endpoint valida o segredo `CRON_SECRET` e chama `/api/ready` no backend para manter o serviço Render e a ligação Prisma aquecidos.
+
+Se o projeto estiver no Vercel Hobby, o cron de 10 minutos pode exigir upgrade para Pro. Alternativas: usar Render sem sleep ou configurar um monitor externo para chamar `https://SEU_BACKEND/api/ready`.
+
+Quando este release for para produção, execute no backend:
+
+```bash
+npm run db:migrate:deploy
+```
 
 ## Checklist beta
 
