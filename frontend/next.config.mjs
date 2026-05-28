@@ -68,6 +68,24 @@ const nextConfig = {
         source: '/(.*)',
         headers: securityHeaders,
       },
+      // Allow the public form route to be embedded in external iframes
+      {
+        source: '/f/:id*',
+        headers: [
+          { key: 'X-Frame-Options', value: 'ALLOWALL' },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net https://www.googletagmanager.com https://www.google-analytics.com https://ssl.google-analytics.com",
+              "style-src 'self' 'unsafe-inline'",
+              "font-src 'self' data:",
+              "img-src 'self' data: blob: https:",
+              `connect-src 'self'${CONNECT_SRC_API_URL} https://www.facebook.com https://connect.facebook.net https://www.googletagmanager.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com https://region1.analytics.google.com`,
+            ].join('; '),
+          },
+        ],
+      },
     ];
   },
 };

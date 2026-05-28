@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dismissWelcomeOnboarding, getCurrentUser, getOnboarding, updateChatPresence } from '@/lib/api';
@@ -91,6 +91,7 @@ function LayoutInner({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const fetchingCount = useIsFetching();
   const [isLoading, setIsLoading] = useState(true);
@@ -370,7 +371,8 @@ function LayoutInner({
   }
 
   if (isPublicPage) {
-    return <>{children}<Footer /></>;
+    const isEmbedMode = pathname.startsWith('/f/') && searchParams.get('embed') === '1';
+    return <>{children}{!isEmbedMode && <Footer />}</>;
   }
 
   if (authLoadError) {
