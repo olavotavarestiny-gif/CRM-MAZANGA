@@ -104,6 +104,16 @@ const isManagedFrontendOrigin = (origin) => {
       return true;
     }
 
+    // Vercel preview deployments for the linked frontend project.
+    if (
+      hostname === 'frontend-olavos-projects-c1426332.vercel.app' ||
+      hostname === 'frontend-git-main-olavos-projects-c1426332.vercel.app' ||
+      hostname.startsWith('frontend-git-') && hostname.endsWith('-olavos-projects-c1426332.vercel.app') ||
+      hostname.startsWith('frontend-') && hostname.endsWith('-olavos-projects-c1426332.vercel.app')
+    ) {
+      return true;
+    }
+
     return false;
   } catch {
     return false;
