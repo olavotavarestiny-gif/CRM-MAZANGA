@@ -161,7 +161,7 @@ export function MessageBubble({ message, isOwn, showAvatar, showReadReceipt = fa
 
         {message.text && !isTaskAssignment && (
           <div
-            className={`rounded-[22px] px-4 py-3 text-sm leading-relaxed shadow-sm ${
+            className={`rounded-[22px] px-4 py-3 text-sm leading-relaxed shadow-sm break-words ${
               isOwn
                 ? 'rounded-tr-md bg-[#0A2540] text-white'
                 : 'rounded-tl-md border border-slate-200 bg-white text-[#0A2540]'

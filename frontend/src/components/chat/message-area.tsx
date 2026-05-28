@@ -277,7 +277,7 @@ export function MessageArea({ channel, currentUserId, currentUser, onBack }: Mes
   };
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col">
       {/* Header */}
       <div className="flex flex-shrink-0 items-center gap-3 border-b border-[#E2E8F0] bg-white px-3 py-3 md:px-5 md:py-4">
         {onBack && (
@@ -352,7 +352,7 @@ export function MessageArea({ channel, currentUserId, currentUser, onBack }: Mes
       <div
         ref={containerRef}
         data-chat-messages="true"
-        className="flex-1 space-y-1 overflow-y-auto bg-[#FCFDFE] px-3 py-4 md:px-5 md:py-5"
+        className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden bg-[#FCFDFE] px-3 py-4 md:px-5 md:py-5"
       >
         {loadingOlder && (
           <p className="text-center text-xs text-[#94a3b8] py-2">A carregar mensagens anteriores…</p>
