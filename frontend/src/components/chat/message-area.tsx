@@ -26,6 +26,9 @@ interface ReadReceiptPayload {
   lastReadAt: string;
 }
 
+const INITIAL_MESSAGE_LIMIT = 15;
+const HISTORY_MESSAGE_LIMIT = 25;
+
 function isSameDay(a: string, b: string) {
   return new Date(a).toDateString() === new Date(b).toDateString();
 }
@@ -93,9 +96,9 @@ export function MessageArea({ channel, currentUserId, currentUser, onBack }: Mes
     setIsInitialLoading(true);
     setLoadError(null);
     try {
-      const msgs = await getChatMessages(channel.id);
+      const msgs = await getChatMessages(channel.id, undefined, INITIAL_MESSAGE_LIMIT);
       setMessages(msgs);
-      setHasMore(msgs.length >= 50);
+      setHasMore(msgs.length >= INITIAL_MESSAGE_LIMIT);
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 50);
     } catch {
       setLoadError('Não foi possível carregar as mensagens deste canal.');
@@ -113,7 +116,7 @@ export function MessageArea({ channel, currentUserId, currentUser, onBack }: Mes
   const syncLatestMessages = useCallback(async () => {
     if (isInitialLoading || loadingOlder || loadError) return;
 
-    const latest = await getChatMessages(channel.id);
+    const latest = await getChatMessages(channel.id, undefined, INITIAL_MESSAGE_LIMIT);
     const existingIds = new Set(messages.map((message) => message.id));
     const hasNewIncoming = latest.some((message) => message.senderId !== currentUserId && !existingIds.has(message.id));
     const shouldStickToBottom = !containerRef.current || isNearBottom(containerRef.current);
@@ -182,11 +185,11 @@ export function MessageArea({ channel, currentUserId, currentUser, onBack }: Mes
     const oldestId = messages[0]?.id;
     setLoadingOlder(true);
     try {
-      const older = await getChatMessages(channel.id, oldestId);
+      const older = await getChatMessages(channel.id, oldestId, HISTORY_MESSAGE_LIMIT);
       if (older.length === 0) { setHasMore(false); return; }
       const prevHeight = containerRef.current.scrollHeight;
       setMessages((prev) => [...older, ...prev]);
-      setHasMore(older.length >= 50);
+      setHasMore(older.length >= HISTORY_MESSAGE_LIMIT);
       // Preserve scroll position
       requestAnimationFrame(() => {
         if (containerRef.current) {
@@ -346,7 +349,11 @@ export function MessageArea({ channel, currentUserId, currentUser, onBack }: Mes
       </div>
 
       {/* Messages */}
-      <div ref={containerRef} className="flex-1 space-y-1 overflow-y-auto bg-[#FCFDFE] px-3 py-4 md:px-5 md:py-5">
+      <div
+        ref={containerRef}
+        data-chat-messages="true"
+        className="flex-1 space-y-1 overflow-y-auto bg-[#FCFDFE] px-3 py-4 md:px-5 md:py-5"
+      >
         {loadingOlder && (
           <p className="text-center text-xs text-[#94a3b8] py-2">A carregar mensagens anteriores…</p>
         )}

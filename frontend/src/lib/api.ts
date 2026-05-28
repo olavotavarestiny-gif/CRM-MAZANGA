@@ -1503,9 +1503,9 @@ export async function createDM(targetUserId: number): Promise<ChatChannel> {
   return res.data;
 }
 
-export async function getChatMessages(channelId: string, before?: string): Promise<ChatMessage[]> {
+export async function getChatMessages(channelId: string, before?: string, limit = 50): Promise<ChatMessage[]> {
   const res = await api.get(`/api/chat/channels/${channelId}/messages`, {
-    params: before ? { before, limit: 50 } : { limit: 50 },
+    params: before ? { before, limit } : { limit },
   });
   return res.data;
 }

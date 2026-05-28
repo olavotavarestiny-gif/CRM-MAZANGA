@@ -34,6 +34,12 @@ function daysFromNow(days: number) {
   return date.toISOString();
 }
 
+function minutesFromNow(minutes: number) {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() + minutes);
+  return date.toISOString();
+}
+
 function uid(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -296,10 +302,22 @@ function createInitialState() {
     },
   ];
   const chatMessages = {
-    'dev-chat-geral': [
-      { id: 'dev-msg-1', channelId: 'dev-chat-geral', senderId: -1002, senderName: 'Marta Demo', senderEmail: 'marta@local.test', text: 'A proposta demo ficou pronta.', attachments: [], mentions: [], createdAt: daysFromNow(-1) },
-      { id: 'dev-msg-2', channelId: 'dev-chat-geral', senderId: DEV_USER_ID, senderName: 'Dev Tester', senderEmail: 'dev@local.test', text: 'Obrigado, vou rever nos relatórios.', attachments: [], mentions: [], createdAt: daysFromNow(-1) },
-    ],
+    'dev-chat-geral': Array.from({ length: 40 }, (_, index) => {
+      const isOwn = index % 3 === 1;
+      return {
+        id: `dev-msg-${index + 1}`,
+        channelId: 'dev-chat-geral',
+        senderId: isOwn ? DEV_USER_ID : -1002,
+        senderName: isOwn ? 'Dev Tester' : 'Marta Demo',
+        senderEmail: isOwn ? 'dev@local.test' : 'marta@local.test',
+        text: index === 39
+          ? 'A proposta demo ficou pronta.'
+          : `Mensagem demo ${index + 1} para testar histórico paginado do chat.`,
+        attachments: [],
+        mentions: [],
+        createdAt: minutesFromNow(-120 + index * 3),
+      };
+    }),
   } as Record<string, any[]>;
 
   return {
@@ -476,7 +494,17 @@ function match(pathname: string, pattern: RegExp) {
 
 function normalizeUrl(config: InternalAxiosRequestConfig) {
   const base = config.baseURL || 'http://localhost';
-  return new URL(config.url || '/', base);
+  const url = new URL(config.url || '/', base);
+  const params = config.params && typeof config.params === 'object' ? config.params : null;
+
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      url.searchParams.set(key, String(value));
+    });
+  }
+
+  return url;
 }
 
 function response(config: InternalAxiosRequestConfig, data: unknown, status = 200): AxiosResponse {
@@ -698,7 +726,18 @@ function handleRequest(config: InternalAxiosRequestConfig): AxiosResponse | Prom
 
   if (method === 'get' && path === '/api/chat/channels') return response(config, state.chatChannels);
   const chatMessagesMatch = match(path, /^\/api\/chat\/channels\/([^/]+)\/messages$/);
-  if (chatMessagesMatch && method === 'get') return response(config, state.chatMessages[chatMessagesMatch[1]] || []);
+  if (chatMessagesMatch && method === 'get') {
+    const allMessages = [...(state.chatMessages[chatMessagesMatch[1]] || [])].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+    const before = url.searchParams.get('before');
+    const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || 50), 1), 100);
+    const beforeMessage = before ? allMessages.find((message) => message.id === before) : null;
+    const eligibleMessages = beforeMessage
+      ? allMessages.filter((message) => new Date(message.createdAt).getTime() < new Date(beforeMessage.createdAt).getTime())
+      : allMessages;
+    return response(config, eligibleMessages.slice(-limit));
+  }
   if (chatMessagesMatch && method === 'post') {
     const message = { id: uid('dev-msg'), channelId: chatMessagesMatch[1], senderId: DEV_USER_ID, senderName: 'Dev Tester', senderEmail: 'dev@local.test', text: body.text || '', attachments: body.attachments || [], mentions: [], createdAt: nowIso() };
     state.chatMessages[chatMessagesMatch[1]] = [...(state.chatMessages[chatMessagesMatch[1]] || []), message];
