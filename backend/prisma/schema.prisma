@@ -31,6 +31,7 @@ model User {
   expiresAt                 DateTime?
   graceEndsAt               DateTime?
   accountStatus             String                 @default("active")
+  lastSeenAt                DateTime?
   automations               Automation[]           @relation("AutomationUser")
   caixaSessoesFechadas      CaixaSessao[]          @relation("CaixaSessaoClosedBy")
   caixaSessoesAbertas       CaixaSessao[]          @relation("CaixaSessaoOpenedBy")
@@ -78,6 +79,7 @@ model User {
   @@index([accountStatus])
   @@index([expiresAt])
   @@index([trialEndsAt])
+  @@index([lastSeenAt])
 }
 
 model ServiceDashboardSettings {
@@ -143,6 +145,8 @@ model Contact {
   @@index([userId, inPipeline])
   @@index([userId, stage])
   @@index([userId, lastActivityAt])
+  @@index([userId, updatedAt])
+  @@index([userId, status, birthDate])
   @@index([userId, birthDate])
 }
 
@@ -248,6 +252,8 @@ model Task {
 
   @@index([assignedToUserId])
   @@index([userId, dueDate])
+  @@index([userId, done, dueDate])
+  @@index([userId, done, contactId, dueDate])
   @@index([contactId])
   @@index([userId, source])
   @@index([automationId])
@@ -337,6 +343,8 @@ model ActivityLog {
   created_at      DateTime @default(now())
 
   @@index([organization_id, created_at])
+  @@index([organization_id, entity_type, action, field_changed, new_value, created_at], map: "activity_log_org_stage_change_new_value_created_idx")
+  @@index([organization_id, entity_type, action, field_changed, created_at], map: "activity_log_org_stage_change_created_idx")
   @@index([entity_type, entity_id])
   @@map("activity_log")
 }
@@ -436,6 +444,8 @@ model Transaction {
   @@index([cashSessionId])
   @@index([userId, invoiceId])
   @@index([userId, cashSessionId])
+  @@index([userId, type, status, deleted, date])
+  @@index([userId, clientId])
 }
 
 model FinancialCategory {
@@ -844,6 +854,7 @@ model ChatMessage {
   text        String
   attachments String      @default("[]")
   mentions    String      @default("[]")
+  metadata    String      @default("{}")
   createdAt   DateTime    @default(now())
   channel     ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   sender      User        @relation("ChatSenderUser", fields: [senderId], references: [id], onDelete: Cascade)
@@ -1017,11 +1028,3 @@ model MessagingOptOut {
 
   @@index([isActive])
 }
-  @@index([userId, updatedAt])
-  @@index([userId, status, birthDate])
-  @@index([userId, done, dueDate])
-  @@index([userId, done, contactId, dueDate])
-  @@index([organization_id, entity_type, action, field_changed, new_value, created_at], map: "activity_log_org_stage_change_new_value_created_idx")
-  @@index([organization_id, entity_type, action, field_changed, created_at], map: "activity_log_org_stage_change_created_idx")
-  @@index([userId, type, status, deleted, date])
-  @@index([userId, clientId])

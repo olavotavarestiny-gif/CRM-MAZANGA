@@ -15,6 +15,7 @@ interface ChannelListProps {
   selectedId: string | null;
   onSelect: (id: string) => void;
   currentUserId: number;
+  className?: string;
 }
 
 function ChannelItem({
@@ -33,12 +34,13 @@ function ChannelItem({
     ? channel.members.find((m) => m.userId !== currentUserId)
     : null;
   const displayName = isDM ? (otherMember?.name || channel.name) : channel.name;
+  const isOnline = isDM && otherMember?.isOnline;
 
   return (
     <button
       onClick={onClick}
       className={cn(
-        'w-full rounded-2xl border px-3.5 py-3 text-left text-sm transition-all',
+        'flex w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left text-sm transition-all',
         selected
           ? 'border-[#D6E4FF] bg-[#EEF4FF] text-[#0A2540] shadow-sm'
           : 'border-transparent text-[#6b7e9a] hover:border-slate-200 hover:bg-white hover:text-[#0A2540]'
@@ -46,10 +48,13 @@ function ChannelItem({
     >
       {isDM ? (
         <div className={cn(
-          'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
+          'relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
           selected ? 'bg-[#0A2540] text-white' : 'bg-[#E2E8F0] text-[#0A2540]'
         )}>
           {displayName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
+          {isOnline && (
+            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
+          )}
         </div>
       ) : (
         <div className={cn(
@@ -62,7 +67,7 @@ function ChannelItem({
       <div className="min-w-0 flex-1">
         <span className="block truncate font-medium">{displayName}</span>
         <span className="mt-0.5 block truncate text-[11px] text-[#94a3b8]">
-          {isDM ? 'Mensagem directa' : 'Canal interno'}
+          {isDM && isOnline ? 'Online' : isDM ? 'Mensagem directa' : 'Canal interno'}
         </span>
       </div>
       {channel.unreadCount > 0 && (
@@ -74,7 +79,7 @@ function ChannelItem({
   );
 }
 
-export function ChannelList({ selectedId, onSelect, currentUserId }: ChannelListProps) {
+export function ChannelList({ selectedId, onSelect, currentUserId, className }: ChannelListProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [showCreate, setShowCreate] = useState(false);
@@ -121,7 +126,7 @@ export function ChannelList({ selectedId, onSelect, currentUserId }: ChannelList
 
   return (
     <>
-      <div className="flex h-full w-80 flex-shrink-0 flex-col border-r border-[#E2E8F0] bg-[#F8FAFC]">
+      <div className={cn('flex h-full w-full flex-shrink-0 flex-col border-r border-[#E2E8F0] bg-[#F8FAFC] md:w-80', className)}>
         {/* Header */}
         <div className="border-b border-[#E2E8F0] px-4 py-4">
           <div className="flex items-center justify-between">

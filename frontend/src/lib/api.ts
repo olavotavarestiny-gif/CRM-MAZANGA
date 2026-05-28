@@ -847,6 +847,7 @@ export interface User {
   subscription?: SubscriptionAccess;
   createdAt: string;
   lastLogin?: string;
+  lastSeenAt?: string | null;
 }
 
 export interface SubscriptionAccess {
@@ -1521,13 +1522,19 @@ export async function sendChatMessage(
   return res.data;
 }
 
-export async function markChannelRead(channelId: string): Promise<void> {
-  await api.post(`/api/chat/channels/${channelId}/read`);
+export async function markChannelRead(channelId: string): Promise<{ ok: boolean; lastReadAt: string }> {
+  const res = await api.post<{ ok: boolean; lastReadAt: string }>(`/api/chat/channels/${channelId}/read`);
+  return res.data;
 }
 
 export async function getChatUnreadCount(): Promise<number> {
   const res = await api.get<{ unread: number }>('/api/chat/unread');
   return res.data.unread;
+}
+
+export async function updateChatPresence(): Promise<{ ok: boolean; lastSeenAt: string; isOnline: boolean }> {
+  const res = await api.post<{ ok: boolean; lastSeenAt: string; isOnline: boolean }>('/api/chat/presence');
+  return res.data;
 }
 
 export interface ChatUser {
@@ -1537,6 +1544,8 @@ export interface ChatUser {
   role: string;
   accountOwnerId?: number | null;
   isSuperAdmin?: boolean;
+  lastSeenAt?: string | null;
+  isOnline?: boolean;
 }
 
 export async function getChatUsers(): Promise<ChatUser[]> {

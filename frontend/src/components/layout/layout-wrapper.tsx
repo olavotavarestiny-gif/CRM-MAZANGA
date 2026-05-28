@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { dismissWelcomeOnboarding, getCurrentUser, getOnboarding } from '@/lib/api';
+import { dismissWelcomeOnboarding, getCurrentUser, getOnboarding, updateChatPresence } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import Sidebar from './sidebar';
@@ -244,6 +244,30 @@ function LayoutInner({
     const interval = setInterval(ping, 14 * 60 * 1000);
     return () => clearInterval(interval);
   }, [devAuthBypassEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (devAuthBypassEnabled) return;
+    if (isPublicPage) return;
+    if (!currentUser) return;
+    if (currentUser.planFeatures && currentUser.planFeatures.conversas !== true) return;
+
+    const pingPresence = () => {
+      if (document.visibilityState === 'hidden') return;
+      updateChatPresence().catch(() => {});
+    };
+
+    pingPresence();
+    const interval = window.setInterval(pingPresence, 60_000);
+    const handleVisible = () => pingPresence();
+
+    window.addEventListener('focus', handleVisible);
+    document.addEventListener('visibilitychange', handleVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', handleVisible);
+      document.removeEventListener('visibilitychange', handleVisible);
+    };
+  }, [currentUser, devAuthBypassEnabled, isPublicPage]);
 
   useEffect(() => {
     if (isPublicPage) {

@@ -5,9 +5,131 @@ const prisma = require('../lib/prisma');
 const { checkLimit, getAllUsage } = require('../lib/plan-limits');
 const { requirePermission } = require('../lib/permissions');
 
+const CHAT_MAX_ATTACHMENT_SIZE = 2 * 1024 * 1024;
+const CHAT_ALLOWED_ATTACHMENT_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/heic',
+  'image/heif',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]);
+const CHAT_ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
+  'jpg',
+  'jpeg',
+  'png',
+  'webp',
+  'gif',
+  'heic',
+  'heif',
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+]);
+const ONLINE_WINDOW_MS = 90 * 1000;
+const PRESENCE_UPDATE_THROTTLE_MS = 45 * 1000;
+const presenceUpdateCache = new Map();
+
 // Helper: resolve orgId for the current user
 function getOrgId(req) {
   return req.user.effectiveUserId;
+}
+
+function getFileExtension(filename) {
+  const parts = String(filename || '').split('.');
+  return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
+}
+
+function validateChatAttachments(attachments) {
+  if (!Array.isArray(attachments)) {
+    return 'Anexos inválidos';
+  }
+
+  for (const attachment of attachments) {
+    if (!attachment || typeof attachment !== 'object') {
+      return 'Anexo inválido';
+    }
+
+    if (typeof attachment.url !== 'string' || !attachment.url.trim()) {
+      return 'URL do anexo inválido';
+    }
+
+    if (typeof attachment.name !== 'string' || !attachment.name.trim()) {
+      return 'Nome do anexo inválido';
+    }
+
+    if (typeof attachment.size !== 'number' || attachment.size < 0) {
+      return 'Tamanho do anexo inválido';
+    }
+
+    if (attachment.size > CHAT_MAX_ATTACHMENT_SIZE) {
+      return 'Ficheiro demasiado grande. Máximo: 2 MB';
+    }
+
+    const extension = getFileExtension(attachment.name);
+    const typeAllowed = typeof attachment.type === 'string' && CHAT_ALLOWED_ATTACHMENT_TYPES.has(attachment.type);
+    const extensionAllowed = CHAT_ALLOWED_ATTACHMENT_EXTENSIONS.has(extension);
+    if (!typeAllowed && !extensionAllowed) {
+      return 'Tipo de ficheiro não permitido. Use imagem, PDF, Word ou Excel.';
+    }
+  }
+
+  return null;
+}
+
+function parseJsonField(value, fallback) {
+  try {
+    return JSON.parse(value || '');
+  } catch {
+    return fallback;
+  }
+}
+
+function isUserOnline(lastSeenAt, now = new Date()) {
+  return !!lastSeenAt && now.getTime() - new Date(lastSeenAt).getTime() <= ONLINE_WINDOW_MS;
+}
+
+function serializeChatMember(member, now = new Date()) {
+  const lastSeenAt = member.user?.lastSeenAt || null;
+  return {
+    userId: member.userId,
+    name: member.user?.name || '',
+    email: member.user?.email || '',
+    lastSeenAt,
+    isOnline: isUserOnline(lastSeenAt, now),
+  };
+}
+
+function serializeMessage(message, { currentUserId, otherMember, isDM = false } = {}) {
+  const readByOtherAt =
+    isDM &&
+    currentUserId &&
+    message.senderId === currentUserId &&
+    otherMember?.lastReadAt &&
+    otherMember.lastReadAt >= message.createdAt
+      ? otherMember.lastReadAt
+      : null;
+
+  return {
+    id: message.id,
+    channelId: message.channelId,
+    senderId: message.senderId,
+    senderName: message.sender?.name || '',
+    senderEmail: message.sender?.email || '',
+    text: message.text,
+    attachments: parseJsonField(message.attachments, []),
+    mentions: parseJsonField(message.mentions, []),
+    metadata: parseJsonField(message.metadata, {}),
+    readByOtherAt,
+    createdAt: message.createdAt,
+  };
 }
 
 // Helper: build channel response with unread count for a specific user
@@ -33,6 +155,8 @@ async function buildChannelResponse(channel, userId) {
     userId: m.userId,
     name: m.user?.name || '',
     email: m.user?.email || '',
+    lastSeenAt: m.user?.lastSeenAt || null,
+    isOnline: isUserOnline(m.user?.lastSeenAt || null),
   }));
 
   return {
@@ -59,7 +183,7 @@ async function getChannelWithMembers(channelId, orgId) {
   return prisma.chatChannel.findFirst({
     where: { id: channelId, orgId },
     include: {
-      members: { include: { user: { select: { name: true, email: true } } } },
+      members: { include: { user: { select: { name: true, email: true, lastSeenAt: true } } } },
     },
   });
 }
@@ -95,7 +219,7 @@ router.get('/channels', requirePermission('chat', 'view'), async (req, res) => {
         members: { some: { userId } },
       },
       include: {
-        members: { include: { user: { select: { name: true, email: true } } } },
+        members: { include: { user: { select: { name: true, email: true, lastSeenAt: true } } } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -126,6 +250,7 @@ router.get('/channels', requirePermission('chat', 'view'), async (req, res) => {
       })
     );
 
+    const now = new Date();
     const result = channels.map((c, i) => {
       const lm = lastMessageMap[c.id];
       return {
@@ -136,7 +261,7 @@ router.get('/channels', requirePermission('chat', 'view'), async (req, res) => {
         orgId: c.orgId,
         createdById: c.createdById,
         createdAt: c.createdAt,
-        members: c.members.map((m) => ({ userId: m.userId, name: m.user?.name || '', email: m.user?.email || '' })),
+        members: c.members.map((m) => serializeChatMember(m, now)),
         unreadCount: unreadCounts[i],
         lastMessage: lm ? { text: lm.text, createdAt: lm.createdAt, senderName: lm.sender?.name || '' } : null,
       };
@@ -184,7 +309,7 @@ router.post('/channels', requirePermission('chat', 'edit'), async (req, res) => 
         },
       },
       include: {
-        members: { include: { user: { select: { name: true, email: true } } } },
+        members: { include: { user: { select: { name: true, email: true, lastSeenAt: true } } } },
       },
     });
 
@@ -216,7 +341,7 @@ router.post('/dm', requirePermission('chat', 'edit'), async (req, res) => {
         ],
       },
       include: {
-        members: { include: { user: { select: { name: true, email: true } } } },
+        members: { include: { user: { select: { name: true, email: true, lastSeenAt: true } } } },
       },
     });
 
@@ -242,7 +367,7 @@ router.post('/dm', requirePermission('chat', 'edit'), async (req, res) => {
         },
       },
       include: {
-        members: { include: { user: { select: { name: true, email: true } } } },
+        members: { include: { user: { select: { name: true, email: true, lastSeenAt: true } } } },
       },
     });
 
@@ -263,11 +388,19 @@ router.get('/channels/:id/messages', requirePermission('chat', 'view'), async (r
     const { before, limit: limitParam = '50' } = req.query;
     const limit = Math.min(parseInt(limitParam, 10) || 50, 100);
 
-    // Verify membership
-    const membership = await prisma.chatChannelMember.findUnique({
-      where: { channelId_userId: { channelId, userId } },
+    const channel = await prisma.chatChannel.findFirst({
+      where: {
+        id: channelId,
+        orgId,
+        members: { some: { userId } },
+      },
+      include: {
+        members: {
+          select: { userId: true, lastReadAt: true },
+        },
+      },
     });
-    if (!membership) return res.status(403).json({ error: 'Sem acesso a este canal' });
+    if (!channel) return res.status(403).json({ error: 'Sem acesso a este canal' });
 
     const where = { channelId };
     if (before) {
@@ -282,18 +415,11 @@ router.get('/channels/:id/messages', requirePermission('chat', 'view'), async (r
       take: limit,
     });
 
+    const isDM = channel.type === 'dm';
+    const otherMember = isDM ? channel.members.find((m) => m.userId !== userId) : null;
+
     // Return oldest first
-    res.json(messages.reverse().map((m) => ({
-      id: m.id,
-      channelId: m.channelId,
-      senderId: m.senderId,
-      senderName: m.sender?.name || '',
-      senderEmail: m.sender?.email || '',
-      text: m.text,
-      attachments: JSON.parse(m.attachments || '[]'),
-      mentions: JSON.parse(m.mentions || '[]'),
-      createdAt: m.createdAt,
-    })));
+    res.json(messages.reverse().map((m) => serializeMessage(m, { currentUserId: userId, otherMember, isDM })));
   } catch (err) {
     console.error('GET /chat/channels/:id/messages error:', err);
     res.status(500).json({ error: 'Erro interno' });
@@ -310,6 +436,11 @@ router.post('/channels/:id/messages', requirePermission('chat', 'edit'), async (
 
     if (!text?.trim() && attachments.length === 0) {
       return res.status(400).json({ error: 'Mensagem não pode estar vazia' });
+    }
+
+    const attachmentError = validateChatAttachments(attachments);
+    if (attachmentError) {
+      return res.status(400).json({ error: attachmentError });
     }
 
     // Verify membership
@@ -337,6 +468,7 @@ router.post('/channels/:id/messages', requirePermission('chat', 'edit'), async (
         text: text?.trim() || '',
         attachments: JSON.stringify(attachments),
         mentions: JSON.stringify(mentions),
+        metadata: '{}',
       },
       include: { sender: { select: { id: true, name: true, email: true } } },
     });
@@ -347,17 +479,7 @@ router.post('/channels/:id/messages', requirePermission('chat', 'edit'), async (
       data: { lastReadAt: new Date() },
     });
 
-    res.status(201).json({
-      id: message.id,
-      channelId: message.channelId,
-      senderId: message.senderId,
-      senderName: message.sender?.name || '',
-      senderEmail: message.sender?.email || '',
-      text: message.text,
-      attachments: JSON.parse(message.attachments || '[]'),
-      mentions: JSON.parse(message.mentions || '[]'),
-      createdAt: message.createdAt,
-    });
+    res.status(201).json(serializeMessage(message, { currentUserId: userId }));
   } catch (err) {
     console.error('POST /chat/channels/:id/messages error:', err);
     res.status(500).json({ error: 'Erro interno' });
@@ -369,13 +491,18 @@ router.post('/channels/:id/read', requirePermission('chat', 'view'), async (req,
   try {
     const userId = req.user.id;
     const { id: channelId } = req.params;
+    const lastReadAt = new Date();
 
-    await prisma.chatChannelMember.updateMany({
+    const result = await prisma.chatChannelMember.updateMany({
       where: { channelId, userId },
-      data: { lastReadAt: new Date() },
+      data: { lastReadAt },
     });
 
-    res.json({ ok: true });
+    if (result.count === 0) {
+      return res.status(403).json({ error: 'Sem acesso a este canal' });
+    }
+
+    res.json({ ok: true, lastReadAt });
   } catch (err) {
     console.error('POST /chat/channels/:id/read error:', err);
     res.status(500).json({ error: 'Erro interno' });
@@ -413,10 +540,34 @@ router.get('/unread', requirePermission('chat', 'view'), async (req, res) => {
   }
 });
 
+// POST /api/chat/presence
+router.post('/presence', requirePermission('chat', 'view'), async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const cachedAt = presenceUpdateCache.get(userId) || 0;
+    const nowMs = Date.now();
+    const lastSeenAt = new Date(nowMs);
+
+    if (nowMs - cachedAt >= PRESENCE_UPDATE_THROTTLE_MS) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { lastSeenAt },
+      });
+      presenceUpdateCache.set(userId, nowMs);
+    }
+
+    res.json({ ok: true, lastSeenAt, isOnline: true });
+  } catch (err) {
+    console.error('POST /chat/presence error:', err);
+    res.status(500).json({ error: 'Erro interno' });
+  }
+});
+
 // GET /api/chat/users — list org members for @mentions, channel creation, and task assignment
 router.get('/users', async (req, res) => {
   try {
     const orgId = getOrgId(req);
+    const now = new Date();
 
     // The org consists of: the account owner + all members with accountOwnerId = orgId
     const users = await prisma.user.findMany({
@@ -434,11 +585,15 @@ router.get('/users', async (req, res) => {
         role: true,
         accountOwnerId: true,
         isSuperAdmin: true,
+        lastSeenAt: true,
       },
       orderBy: { name: 'asc' },
     });
 
-    res.json(users);
+    res.json(users.map((user) => ({
+      ...user,
+      isOnline: isUserOnline(user.lastSeenAt, now),
+    })));
   } catch (err) {
     console.error('GET /chat/users error:', err);
     res.status(500).json({ error: 'Erro interno' });

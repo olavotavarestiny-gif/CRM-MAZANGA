@@ -138,15 +138,22 @@ async function notifyTaskAssignment({ req, assignedToUserId, taskTitle, taskId, 
   if (!assignee || !canReceiveInternalChat(assignee)) return;
 
   const dmChannel = await ensureDirectChannel(req.user.effectiveUserId, req.user.id, assignedToUserId);
-  const messageText = `Nova tarefa atribuída: "${taskTitle}" por ${req.user.name}. Consulta em /tasks (ref. #${taskId}).`;
+  const taskHref = `/tasks?taskId=${taskId}`;
 
   await prisma.chatMessage.create({
     data: {
       channelId: dmChannel.id,
       senderId: req.user.id,
-      text: messageText,
+      text: 'Nova tarefa atribuída',
       attachments: '[]',
       mentions: '[]',
+      metadata: JSON.stringify({
+        type: 'task_assignment',
+        taskId,
+        taskTitle,
+        assignedByName: req.user.name,
+        href: taskHref,
+      }),
     },
   });
 }

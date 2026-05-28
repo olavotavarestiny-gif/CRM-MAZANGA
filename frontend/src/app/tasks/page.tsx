@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCurrentUser, getTasks, updateTask, deleteTask } from '@/lib/api';
 import { Task } from '@/lib/types';
@@ -27,11 +28,14 @@ import { useToast } from '@/components/ui/toast-provider';
 type FilterType = 'todas' | 'hoje' | 'atrasadas' | 'concluidas';
 
 export default function TasksPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [filter, setFilter] = useState<FilterType>('todas');
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [viewingTask, setViewingTask] = useState<Task | null>(null);
+  const [handledTaskIdParam, setHandledTaskIdParam] = useState<string | null>(null);
   const [settlingTaskIds, setSettlingTaskIds] = useState<number[]>([]);
   const [pendingToggleIds, setPendingToggleIds] = useState<number[]>([]);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<number[]>([]);
@@ -144,8 +148,49 @@ export default function TasksPage() {
     return isSameDay(dd, today);
   }).length;
 
+  const taskIdParam = searchParams.get('taskId');
+
+  useEffect(() => {
+    if (!taskIdParam) {
+      setHandledTaskIdParam(null);
+      return;
+    }
+
+    if (isLoading || handledTaskIdParam === taskIdParam) return;
+
+    const taskId = Number(taskIdParam);
+    if (!Number.isInteger(taskId)) {
+      setHandledTaskIdParam(taskIdParam);
+      toast({
+        variant: 'error',
+        title: 'Tarefa inválida',
+        description: 'O link da tarefa não é válido.',
+      });
+      return;
+    }
+
+    const task = allTasks.find((item) => item.id === taskId);
+    setHandledTaskIdParam(taskIdParam);
+
+    if (task) {
+      setViewingTask(task);
+      return;
+    }
+
+    toast({
+      variant: 'error',
+      title: 'Tarefa não encontrada',
+      description: 'A tarefa pode ter sido eliminada ou não está disponível para o teu perfil.',
+    });
+  }, [allTasks, handledTaskIdParam, isLoading, taskIdParam, toast]);
+
   const handleView = (task: Task) => setViewingTask(task);
-  const handleCloseDetail = () => setViewingTask(null);
+  const handleCloseDetail = () => {
+    setViewingTask(null);
+    if (taskIdParam) {
+      router.replace('/tasks', { scroll: false });
+    }
+  };
 
   const handleEdit = (task: Task) => {
     setEditingTask(task);

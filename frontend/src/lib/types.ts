@@ -1354,6 +1354,8 @@ export interface ChatMember {
   userId: number;
   name: string;
   email: string;
+  lastSeenAt?: string | null;
+  isOnline?: boolean;
 }
 
 export interface ChatLastMessage {
@@ -1382,6 +1384,14 @@ export interface ChatAttachment {
   type: string;
 }
 
+export interface ChatMessageMetadata {
+  type?: 'task_assignment' | string;
+  taskId?: number;
+  taskTitle?: string;
+  assignedByName?: string;
+  href?: string;
+}
+
 export interface ChatMessage {
   id: string;
   channelId: string;
@@ -1391,6 +1401,8 @@ export interface ChatMessage {
   text: string;
   attachments: ChatAttachment[];
   mentions: number[];
+  metadata?: ChatMessageMetadata;
+  readByOtherAt?: string | null;
   createdAt: string;
 }
 
