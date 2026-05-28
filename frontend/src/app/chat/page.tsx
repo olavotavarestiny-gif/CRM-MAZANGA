@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MessageSquare, Radio } from 'lucide-react';
 import { getCurrentUser } from '@/lib/api';
@@ -11,7 +11,6 @@ import { ErrorState } from '@/components/ui/error-state';
 
 export default function ChatPage() {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
 
   const { data: currentUser, isLoading: userLoading, isError: userError } = useQuery({
     queryKey: ['current-user'],
@@ -24,21 +23,6 @@ export default function ChatPage() {
     queryFn: getChatChannels,
     enabled: !!currentUser,
   });
-
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 767px)');
-    const handleChange = () => setIsMobile(media.matches);
-    handleChange();
-    media.addEventListener('change', handleChange);
-    return () => media.removeEventListener('change', handleChange);
-  }, []);
-
-  // Auto-select first channel on desktop only. Mobile starts from the conversation list.
-  useEffect(() => {
-    if (!isMobile && !selectedChannelId && channels.length > 0) {
-      setSelectedChannelId(channels[0].id);
-    }
-  }, [channels, isMobile, selectedChannelId]);
 
   const handleSelectChannel = (id: string) => {
     setSelectedChannelId(id);
@@ -113,6 +97,7 @@ export default function ChatPage() {
 
         {selectedChannel ? (
           <MessageArea
+            key={selectedChannel.id}
             channel={selectedChannel}
             currentUserId={currentUser.id}
             currentUser={currentUser}
