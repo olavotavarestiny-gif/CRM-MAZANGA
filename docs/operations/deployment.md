@@ -129,14 +129,14 @@ Depois do deploy, validar:
 10. uma rota autenticada como `/contacts` responde normalmente
 11. um formulário público em `/f/[id]` abre sem autenticação
 12. `GET /api/ready` no backend responde `{"status":"ready"}` quando a base está acessível
-13. no Vercel, o cron `/api/backend-warmup` responde `200` com `CRON_SECRET` configurado
+13. o endpoint `/api/backend-warmup` responde `200` com `CRON_SECRET` configurado
 
 ## Performance da API
 
-O frontend tem um Vercel Cron configurado em `frontend/vercel.json` para chamar `/api/backend-warmup` a cada 10 minutos. Esse endpoint chama o `/api/ready` do backend e evita cold starts do Render quando o projeto está em plano que permite cron frequente.
+O frontend expõe `/api/backend-warmup`. Esse endpoint chama o `/api/ready` do backend e evita cold starts do Render quando chamado por um monitor externo ou por um plano que permita cron frequente.
 
 - Defina `CRON_SECRET` no Vercel.
-- Se o projeto estiver no Vercel Hobby, o intervalo de 10 minutos pode exigir upgrade para Pro. Como alternativa, use um serviço Render sem sleep ou um monitor externo que chame `https://SEU_BACKEND/api/ready`.
+- O projeto Vercel está em plano Hobby, que bloqueia crons mais frequentes que uma vez por dia. Para warmup a cada 10 minutos, use Render sem sleep ou um monitor externo que chame `https://SEU_FRONTEND/api/backend-warmup` com header `Authorization: Bearer CRON_SECRET`.
 - Depois de deploys com migrations, execute `npm run db:migrate:deploy` no backend para criar os índices de performance.
 
 ## Erros comuns
