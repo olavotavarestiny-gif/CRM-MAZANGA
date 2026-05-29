@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
 import Script from 'next/script';
 import { getForm, submitForm } from '@/lib/api';
 import { Label } from '@/components/ui/label';
@@ -10,8 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 
 export default function PublicFormPage({ params }: { params: { id: string } }) {
-  const searchParams = useSearchParams();
-  const isEmbed = searchParams.get('embed') === '1';
+  const [isEmbed, setIsEmbed] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setIsEmbed(params.get('embed') === '1');
+  }, []);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
