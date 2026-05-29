@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dismissWelcomeOnboarding, getCurrentUser, getOnboarding, updateChatPresence } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
@@ -80,6 +80,14 @@ type AuthLoadError = {
   requestId?: string;
 };
 
+// Isolated component so useSearchParams is inside a Suspense boundary
+function PublicFooter() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const isEmbed = pathname.startsWith('/f/') && searchParams.get('embed') === '1';
+  return isEmbed ? null : <Footer />;
+}
+
 // ── Inner layout — consumes TourContext ──────────────────────────────────────
 
 function LayoutInner({
@@ -91,7 +99,6 @@ function LayoutInner({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const fetchingCount = useIsFetching();
   const [isLoading, setIsLoading] = useState(true);
@@ -371,8 +378,14 @@ function LayoutInner({
   }
 
   if (isPublicPage) {
-    const isEmbedMode = pathname.startsWith('/f/') && searchParams.get('embed') === '1';
-    return <>{children}{!isEmbedMode && <Footer />}</>;
+    return (
+      <>
+        {children}
+        <Suspense fallback={null}>
+          <PublicFooter />
+        </Suspense>
+      </>
+    );
   }
 
   if (authLoadError) {
