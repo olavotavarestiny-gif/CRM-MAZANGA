@@ -343,7 +343,6 @@ model ActivityLog {
   created_at      DateTime @default(now())
 
   @@index([organization_id, created_at])
-  @@index([organization_id, entity_type, action, field_changed, new_value, created_at], map: "activity_log_org_stage_change_new_value_created_idx")
   @@index([organization_id, entity_type, action, field_changed, created_at], map: "activity_log_org_stage_change_created_idx")
   @@index([entity_type, entity_id])
   @@map("activity_log")
