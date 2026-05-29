@@ -10,7 +10,7 @@ interface EmbedCodePanelProps {
 export function EmbedCodePanel({ formId }: EmbedCodePanelProps) {
   const [copiedKey, setCopiedKey] = useState<'iframe' | 'script' | null>(null);
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const origin = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
   const embedUrl = `${origin}/f/${formId}?embed=1`;
 
   const iframeSnippet = `<iframe

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const cors = require('cors');
 const prisma = require('../lib/prisma');
 const automationRunner = require('../services/automationRunner');
 const requireAuth = require('../middleware/auth');
@@ -349,8 +350,8 @@ router.post('/', requireAuth, requirePlanFeature('formularios'), requirePermissi
   }
 });
 
-// GET /api/forms/:id - obter formulário com campos ordenados
-router.get('/:id', async (req, res) => {
+// GET /api/forms/:id - obter formulário com campos ordenados (pública — cors aberto para embeds)
+router.get('/:id', cors({ origin: '*' }), async (req, res) => {
   try {
     const form = await prisma.form.findUnique({
       where: { id: req.params.id },
@@ -610,8 +611,8 @@ router.post('/:id/fields/reorder', requireAuth, requirePlanFeature('formularios'
   }
 });
 
-// POST /api/forms/:id/submit - submeter formulário (pública)
-router.post('/:id/submit', async (req, res) => {
+// POST /api/forms/:id/submit - submeter formulário (pública — cors aberto para embeds)
+router.post('/:id/submit', cors({ origin: '*' }), async (req, res) => {
   try {
     const form = await prisma.form.findUnique({
       where: { id: req.params.id },
