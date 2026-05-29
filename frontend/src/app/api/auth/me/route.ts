@@ -81,7 +81,10 @@ export async function GET(req: NextRequest) {
   let backendRes: Response | null = null;
   let lastBackendError: unknown = null;
 
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  // Mais tentativas porque este é o 1.º pedido ao abrir a app e o backend
+  // (Render free tier) pode levar ~30-60s a acordar a frio.
+  const MAX_BACKEND_ATTEMPTS = 5;
+  for (let attempt = 1; attempt <= MAX_BACKEND_ATTEMPTS; attempt += 1) {
     try {
       backendRes = await fetchWithTimeout(`${apiUrl}/api/auth/me`, {
         method: 'GET',
@@ -91,8 +94,11 @@ export async function GET(req: NextRequest) {
         cache: 'no-store',
       }, AUTH_FETCH_TIMEOUT_MS);
 
-      // Retry on 502/503 (Render cold start returning gateway errors)
-      if ((backendRes.status === 502 || backendRes.status === 503) && attempt < 3) {
+      // Retry on 502/503/504 (Render cold start returning gateway errors)
+      if (
+        (backendRes.status === 502 || backendRes.status === 503 || backendRes.status === 504) &&
+        attempt < MAX_BACKEND_ATTEMPTS
+      ) {
         backendRes = null;
         await delay(AUTH_RETRY_DELAY_MS * 4);
         continue;
@@ -101,7 +107,7 @@ export async function GET(req: NextRequest) {
       break;
     } catch (error) {
       lastBackendError = error;
-      if (attempt < 3) {
+      if (attempt < MAX_BACKEND_ATTEMPTS) {
         await delay(AUTH_RETRY_DELAY_MS);
       }
     }

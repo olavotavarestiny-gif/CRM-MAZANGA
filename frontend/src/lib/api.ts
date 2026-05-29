@@ -75,9 +75,54 @@ import type { AccessRole } from './roles';
 const DEFAULT_API_URL = 'http://localhost:3001';
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL?.trim() || '';
 const API_TIMEOUT_MS = 30_000;
-const DASHBOARD_API_TIMEOUT_MS = 15_000;
+const DASHBOARD_API_TIMEOUT_MS = 20_000;
 const CONTACTS_BATCH_PAGE_SIZE = 100;
 const CONTACTS_PAGE_FETCH_CONCURRENCY = 4;
+
+// Resiliência contra cold start do Render (free tier): enquanto o backend
+// "acorda", devolve 502/503/504 ou a ligação expira. Repetimos com backoff
+// em vez de mostrar erro ao utilizador.
+const MAX_RETRIES = 4;
+const RETRY_BASE_DELAY_MS = 800;
+const RETRY_MAX_DELAY_MS = 6_000;
+const RETRYABLE_STATUS = new Set([502, 503, 504]);
+
+// Eventos para a UI poder mostrar "A ligar ao servidor…" durante o warmup.
+export const BACKEND_WAKING_EVENT = 'kukugest:backend-waking';
+export const BACKEND_READY_EVENT = 'kukugest:backend-ready';
+
+function emitBackendStatus(eventName: string) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(eventName));
+  }
+}
+
+const IDEMPOTENT_METHODS = new Set(['get', 'head', 'options']);
+
+function isRetryableError(error: any): boolean {
+  const method = String(error?.config?.method || 'get').toLowerCase();
+
+  // Sem resposta = erro de rede ou timeout (backend a dormir / a acordar).
+  // Só repetimos métodos idempotentes para não arriscar submissões duplicadas
+  // num endpoint lento mas já acordado.
+  if (!error?.response) {
+    const isNetworkOrTimeout =
+      error?.code === 'ECONNABORTED' ||
+      error?.code === 'ERR_NETWORK' ||
+      error?.code === 'ETIMEDOUT' ||
+      /timeout|network/i.test(error?.message || '');
+    return isNetworkOrTimeout && IDEMPOTENT_METHODS.has(method);
+  }
+
+  // 502/503/504: o gateway nem chegou a entregar à app (cold start) → seguro
+  // repetir mesmo mutações.
+  return RETRYABLE_STATUS.has(error.response.status);
+}
+
+function getRetryDelay(attempt: number): number {
+  const expo = Math.min(RETRY_MAX_DELAY_MS, RETRY_BASE_DELAY_MS * 2 ** attempt);
+  return expo + Math.random() * 300; // jitter para evitar thundering herd
+}
 
 function isAbsoluteHttpUrl(value: string): boolean {
   try {
@@ -156,11 +201,28 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Response interceptor: handle 401 + extract user-friendly error messages
+// Response interceptor: retry em cold start + handle 401 + mensagens legíveis
 let isLoggingOut = false;
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (response) => {
+    // Houve resposta do backend → está acordado.
+    emitBackendStatus(BACKEND_READY_EVENT);
+    return response;
+  },
+  async (error) => {
+    const config = error?.config;
+
+    // Retry com backoff para falhas típicas de cold start (timeout / 502-504).
+    if (config && isRetryableError(error)) {
+      const currentRetry = (config.__retryCount as number) ?? 0;
+      if (currentRetry < MAX_RETRIES) {
+        config.__retryCount = currentRetry + 1;
+        emitBackendStatus(BACKEND_WAKING_EVENT);
+        await new Promise((resolve) => setTimeout(resolve, getRetryDelay(currentRetry)));
+        return api(config);
+      }
+    }
+
     if (error.response?.status === 401 && !isLoggingOut) {
       isLoggingOut = true;
       if (typeof window !== 'undefined') {
@@ -177,6 +239,7 @@ api.interceptors.response.use(
       error.message;
     const friendlyError = new Error(message);
     (friendlyError as any).response = error.response;
+    (friendlyError as any).code = error.code;
     return Promise.reject(friendlyError);
   }
 );
