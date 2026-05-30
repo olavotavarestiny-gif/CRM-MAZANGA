@@ -340,16 +340,29 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
   let effectivePlan = normalizePlan(user.plan);
   let effectiveWorkspaceMode = user.workspaceMode ?? 'servicos';
   let accountOwnerName = null;
+  let subscriptionAccount = user;
 
   if (user.accountOwnerId) {
     const owner = await prisma.user.findUnique({
       where: { id: user.accountOwnerId },
-      select: { plan: true, permissions: true, name: true, workspaceMode: true },
+      select: {
+        id: true,
+        plan: true,
+        permissions: true,
+        name: true,
+        workspaceMode: true,
+        billingType: true,
+        trialEndsAt: true,
+        expiresAt: true,
+        graceEndsAt: true,
+        accountStatus: true,
+      },
     });
     if (owner) {
       effectivePlan = normalizePlan(owner.plan);
       effectiveWorkspaceMode = owner.workspaceMode ?? 'servicos';
       accountOwnerName = owner.name;
+      subscriptionAccount = owner;
       const orgPerms = parsePermissions(owner.permissions);
       effectivePermissions = intersectPermissions(orgPerms, effectivePermissions);
     }
@@ -358,7 +371,7 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
   const isSuperAdmin = Boolean(user.isSuperAdmin || isBootstrapSuperAdminEmail(user.email));
   const userWithEffectiveRole = { ...user, isSuperAdmin };
   const currentPlanCatalog = getSerializedPlanCatalog(effectivePlan, effectiveWorkspaceMode);
-  const subscription = await getSubscriptionState(user.accountOwnerId || user.id);
+  const subscription = await getSubscriptionState(user.accountOwnerId || user.id, subscriptionAccount);
 
   return {
     ...userWithEffectiveRole,

@@ -1,22 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadFile, type UploadFolder } from '@/lib/storage';
 import { createClient } from '@/lib/supabase/server';
+import { getFileExtension } from '@/lib/file-utils';
 
 const MAX_SIZES: Record<UploadFolder, number> = {
   avatars: 2 * 1024 * 1024,      // 2 MB
-  attachments: 10 * 1024 * 1024,  // 10 MB
+  attachments: 2 * 1024 * 1024,   // 2 MB
   invoices: 5 * 1024 * 1024,      // 5 MB
 };
 
 const ALLOWED_TYPES: Record<UploadFolder, readonly string[]> = {
   avatars: ['image/jpeg', 'image/png', 'image/webp'],
   attachments: [
-    'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif',
     'application/pdf',
+    'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   ],
   invoices: ['application/pdf'],
+};
+
+const ALLOWED_EXTENSIONS: Record<UploadFolder, readonly string[]> = {
+  avatars: ['jpg', 'jpeg', 'png', 'webp'],
+  attachments: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'pdf', 'doc', 'docx', 'xls', 'xlsx'],
+  invoices: ['pdf'],
 };
 
 const VALID_FOLDERS: UploadFolder[] = ['avatars', 'attachments', 'invoices'];
@@ -100,6 +109,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const folder = folderRaw as UploadFolder;
   const maxSize = MAX_SIZES[folder];
   const allowedTypes = ALLOWED_TYPES[folder];
+  const allowedExtensions = ALLOWED_EXTENSIONS[folder];
+  const extension = getFileExtension(file.name);
 
   if (file.size > maxSize) {
     const mb = (maxSize / 1024 / 1024).toFixed(0);
@@ -109,7 +120,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  if (!allowedTypes.includes(file.type)) {
+  if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(extension)) {
     return NextResponse.json(
       { error: `Tipo de ficheiro não permitido para ${folder}` },
       { status: 400 }

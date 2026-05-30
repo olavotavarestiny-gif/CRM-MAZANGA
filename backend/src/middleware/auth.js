@@ -68,7 +68,89 @@ const USER_SELECT = {
   id: true, name: true, email: true, role: true,
   active: true, accountOwnerId: true, mustChangePassword: true,
   isSuperAdmin: true, permissions: true, supabaseUid: true,
+  plan: true, workspaceMode: true, billingType: true,
+  trialEndsAt: true, expiresAt: true, graceEndsAt: true, accountStatus: true,
+  accountOwner: {
+    select: {
+      id: true,
+      plan: true,
+      workspaceMode: true,
+      billingType: true,
+      trialEndsAt: true,
+      expiresAt: true,
+      graceEndsAt: true,
+      accountStatus: true,
+    },
+  },
 };
+
+const AUTH_USER_CACHE_TTL_MS = Math.max(0, Number(process.env.AUTH_USER_CACHE_TTL_MS || 15_000));
+const AUTH_USER_CACHE_MAX_ENTRIES = Math.max(10, Number(process.env.AUTH_USER_CACHE_MAX_ENTRIES || 500));
+const authUserCache = new Map();
+const authUserLoaders = new Map();
+
+function pruneAuthUserCache() {
+  while (authUserCache.size > AUTH_USER_CACHE_MAX_ENTRIES) {
+    const oldestKey = authUserCache.keys().next().value;
+    if (!oldestKey) break;
+    authUserCache.delete(oldestKey);
+  }
+}
+
+function cloneCachedRequestUser(user) {
+  return {
+    ...user,
+    planContext: user.planContext ? { ...user.planContext } : null,
+    subscriptionAccount: user.subscriptionAccount ? { ...user.subscriptionAccount } : null,
+  };
+}
+
+function getCachedAuthUser(cacheKey) {
+  if (!AUTH_USER_CACHE_TTL_MS) return null;
+  const entry = authUserCache.get(cacheKey);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    authUserCache.delete(cacheKey);
+    return null;
+  }
+  return cloneCachedRequestUser(entry.user);
+}
+
+function setCachedAuthUser(cacheKey, requestUser) {
+  if (!AUTH_USER_CACHE_TTL_MS || !cacheKey || !requestUser) return;
+  authUserCache.set(cacheKey, {
+    user: cloneCachedRequestUser(requestUser),
+    expiresAt: Date.now() + AUTH_USER_CACHE_TTL_MS,
+  });
+  pruneAuthUserCache();
+}
+
+async function getOrLoadAuthUser(cacheKey, loader) {
+  const cachedUser = getCachedAuthUser(cacheKey);
+  if (cachedUser) return cachedUser;
+
+  const existingLoader = authUserLoaders.get(cacheKey);
+  if (existingLoader) {
+    const requestUser = await existingLoader;
+    return requestUser ? cloneCachedRequestUser(requestUser) : null;
+  }
+
+  const loaderPromise = Promise.resolve()
+    .then(loader)
+    .then((requestUser) => {
+      if (requestUser) {
+        setCachedAuthUser(cacheKey, requestUser);
+      }
+      return requestUser;
+    })
+    .finally(() => {
+      authUserLoaders.delete(cacheKey);
+    });
+
+  authUserLoaders.set(cacheKey, loaderPromise);
+  const requestUser = await loaderPromise;
+  return requestUser ? cloneCachedRequestUser(requestUser) : null;
+}
 
 // Bootstrap: emails that always get superadmin regardless of DB field value
 const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'olavo@kukugest.ao';
@@ -77,6 +159,45 @@ const SUPER_ADMIN_EMAILS = [...new Set([SUPER_ADMIN_EMAIL, 'olavo@kukugest.ao'])
   .filter(Boolean);
 function isBootstrapSuperAdminEmail(email) {
   return SUPER_ADMIN_EMAILS.includes(String(email || '').trim().toLowerCase());
+}
+
+function buildSubscriptionAccountSnapshot(account) {
+  if (!account) return null;
+  return {
+    id: account.id,
+    plan: account.plan,
+    workspaceMode: account.workspaceMode,
+    billingType: account.billingType,
+    trialEndsAt: account.trialEndsAt,
+    expiresAt: account.expiresAt,
+    graceEndsAt: account.graceEndsAt,
+    accountStatus: account.accountStatus,
+  };
+}
+
+function buildRequestUser(user, { supabaseUid = null, impersonatedBy = null } = {}) {
+  const effectiveAccount = user.accountOwner || user;
+  const requestUser = {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    isSuperAdmin: user.isSuperAdmin || isBootstrapSuperAdminEmail(user.email),
+    permissionsJson: user.permissions,
+    accountOwnerId: user.accountOwnerId || null,
+    supabaseUid: user.supabaseUid || supabaseUid || null,
+    effectiveUserId: user.accountOwnerId || user.id,
+    isAccountOwner: !user.accountOwnerId,
+    mustChangePassword: user.mustChangePassword,
+    impersonatedBy,
+    planContext: {
+      plan: effectiveAccount.plan || user.plan,
+      workspaceMode: effectiveAccount.workspaceMode || user.workspaceMode || 'servicos',
+    },
+    subscriptionAccount: buildSubscriptionAccountSnapshot(effectiveAccount),
+  };
+  requestUser.accessRole = getAccessRole(requestUser);
+  return requestUser;
 }
 
 async function requireAuth(req, res, next) {
@@ -107,28 +228,21 @@ async function requireAuth(req, res, next) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       if (decoded.type === 'impersonation') {
-        const targetUser = await prisma.user.findUnique({
-          where: { id: decoded.impersonatedUserId },
-          select: USER_SELECT,
+        const cacheKey = `impersonation:${decoded.impersonatedUserId}:${decoded.impersonatorId || ''}`;
+        const requestUser = await getOrLoadAuthUser(cacheKey, async () => {
+          const targetUser = await prisma.user.findUnique({
+            where: { id: decoded.impersonatedUserId },
+            select: USER_SELECT,
+          });
+          if (!targetUser || !targetUser.active) return null;
+          return buildRequestUser(targetUser, { impersonatedBy: decoded.impersonatorId });
         });
-        if (!targetUser || !targetUser.active) {
+
+        if (!requestUser) {
           return res.status(403).json({ error: 'Utilizador impersonado não encontrado ou inactivo' });
         }
-        req.user = {
-          id: targetUser.id,
-          email: targetUser.email,
-          name: targetUser.name,
-          role: targetUser.role,
-          isSuperAdmin: targetUser.isSuperAdmin || isBootstrapSuperAdminEmail(targetUser.email),
-          permissionsJson: targetUser.permissions,
-          accountOwnerId: targetUser.accountOwnerId || null,
-          supabaseUid: targetUser.supabaseUid || null,
-          effectiveUserId: targetUser.accountOwnerId || targetUser.id,
-          isAccountOwner: !targetUser.accountOwnerId,
-          mustChangePassword: targetUser.mustChangePassword,
-          impersonatedBy: decoded.impersonatorId,
-        };
-        req.user.accessRole = getAccessRole(req.user);
+
+        req.user = requestUser;
         return next();
       }
     } catch {
@@ -147,51 +261,47 @@ async function requireAuth(req, res, next) {
 
   const supabaseUid = decoded.sub;
   const jwtEmail = decoded.email;
+  const cacheKey = `supabase:${supabaseUid}`;
 
   try {
-    let user = await prisma.user.findUnique({ where: { supabaseUid }, select: USER_SELECT });
+    const requestUser = await getOrLoadAuthUser(cacheKey, async () => {
+      let user = await prisma.user.findUnique({ where: { supabaseUid }, select: USER_SELECT });
 
-    // Auto-link: first login after migration — supabaseUid not yet linked in DB
-    if (!user && jwtEmail) {
-      const byEmail = await prisma.user.findUnique({
-        where: { email: jwtEmail },
-        select: USER_SELECT,
-      });
-      if (byEmail && !byEmail.supabaseUid) {
-        user = await prisma.user.update({
-          where: { id: byEmail.id },
-          data: { supabaseUid },
+      // Auto-link: first login after migration — supabaseUid not yet linked in DB
+      if (!user && jwtEmail) {
+        const byEmail = await prisma.user.findUnique({
+          where: { email: jwtEmail },
           select: USER_SELECT,
         });
-        console.log(`[auth] auto-linked supabaseUid for ${jwtEmail}`);
+        if (byEmail && !byEmail.supabaseUid) {
+          user = await prisma.user.update({
+            where: { id: byEmail.id },
+            data: { supabaseUid },
+            select: USER_SELECT,
+          });
+          console.log(`[auth] auto-linked supabaseUid for ${jwtEmail}`);
+        }
       }
-    }
 
-    if (!user) {
+      if (!user) return null;
+      if (!user.active) {
+        const error = new Error('Conta desactivada. Contacte o administrador.');
+        error.statusCode = 403;
+        throw error;
+      }
+      return buildRequestUser(user, { supabaseUid });
+    });
+
+    if (!requestUser) {
       return res.status(403).json({ error: 'Utilizador autenticado no Supabase, mas sem registo interno no CRM.' });
     }
 
-    if (!user.active) {
-      return res.status(403).json({ error: 'Conta desactivada. Contacte o administrador.' });
-    }
-
-    req.user = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      isSuperAdmin: user.isSuperAdmin || isBootstrapSuperAdminEmail(user.email),
-      permissionsJson: user.permissions,
-      accountOwnerId: user.accountOwnerId || null,
-      supabaseUid,
-      effectiveUserId: user.accountOwnerId || user.id,
-      isAccountOwner: !user.accountOwnerId,
-      mustChangePassword: user.mustChangePassword,
-      impersonatedBy: null,
-    };
-    req.user.accessRole = getAccessRole(req.user);
+    req.user = requestUser;
     next();
   } catch (error) {
+    if (error.statusCode === 403) {
+      return res.status(403).json({ error: error.message });
+    }
     console.error('[auth] DB error:', error.message);
     res.status(500).json({ error: 'Erro ao verificar autenticação' });
   }

@@ -8,7 +8,7 @@ if (process.env.NODE_ENV !== 'production') {
 const express = require('express');
 const cors = require('cors');
 const prisma = require('./lib/prisma');
-const { registerPrismaShutdown, startPrismaWarmup } = require('./lib/prisma-startup');
+const { getPrismaStartupState, registerPrismaShutdown, startPrismaWarmup } = require('./lib/prisma-startup');
 const { renewExpiringWatchChannels } = require('./lib/google-calendar');
 
 const contactsRouter = require('./routes/contacts');
@@ -58,6 +58,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const HEALTH_DB_TIMEOUT_MS = Math.max(500, Number(process.env.HEALTH_DB_TIMEOUT_MS || 3500));
+const SLOW_API_WARNING_MS = Math.max(500, Number(process.env.SLOW_API_WARNING_MS || 2500));
+const READINESS_TIMEOUT_MS = Math.max(500, Number(process.env.READINESS_TIMEOUT_MS || 3500));
 const essentialEnvPresence = {
   DATABASE_URL: Boolean(process.env.DATABASE_URL),
   FRONTEND_URL: Boolean(process.env.FRONTEND_URL),
@@ -100,6 +102,16 @@ const isManagedFrontendOrigin = (origin) => {
 
     // Official beta/staging custom domain.
     if (hostname === 'beta.kukugest.ao') {
+      return true;
+    }
+
+    // Vercel preview deployments for the linked frontend project.
+    if (
+      hostname === 'frontend-olavos-projects-c1426332.vercel.app' ||
+      hostname === 'frontend-git-main-olavos-projects-c1426332.vercel.app' ||
+      hostname.startsWith('frontend-git-') && hostname.endsWith('-olavos-projects-c1426332.vercel.app') ||
+      hostname.startsWith('frontend-') && hostname.endsWith('-olavos-projects-c1426332.vercel.app')
+    ) {
       return true;
     }
 
@@ -181,6 +193,48 @@ function getDatabaseHealthError(errorOrTimeout) {
   return errorOrTimeout?.code || errorOrTimeout?.name || 'DB_ERROR';
 }
 
+function getPublicPrismaStartupState() {
+  const state = getPrismaStartupState();
+  return {
+    ready: state.ready,
+    attempts: state.attempts,
+    lastSuccessAt: state.lastSuccessAt,
+    lastError: state.lastError ? 'redacted' : null,
+  };
+}
+
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api')) {
+    return next();
+  }
+
+  const startedAt = Date.now();
+  const originalEnd = res.end;
+
+  res.end = function endWithTiming(...args) {
+    const durationMs = Date.now() - startedAt;
+
+    if (!res.headersSent) {
+      res.setHeader('Server-Timing', `app;dur=${durationMs}`);
+    }
+
+    if (durationMs >= SLOW_API_WARNING_MS) {
+      console.warn('[api.slow]', {
+        route: req.originalUrl || req.url,
+        method: req.method,
+        status: res.statusCode,
+        durationMs,
+        userId: req.user?.id || null,
+        effectiveUserId: req.user?.effectiveUserId || null,
+      });
+    }
+
+    return originalEnd.apply(this, args);
+  };
+
+  return next();
+});
+
 // Public health checks
 app.get('/health', (req, res) => {
   res.status(200).json(buildAliveHealthPayload());
@@ -221,6 +275,41 @@ app.get('/health/db', async (req, res) => {
       database: 'error',
       timestamp: new Date().toISOString(),
       error: getDatabaseHealthError(error),
+    });
+  }
+});
+
+app.get('/api/ready', async (req, res) => {
+  const startedAt = Date.now();
+  try {
+    const database = await withTimeout(
+      prisma.$queryRaw`SELECT 1`,
+      READINESS_TIMEOUT_MS,
+      { timeout: true }
+    );
+
+    if (database?.timeout) {
+      return res.status(503).json({
+        status: 'starting',
+        database: 'timeout',
+        durationMs: Date.now() - startedAt,
+        prisma: getPublicPrismaStartupState(),
+      });
+    }
+
+    return res.json({
+      status: 'ready',
+      database: 'ok',
+      durationMs: Date.now() - startedAt,
+      prisma: getPublicPrismaStartupState(),
+    });
+  } catch (error) {
+    return res.status(503).json({
+      status: 'starting',
+      database: 'error',
+      error: error?.code || error?.name || 'DB_ERROR',
+      durationMs: Date.now() - startedAt,
+      prisma: getPublicPrismaStartupState(),
     });
   }
 });

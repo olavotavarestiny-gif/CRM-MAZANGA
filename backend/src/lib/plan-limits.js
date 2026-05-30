@@ -6,6 +6,10 @@ const { logRouteWarning } = require('./request-log');
 
 const DEFAULT_WORKSPACE_MODE = 'servicos';
 const PLAN_ORDER = ['essencial', 'profissional', 'enterprise'];
+const PLAN_CONTEXT_CACHE_TTL_MS = Math.max(0, Number(process.env.PLAN_CONTEXT_CACHE_TTL_MS || 30_000));
+const PLAN_CONTEXT_CACHE_MAX_ENTRIES = Math.max(10, Number(process.env.PLAN_CONTEXT_CACHE_MAX_ENTRIES || 500));
+const planContextCache = new Map();
+const planContextLoaders = new Map();
 
 function normalizeWorkspaceMode(workspaceMode) {
   return workspaceMode === 'comercio' ? 'comercio' : DEFAULT_WORKSPACE_MODE;
@@ -298,16 +302,65 @@ async function getPlan(effectiveUserId) {
   return normalizePlan(owner?.plan || DEFAULT_PLAN);
 }
 
-async function getPlanContext(effectiveUserId) {
-  const owner = await prisma.user.findUnique({
-    where: { id: effectiveUserId },
-    select: { plan: true, workspaceMode: true },
+function getCachedPlanContext(effectiveUserId) {
+  if (!PLAN_CONTEXT_CACHE_TTL_MS) return null;
+  const entry = planContextCache.get(effectiveUserId);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    planContextCache.delete(effectiveUserId);
+    return null;
+  }
+  return { ...entry.context };
+}
+
+function setCachedPlanContext(effectiveUserId, context) {
+  if (!PLAN_CONTEXT_CACHE_TTL_MS) return;
+  planContextCache.set(effectiveUserId, {
+    context: { ...context },
+    expiresAt: Date.now() + PLAN_CONTEXT_CACHE_TTL_MS,
   });
 
+  while (planContextCache.size > PLAN_CONTEXT_CACHE_MAX_ENTRIES) {
+    const oldestKey = planContextCache.keys().next().value;
+    if (!oldestKey) break;
+    planContextCache.delete(oldestKey);
+  }
+}
+
+function getRequestPlanContext(req) {
+  const context = req.user?.planContext;
+  if (!context?.plan) return null;
   return {
-    plan: normalizePlan(owner?.plan || DEFAULT_PLAN),
-    workspaceMode: normalizeWorkspaceMode(owner?.workspaceMode),
+    plan: normalizePlan(context.plan),
+    workspaceMode: normalizeWorkspaceMode(context.workspaceMode),
   };
+}
+
+async function getPlanContext(effectiveUserId) {
+  const cached = getCachedPlanContext(effectiveUserId);
+  if (cached) return cached;
+
+  const existingLoader = planContextLoaders.get(effectiveUserId);
+  if (existingLoader) {
+    return { ...(await existingLoader) };
+  }
+
+  const loader = prisma.user.findUnique({
+    where: { id: effectiveUserId },
+    select: { plan: true, workspaceMode: true },
+  }).then((owner) => {
+    const context = {
+      plan: normalizePlan(owner?.plan || DEFAULT_PLAN),
+      workspaceMode: normalizeWorkspaceMode(owner?.workspaceMode),
+    };
+    setCachedPlanContext(effectiveUserId, context);
+    return context;
+  }).finally(() => {
+    planContextLoaders.delete(effectiveUserId);
+  });
+
+  planContextLoaders.set(effectiveUserId, loader);
+  return { ...(await loader) };
 }
 
 async function getWorkspaceMode(effectiveUserId) {
@@ -437,7 +490,12 @@ function requirePlanFeature(feature) {
         return next();
       }
 
-      const state = await getFeatureState(req.user.effectiveUserId, feature);
+      const context = getRequestPlanContext(req) || await getPlanContext(req.user.effectiveUserId);
+      const state = {
+        ...context,
+        feature,
+        allowed: hasPlanFeature(context.plan, feature, context.workspaceMode),
+      };
       if (!state.allowed) {
         logRouteWarning('[plan-feature] denied', req, {
           status: 403,

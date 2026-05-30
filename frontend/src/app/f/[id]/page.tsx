@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import Script from 'next/script';
 import { getForm, submitForm } from '@/lib/api';
@@ -9,6 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 
 export default function PublicFormPage({ params }: { params: { id: string } }) {
+  const [isEmbed, setIsEmbed] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setIsEmbed(params.get('embed') === '1');
+  }, []);
+
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -68,6 +74,20 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
   const cardBorder = isDark ? 'rgba(255,255,255,0.15)' : '#E2E8F0';
   const inputBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
 
+  useEffect(() => {
+    if (!isEmbed) return;
+    const reportHeight = () => {
+      window.parent.postMessage(
+        { type: 'kukugest:resize', height: document.documentElement.scrollHeight },
+        '*'
+      );
+    };
+    reportHeight();
+    const ro = new ResizeObserver(reportHeight);
+    ro.observe(document.body);
+    return () => ro.disconnect();
+  }, [isEmbed, currentStep, submitted, isLoading]);
+
   const isStepByStep = form?.mode === 'step';
   const fields = form?.fields || [];
   const currentField = isStepByStep ? fields[currentStep] : null;
@@ -121,7 +141,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: bgColor }}>
+      <div className={`${isEmbed ? '' : 'min-h-screen'} flex items-center justify-center`} style={{ background: bgColor }}>
         <p style={{ color: subColor }}>A carregar...</p>
       </div>
     );
@@ -129,7 +149,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
 
   if (!form) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: bgColor }}>
+      <div className={`${isEmbed ? '' : 'min-h-screen'} flex items-center justify-center`} style={{ background: bgColor }}>
         <p style={{ color: '#EF4444' }}>Formulário não encontrado</p>
       </div>
     );
@@ -137,7 +157,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: bgColor }}>
+      <div className={`${isEmbed ? '' : 'min-h-screen'} flex items-center justify-center p-4`} style={{ background: bgColor }}>
         <div className="w-full max-w-md rounded-2xl border p-8 text-center shadow-sm"
           style={{ background: cardBg, borderColor: cardBorder }}>
           <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
@@ -197,7 +217,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
         </>
       )}
 
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: bgColor }}>
+      <div className={`${isEmbed ? '' : 'min-h-screen'} flex items-center justify-center p-4`} style={{ background: bgColor }}>
         <div className="w-full max-w-lg rounded-2xl border shadow-sm overflow-hidden"
           style={{ background: cardBg, borderColor: cardBorder }}>
 

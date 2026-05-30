@@ -91,6 +91,7 @@ O projeto já tem `vercel.json` preparado para construir a app dentro de `fronte
 | `NEXT_PUBLIC_APP_URL` | sim | origem pública do frontend, por exemplo `https://app.kukugest.ao` |
 | `NEXT_PUBLIC_SUPABASE_URL` | sim | URL pública do Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | sim | anon key do Supabase |
+| `CRON_SECRET` | sim | segredo usado pelo Vercel Cron para manter o backend acordado |
 
 ### Variáveis opcionais
 
@@ -127,6 +128,16 @@ Depois do deploy, validar:
 9. o login carrega a sessão e redireciona
 10. uma rota autenticada como `/contacts` responde normalmente
 11. um formulário público em `/f/[id]` abre sem autenticação
+12. `GET /api/ready` no backend responde `{"status":"ready"}` quando a base está acessível
+13. o endpoint `/api/backend-warmup` responde `200` com `CRON_SECRET` configurado
+
+## Performance da API
+
+O frontend expõe `/api/backend-warmup`. Esse endpoint chama o `/api/ready` do backend e evita cold starts do Render quando chamado por um monitor externo ou por um plano que permita cron frequente.
+
+- Defina `CRON_SECRET` no Vercel.
+- O projeto Vercel está em plano Hobby, que bloqueia crons mais frequentes que uma vez por dia. Para warmup a cada 10 minutos, use Render sem sleep ou um monitor externo que chame `https://SEU_FRONTEND/api/backend-warmup` com header `Authorization: Bearer CRON_SECRET`.
+- Depois de deploys com migrations, execute `npm run db:migrate:deploy` no backend para criar os índices de performance.
 
 ## Erros comuns
 

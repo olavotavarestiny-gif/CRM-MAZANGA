@@ -6,9 +6,64 @@ import { Button } from '@/components/ui/button';
 import { getChatUsers, sendChatMessage } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
 import type { ChatAttachment } from '@/lib/types';
+import { formatFileSize, getFileExtension } from '@/lib/file-utils';
 import { PlanLimitModal } from './plan-limit-modal';
 import { ErrorState } from '@/components/ui/error-state';
 import { useToast } from '@/components/ui/toast-provider';
+
+const CHAT_MAX_ATTACHMENT_SIZE = 2 * 1024 * 1024;
+const CHAT_ALLOWED_ATTACHMENT_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/heic',
+  'image/heif',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]);
+const CHAT_ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
+  'jpg',
+  'jpeg',
+  'png',
+  'webp',
+  'gif',
+  'heic',
+  'heif',
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+]);
+const CHAT_ATTACHMENT_ACCEPT = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/heic',
+  'image/heif',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.gif',
+  '.heic',
+  '.heif',
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+].join(',');
 
 interface MessageInputProps {
   channelId: string;
@@ -80,6 +135,20 @@ export function MessageInput({ channelId, onMessageSent }: MessageInputProps) {
     if (!file) return;
     e.target.value = '';
 
+    const extension = getFileExtension(file.name);
+    if (file.size > CHAT_MAX_ATTACHMENT_SIZE) {
+      const message = `Ficheiro demasiado grande. Máximo: ${formatFileSize(CHAT_MAX_ATTACHMENT_SIZE)}.`;
+      setComposerError({ message, action: 'upload' });
+      toast({ variant: 'error', title: 'Falha no upload', description: message });
+      return;
+    }
+    if (!CHAT_ALLOWED_ATTACHMENT_TYPES.has(file.type) && !CHAT_ALLOWED_ATTACHMENT_EXTENSIONS.has(extension)) {
+      const message = 'Tipo de ficheiro não permitido. Use imagem, PDF, Word ou Excel.';
+      setComposerError({ message, action: 'upload' });
+      toast({ variant: 'error', title: 'Falha no upload', description: message });
+      return;
+    }
+
     setUploading(true);
     setComposerError(null);
     try {
@@ -87,16 +156,21 @@ export function MessageInput({ channelId, onMessageSent }: MessageInputProps) {
       form.append('file', file);
       form.append('folder', 'attachments');
       const res = await fetch('/api/upload', { method: 'POST', body: form });
-      if (!res.ok) throw new Error('Upload falhou');
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const message = typeof data?.error === 'string' ? data.error : 'Upload falhou';
+        throw new Error(message);
+      }
       setAttachments((prev) => [...prev, { url: data.url, name: file.name, size: file.size, type: file.type }]);
       toast({
         variant: 'success',
         title: 'Ficheiro anexado',
         description: `${file.name} está pronto para envio.`,
       });
-    } catch {
-      const message = 'Não foi possível carregar o ficheiro para esta conversa.';
+    } catch (err) {
+      const message = err instanceof Error && err.message
+        ? err.message
+        : 'Não foi possível carregar o ficheiro para esta conversa.';
       setComposerError({ message, action: 'upload' });
       toast({
         variant: 'error',
@@ -159,7 +233,7 @@ export function MessageInput({ channelId, onMessageSent }: MessageInputProps) {
   }
 
   return (
-    <div className="border-t border-[#E2E8F0] bg-white px-5 py-4">
+    <div className="border-t border-[#E2E8F0] bg-white px-3 py-3 md:px-5 md:py-4">
       {composerError && (
         <div className="mb-3">
           <ErrorState
@@ -181,9 +255,9 @@ export function MessageInput({ channelId, onMessageSent }: MessageInputProps) {
       {attachments.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-2">
           {attachments.map((att, i) => (
-            <div key={i} className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 py-2 text-xs text-[#0A2540]">
+            <div key={i} className="flex max-w-full items-center gap-1.5 rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 py-2 text-xs text-[#0A2540]">
               <File className="w-3.5 h-3.5 text-[#6b7e9a]" />
-              <span className="max-w-[120px] truncate">{att.name}</span>
+              <span className="max-w-[160px] truncate md:max-w-[120px]">{att.name}</span>
               <button onClick={() => removeAttachment(i)} className="text-[#94a3b8] hover:text-[#0A2540] ml-0.5">
                 <X className="w-3 h-3" />
               </button>
@@ -220,7 +294,13 @@ export function MessageInput({ channelId, onMessageSent }: MessageInputProps) {
           >
             <Paperclip className="w-4.5 h-4.5" />
           </button>
-          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept={CHAT_ATTACHMENT_ACCEPT}
+            onChange={handleFileChange}
+          />
 
           <textarea
             ref={textareaRef}
@@ -245,7 +325,8 @@ export function MessageInput({ channelId, onMessageSent }: MessageInputProps) {
 
       <p className="mt-2 text-right text-[10px] text-[#94a3b8]">
         {uploading ? 'A carregar anexo… · ' : ''}
-        Enter para enviar · Shift+Enter para nova linha
+        <span className="hidden sm:inline">Anexos até 2 MB · Enter para enviar · Shift+Enter para nova linha</span>
+        <span className="sm:hidden">Anexos até 2 MB</span>
       </p>
     </div>
   );

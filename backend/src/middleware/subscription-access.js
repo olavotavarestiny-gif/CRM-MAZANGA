@@ -22,7 +22,7 @@ async function checkSubscriptionAccess(req, res, next) {
       isRenewalPath(req.originalUrl || req.path)
     ) return next();
 
-    const state = await getSubscriptionState(req.user.effectiveUserId);
+    const state = await getSubscriptionState(req.user.effectiveUserId, req.user.subscriptionAccount);
     if (!state) return next();
 
     req.subscriptionAccess = state;

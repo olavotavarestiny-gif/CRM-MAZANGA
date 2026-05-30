@@ -14,7 +14,7 @@ const DEFAULT_ACCEPT: Record<UploadFolder, string> = {
 
 const MAX_SIZES: Record<UploadFolder, number> = {
   avatars: 2 * 1024 * 1024,
-  attachments: 10 * 1024 * 1024,
+  attachments: 2 * 1024 * 1024,
   invoices: 5 * 1024 * 1024,
 };
 

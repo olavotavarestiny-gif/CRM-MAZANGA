@@ -1,9 +1,9 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { dismissWelcomeOnboarding, getCurrentUser, getOnboarding } from '@/lib/api';
+import { dismissWelcomeOnboarding, getCurrentUser, getOnboarding, updateChatPresence, BACKEND_WAKING_EVENT, BACKEND_READY_EVENT } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import Sidebar from './sidebar';
@@ -80,6 +80,14 @@ type AuthLoadError = {
   requestId?: string;
 };
 
+// Isolated component so useSearchParams is inside a Suspense boundary
+function PublicFooter() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const isEmbed = pathname.startsWith('/f/') && searchParams.get('embed') === '1';
+  return isEmbed ? null : <Footer />;
+}
+
 // ── Inner layout — consumes TourContext ──────────────────────────────────────
 
 function LayoutInner({
@@ -103,6 +111,7 @@ function LayoutInner({
   const [routeTransitioning, setRouteTransitioning] = useState(false);
   const comercio = isComercio(currentUser?.workspaceMode);
   const [showTopProgress, setShowTopProgress] = useState(false);
+  const [backendWaking, setBackendWaking] = useState(false);
   const authChecked = useRef(false);
   const currentSessionRef = useRef<string | null>(null);
 
@@ -234,16 +243,75 @@ function LayoutInner({
     }
   }, [pathname]);
 
-  // Keep-alive: ping backend every 14 minutes to prevent Render free tier cold starts
+  // Keep-alive + warmup: acorda o backend (Render free tier adormece) e mantém-no
+  // acordado a cada 14 min. No arranque insiste até obter resposta, para que as
+  // queries seguintes já apanhem o backend "quente" em vez de timeout/erro.
   useEffect(() => {
     if (devAuthBypassEnabled) return;
     if (isPublicPage) return;
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    const ping = () => fetch(`${API_URL}/health`, { method: 'GET' }).catch(() => {});
-    ping();
-    const interval = setInterval(ping, 14 * 60 * 1000);
-    return () => clearInterval(interval);
+
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | undefined;
+
+    const pingOnce = (signal?: AbortSignal) =>
+      fetch(`${API_URL}/health`, { method: 'GET', signal })
+        .then((res) => res.ok)
+        .catch(() => false);
+
+    // Warmup inicial: tenta acordar com várias tentativas e backoff.
+    const wakeUp = async () => {
+      for (let attempt = 0; attempt < 6 && !cancelled; attempt += 1) {
+        const ok = await pingOnce();
+        if (ok || cancelled) return;
+        if (attempt === 0) setBackendWaking(true); // só mostra aviso se o 1.º falhar
+        await new Promise((r) => setTimeout(r, Math.min(6_000, 1_000 * 2 ** attempt)));
+      }
+    };
+
+    wakeUp();
+    interval = setInterval(() => pingOnce(), 14 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      if (interval) clearInterval(interval);
+    };
   }, [devAuthBypassEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Aviso "A ligar ao servidor…" ligado aos eventos da camada API (retry de cold start).
+  useEffect(() => {
+    const onWaking = () => setBackendWaking(true);
+    const onReady = () => setBackendWaking(false);
+    window.addEventListener(BACKEND_WAKING_EVENT, onWaking);
+    window.addEventListener(BACKEND_READY_EVENT, onReady);
+    return () => {
+      window.removeEventListener(BACKEND_WAKING_EVENT, onWaking);
+      window.removeEventListener(BACKEND_READY_EVENT, onReady);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (devAuthBypassEnabled) return;
+    if (isPublicPage) return;
+    if (!currentUser) return;
+    if (currentUser.planFeatures && currentUser.planFeatures.conversas !== true) return;
+
+    const pingPresence = () => {
+      if (document.visibilityState === 'hidden') return;
+      updateChatPresence().catch(() => {});
+    };
+
+    pingPresence();
+    const interval = window.setInterval(pingPresence, 60_000);
+    const handleVisible = () => pingPresence();
+
+    window.addEventListener('focus', handleVisible);
+    document.addEventListener('visibilitychange', handleVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', handleVisible);
+      document.removeEventListener('visibilitychange', handleVisible);
+    };
+  }, [currentUser, devAuthBypassEnabled, isPublicPage]);
 
   useEffect(() => {
     if (isPublicPage) {
@@ -346,7 +414,14 @@ function LayoutInner({
   }
 
   if (isPublicPage) {
-    return <>{children}<Footer /></>;
+    return (
+      <>
+        {children}
+        <Suspense fallback={null}>
+          <PublicFooter />
+        </Suspense>
+      </>
+    );
   }
 
   if (authLoadError) {
@@ -404,6 +479,15 @@ function LayoutInner({
           } ${routeTransitioning || fetchingCount > 0 ? 'w-2/3' : 'w-full'} bg-[var(--workspace-primary)]`}
         />
       </div>
+      {/* Aviso subtil enquanto o backend (Render free tier) acorda */}
+      {backendWaking && (
+        <div className="fixed top-3 left-1/2 z-[90] -translate-x-1/2">
+          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 px-4 py-2 text-xs font-medium text-slate-600 shadow-md backdrop-blur">
+            <RefreshCw className="h-3.5 w-3.5 animate-spin text-[var(--workspace-primary)]" />
+            A ligar ao servidor…
+          </div>
+        </div>
+      )}
       {/* Sidebar Desktop */}
       <div className="hidden md:flex">
         <Sidebar

@@ -68,19 +68,26 @@ function buildSubscriptionState(account, now = new Date()) {
   };
 }
 
-async function getSubscriptionState(orgId) {
-  const account = await prisma.user.findUnique({
-    where: { id: orgId },
-    select: {
-      id: true,
-      plan: true,
-      billingType: true,
-      trialEndsAt: true,
-      expiresAt: true,
-      graceEndsAt: true,
-      accountStatus: true,
-    },
-  });
+async function getSubscriptionState(orgId, accountSnapshot = null) {
+  let account =
+    accountSnapshot && Number(accountSnapshot.id) === Number(orgId)
+      ? accountSnapshot
+      : null;
+
+  if (!account) {
+    account = await prisma.user.findUnique({
+      where: { id: orgId },
+      select: {
+        id: true,
+        plan: true,
+        billingType: true,
+        trialEndsAt: true,
+        expiresAt: true,
+        graceEndsAt: true,
+        accountStatus: true,
+      },
+    });
+  }
 
   if (!account) return null;
 

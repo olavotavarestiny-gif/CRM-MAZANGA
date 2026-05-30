@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MessageSquare, Radio } from 'lucide-react';
 import { getCurrentUser } from '@/lib/api';
@@ -24,12 +24,9 @@ export default function ChatPage() {
     enabled: !!currentUser,
   });
 
-  // Auto-select first channel
-  useEffect(() => {
-    if (!selectedChannelId && channels.length > 0) {
-      setSelectedChannelId(channels[0].id);
-    }
-  }, [channels, selectedChannelId]);
+  const handleSelectChannel = (id: string) => {
+    setSelectedChannelId(id);
+  };
 
   const selectedChannel = channels.find((c) => c.id === selectedChannelId) ?? null;
 
@@ -71,8 +68,8 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mx-auto flex h-[100dvh] max-w-7xl flex-col gap-0 overflow-hidden p-0 md:h-auto md:gap-6 md:p-6">
+      <div className="hidden flex-col gap-4 md:flex lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Conversas</h1>
           <p className="mt-1 text-sm text-[#6b7e9a]">
@@ -90,21 +87,24 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <div className="flex h-[calc(100vh-15rem)] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+      <div className="flex min-h-0 flex-1 overflow-hidden bg-white md:h-[calc(100vh-15rem)] md:rounded-[28px] md:border md:border-slate-200 md:shadow-sm">
         <ChannelList
           selectedId={selectedChannelId}
-          onSelect={setSelectedChannelId}
+          onSelect={handleSelectChannel}
           currentUserId={currentUser.id}
+          className={selectedChannel ? 'hidden md:flex' : 'flex'}
         />
 
         {selectedChannel ? (
           <MessageArea
+            key={selectedChannel.id}
             channel={selectedChannel}
             currentUserId={currentUser.id}
             currentUser={currentUser}
+            onBack={() => setSelectedChannelId(null)}
           />
         ) : channelsError ? (
-          <div className="flex flex-1 flex-col items-center justify-center bg-[#FBFDFF] px-6 text-center">
+          <div className="hidden flex-1 flex-col items-center justify-center bg-[#FBFDFF] px-6 text-center md:flex">
             <div className="max-w-md">
               <ErrorState
                 title="Erro ao carregar conversas"
@@ -115,7 +115,7 @@ export default function ChatPage() {
             </div>
           </div>
         ) : (
-          <div className="flex flex-1 flex-col items-center justify-center bg-[#FBFDFF] px-6 text-center">
+          <div className="hidden flex-1 flex-col items-center justify-center bg-[#FBFDFF] px-6 text-center md:flex">
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#EFF2F7]">
               <MessageSquare className="h-8 w-8 text-[#6b7e9a]" />
             </div>

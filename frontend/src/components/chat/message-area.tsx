@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Settings2, Trash2, Users, Hash, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Loader2, Settings2, Trash2, Users, Hash, MessageSquare } from 'lucide-react';
 import { deleteChatChannel, getChatMessages, markChannelRead, User } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
 import { getSupabaseEnv } from '@/lib/supabase/env';
@@ -17,13 +17,45 @@ interface MessageAreaProps {
   channel: ChatChannel;
   currentUserId: number;
   currentUser: User;
+  onBack?: () => void;
 }
+
+interface ReadReceiptPayload {
+  channelId: string;
+  userId: number;
+  lastReadAt: string;
+}
+
+const INITIAL_MESSAGE_LIMIT = 15;
+const HISTORY_MESSAGE_LIMIT = 25;
 
 function isSameDay(a: string, b: string) {
   return new Date(a).toDateString() === new Date(b).toDateString();
 }
 
-export function MessageArea({ channel, currentUserId, currentUser }: MessageAreaProps) {
+function isNearBottom(el: HTMLDivElement) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+}
+
+function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
+  const byId = new Map(current.map((message) => [message.id, message]));
+
+  for (const message of incoming) {
+    const existing = byId.get(message.id);
+    byId.set(message.id, existing ? { ...existing, ...message } : message);
+  }
+
+  return Array.from(byId.values()).sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+}
+
+function formatPresenceLabel(lastSeenAt?: string | null) {
+  if (!lastSeenAt) return 'Offline';
+  return `Visto pela última vez ${new Date(lastSeenAt).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+export function MessageArea({ channel, currentUserId, currentUser, onBack }: MessageAreaProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -35,15 +67,38 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
   const [showManageModal, setShowManageModal] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const broadcastReadReceipt = useCallback((lastReadAt: string) => {
+    if (channel.type !== 'dm' || (currentUser as any).isDevAuthBypass || !getSupabaseEnv()) return;
+
+    const supabase = createClient();
+    supabase.channel(`chat-${channel.id}`).send({
+      type: 'broadcast',
+      event: 'read_receipt',
+      payload: { channelId: channel.id, userId: currentUserId, lastReadAt },
+    });
+  }, [channel.id, channel.type, currentUser, currentUserId]);
+
+  const markCurrentChannelRead = useCallback(async (options: { broadcast?: boolean } = {}) => {
+    const result = await markChannelRead(channel.id);
+    queryClient.invalidateQueries({ queryKey: ['chat-channels'] });
+    queryClient.invalidateQueries({ queryKey: ['chat-unread'] });
+
+    if (options.broadcast !== false && result.lastReadAt) {
+      broadcastReadReceipt(result.lastReadAt);
+    }
+
+    return result;
+  }, [broadcastReadReceipt, channel.id, queryClient]);
+
   const loadMessages = useCallback(async () => {
     setMessages([]);
     setHasMore(true);
     setIsInitialLoading(true);
     setLoadError(null);
     try {
-      const msgs = await getChatMessages(channel.id);
+      const msgs = await getChatMessages(channel.id, undefined, INITIAL_MESSAGE_LIMIT);
       setMessages(msgs);
-      setHasMore(msgs.length >= 50);
+      setHasMore(msgs.length >= INITIAL_MESSAGE_LIMIT);
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 50);
     } catch {
       setLoadError('Não foi possível carregar as mensagens deste canal.');
@@ -55,12 +110,27 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
   // Initial load
   useEffect(() => {
     loadMessages();
-    // Mark as read
-    markChannelRead(channel.id).then(() => {
-      queryClient.invalidateQueries({ queryKey: ['chat-channels'] });
-      queryClient.invalidateQueries({ queryKey: ['chat-unread'] });
-    });
-  }, [channel.id, loadMessages, queryClient]);
+    markCurrentChannelRead().catch(() => null);
+  }, [channel.id, loadMessages, markCurrentChannelRead]);
+
+  const syncLatestMessages = useCallback(async () => {
+    if (isInitialLoading || loadingOlder || loadError) return;
+
+    const latest = await getChatMessages(channel.id, undefined, INITIAL_MESSAGE_LIMIT);
+    const existingIds = new Set(messages.map((message) => message.id));
+    const hasNewIncoming = latest.some((message) => message.senderId !== currentUserId && !existingIds.has(message.id));
+    const shouldStickToBottom = !containerRef.current || isNearBottom(containerRef.current);
+
+    setMessages((prev) => mergeMessages(prev, latest));
+
+    if (shouldStickToBottom) {
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    }
+
+    if (hasNewIncoming) {
+      markCurrentChannelRead().catch(() => null);
+    }
+  }, [channel.id, currentUserId, isInitialLoading, loadError, loadingOlder, markCurrentChannelRead, messages]);
 
   // Supabase Realtime broadcast
   useEffect(() => {
@@ -77,14 +147,35 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
         return [...prev, payload.message];
       });
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-      markChannelRead(channel.id).then(() => {
-        queryClient.invalidateQueries({ queryKey: ['chat-channels'] });
-        queryClient.invalidateQueries({ queryKey: ['chat-unread'] });
-      });
+      markCurrentChannelRead().catch(() => null);
+    }).on('broadcast', { event: 'read_receipt' }, ({ payload }: { payload: ReadReceiptPayload }) => {
+      if (channel.type !== 'dm' || payload.channelId !== channel.id || payload.userId === currentUserId) return;
+
+      setMessages((prev) => prev.map((message) => {
+        if (message.senderId !== currentUserId) return message;
+        if (new Date(message.createdAt).getTime() > new Date(payload.lastReadAt).getTime()) return message;
+        return { ...message, readByOtherAt: payload.lastReadAt };
+      }));
     }).subscribe();
 
     return () => { supabase.removeChannel(ch); };
-  }, [channel.id, currentUser]);
+  }, [channel.id, channel.type, currentUser, currentUserId, markCurrentChannelRead]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      syncLatestMessages().catch(() => null);
+    }, 10_000);
+
+    const handleFocus = () => {
+      syncLatestMessages().catch(() => null);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [syncLatestMessages]);
 
   // Scroll-to-top to load older messages
   const handleScroll = useCallback(async () => {
@@ -94,11 +185,11 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
     const oldestId = messages[0]?.id;
     setLoadingOlder(true);
     try {
-      const older = await getChatMessages(channel.id, oldestId);
+      const older = await getChatMessages(channel.id, oldestId, HISTORY_MESSAGE_LIMIT);
       if (older.length === 0) { setHasMore(false); return; }
       const prevHeight = containerRef.current.scrollHeight;
       setMessages((prev) => [...older, ...prev]);
-      setHasMore(older.length >= 50);
+      setHasMore(older.length >= HISTORY_MESSAGE_LIMIT);
       // Preserve scroll position
       requestAnimationFrame(() => {
         if (containerRef.current) {
@@ -127,12 +218,14 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
 
     // Broadcast to other members via Supabase
-    const supabase = createClient();
-    supabase.channel(`chat-${channel.id}`).send({
-      type: 'broadcast',
-      event: 'new_message',
-      payload: { message: msg },
-    });
+    if (!(currentUser as any).isDevAuthBypass && getSupabaseEnv()) {
+      const supabase = createClient();
+      supabase.channel(`chat-${channel.id}`).send({
+        type: 'broadcast',
+        event: 'new_message',
+        payload: { message: msg },
+      });
+    }
 
     queryClient.invalidateQueries({ queryKey: ['chat-channels'] });
     queryClient.invalidateQueries({ queryKey: ['chat-unread'] });
@@ -142,6 +235,7 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
   const otherMember = isDM
     ? channel.members.find((m) => m.userId !== currentUserId)
     : null;
+  const presenceLabel = otherMember?.isOnline ? 'Online' : formatPresenceLabel(otherMember?.lastSeenAt);
 
   const memberCount = channel.members.length;
   const isChannelCreator = channel.createdById === currentUser.id && channel.members.some((member) => member.userId === currentUser.id);
@@ -151,6 +245,9 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
     !currentUser.accountOwnerId ||
     isChannelCreator
   );
+  const latestOwnMessageId = channel.type === 'dm'
+    ? [...messages].reverse().find((message) => message.senderId === currentUserId)?.id
+    : null;
 
   const deleteChannelMutation = useMutation({
     mutationFn: () => deleteChatChannel(channel.id),
@@ -180,9 +277,19 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col">
       {/* Header */}
-      <div className="flex flex-shrink-0 items-center gap-3 border-b border-[#E2E8F0] bg-white px-5 py-4">
+      <div className="flex flex-shrink-0 items-center gap-3 border-b border-[#E2E8F0] bg-white px-3 py-3 md:px-5 md:py-4">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-[#526277] md:hidden"
+            title="Voltar às conversas"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+        )}
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#EFF2F7]">
           {isDM ? (
             <span className="text-sm font-bold text-[#0A2540]">
@@ -197,7 +304,12 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
             {isDM ? (otherMember?.name || channel.name) : channel.name}
           </h2>
           <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[#94a3b8]">
-            {!isDM && (
+            {isDM ? (
+              <p className="flex items-center gap-1">
+                <span className={`h-2 w-2 rounded-full ${otherMember?.isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                {presenceLabel}
+              </p>
+            ) : (
               <p className="flex items-center gap-1">
                 <Users className="h-3 w-3" />
                 {memberCount} {memberCount === 1 ? 'membro' : 'membros'}
@@ -210,7 +322,7 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
           {isDM ? 'Mensagem directa' : 'Canal interno'}
         </div>
         {canManageChannel && (
-          <div className="flex items-center gap-2">
+          <div className="hidden items-center gap-2 sm:flex">
             <button
               type="button"
               onClick={() => setShowManageModal(true)}
@@ -237,7 +349,11 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
       </div>
 
       {/* Messages */}
-      <div ref={containerRef} className="flex-1 space-y-1 overflow-y-auto bg-[#FCFDFE] px-5 py-5">
+      <div
+        ref={containerRef}
+        data-chat-messages="true"
+        className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden bg-[#FCFDFE] px-3 py-4 md:px-5 md:py-5"
+      >
         {loadingOlder && (
           <p className="text-center text-xs text-[#94a3b8] py-2">A carregar mensagens anteriores…</p>
         )}
@@ -294,6 +410,7 @@ export function MessageArea({ channel, currentUserId, currentUser }: MessageArea
                 message={msg}
                 isOwn={isOwn}
                 showAvatar={!isSameSender}
+                showReadReceipt={channel.type === 'dm' && isOwn && msg.id === latestOwnMessageId}
               />
             </div>
           );

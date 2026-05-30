@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { Plus, Hash, MessageSquare } from 'lucide-react';
+import { Plus, Hash, MessageSquare, Search } from 'lucide-react';
 import { getChatChannels, getChatUsers, createDM } from '@/lib/api';
 import { markChannelRead } from '@/lib/api';
 import type { ChatChannel } from '@/lib/types';
@@ -15,6 +15,7 @@ interface ChannelListProps {
   selectedId: string | null;
   onSelect: (id: string) => void;
   currentUserId: number;
+  className?: string;
 }
 
 function ChannelItem({
@@ -33,12 +34,13 @@ function ChannelItem({
     ? channel.members.find((m) => m.userId !== currentUserId)
     : null;
   const displayName = isDM ? (otherMember?.name || channel.name) : channel.name;
+  const isOnline = isDM && otherMember?.isOnline;
 
   return (
     <button
       onClick={onClick}
       className={cn(
-        'w-full rounded-2xl border px-3.5 py-3 text-left text-sm transition-all',
+        'flex w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left text-sm transition-all',
         selected
           ? 'border-[#D6E4FF] bg-[#EEF4FF] text-[#0A2540] shadow-sm'
           : 'border-transparent text-[#6b7e9a] hover:border-slate-200 hover:bg-white hover:text-[#0A2540]'
@@ -46,10 +48,13 @@ function ChannelItem({
     >
       {isDM ? (
         <div className={cn(
-          'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
+          'relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
           selected ? 'bg-[#0A2540] text-white' : 'bg-[#E2E8F0] text-[#0A2540]'
         )}>
           {displayName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
+          {isOnline && (
+            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
+          )}
         </div>
       ) : (
         <div className={cn(
@@ -62,7 +67,7 @@ function ChannelItem({
       <div className="min-w-0 flex-1">
         <span className="block truncate font-medium">{displayName}</span>
         <span className="mt-0.5 block truncate text-[11px] text-[#94a3b8]">
-          {isDM ? 'Mensagem directa' : 'Canal interno'}
+          {isDM && isOnline ? 'Online' : isDM ? 'Mensagem directa' : 'Canal interno'}
         </span>
       </div>
       {channel.unreadCount > 0 && (
@@ -74,11 +79,13 @@ function ChannelItem({
   );
 }
 
-export function ChannelList({ selectedId, onSelect, currentUserId }: ChannelListProps) {
+export function ChannelList({ selectedId, onSelect, currentUserId, className }: ChannelListProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [showCreate, setShowCreate] = useState(false);
   const [showDMPicker, setShowDMPicker] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<'all' | 'channels' | 'dms'>('all');
 
   const { data: channels = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['chat-channels'],
@@ -116,12 +123,37 @@ export function ChannelList({ selectedId, onSelect, currentUserId }: ChannelList
     });
   };
 
-  const regularChannels = channels.filter((c) => c.type === 'channel');
-  const dmChannels = channels.filter((c) => c.type === 'dm');
+  const normalizedSearch = search.trim().toLowerCase();
+  const matchesSearch = (channel: ChatChannel) => {
+    if (!normalizedSearch) return true;
+    const otherMember = channel.type === 'dm'
+      ? channel.members.find((member) => member.userId !== currentUserId)
+      : null;
+    const label = channel.type === 'dm'
+      ? `${otherMember?.name || channel.name} ${otherMember?.email || ''}`
+      : `${channel.name} ${channel.description || ''}`;
+    return label.toLowerCase().includes(normalizedSearch);
+  };
+  const filteredChannels = channels.filter((channel) => {
+    if (filter === 'channels' && channel.type !== 'channel') return false;
+    if (filter === 'dms' && channel.type !== 'dm') return false;
+    return matchesSearch(channel);
+  });
+  const allRegularCount = channels.filter((c) => c.type === 'channel').length;
+  const allDmCount = channels.filter((c) => c.type === 'dm').length;
+  const regularChannels = filteredChannels.filter((c) => c.type === 'channel');
+  const dmChannels = filteredChannels.filter((c) => c.type === 'dm');
+  const hasNoFilteredResults = !isLoading && !isError && filteredChannels.length === 0 && channels.length > 0;
+  const shouldShowChannelsSection = filter !== 'dms' && (
+    isLoading || isError || regularChannels.length > 0 || (!normalizedSearch && allRegularCount === 0)
+  );
+  const shouldShowDmSection = filter !== 'channels' && (
+    dmChannels.length > 0 || (!normalizedSearch && allDmCount === 0)
+  );
 
   return (
     <>
-      <div className="flex h-full w-80 flex-shrink-0 flex-col border-r border-[#E2E8F0] bg-[#F8FAFC]">
+      <div className={cn('flex h-full w-full flex-shrink-0 flex-col border-r border-[#E2E8F0] bg-[#F8FAFC] md:w-80', className)}>
         {/* Header */}
         <div className="border-b border-[#E2E8F0] px-4 py-4">
           <div className="flex items-center justify-between">
@@ -150,8 +182,47 @@ export function ChannelList({ selectedId, onSelect, currentUserId }: ChannelList
           </div>
         </div>
 
+        <div className="border-b border-[#E2E8F0] bg-white/70 px-3 py-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b8]" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Procurar conversas"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-[#0A2540] outline-none transition-colors placeholder:text-[#94a3b8] focus:border-[#0A2540]"
+            />
+          </div>
+          <div className="mt-3 grid grid-cols-3 rounded-xl bg-[#EFF2F7] p-1 text-xs font-semibold text-[#64748B]">
+            {[
+              { value: 'all', label: 'Todas' },
+              { value: 'channels', label: 'Canais' },
+              { value: 'dms', label: 'DMs' },
+            ].map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setFilter(item.value as 'all' | 'channels' | 'dms')}
+                className={cn(
+                  'rounded-lg px-2 py-2 transition-colors',
+                  filter === item.value ? 'bg-white text-[#0A2540] shadow-sm' : 'hover:text-[#0A2540]'
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
+          {hasNoFilteredResults && (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-[#94a3b8] shadow-sm">
+              <p className="font-medium text-[#0A2540]">Nenhuma conversa encontrada</p>
+              <p className="mt-1">Ajusta a procura ou muda o filtro para ver mais resultados.</p>
+            </div>
+          )}
+
           {/* Channels section */}
+          {shouldShowChannelsSection && (
           <div>
             <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#94a3b8]">Canais</p>
             <div className="space-y-2">
@@ -203,8 +274,10 @@ export function ChannelList({ selectedId, onSelect, currentUserId }: ChannelList
               ))}
             </div>
           </div>
+          )}
 
           {/* DMs section */}
+          {shouldShowDmSection && (
           <div>
             <div className="mb-2 flex items-center justify-between px-1">
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#94a3b8]">Mensagens Directas</p>
@@ -261,6 +334,7 @@ export function ChannelList({ selectedId, onSelect, currentUserId }: ChannelList
               ))}
             </div>
           </div>
+          )}
         </div>
       </div>
 

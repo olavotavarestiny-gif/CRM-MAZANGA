@@ -28,6 +28,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { FormFieldList } from '@/components/forms/form-field-list';
 import { FormFieldEditor } from '@/components/forms/form-field-editor';
+import { EmbedCodePanel } from '@/components/forms/embed-code-panel';
 
 const PRESET_BRAND_COLORS = [
   '#635BFF', '#0A2540', '#10B981', '#F59E0B',
@@ -167,7 +168,7 @@ function BrandingPreview({ brandColor, bgColor, logoUrl, title }: {
 
 export default function FormEditPage({ params }: { params: { id: string } }) {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'builder' | 'branding' | 'tracking' | 'submissions'>('builder');
+  const [activeTab, setActiveTab] = useState<'builder' | 'branding' | 'tracking' | 'submissions' | 'embed'>('builder');
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
   const [submissionSearch, setSubmissionSearch] = useState('');
@@ -690,6 +691,7 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
     ...(currentUser?.workspaceMode === 'servicos'
       ? [{ key: 'tracking' as const, label: 'Tracking' }]
       : []),
+    { key: 'embed' as const, label: 'Incorporar' },
     { key: 'submissions', label: 'Submissões', badge: form?._count?.submissions },
   ] as const;
 
@@ -1000,6 +1002,11 @@ export default function FormEditPage({ params }: { params: { id: string } }) {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* ── EMBED TAB ── */}
+      {activeTab === 'embed' && (
+        <EmbedCodePanel formId={params.id} />
       )}
 
       {/* ── SUBMISSIONS TAB ── */}
