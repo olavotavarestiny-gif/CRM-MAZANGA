@@ -731,27 +731,70 @@ export async function updateServicesDashboardSettings(data: ServicesDashboardSet
   return response.data;
 }
 
-export async function getCurrentUser() {
-  const response = await fetch('/api/auth/me', {
-    headers: { 'Cache-Control': 'no-store' },
-    cache: 'no-store',
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    clearDevAuthSession();
-    const err: any = new Error(data?.error || data?.message || 'Não foi possível carregar a conta.');
-    err.code = data?.code;
-    err.requestId = data?.requestId;
-    err.response = { status: response.status, data };
-    throw err;
+export async function getCurrentUser(): Promise<User> {
+  const TIMEOUT_MS = 15_000;
+  const MAX_TRIES = 3;
+  const DELAYS = [1_000, 2_000];
+
+  for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    try {
+      const response = await fetch('/api/auth/me', {
+        headers: { 'Cache-Control': 'no-store' },
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          clearDevAuthSession();
+          const err: any = new Error(data?.error || data?.message || 'Sessão inválida.');
+          err.code = data?.code;
+          err.requestId = data?.requestId;
+          err.response = { status: response.status, data };
+          throw err;
+        }
+        if ([502, 503, 504].includes(response.status) && attempt < MAX_TRIES - 1) {
+          await new Promise((r) => setTimeout(r, DELAYS[attempt]));
+          continue;
+        }
+        clearDevAuthSession();
+        const err: any = new Error(data?.error || data?.message || 'Não foi possível carregar a conta.');
+        err.code = data?.code;
+        err.requestId = data?.requestId;
+        err.response = { status: response.status, data };
+        throw err;
+      }
+
+      const payload = data as User;
+      if (isDevAuthUserPayload(payload)) {
+        writeDevAuthSession(payload);
+      } else {
+        clearDevAuthSession();
+      }
+      return payload;
+
+    } catch (err: any) {
+      clearTimeout(timer);
+      const isTransient =
+        err?.name === 'AbortError' ||
+        err?.code === 'ECONNABORTED' ||
+        err?.code === 'ERR_NETWORK' ||
+        /network|timeout/i.test(err?.message || '');
+
+      if (isTransient && attempt < MAX_TRIES - 1) {
+        await new Promise((r) => setTimeout(r, DELAYS[attempt]));
+        continue;
+      }
+      throw err;
+    }
   }
-  const payload = data as User;
-  if (isDevAuthUserPayload(payload)) {
-    writeDevAuthSession(payload);
-  } else {
-    clearDevAuthSession();
-  }
-  return payload;
+  throw new Error('Não foi possível carregar a conta após várias tentativas.');
 }
 
 export async function updateCurrentUserProfile(data: { name?: string; jobTitle?: string | null }) {
