@@ -24,7 +24,8 @@ import {
 import { isComercio } from '@/lib/business-modes';
 import TransactionForm from '@/components/finances/transaction-form';
 import ClientProfitabilityModal from '@/components/finances/client-profitability-modal';
-import { TrendingUp, TrendingDown, DollarSign, RefreshCw, Plus, Download, ChevronLeft, ChevronRight, Pencil, Trash2, BarChart2, ArrowDownUp, Wallet, Landmark, Paperclip } from 'lucide-react';
+import CategoryManagerModal from '@/components/finances/category-manager-modal';
+import { TrendingUp, TrendingDown, DollarSign, RefreshCw, Plus, Download, ChevronLeft, ChevronRight, Pencil, Trash2, BarChart2, ArrowDownUp, Wallet, Landmark, Paperclip, Settings2 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FilterBar } from '@/components/ui/filter-bar';
 
@@ -63,6 +64,7 @@ export default function FinancesPage() {
   const [editTransaction, setEditTransaction] = useState<Transaction | undefined>();
   const [profitabilityClient, setProfitabilityClient] = useState<ClientProfitability | null>(null);
   const [activeTab, setActiveTab] = useState<'transacoes' | 'rentabilidade'>('transacoes');
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
 
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser'],
@@ -175,16 +177,26 @@ export default function FinancesPage() {
           <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">{title}</h1>
           <p className="mt-1 text-sm text-[#6b7e9a]">{subtitle}</p>
         </div>
-        {activeTab === 'transacoes' && (
+        <div className="flex flex-col gap-2 lg:flex-row">
           <Button
-            onClick={() => { setEditTransaction(undefined); setFormOpen(true); }}
-            className="w-full gap-2 lg:w-auto"
-            style={{ backgroundColor: primaryAccent, borderColor: primaryAccent }}
+            variant="outline"
+            onClick={() => setCategoryManagerOpen(true)}
+            className="w-full gap-2 lg:w-auto border-slate-200 text-slate-600 hover:bg-slate-50"
           >
-            <Plus className="w-4 h-4" />
-            Nova Transação
+            <Settings2 className="w-4 h-4" />
+            Categorias
           </Button>
-        )}
+          {activeTab === 'transacoes' && (
+            <Button
+              onClick={() => { setEditTransaction(undefined); setFormOpen(true); }}
+              className="w-full gap-2 lg:w-auto"
+              style={{ backgroundColor: primaryAccent, borderColor: primaryAccent }}
+            >
+              <Plus className="w-4 h-4" />
+              Nova Transação
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-nowrap gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
@@ -549,6 +561,10 @@ export default function FinancesPage() {
         open={formOpen}
         onClose={handleFormClose}
         transaction={editTransaction}
+      />
+      <CategoryManagerModal
+        open={categoryManagerOpen}
+        onClose={() => setCategoryManagerOpen(false)}
       />
       </div>}
     </div>

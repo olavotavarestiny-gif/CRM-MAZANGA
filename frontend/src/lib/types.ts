@@ -674,11 +674,14 @@ export interface Transaction {
 
 export interface FinancialCategory {
   id: string;
+  userId?: number | null;
   type: TransactionType;
   category: string;
   subcategories?: string[];
   color?: string;
   icon?: string;
+  sortOrder?: number;
+  active?: boolean;
 }
 
 export interface DashboardStats {

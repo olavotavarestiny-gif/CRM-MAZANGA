@@ -1112,6 +1112,36 @@ export async function getFinancialCategories(): Promise<FinancialCategory[]> {
   return response.data;
 }
 
+export async function createFinancialCategory(data: {
+  type: 'entrada' | 'saida';
+  category: string;
+  subcategories?: string[];
+  color?: string;
+  icon?: string;
+  sortOrder?: number;
+}): Promise<FinancialCategory> {
+  const response = await api.post<FinancialCategory>('/api/finances/categories', data);
+  return response.data;
+}
+
+export async function updateFinancialCategory(
+  id: string,
+  data: {
+    category?: string;
+    subcategories?: string[];
+    color?: string;
+    icon?: string;
+    sortOrder?: number;
+  }
+): Promise<FinancialCategory> {
+  const response = await api.put<FinancialCategory>(`/api/finances/categories/${id}`, data);
+  return response.data;
+}
+
+export async function deleteFinancialCategory(id: string): Promise<void> {
+  await api.delete(`/api/finances/categories/${id}`);
+}
+
 export async function seedFinancialCategories(): Promise<void> {
   await api.post('/api/finances/seed-categories');
 }
