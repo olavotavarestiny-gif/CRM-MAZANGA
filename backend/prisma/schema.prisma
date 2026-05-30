@@ -164,14 +164,15 @@ model ContactGroup {
 }
 
 model ContactNote {
-  id        Int      @id @default(autoincrement())
-  contactId Int
-  userId    Int?
-  content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  user      User?    @relation("NoteAuthor", fields: [userId], references: [id])
+  id          Int      @id @default(autoincrement())
+  contactId   Int
+  userId      Int?
+  content     String
+  attachments String   @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user        User?    @relation("NoteAuthor", fields: [userId], references: [id])
 }
 
 model ContactFieldDef {

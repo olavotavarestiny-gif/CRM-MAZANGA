@@ -1449,10 +1449,19 @@ export interface ClientAccount {
   _count: { accountMembers: number };
 }
 
+export interface NoteAttachment {
+  name: string;
+  url: string;
+  size?: number;
+  contentType?: string;
+  uploadedAt: string;
+}
+
 export interface ContactNote {
   id: number;
   contactId: number;
   content: string;
+  attachments: NoteAttachment[];
   createdAt: string;
   updatedAt: string;
   user?: { id: number; name: string };

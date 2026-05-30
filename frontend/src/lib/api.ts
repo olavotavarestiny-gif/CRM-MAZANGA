@@ -398,13 +398,21 @@ export async function getContactNotes(contactId: number, skip = 0) {
   return res.data as import('./types').ContactNote[];
 }
 
-export async function createContactNote(contactId: number, content: string) {
-  const res = await api.post(`/api/contacts/${contactId}/notes`, { content });
+export async function createContactNote(
+  contactId: number,
+  content: string,
+  attachments: import('./types').NoteAttachment[] = []
+) {
+  const res = await api.post(`/api/contacts/${contactId}/notes`, { content, attachments });
   return res.data as import('./types').ContactNote;
 }
 
-export async function updateContactNote(noteId: number, content: string) {
-  const res = await api.put(`/api/notes/${noteId}`, { content });
+export async function updateContactNote(
+  noteId: number,
+  content: string,
+  attachments?: import('./types').NoteAttachment[]
+) {
+  const res = await api.put(`/api/notes/${noteId}`, { content, attachments });
   return res.data as import('./types').ContactNote;
 }
 

@@ -8,7 +8,7 @@ import {
   getContactNotes, createContactNote, updateContactNote, deleteContactNote,
   getContactSummary, getContactGroups, getContactFormSubmissions,
 } from '@/lib/api';
-import type { ContactFieldConfig, ContactFieldDef, ContactNote, FormSubmission, Task } from '@/lib/types';
+import type { ContactFieldConfig, ContactFieldDef, ContactNote, NoteAttachment, FormSubmission, Task } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,7 @@ import { ContactHistoryTimeline } from '@/components/contacts/contact-history-ti
 import ContactGroupsManager from '@/components/contacts/contact-groups-manager';
 import {
   Pencil, Check, X, ExternalLink, Phone, Download, Trash2, ChevronDown, ChevronUp,
-  Upload, Loader2, Send, FileText, TrendingUp, Clock,
+  Upload, Loader2, Send, FileText, TrendingUp, Clock, Paperclip, Image, ZoomIn,
 } from 'lucide-react';
 import { useFileUpload } from '@/hooks/use-file-upload';
 
@@ -370,6 +370,182 @@ function TagsField({
   );
 }
 
+// ── Helpers de ficheiros ────────────────────────────────────────────────────────
+function isImage(name: string, contentType?: string): boolean {
+  if (contentType?.startsWith('image/')) return true;
+  return /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(name);
+}
+
+// ── Lightbox simples ────────────────────────────────────────────────────────────
+function Lightbox({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <button
+        className="absolute top-4 right-4 text-white/70 hover:text-white"
+        onClick={onClose}
+      >
+        <X className="w-7 h-7" />
+      </button>
+      <img
+        src={url}
+        alt={name}
+        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      />
+      <a
+        href={url}
+        download={name}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute bottom-4 right-4 flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg backdrop-blur-sm transition-colors"
+        onClick={e => e.stopPropagation()}
+      >
+        <Download className="w-4 h-4" />Download
+      </a>
+    </div>
+  );
+}
+
+// ── Lista de anexos (usado em notas e documentos) ───────────────────────────────
+function AttachmentList({
+  attachments,
+  onDelete,
+}: {
+  attachments: NoteAttachment[];
+  onDelete?: (url: string) => void;
+}) {
+  const [lightbox, setLightbox] = useState<NoteAttachment | null>(null);
+  if (attachments.length === 0) return null;
+
+  const images = attachments.filter(a => isImage(a.name, a.contentType));
+  const docs   = attachments.filter(a => !isImage(a.name, a.contentType));
+
+  return (
+    <>
+      {lightbox && (
+        <Lightbox url={lightbox.url} name={lightbox.name} onClose={() => setLightbox(null)} />
+      )}
+
+      {/* Galeria de imagens */}
+      {images.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-2">
+          {images.map((img, i) => (
+            <div key={i} className="relative group/img w-20 h-20 rounded-lg overflow-hidden border border-white/10 flex-shrink-0">
+              <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/40 transition-colors flex items-center justify-center gap-1">
+                <button
+                  onClick={() => setLightbox(img)}
+                  className="opacity-0 group-hover/img:opacity-100 transition-opacity p-1.5 bg-white/20 hover:bg-white/40 rounded-full backdrop-blur-sm"
+                  title="Ver imagem"
+                >
+                  <ZoomIn className="w-3.5 h-3.5 text-white" />
+                </button>
+                {onDelete && (
+                  <button
+                    onClick={() => onDelete(img.url)}
+                    className="opacity-0 group-hover/img:opacity-100 transition-opacity p-1.5 bg-red-500/70 hover:bg-red-500 rounded-full backdrop-blur-sm"
+                    title="Remover"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-white" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Lista de documentos */}
+      {docs.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {docs.map((doc, i) => (
+            <div key={i} className="group/doc flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+              <FileText className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+              <span className="flex-1 text-xs text-zinc-300 truncate">{doc.name}</span>
+              {doc.size && <span className="text-xs text-zinc-500 flex-shrink-0">{formatFileSize(doc.size)}</span>}
+              <a
+                href={doc.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-shrink-0 p-1 text-zinc-400 hover:text-white transition-colors"
+                title="Download"
+              >
+                <Download className="w-3.5 h-3.5" />
+              </a>
+              {onDelete && (
+                <button
+                  onClick={() => onDelete(doc.url)}
+                  className="flex-shrink-0 p-1 text-zinc-500 hover:text-red-400 transition-colors opacity-0 group-hover/doc:opacity-100"
+                  title="Remover"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Miniatura de imagem no card Documentos ──────────────────────────────────────
+function DocImageThumb({
+  doc,
+  onDelete,
+}: {
+  doc: { name: string; url: string; size?: number; uploadedAt: string };
+  onDelete: (url: string) => void;
+}) {
+  const [lightbox, setLightbox] = useState(false);
+  return (
+    <>
+      {lightbox && <Lightbox url={doc.url} name={doc.name} onClose={() => setLightbox(false)} />}
+      <div className="relative group/thumb aspect-square rounded-lg overflow-hidden border border-white/10 bg-white/5">
+        <img src={doc.url} alt={doc.name} className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-black/0 group-hover/thumb:bg-black/50 transition-colors" />
+        <div className="absolute inset-0 flex items-center justify-center gap-1.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity">
+          <button
+            onClick={() => setLightbox(true)}
+            className="p-1.5 bg-white/20 hover:bg-white/40 rounded-full backdrop-blur-sm"
+            title="Ver foto"
+          >
+            <ZoomIn className="w-4 h-4 text-white" />
+          </button>
+          <a
+            href={doc.url}
+            download={doc.name}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1.5 bg-white/20 hover:bg-white/40 rounded-full backdrop-blur-sm"
+            title="Download"
+          >
+            <Download className="w-4 h-4 text-white" />
+          </a>
+          <button
+            onClick={() => onDelete(doc.url)}
+            className="p-1.5 bg-red-500/70 hover:bg-red-500 rounded-full backdrop-blur-sm"
+            title="Apagar"
+          >
+            <Trash2 className="w-4 h-4 text-white" />
+          </button>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover/thumb:opacity-100 transition-opacity">
+          <p className="text-[10px] text-white/80 truncate">{doc.name}</p>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Note item ──────────────────────────────────────────────────────────────────
 function NoteItem({
   note,
@@ -377,7 +553,7 @@ function NoteItem({
   onDelete,
 }: {
   note: ContactNote;
-  onUpdate: (id: number, content: string) => void;
+  onUpdate: (id: number, content: string, attachments: NoteAttachment[]) => void;
   onDelete: (id: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -386,16 +562,18 @@ function NoteItem({
 
   useEffect(() => { if (editing) textareaRef.current?.focus(); }, [editing]);
 
+  const attachments: NoteAttachment[] = Array.isArray(note.attachments) ? note.attachments : [];
+
   const commit = () => {
     if (draft.trim() && draft.trim() !== note.content) {
-      onUpdate(note.id, draft.trim());
+      onUpdate(note.id, draft.trim(), attachments);
     }
     setEditing(false);
   };
 
   return (
-    <div className="group flex gap-3 py-3 border-b border-[#f0f4f9] last:border-0">
-      <div className="w-2 h-2 rounded-full bg-[#0A2540]/30 mt-2 flex-shrink-0" />
+    <div className="group flex gap-3 py-3 border-b border-white/5 last:border-0">
+      <div className="w-2 h-2 rounded-full bg-white/20 mt-2 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         {editing ? (
           <div className="space-y-2">
@@ -407,28 +585,29 @@ function NoteItem({
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(); }
                 if (e.key === 'Escape') { setDraft(note.content); setEditing(false); }
               }}
-              className="w-full text-sm text-[#0A2540] border border-[#dde3ec] rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#0A2540]/20"
+              className="w-full text-sm text-white bg-white/5 border border-white/15 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/40"
               rows={3}
             />
             <div className="flex gap-2">
-              <button onClick={commit} className="text-xs text-green-600 hover:text-green-700 font-medium flex items-center gap-1">
+              <button onClick={commit} className="text-xs text-green-400 hover:text-green-300 font-medium flex items-center gap-1">
                 <Check className="w-3 h-3" />Guardar
               </button>
-              <button onClick={() => { setDraft(note.content); setEditing(false); }} className="text-xs text-[#6b7e9a] hover:text-red-500 font-medium flex items-center gap-1">
+              <button onClick={() => { setDraft(note.content); setEditing(false); }} className="text-xs text-zinc-400 hover:text-red-400 font-medium flex items-center gap-1">
                 <X className="w-3 h-3" />Cancelar
               </button>
             </div>
           </div>
         ) : (
           <>
-            <p className="text-sm text-[#0A2540] whitespace-pre-wrap break-words">{note.content}</p>
-            <div className="flex items-center gap-3 mt-1">
-              <span className="text-xs text-[#6b7e9a]">{formatTime(note.createdAt)}{note.user ? ` · ${note.user.name}` : ''}</span>
+            <p className="text-sm text-white/90 whitespace-pre-wrap break-words">{note.content}</p>
+            <AttachmentList attachments={attachments} />
+            <div className="flex items-center gap-3 mt-1.5">
+              <span className="text-xs text-zinc-500">{formatTime(note.createdAt)}{note.user ? ` · ${note.user.name}` : ''}</span>
               <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                <button onClick={() => { setDraft(note.content); setEditing(true); }} className="text-xs text-[#6b7e9a] hover:text-[#0A2540] flex items-center gap-0.5">
+                <button onClick={() => { setDraft(note.content); setEditing(true); }} className="text-xs text-zinc-400 hover:text-white flex items-center gap-0.5">
                   <Pencil className="w-3 h-3" />Editar
                 </button>
-                <button onClick={() => onDelete(note.id)} className="text-xs text-[#6b7e9a] hover:text-red-500 flex items-center gap-0.5">
+                <button onClick={() => onDelete(note.id)} className="text-xs text-zinc-400 hover:text-red-400 flex items-center gap-0.5">
                   <Trash2 className="w-3 h-3" />Apagar
                 </button>
               </div>
@@ -538,9 +717,13 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [noteInput, setNoteInput] = useState('');
   const [notesSkip, setNotesSkip] = useState(0);
+  const [pendingNoteAttachments, setPendingNoteAttachments] = useState<NoteAttachment[]>([]);
+  const [noteAttachUploading, setNoteAttachUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const noteAttachInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { upload, uploading: fileUploading } = useFileUpload();
+  const { upload: uploadNote } = useFileUpload();
 
   const { data: contact } = useQuery({
     queryKey: ['contact', params.id],
@@ -602,15 +785,18 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   });
 
   const createNoteMutation = useMutation({
-    mutationFn: (content: string) => createContactNote(parseInt(params.id), content),
+    mutationFn: ({ content, attachments }: { content: string; attachments: NoteAttachment[] }) =>
+      createContactNote(parseInt(params.id), content, attachments),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contact-notes', params.id] });
       setNoteInput('');
+      setPendingNoteAttachments([]);
     },
   });
 
   const updateNoteMutation = useMutation({
-    mutationFn: ({ id, content }: { id: number; content: string }) => updateContactNote(id, content),
+    mutationFn: ({ id, content, attachments }: { id: number; content: string; attachments: NoteAttachment[] }) =>
+      updateContactNote(id, content, attachments),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contact-notes', params.id] }),
   });
 
@@ -647,23 +833,54 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['contact', params.id] }),
   });
 
-  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !contact) return;
-    const result = await upload(file, 'attachments');
-    if (!result) return;
-    const existing: { name: string; url: string; size?: number; uploadedAt: string }[] =
-      normalizeDocuments((contact as any).documents);
-    const updated = [...existing, { name: file.name, url: result.url, size: result.size, uploadedAt: new Date().toISOString() }];
-    patchContact.mutate({ documents: updated });
+  const addDocuments = useCallback(async (files: File[]) => {
+    if (!contact || files.length === 0) return;
+    for (const file of files) {
+      const result = await upload(file, 'attachments');
+      if (!result) continue;
+      const existing = normalizeDocuments((contact as any).documents);
+      const updated = [...existing, {
+        name: file.name, url: result.url, size: result.size,
+        contentType: file.type, uploadedAt: new Date().toISOString(),
+      }];
+      patchContact.mutate({ documents: updated });
+    }
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [contact, upload, patchContact]);
+
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    await addDocuments(files);
+  }, [addDocuments]);
+
+  const handleDocDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files);
+    await addDocuments(files);
+  }, [addDocuments]);
 
   const deleteDocument = useCallback((url: string) => {
     if (!contact) return;
     const updated = normalizeDocuments((contact as any).documents).filter(d => d.url !== url);
     patchContact.mutate({ documents: updated });
   }, [contact, patchContact]);
+
+  const handleNoteAttachFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    setNoteAttachUploading(true);
+    for (const file of files) {
+      const result = await uploadNote(file, 'attachments');
+      if (result) {
+        setPendingNoteAttachments(prev => [...prev, {
+          name: file.name, url: result.url, size: result.size,
+          contentType: file.type, uploadedAt: new Date().toISOString(),
+        }]);
+      }
+    }
+    setNoteAttachUploading(false);
+    if (noteAttachInputRef.current) noteAttachInputRef.current.value = '';
+  }, [uploadNote]);
 
   if (!contact) return <div className="p-6 text-[#6b7e9a]">A carregar...</div>;
 
@@ -946,27 +1163,79 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
             </CardHeader>
             <CardContent>
               {/* Input */}
-              <div className="flex gap-2 mb-4">
-                <textarea
-                  value={noteInput}
-                  onChange={e => setNoteInput(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      if (noteInput.trim()) createNoteMutation.mutate(noteInput.trim());
-                    }
-                  }}
-                  placeholder="Adicionar nota... (Enter para guardar, Shift+Enter para nova linha)"
-                  className="flex-1 text-sm border border-[#dde3ec] rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#0A2540]/20 min-h-[72px]"
-                  rows={3}
-                />
-                <button
-                  onClick={() => { if (noteInput.trim()) createNoteMutation.mutate(noteInput.trim()); }}
-                  disabled={!noteInput.trim() || createNoteMutation.isPending}
-                  className="flex-shrink-0 self-end p-2 bg-[#0A2540] text-white rounded-lg hover:bg-[#0A2540]/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+              <div className="mb-4 space-y-2">
+                <div className="flex gap-2">
+                  <textarea
+                    value={noteInput}
+                    onChange={e => setNoteInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (noteInput.trim() || pendingNoteAttachments.length > 0) {
+                          createNoteMutation.mutate({ content: noteInput.trim() || '📎', attachments: pendingNoteAttachments });
+                        }
+                      }
+                    }}
+                    placeholder="Adicionar nota... (Enter para guardar, Shift+Enter para nova linha)"
+                    className="flex-1 text-sm bg-white/5 text-white placeholder-zinc-500 border border-white/10 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/40 min-h-[72px]"
+                    rows={3}
+                  />
+                  <div className="flex flex-col gap-1 flex-shrink-0 self-end">
+                    {/* Botão de anexar */}
+                    <input
+                      ref={noteAttachInputRef}
+                      type="file"
+                      multiple
+                      className="sr-only"
+                      accept="image/*,application/pdf,application/vnd.openxmlformats-officedocument.*,.doc,.docx,.xls,.xlsx"
+                      onChange={handleNoteAttachFile}
+                    />
+                    <button
+                      onClick={() => noteAttachInputRef.current?.click()}
+                      disabled={noteAttachUploading}
+                      className="p-2 text-zinc-400 hover:text-white border border-white/10 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-40 transition-colors"
+                      title="Anexar ficheiro"
+                    >
+                      {noteAttachUploading
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <Paperclip className="w-4 h-4" />
+                      }
+                    </button>
+                    {/* Botão enviar */}
+                    <button
+                      onClick={() => {
+                        if (noteInput.trim() || pendingNoteAttachments.length > 0) {
+                          createNoteMutation.mutate({ content: noteInput.trim() || '📎', attachments: pendingNoteAttachments });
+                        }
+                      }}
+                      disabled={(!noteInput.trim() && pendingNoteAttachments.length === 0) || createNoteMutation.isPending}
+                      className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Pré-visualização de anexos pendentes */}
+                {pendingNoteAttachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {pendingNoteAttachments.map((a, i) => (
+                      <div key={i} className="flex items-center gap-1.5 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs text-zinc-300">
+                        {isImage(a.name, a.contentType)
+                          ? <Image className="w-3.5 h-3.5 text-blue-400" />
+                          : <FileText className="w-3.5 h-3.5 text-zinc-400" />
+                        }
+                        <span className="max-w-[120px] truncate">{a.name}</span>
+                        <button
+                          onClick={() => setPendingNoteAttachments(prev => prev.filter((_, j) => j !== i))}
+                          className="text-zinc-500 hover:text-red-400 ml-0.5"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Notes list */}
@@ -976,21 +1245,21 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
                     <NoteItem
                       key={note.id}
                       note={note}
-                      onUpdate={(id, content) => updateNoteMutation.mutate({ id, content })}
+                      onUpdate={(id, content, attachments) => updateNoteMutation.mutate({ id, content, attachments })}
                       onDelete={(id) => deleteNoteMutation.mutate(id)}
                     />
                   ))}
                   {notes.length === 10 && (
                     <button
                       onClick={() => setNotesSkip(prev => prev + 10)}
-                      className="mt-3 text-sm text-[#0A2540] hover:underline"
+                      className="mt-3 text-sm text-zinc-400 hover:text-white"
                     >
                       Ver mais →
                     </button>
                   )}
                 </div>
               ) : (
-                <p className="text-center text-[#6b7e9a] text-sm py-4">Nenhuma nota ainda</p>
+                <p className="text-center text-zinc-500 text-sm py-4">Nenhuma nota ainda</p>
               )}
             </CardContent>
           </Card>
@@ -998,11 +1267,12 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
           {/* Documents card */}
           <Card>
             <CardHeader className="flex justify-between items-center">
-              <CardTitle>Documentos</CardTitle>
+              <CardTitle>Ficheiros & Galeria</CardTitle>
               <div>
                 <input
                   ref={fileInputRef}
                   type="file"
+                  multiple
                   className="sr-only"
                   accept="image/*,application/pdf,application/vnd.openxmlformats-officedocument.*,.doc,.docx,.xls,.xlsx"
                   onChange={handleFileUpload}
@@ -1022,47 +1292,92 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
               </div>
             </CardHeader>
             <CardContent>
-              {documents.length > 0 ? (
-                <div className="space-y-2">
-                  {documents.map((doc, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-3 rounded-lg border border-[#dde3ec] hover:bg-[#f5f7fa] transition-colors group">
-                      <FileText className="w-5 h-5 text-[#6b7e9a] flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[#0A2540] truncate">{doc.name}</p>
-                        <p className="text-xs text-[#6b7e9a]">
-                          {doc.size ? formatFileSize(doc.size) + ' · ' : ''}{formatDate(doc.uploadedAt)}
+              {/* Zona de drop */}
+              <div
+                onDragOver={e => e.preventDefault()}
+                onDrop={handleDocDrop}
+                className="relative"
+              >
+                {documents.length > 0 ? (
+                  <>
+                    {/* Galeria de imagens */}
+                    {documents.filter(d => isImage(d.name, (d as any).contentType)).length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                          <Image className="w-3.5 h-3.5" />Fotos
                         </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {documents
+                            .filter(d => isImage(d.name, (d as any).contentType))
+                            .map((doc, idx) => (
+                              <DocImageThumb key={idx} doc={doc} onDelete={deleteDocument} />
+                            ))}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <a
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1.5 text-[#6b7e9a] hover:text-[#0A2540] rounded transition-colors"
-                          title="Download"
-                        >
-                          <Download className="w-4 h-4" />
-                        </a>
-                        <button
-                          onClick={() => deleteDocument(doc.url)}
-                          className="p-1.5 text-[#6b7e9a] hover:text-red-500 rounded transition-colors opacity-0 group-hover:opacity-100"
-                          title="Apagar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                    )}
+
+                    {/* Lista de documentos */}
+                    {documents.filter(d => !isImage(d.name, (d as any).contentType)).length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5" />Documentos
+                        </p>
+                        <div className="space-y-1.5">
+                          {documents
+                            .filter(d => !isImage(d.name, (d as any).contentType))
+                            .map((doc, idx) => (
+                              <div key={idx} className="group/doc flex items-center gap-3 p-3 rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] transition-colors">
+                                <FileText className="w-5 h-5 text-zinc-400 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-white truncate">{doc.name}</p>
+                                  <p className="text-xs text-zinc-500">
+                                    {doc.size ? formatFileSize(doc.size) + ' · ' : ''}{formatDate(doc.uploadedAt)}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  <a
+                                    href={doc.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1.5 text-zinc-400 hover:text-white rounded transition-colors"
+                                    title="Abrir / Download"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </a>
+                                  <button
+                                    onClick={() => deleteDocument(doc.url)}
+                                    className="p-1.5 text-zinc-500 hover:text-red-400 rounded transition-colors opacity-0 group-hover/doc:opacity-100"
+                                    title="Apagar"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
                       </div>
+                    )}
+
+                    {/* Área de drop sobreposta quando já há ficheiros */}
+                    <div
+                      className="mt-3 flex items-center justify-center py-3 border border-dashed border-white/10 rounded-lg cursor-pointer hover:bg-white/5 transition-colors text-zinc-500 text-xs gap-1.5"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Arraste ou clique para adicionar mais
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div
-                  className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-[#dde3ec] rounded-lg cursor-pointer hover:bg-[#f5f7fa] transition-colors"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="w-8 h-8 text-[#6b7e9a] mb-2" />
-                  <p className="text-sm text-[#6b7e9a]">Arraste ou clique para adicionar documentos</p>
-                </div>
-              )}
+                  </>
+                ) : (
+                  <div
+                    className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-white/10 rounded-lg cursor-pointer hover:bg-white/5 transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="w-8 h-8 text-zinc-500 mb-2" />
+                    <p className="text-sm text-zinc-400 font-medium">Arraste ou clique para adicionar</p>
+                    <p className="text-xs text-zinc-600 mt-0.5">Fotos, PDF, Word, Excel · max 10 MB</p>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 

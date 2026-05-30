@@ -4,8 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getFileExtension } from '@/lib/file-utils';
 
 const MAX_SIZES: Record<UploadFolder, number> = {
-  avatars: 2 * 1024 * 1024,      // 2 MB
-  attachments: 2 * 1024 * 1024,   // 2 MB
+  avatars: 2 * 1024 * 1024,       // 2 MB
+  attachments: 10 * 1024 * 1024,  // 10 MB (documentos + fotos de alta resolução)
   invoices: 5 * 1024 * 1024,      // 5 MB
 };
 

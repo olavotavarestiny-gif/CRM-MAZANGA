@@ -11,6 +11,18 @@ async function touchContactActivity(contactId, userId) {
   });
 }
 
+function parseAttachments(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch { return []; }
+  }
+  return [];
+}
+
+function serializeNote(note) {
+  return { ...note, attachments: parseAttachments(note.attachments) };
+}
+
 // GET /api/contacts/:id/notes
 router.get('/contacts/:id/notes', requirePermission('contacts', 'view'), async (req, res) => {
   try {
@@ -29,7 +41,7 @@ router.get('/contacts/:id/notes', requirePermission('contacts', 'view'), async (
       include: { user: { select: { id: true, name: true } } },
     });
 
-    res.json(notes);
+    res.json(notes.map(serializeNote));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -39,7 +51,7 @@ router.get('/contacts/:id/notes', requirePermission('contacts', 'view'), async (
 router.post('/contacts/:id/notes', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const contactId = parseInt(req.params.id);
-    const { content } = req.body;
+    const { content, attachments } = req.body;
     const userId = req.user.effectiveUserId;
 
     if (!content || !content.trim()) {
@@ -49,17 +61,20 @@ router.post('/contacts/:id/notes', requirePermission('contacts', 'edit'), async 
     const contact = await prisma.contact.findFirst({ where: { id: contactId, userId } });
     if (!contact) return res.status(404).json({ error: 'Contacto não encontrado' });
 
+    const safeAttachments = parseAttachments(attachments);
+
     const note = await prisma.contactNote.create({
       data: {
         contactId,
         userId: req.user.id,
         content: content.trim(),
+        attachments: JSON.stringify(safeAttachments),
       },
       include: { user: { select: { id: true, name: true } } },
     });
     await touchContactActivity(contactId, userId);
 
-    res.status(201).json(note);
+    res.status(201).json(serializeNote(note));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -69,7 +84,7 @@ router.post('/contacts/:id/notes', requirePermission('contacts', 'edit'), async 
 router.put('/notes/:id', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const noteId = parseInt(req.params.id);
-    const { content } = req.body;
+    const { content, attachments } = req.body;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ error: 'Conteúdo é obrigatório' });
@@ -84,19 +99,23 @@ router.put('/notes/:id', requirePermission('contacts', 'edit'), async (req, res)
       return res.status(404).json({ error: 'Nota não encontrada' });
     }
 
-    // Only author or an admin within the same organization can edit.
     if (note.userId !== req.user.id && !req.user.isAccountOwner && !req.user.isSuperAdmin && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Sem permissão para editar esta nota' });
     }
 
+    const updateData = { content: content.trim() };
+    if (attachments !== undefined) {
+      updateData.attachments = JSON.stringify(parseAttachments(attachments));
+    }
+
     const updated = await prisma.contactNote.update({
       where: { id: noteId },
-      data: { content: content.trim() },
+      data: updateData,
       include: { user: { select: { id: true, name: true } } },
     });
     await touchContactActivity(note.contactId, req.user.effectiveUserId);
 
-    res.json(updated);
+    res.json(serializeNote(updated));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
