@@ -7,6 +7,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 const express = require('express');
 const cors = require('cors');
+const prisma = require('./lib/prisma');
 const { registerPrismaShutdown, startPrismaWarmup } = require('./lib/prisma-startup');
 const { renewExpiringWatchChannels } = require('./lib/google-calendar');
 
@@ -56,6 +57,7 @@ const { checkSubscriptionAccess } = require('./middleware/subscription-access');
 const app = express();
 const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const HEALTH_DB_TIMEOUT_MS = Math.max(500, Number(process.env.HEALTH_DB_TIMEOUT_MS || 3500));
 const essentialEnvPresence = {
   DATABASE_URL: Boolean(process.env.DATABASE_URL),
   FRONTEND_URL: Boolean(process.env.FRONTEND_URL),
@@ -152,13 +154,75 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health check
+function withTimeout(promise, timeoutMs, timeoutValue) {
+  let timeout;
+  return Promise.race([
+    promise.finally(() => clearTimeout(timeout)),
+    new Promise((resolve) => {
+      timeout = setTimeout(() => resolve(timeoutValue), timeoutMs);
+    }),
+  ]);
+}
+
+function buildAliveHealthPayload() {
+  return {
+    ok: true,
+    service: 'kukugest-backend',
+    status: 'alive',
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function getDatabaseHealthError(errorOrTimeout) {
+  if (errorOrTimeout?.timeout) {
+    return 'DB_TIMEOUT';
+  }
+
+  return errorOrTimeout?.code || errorOrTimeout?.name || 'DB_ERROR';
+}
+
+// Public health checks
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.status(200).json(buildAliveHealthPayload());
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.status(200).json(buildAliveHealthPayload());
+});
+
+app.get('/health/db', async (req, res) => {
+  try {
+    const database = await withTimeout(
+      prisma.$queryRaw`SELECT 1`,
+      HEALTH_DB_TIMEOUT_MS,
+      { timeout: true }
+    );
+
+    if (database?.timeout) {
+      return res.status(503).json({
+        ok: false,
+        service: 'kukugest-backend',
+        database: 'timeout',
+        timestamp: new Date().toISOString(),
+        error: getDatabaseHealthError(database),
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      service: 'kukugest-backend',
+      database: 'ok',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    return res.status(503).json({
+      ok: false,
+      service: 'kukugest-backend',
+      database: 'error',
+      timestamp: new Date().toISOString(),
+      error: getDatabaseHealthError(error),
+    });
+  }
 });
 
 // Public routes
