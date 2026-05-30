@@ -763,8 +763,12 @@ router.get('/profitability/:clientId', requirePermission('finances', 'transactio
 // ─── GET /api/finances/categories ───────────────────────────────────────────
 router.get('/categories', async (req, res) => {
   try {
+    const userId = req.user?.effectiveUserId;
     const categories = await prisma.financialCategory.findMany({
-      where: { active: true },
+      where: {
+        active: true,
+        OR: [{ userId }, { userId: null }],
+      },
       orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }],
     });
     const parsed = categories.map((c) => ({
@@ -778,37 +782,108 @@ router.get('/categories', async (req, res) => {
   }
 });
 
-// ─── POST /api/finances/seed-categories ─────────────────────────────────────
-router.post('/seed-categories', async (req, res) => {
+// ─── POST /api/finances/categories ──────────────────────────────────────────
+router.post('/categories', requirePermission('finances', 'transactions_view'), async (req, res) => {
   try {
+    const userId = req.user.effectiveUserId;
+    const { type, category, subcategories = [], color = '#6366F1', icon = '📂', sortOrder = 99 } = req.body;
+    if (!type || !['entrada', 'saida'].includes(type)) return res.status(400).json({ error: 'type deve ser "entrada" ou "saida".' });
+    if (!category || typeof category !== 'string' || !category.trim()) return res.status(400).json({ error: 'category é obrigatório.' });
+
+    const created = await prisma.financialCategory.create({
+      data: {
+        userId,
+        type,
+        category: category.trim(),
+        subcategories: JSON.stringify(Array.isArray(subcategories) ? subcategories.map((s) => String(s).trim()).filter(Boolean) : []),
+        color,
+        icon,
+        sortOrder: Number(sortOrder),
+      },
+    });
+    res.json({ ...created, subcategories: JSON.parse(created.subcategories || '[]') });
+  } catch (error) {
+    if (error.code === 'P2002') return res.status(409).json({ error: 'Já existe uma categoria com esse nome.' });
+    console.error('Error creating category:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── PUT /api/finances/categories/:id ───────────────────────────────────────
+router.put('/categories/:id', requirePermission('finances', 'transactions_view'), async (req, res) => {
+  try {
+    const userId = req.user.effectiveUserId;
+    const { id } = req.params;
+    const { category, subcategories, color, icon, sortOrder } = req.body;
+
+    const existing = await prisma.financialCategory.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Categoria não encontrada.' });
+    if (existing.userId !== null && existing.userId !== userId) return res.status(403).json({ error: 'Sem permissão para editar esta categoria.' });
+
+    const data = {};
+    if (category !== undefined) data.category = String(category).trim();
+    if (subcategories !== undefined) data.subcategories = JSON.stringify(Array.isArray(subcategories) ? subcategories.map((s) => String(s).trim()).filter(Boolean) : []);
+    if (color !== undefined) data.color = color;
+    if (icon !== undefined) data.icon = icon;
+    if (sortOrder !== undefined) data.sortOrder = Number(sortOrder);
+    if (existing.userId === null) data.userId = userId;
+
+    const updated = await prisma.financialCategory.update({ where: { id }, data });
+    res.json({ ...updated, subcategories: JSON.parse(updated.subcategories || '[]') });
+  } catch (error) {
+    if (error.code === 'P2002') return res.status(409).json({ error: 'Já existe uma categoria com esse nome.' });
+    console.error('Error updating category:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── DELETE /api/finances/categories/:id ────────────────────────────────────
+router.delete('/categories/:id', requirePermission('finances', 'transactions_view'), async (req, res) => {
+  try {
+    const userId = req.user.effectiveUserId;
+    const { id } = req.params;
+
+    const existing = await prisma.financialCategory.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Categoria não encontrada.' });
+    if (existing.userId !== null && existing.userId !== userId) return res.status(403).json({ error: 'Sem permissão para eliminar esta categoria.' });
+
+    await prisma.financialCategory.update({ where: { id }, data: { active: false } });
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── POST /api/finances/seed-categories ─────────────────────────────────────
+router.post('/seed-categories', requirePermission('finances', 'transactions_view'), async (req, res) => {
+  try {
+    const userId = req.user.effectiveUserId;
     const categories = [
       // ENTRADAS
-      { type: 'entrada', category: 'Receitas de Faturação', subcategories: ['Documento FT', 'Documento FR', 'Documento FA', 'Documento ND'], color: '#0EA5E9', icon: '🧾', sortOrder: 1 },
-      { type: 'entrada', category: 'Serviços Recorrentes', subcategories: ['Cliente Angola', 'Cliente Suíça', 'Cliente Portugal', 'Cliente Brasil', 'Cliente França'], color: '#10B981', icon: '💰', sortOrder: 2 },
-      { type: 'entrada', category: 'Projetos One-off', subcategories: ['Website', 'Landing Page', 'Diagnóstico', 'Consultoria', 'Setup CRM'], color: '#3B82F6', icon: '🚀', sortOrder: 3 },
-      { type: 'entrada', category: 'Serviços Extras', subcategories: ['Vídeo adicional', 'Posts extras', 'Fotografia', 'Design pontual'], color: '#8B5CF6', icon: '✨', sortOrder: 4 },
-      { type: 'entrada', category: 'Outras Receitas', subcategories: ['Formação', 'Comissões', 'Parceria', 'Diversos'], color: '#06B6D4', icon: '💡', sortOrder: 5 },
+      { type: 'entrada', category: 'Receitas de Faturação', subcategories: ['Fatura', 'Recibo', 'Nota de Débito', 'Adiantamento'], color: '#0EA5E9', icon: '🧾', sortOrder: 1 },
+      { type: 'entrada', category: 'Serviços Recorrentes', subcategories: ['Mensalidade', 'Retainer', 'Subscrição', 'Manutenção'], color: '#10B981', icon: '💰', sortOrder: 2 },
+      { type: 'entrada', category: 'Projetos Pontuais', subcategories: ['Projeto completo', 'Consultoria', 'Auditoria', 'Formação'], color: '#3B82F6', icon: '🚀', sortOrder: 3 },
+      { type: 'entrada', category: 'Serviços Extras', subcategories: ['Serviço adicional', 'Urgência', 'Suporte extra', 'Add-on'], color: '#8B5CF6', icon: '✨', sortOrder: 4 },
+      { type: 'entrada', category: 'Outras Receitas', subcategories: ['Comissão', 'Parceria', 'Reembolso', 'Diversos'], color: '#06B6D4', icon: '💡', sortOrder: 5 },
       // SAÍDAS
-      { type: 'saida', category: 'Design', subcategories: ['Designer freelance', 'Designer mensal', 'Assets (stock)', 'Impressão'], color: '#EC4899', icon: '🎨', sortOrder: 1 },
-      { type: 'saida', category: 'Ferramentas', subcategories: ['Claude Pro', 'CapCut Pro', 'Canva Pro', 'Buffer/Later', 'GHL/CRM', 'Google Workspace', 'Adobe CC', 'Outras'], color: '#F59E0B', icon: '🛠️', sortOrder: 2 },
-      { type: 'saida', category: 'Transporte', subcategories: ['Gasolina', 'Uber/Táxi', 'Estacionamento', 'Manutenção viatura'], color: '#6366F1', icon: '🚗', sortOrder: 3 },
-      { type: 'saida', category: 'Produção Audiovisual', subcategories: ['Videógrafo freelance', 'Equipamento', 'Props/cenário', 'Aluguer'], color: '#EF4444', icon: '🎬', sortOrder: 4 },
-      { type: 'saida', category: 'Fotografia', subcategories: ['Fotógrafo freelance', 'Edição fotos', 'Props'], color: '#14B8A6', icon: '📸', sortOrder: 5 },
-      { type: 'saida', category: 'CRM/Tecnologia', subcategories: ['Desenvolvimento CRM', 'Hosting/Servidor', 'Domínios', 'APIs', 'Manutenção'], color: '#8B5CF6', icon: '💻', sortOrder: 6 },
-      { type: 'saida', category: 'Anúncios Online', subcategories: ['Meta Ads', 'Google Ads', 'LinkedIn Ads', 'Outras'], color: '#F97316', icon: '📢', sortOrder: 7 },
-      { type: 'saida', category: 'Operação', subcategories: ['Internet', 'Telefone', 'Eletricidade', 'Espaço trabalho', 'Material escritório'], color: '#64748B', icon: '🏢', sortOrder: 8 },
-      { type: 'saida', category: 'Networking/Comercial', subcategories: ['Almoços clientes', 'Jantares negócio', 'Eventos', 'Materiais marketing'], color: '#10B981', icon: '🤝', sortOrder: 9 },
-      { type: 'saida', category: 'Pessoal', subcategories: ['Retirada Olavo', 'Colaborador fixo', 'Freelancer pontual', 'Formação/Cursos'], color: '#06B6D4', icon: '👤', sortOrder: 10 },
-      { type: 'saida', category: 'Legal/Administrativo', subcategories: ['Contabilidade', 'Advogado', 'Impostos', 'Taxas/Licenças'], color: '#84CC16', icon: '⚖️', sortOrder: 11 },
-      { type: 'saida', category: 'Reserva/Investimento', subcategories: ['Fundo emergência', 'Investimento futuro', 'Buffer estratégico'], color: '#A855F7', icon: '🏦', sortOrder: 12 },
+      { type: 'saida', category: 'Fornecedores', subcategories: ['Freelancer', 'Agência', 'Consultora', 'Subcontratado'], color: '#EC4899', icon: '🤝', sortOrder: 1 },
+      { type: 'saida', category: 'Ferramentas e Software', subcategories: ['SaaS/Subscrição', 'Licença', 'Plugin', 'API'], color: '#F59E0B', icon: '🛠️', sortOrder: 2 },
+      { type: 'saida', category: 'Transporte', subcategories: ['Combustível', 'Transportes públicos', 'Táxi/Uber', 'Manutenção'], color: '#6366F1', icon: '🚗', sortOrder: 3 },
+      { type: 'saida', category: 'Infraestrutura Tech', subcategories: ['Hosting/Servidor', 'Domínios', 'CDN', 'Backups'], color: '#8B5CF6', icon: '💻', sortOrder: 4 },
+      { type: 'saida', category: 'Marketing e Publicidade', subcategories: ['Anúncios pagos', 'Materiais gráficos', 'Conteúdo', 'Eventos'], color: '#F97316', icon: '📢', sortOrder: 5 },
+      { type: 'saida', category: 'Operações', subcategories: ['Internet', 'Telefone', 'Eletricidade', 'Escritório', 'Material'], color: '#64748B', icon: '🏢', sortOrder: 6 },
+      { type: 'saida', category: 'Pessoal e Salários', subcategories: ['Salário fixo', 'Remuneração sócios', 'Bónus', 'Freelancer pontual'], color: '#06B6D4', icon: '👤', sortOrder: 7 },
+      { type: 'saida', category: 'Legal e Administrativo', subcategories: ['Contabilidade', 'Advogado', 'Impostos', 'Taxas e Licenças'], color: '#84CC16', icon: '⚖️', sortOrder: 8 },
+      { type: 'saida', category: 'Reserva e Investimento', subcategories: ['Fundo de emergência', 'Investimento', 'Poupança'], color: '#A855F7', icon: '🏦', sortOrder: 9 },
     ];
 
     let created = 0;
     for (const cat of categories) {
       await prisma.financialCategory.upsert({
-        where: { type_category: { type: cat.type, category: cat.category } },
+        where: { userId_type_category: { userId, type: cat.type, category: cat.category } },
         update: { subcategories: JSON.stringify(cat.subcategories), color: cat.color, icon: cat.icon, sortOrder: cat.sortOrder },
-        create: { type: cat.type, category: cat.category, subcategories: JSON.stringify(cat.subcategories), color: cat.color, icon: cat.icon, sortOrder: cat.sortOrder },
+        create: { userId, type: cat.type, category: cat.category, subcategories: JSON.stringify(cat.subcategories), color: cat.color, icon: cat.icon, sortOrder: cat.sortOrder },
       });
       created++;
     }

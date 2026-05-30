@@ -398,13 +398,21 @@ export async function getContactNotes(contactId: number, skip = 0) {
   return res.data as import('./types').ContactNote[];
 }
 
-export async function createContactNote(contactId: number, content: string) {
-  const res = await api.post(`/api/contacts/${contactId}/notes`, { content });
+export async function createContactNote(
+  contactId: number,
+  content: string,
+  attachments: import('./types').NoteAttachment[] = []
+) {
+  const res = await api.post(`/api/contacts/${contactId}/notes`, { content, attachments });
   return res.data as import('./types').ContactNote;
 }
 
-export async function updateContactNote(noteId: number, content: string) {
-  const res = await api.put(`/api/notes/${noteId}`, { content });
+export async function updateContactNote(
+  noteId: number,
+  content: string,
+  attachments?: import('./types').NoteAttachment[]
+) {
+  const res = await api.put(`/api/notes/${noteId}`, { content, attachments });
   return res.data as import('./types').ContactNote;
 }
 
@@ -731,27 +739,70 @@ export async function updateServicesDashboardSettings(data: ServicesDashboardSet
   return response.data;
 }
 
-export async function getCurrentUser() {
-  const response = await fetch('/api/auth/me', {
-    headers: { 'Cache-Control': 'no-store' },
-    cache: 'no-store',
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    clearDevAuthSession();
-    const err: any = new Error(data?.error || data?.message || 'Não foi possível carregar a conta.');
-    err.code = data?.code;
-    err.requestId = data?.requestId;
-    err.response = { status: response.status, data };
-    throw err;
+export async function getCurrentUser(): Promise<User> {
+  const TIMEOUT_MS = 15_000;
+  const MAX_TRIES = 3;
+  const DELAYS = [1_000, 2_000];
+
+  for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    try {
+      const response = await fetch('/api/auth/me', {
+        headers: { 'Cache-Control': 'no-store' },
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          clearDevAuthSession();
+          const err: any = new Error(data?.error || data?.message || 'Sessão inválida.');
+          err.code = data?.code;
+          err.requestId = data?.requestId;
+          err.response = { status: response.status, data };
+          throw err;
+        }
+        if ([502, 503, 504].includes(response.status) && attempt < MAX_TRIES - 1) {
+          await new Promise((r) => setTimeout(r, DELAYS[attempt]));
+          continue;
+        }
+        clearDevAuthSession();
+        const err: any = new Error(data?.error || data?.message || 'Não foi possível carregar a conta.');
+        err.code = data?.code;
+        err.requestId = data?.requestId;
+        err.response = { status: response.status, data };
+        throw err;
+      }
+
+      const payload = data as User;
+      if (isDevAuthUserPayload(payload)) {
+        writeDevAuthSession(payload);
+      } else {
+        clearDevAuthSession();
+      }
+      return payload;
+
+    } catch (err: any) {
+      clearTimeout(timer);
+      const isTransient =
+        err?.name === 'AbortError' ||
+        err?.code === 'ECONNABORTED' ||
+        err?.code === 'ERR_NETWORK' ||
+        /network|timeout/i.test(err?.message || '');
+
+      if (isTransient && attempt < MAX_TRIES - 1) {
+        await new Promise((r) => setTimeout(r, DELAYS[attempt]));
+        continue;
+      }
+      throw err;
+    }
   }
-  const payload = data as User;
-  if (isDevAuthUserPayload(payload)) {
-    writeDevAuthSession(payload);
-  } else {
-    clearDevAuthSession();
-  }
-  return payload;
+  throw new Error('Não foi possível carregar a conta após várias tentativas.');
 }
 
 export async function updateCurrentUserProfile(data: { name?: string; jobTitle?: string | null }) {
@@ -1059,6 +1110,36 @@ export async function getClientProfitabilityDetail(clientId: number): Promise<{
 export async function getFinancialCategories(): Promise<FinancialCategory[]> {
   const response = await api.get<FinancialCategory[]>('/api/finances/categories');
   return response.data;
+}
+
+export async function createFinancialCategory(data: {
+  type: 'entrada' | 'saida';
+  category: string;
+  subcategories?: string[];
+  color?: string;
+  icon?: string;
+  sortOrder?: number;
+}): Promise<FinancialCategory> {
+  const response = await api.post<FinancialCategory>('/api/finances/categories', data);
+  return response.data;
+}
+
+export async function updateFinancialCategory(
+  id: string,
+  data: {
+    category?: string;
+    subcategories?: string[];
+    color?: string;
+    icon?: string;
+    sortOrder?: number;
+  }
+): Promise<FinancialCategory> {
+  const response = await api.put<FinancialCategory>(`/api/finances/categories/${id}`, data);
+  return response.data;
+}
+
+export async function deleteFinancialCategory(id: string): Promise<void> {
+  await api.delete(`/api/finances/categories/${id}`);
 }
 
 export async function seedFinancialCategories(): Promise<void> {

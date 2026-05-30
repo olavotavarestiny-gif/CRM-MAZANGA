@@ -13,8 +13,10 @@ import ProductTourProvider from '@/components/help/product-tour';
 import { BillingSuspendedModal } from '@/components/billing/access-notice';
 import TrialStatusBadge from '@/components/billing/trial-status-badge';
 import KukuGestLogo from '@/components/KukuGestLogo';
+import AppBootLoading from './app-boot-loading';
+import ServerConnectionError from './server-connection-error';
 import { ReactNode } from 'react';
-import { AlertTriangle, Menu, Eye, Info, LogOut, RefreshCw, X } from 'lucide-react';
+import { Menu, Eye, Info, LogOut, RefreshCw, X } from 'lucide-react';
 import type { User } from '@/lib/api';
 import { canAccessWorkspaceRoute, getWorkspaceFallbackRoute, hasFeature } from '@/lib/permissions';
 import { isComercio } from '@/lib/business-modes';
@@ -410,7 +412,7 @@ function LayoutInner({
   };
 
   if (isLoading && !isPublicPage) {
-    return <div className="min-h-screen bg-[#f5f7f9]" />;
+    return <AppBootLoading />;
   }
 
   if (isPublicPage) {
@@ -426,47 +428,15 @@ function LayoutInner({
 
   if (authLoadError) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f5f7f9] px-4">
-        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-amber-50 text-amber-700">
-            <AlertTriangle className="h-5 w-5" />
-          </div>
-          <h1 className="text-lg font-semibold text-slate-900">Não conseguimos carregar a conta</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            A sessão pode estar ativa, mas o perfil, permissões ou plano não responderam a tempo.
-          </p>
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-            <div className="font-semibold text-slate-800">Código para suporte</div>
-            <code className="mt-1 block break-words font-mono">
-              {JSON.stringify({
-                code: authLoadError.code || 'LOGIN_PROFILE_LOAD_FAILED',
-                requestId: authLoadError.requestId,
-              })}
-            </code>
-          </div>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                authChecked.current = false;
-                setIsLoading(true);
-                setAuthLoadError(null);
-                setAuthRetryNonce((value) => value + 1);
-              }}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#0A2540] px-4 text-sm font-semibold text-white transition hover:bg-[#12385f]"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Tentar novamente
-            </button>
-            <a
-              href="/auth/signout"
-              className="inline-flex h-10 items-center rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-            >
-              Voltar ao login
-            </a>
-          </div>
-        </div>
-      </div>
+      <ServerConnectionError
+        onRetry={() => {
+          authChecked.current = false;
+          setIsLoading(true);
+          setAuthLoadError(null);
+          setAuthRetryNonce((value) => value + 1);
+        }}
+        onSignOut={() => { window.location.href = '/auth/signout'; }}
+      />
     );
   }
 

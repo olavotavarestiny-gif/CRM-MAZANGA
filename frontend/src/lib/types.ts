@@ -674,11 +674,14 @@ export interface Transaction {
 
 export interface FinancialCategory {
   id: string;
+  userId?: number | null;
   type: TransactionType;
   category: string;
   subcategories?: string[];
   color?: string;
   icon?: string;
+  sortOrder?: number;
+  active?: boolean;
 }
 
 export interface DashboardStats {
@@ -1449,10 +1452,19 @@ export interface ClientAccount {
   _count: { accountMembers: number };
 }
 
+export interface NoteAttachment {
+  name: string;
+  url: string;
+  size?: number;
+  contentType?: string;
+  uploadedAt: string;
+}
+
 export interface ContactNote {
   id: number;
   contactId: number;
   content: string;
+  attachments: NoteAttachment[];
   createdAt: string;
   updatedAt: string;
   user?: { id: number; name: string };
