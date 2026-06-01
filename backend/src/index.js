@@ -57,6 +57,7 @@ const { checkSubscriptionAccess } = require('./middleware/subscription-access');
 const app = express();
 const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const HEALTH_DB_TIMEOUT_MS = Math.max(500, Number(process.env.HEALTH_DB_TIMEOUT_MS || 3500));
 const SLOW_API_WARNING_MS = Math.max(500, Number(process.env.SLOW_API_WARNING_MS || 2500));
 const READINESS_TIMEOUT_MS = Math.max(500, Number(process.env.READINESS_TIMEOUT_MS || 3500));
 const essentialEnvPresence = {
@@ -175,6 +176,23 @@ function withTimeout(promise, timeoutMs, timeoutValue) {
   ]);
 }
 
+function buildAliveHealthPayload() {
+  return {
+    ok: true,
+    service: 'kukugest-backend',
+    status: 'alive',
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function getDatabaseHealthError(errorOrTimeout) {
+  if (errorOrTimeout?.timeout) {
+    return 'DB_TIMEOUT';
+  }
+
+  return errorOrTimeout?.code || errorOrTimeout?.name || 'DB_ERROR';
+}
+
 function getPublicPrismaStartupState() {
   const state = getPrismaStartupState();
   return {
@@ -217,13 +235,48 @@ app.use((req, res, next) => {
   return next();
 });
 
-// Health check
+// Public health checks
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.status(200).json(buildAliveHealthPayload());
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.status(200).json(buildAliveHealthPayload());
+});
+
+app.get('/health/db', async (req, res) => {
+  try {
+    const database = await withTimeout(
+      prisma.$queryRaw`SELECT 1`,
+      HEALTH_DB_TIMEOUT_MS,
+      { timeout: true }
+    );
+
+    if (database?.timeout) {
+      return res.status(503).json({
+        ok: false,
+        service: 'kukugest-backend',
+        database: 'timeout',
+        timestamp: new Date().toISOString(),
+        error: getDatabaseHealthError(database),
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      service: 'kukugest-backend',
+      database: 'ok',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    return res.status(503).json({
+      ok: false,
+      service: 'kukugest-backend',
+      database: 'error',
+      timestamp: new Date().toISOString(),
+      error: getDatabaseHealthError(error),
+    });
+  }
 });
 
 app.get('/api/ready', async (req, res) => {
