@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadFile, type UploadFolder } from '@/lib/storage';
 import { createClient } from '@/lib/supabase/server';
+import { getSupabaseEnv } from '@/lib/supabase/env';
 import { getFileExtension } from '@/lib/file-utils';
+import { DEV_AUTH_HEADER, DEV_AUTH_TOKEN, isServerDevAuthBypassEnabled } from '@/lib/dev-auth';
 
 const MAX_SIZES: Record<UploadFolder, number> = {
   avatars: 2 * 1024 * 1024,       // 2 MB
@@ -49,26 +51,45 @@ function getUploadErrorMessage(error: unknown): string {
   const rawMessage = error instanceof Error ? error.message : '';
 
   if (rawMessage.includes('BLOB_READ_WRITE_TOKEN')) {
-    return 'Uploads não configurados no ambiente actual. Defina a variável BLOB_READ_WRITE_TOKEN no frontend.';
+    return 'Armazenamento de ficheiros não configurado. Contacte o administrador do sistema.';
   }
-
   if (/storage não configurado/i.test(rawMessage)) {
     return 'O storage de ficheiros não está configurado.';
   }
-
   if (/token|unauthorized|forbidden|access denied|not authorized/i.test(rawMessage)) {
     return 'A configuração do storage está inválida. Verifique o token do Vercel Blob.';
   }
-
   if (/network|fetch failed|timeout|econn|dns/i.test(rawMessage)) {
     return 'O serviço de ficheiros está indisponível neste momento. Tente novamente em instantes.';
   }
+  if (rawMessage.trim()) return rawMessage;
+  return 'Erro interno ao fazer upload';
+}
 
-  if (rawMessage.trim()) {
-    return rawMessage;
+async function resolveUserId(request: NextRequest): Promise<string | null> {
+  // Dev bypass: middleware injects this header when BYPASS_AUTH=true
+  if (isServerDevAuthBypassEnabled()) {
+    return 'dev-user';
   }
 
-  return 'Erro interno ao fazer upload';
+  // Check if middleware's dev header was injected (belt-and-suspenders for dev)
+  const devHeader = request.headers.get(DEV_AUTH_HEADER);
+  if (devHeader === DEV_AUTH_TOKEN) {
+    return 'dev-user';
+  }
+
+  const env = getSupabaseEnv();
+  if (!env) return null;
+
+  try {
+    const supabase = createClient();
+    // getUser() validates the JWT via the Supabase API — works even when middleware
+    // hasn't run to refresh the session (API routes are excluded from the matcher).
+    const { data: { user } } = await supabase.auth.getUser();
+    return user?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -93,10 +114,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const folderRaw = formData.get('folder');
 
   if (!(file instanceof File)) {
-    return NextResponse.json(
-      { error: 'Campo "file" obrigatório' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Campo "file" obrigatório' }, { status: 400 });
   }
 
   if (typeof folderRaw !== 'string' || !VALID_FOLDERS.includes(folderRaw as UploadFolder)) {
@@ -122,21 +140,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(extension)) {
     return NextResponse.json(
-      { error: `Tipo de ficheiro não permitido para ${folder}` },
+      { error: 'Tipo de ficheiro não permitido. Aceites: imagens, PDF, Word, Excel' },
       { status: 400 }
     );
   }
 
+  const userId = await resolveUserId(request);
+  if (!userId) {
+    return NextResponse.json(
+      { error: 'Sessão expirada. Refresque a página e tente novamente.' },
+      { status: 401 }
+    );
+  }
+
   try {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Sessão expirada. Inicie sessão novamente.' }, { status: 401 });
-    }
-
-    const payload = await uploadFile(file, folder, session.user.id);
-
+    const payload = await uploadFile(file, folder, userId);
     return NextResponse.json(payload, { status: 200 });
   } catch (err) {
     console.error('[upload] Error:', err);

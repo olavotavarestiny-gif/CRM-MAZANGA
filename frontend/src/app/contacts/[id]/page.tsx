@@ -722,8 +722,9 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const fileInputRef = useRef<HTMLInputElement>(null);
   const noteAttachInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
-  const { upload, uploading: fileUploading } = useFileUpload();
-  const { upload: uploadNote } = useFileUpload();
+  const { upload, uploading: fileUploading, error: uploadError, reset: resetUploadError } = useFileUpload();
+  const { upload: uploadNote, error: noteUploadError, reset: resetNoteUploadError } = useFileUpload();
+  const anyUploadError = uploadError || noteUploadError;
 
   const { data: contact } = useQuery({
     queryKey: ['contact', params.id],
@@ -835,18 +836,26 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
 
   const addDocuments = useCallback(async (files: File[]) => {
     if (!contact || files.length === 0) return;
-    for (const file of files) {
-      const result = await upload(file, 'attachments');
-      if (!result) continue;
-      const existing = normalizeDocuments((contact as any).documents);
-      const updated = [...existing, {
-        name: file.name, url: result.url, size: result.size,
-        contentType: file.type, uploadedAt: new Date().toISOString(),
-      }];
-      patchContact.mutate({ documents: updated });
+    // Upload all files in parallel, then merge into documents list in one mutation
+    const results = await Promise.all(
+      files.map(async (file) => {
+        const result = await upload(file, 'attachments');
+        if (!result) return null;
+        return {
+          name: file.name, url: result.url, size: result.size,
+          contentType: file.type, uploadedAt: new Date().toISOString(),
+        };
+      })
+    );
+    const newDocs = results.filter((r): r is NonNullable<typeof r> => r !== null);
+    if (newDocs.length > 0) {
+      // Read current documents from query cache at mutation time (not from stale closure)
+      const cached = queryClient.getQueryData<any>(['contact', params.id]);
+      const existing = normalizeDocuments(cached?.documents ?? (contact as any).documents);
+      patchContact.mutate({ documents: [...existing, ...newDocs] });
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
-  }, [contact, upload, patchContact]);
+  }, [contact, upload, patchContact, queryClient, params.id]);
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -1263,6 +1272,19 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
               )}
             </CardContent>
           </Card>
+
+          {/* Upload error banner */}
+          {anyUploadError && (
+            <div className="flex items-start gap-3 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-300">
+              <span className="flex-1">{anyUploadError}</span>
+              <button
+                onClick={() => { resetUploadError(); resetNoteUploadError(); }}
+                className="flex-shrink-0 text-red-400 hover:text-red-200 mt-0.5"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {/* Documents card */}
           <Card>
