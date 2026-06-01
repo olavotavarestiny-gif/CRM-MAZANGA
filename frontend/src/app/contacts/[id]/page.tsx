@@ -572,8 +572,8 @@ function NoteItem({
   };
 
   return (
-    <div className="group flex gap-3 py-3 border-b border-white/5 last:border-0">
-      <div className="w-2 h-2 rounded-full bg-white/20 mt-2 flex-shrink-0" />
+    <div className="group flex gap-3 py-3 border-b border-gray-100 last:border-0">
+      <div className="w-2 h-2 rounded-full bg-gray-300 mt-2 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         {editing ? (
           <div className="space-y-2">
@@ -585,29 +585,29 @@ function NoteItem({
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(); }
                 if (e.key === 'Escape') { setDraft(note.content); setEditing(false); }
               }}
-              className="w-full text-sm text-white bg-white/5 border border-white/15 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+              className="w-full text-sm text-[#2c2f31] bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#0A2540]/30"
               rows={3}
             />
             <div className="flex gap-2">
-              <button onClick={commit} className="text-xs text-green-400 hover:text-green-300 font-medium flex items-center gap-1">
+              <button onClick={commit} className="text-xs text-green-600 hover:text-green-700 font-medium flex items-center gap-1">
                 <Check className="w-3 h-3" />Guardar
               </button>
-              <button onClick={() => { setDraft(note.content); setEditing(false); }} className="text-xs text-zinc-400 hover:text-red-400 font-medium flex items-center gap-1">
+              <button onClick={() => { setDraft(note.content); setEditing(false); }} className="text-xs text-gray-400 hover:text-red-500 font-medium flex items-center gap-1">
                 <X className="w-3 h-3" />Cancelar
               </button>
             </div>
           </div>
         ) : (
           <>
-            <p className="text-sm text-white/90 whitespace-pre-wrap break-words">{note.content}</p>
+            <p className="text-sm text-[#2c2f31] whitespace-pre-wrap break-words">{note.content}</p>
             <AttachmentList attachments={attachments} />
             <div className="flex items-center gap-3 mt-1.5">
-              <span className="text-xs text-zinc-500">{formatTime(note.createdAt)}{note.user ? ` · ${note.user.name}` : ''}</span>
+              <span className="text-xs text-[#6b7e9a]">{formatTime(note.createdAt)}{note.user ? ` · ${note.user.name}` : ''}</span>
               <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                <button onClick={() => { setDraft(note.content); setEditing(true); }} className="text-xs text-zinc-400 hover:text-white flex items-center gap-0.5">
+                <button onClick={() => { setDraft(note.content); setEditing(true); }} className="text-xs text-gray-400 hover:text-[#0A2540] flex items-center gap-0.5">
                   <Pencil className="w-3 h-3" />Editar
                 </button>
-                <button onClick={() => onDelete(note.id)} className="text-xs text-zinc-400 hover:text-red-400 flex items-center gap-0.5">
+                <button onClick={() => onDelete(note.id)} className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-0.5">
                   <Trash2 className="w-3 h-3" />Apagar
                 </button>
               </div>
@@ -1177,7 +1177,7 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
                       }
                     }}
                     placeholder="Adicionar nota... (Enter para guardar, Shift+Enter para nova linha)"
-                    className="flex-1 text-sm bg-white/5 text-white placeholder-zinc-500 border border-white/10 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/40 min-h-[72px]"
+                    className="flex-1 text-sm bg-gray-50 text-[#2c2f31] placeholder-[#6b7e9a] border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#0A2540]/30 min-h-[72px]"
                     rows={3}
                   />
                   <div className="flex flex-col gap-1 flex-shrink-0 self-end">
