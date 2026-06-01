@@ -245,9 +245,13 @@ function LayoutInner({
     }
   }, [pathname]);
 
-  // Keep-alive + warmup: acorda o backend (Render free tier adormece) e mantém-no
-  // acordado a cada 14 min. No arranque insiste até obter resposta, para que as
+  // Keep-alive + warmup: mantém a ligação à base de dados (Prisma) quente, não só
+  // o processo HTTP. Por isso faz ping a /api/ready (que executa SELECT 1) e não a
+  // /health (que responde "alive" sem tocar na DB). Intervalo de 10 min para ter
+  // margem de segurança. No arranque insiste até obter resposta, para que as
   // queries seguintes já apanhem o backend "quente" em vez de timeout/erro.
+  // A fonte primária de keep-alive é o monitor externo (UptimeRobot em /api/ready);
+  // este ping do browser é uma rede de segurança enquanto há um separador aberto.
   useEffect(() => {
     if (devAuthBypassEnabled) return;
     if (isPublicPage) return;
@@ -257,7 +261,7 @@ function LayoutInner({
     let interval: ReturnType<typeof setInterval> | undefined;
 
     const pingOnce = (signal?: AbortSignal) =>
-      fetch(`${API_URL}/health`, { method: 'GET', signal })
+      fetch(`${API_URL}/api/ready`, { method: 'GET', cache: 'no-store', signal })
         .then((res) => res.ok)
         .catch(() => false);
 
@@ -272,7 +276,7 @@ function LayoutInner({
     };
 
     wakeUp();
-    interval = setInterval(() => pingOnce(), 14 * 60 * 1000);
+    interval = setInterval(() => pingOnce(), 10 * 60 * 1000);
     return () => {
       cancelled = true;
       if (interval) clearInterval(interval);

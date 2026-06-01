@@ -107,6 +107,34 @@ Depois do deploy, validar:
 
 ## Performance da API
 
+### Pool de ligações à base de dados (crítico)
+
+A `DATABASE_URL` deve **limitar explicitamente** o pool do Prisma. Sem limite, o Prisma
+abre ligações até esgotar o `max_connections` do Postgres sob carga real (cada página
+do CRM dispara várias queries em paralelo), causando filas e o sintoma "demora a ligar /
+fica sem servidor". Acrescentar à `DATABASE_URL` no painel do Render:
+
+```text
+?sslmode=require&connection_limit=<N>&pool_timeout=20&connect_timeout=10
+```
+
+- `connection_limit = (max_connections do plano Postgres − margem) ÷ nº de instâncias web`.
+  Confirmar o `max_connections` do plano (`SHOW max_connections;`) e quantas instâncias web
+  correm (se houver autoscaling, dividir o budget por elas).
+- Se o Render expuser um endpoint de **pooler/PgBouncer**, usar esse host em vez do host
+  direto (`dpg-...-a.frankfurt-postgres.render.com`).
+- Deixar sempre folga de ligações para migrações (`db:migrate:deploy`) e acesso de admin.
+
+### Readiness vs liveness na monitorização
+
+O monitor externo (UptimeRobot) deve apontar para **`GET /api/ready`** (executa `SELECT 1`
+na base de dados), **não** para `/health` (que responde "alive" sem tocar na DB). Caso
+contrário, se as ligações de DB esgotarem, o monitor fica falso-verde enquanto os
+utilizadores estão bloqueados. Recomendado: 1 monitor em `/api/ready` (readiness real) e
+1 monitor leve em `/health` (liveness do processo), para distinguir os dois casos.
+
+### Warmup
+
 O endpoint `/api/backend-warmup` valida o segredo `CRON_SECRET` e chama `/api/ready` no backend para manter o serviço Render e a ligação Prisma aquecidos.
 
 O projeto Vercel está em plano Hobby, que bloqueia crons mais frequentes que uma vez por dia. Para warmup a cada 10 minutos, use Render sem sleep ou um monitor externo que chame `https://SEU_FRONTEND/api/backend-warmup` com header `Authorization: Bearer CRON_SECRET`.

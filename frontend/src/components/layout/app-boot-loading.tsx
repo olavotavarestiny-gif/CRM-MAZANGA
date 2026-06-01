@@ -4,27 +4,65 @@ import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import KukuGestLogo from '@/components/KukuGestLogo';
 
+// Mensagens encadeadas para tranquilizar o utilizador: o arranque é normal,
+// e se demorar mais é porque o servidor está a acordar — não porque está partido.
+const STAGES = [
+  { at: 0, text: 'Estamos a preparar a sua conta.', hint: null as string | null },
+  {
+    at: 7_000,
+    text: 'A estabelecer ligação segura ao servidor…',
+    hint: 'Isto é normal nos primeiros segundos.',
+  },
+  {
+    at: 16_000,
+    text: 'Quase lá — a sincronizar os seus dados…',
+    hint: 'Obrigado pela paciência, falta pouco.',
+  },
+] as const;
+
 export default function AppBootLoading() {
-  const [slow, setSlow] = useState(false);
+  const [stage, setStage] = useState(0);
 
   useEffect(() => {
-    const timer = setTimeout(() => setSlow(true), 7_000);
-    return () => clearTimeout(timer);
+    const timers = STAGES.slice(1).map((s, i) =>
+      setTimeout(() => setStage(i + 1), s.at)
+    );
+    return () => timers.forEach(clearTimeout);
   }, []);
+
+  const current = STAGES[stage];
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-black px-4">
       <KukuGestLogo height={48} />
-      <div className="flex flex-col items-center gap-2 text-center">
+      <div className="flex w-full max-w-xs flex-col items-center gap-3 text-center">
         <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
-        <p className="text-sm text-white">A ligar ao KukuGest...</p>
-        <p className="text-xs text-zinc-400">Estamos a preparar a sua conta.</p>
-        {slow && (
-          <p className="mt-1 text-xs text-amber-400">
-            Está a demorar mais do que o normal...
-          </p>
+        <p className="text-sm text-white">A ligar ao KukuGest…</p>
+        <p className="text-xs text-zinc-400">{current.text}</p>
+
+        {/* Barra de progresso indeterminada (apenas visual, indica atividade) */}
+        <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/10">
+          <div className="h-full w-1/3 animate-boot-progress rounded-full bg-gradient-to-r from-purple-500 to-purple-400" />
+        </div>
+
+        {current.hint && (
+          <p className="mt-1 text-xs text-amber-400">{current.hint}</p>
         )}
       </div>
+
+      <style jsx>{`
+        @keyframes boot-progress {
+          0% {
+            transform: translateX(-120%);
+          }
+          100% {
+            transform: translateX(420%);
+          }
+        }
+        .animate-boot-progress {
+          animation: boot-progress 1.4s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }

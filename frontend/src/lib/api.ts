@@ -168,6 +168,31 @@ function getSupabaseClient() {
   return _supabaseClient;
 }
 
+// supabase.auth.getSession() lê do localStorage, mas pode disparar um refresh de
+// token (chamada de rede ao Supabase). Se a auth do Supabase estiver lenta ou
+// inacessível, isso bloquearia TODOS os pedidos. Damos timeout e, em caso de
+// falha, reutilizamos o último access token válido (JWT de ~1h ainda válido).
+const SESSION_TOKEN_TIMEOUT_MS = 3_000;
+let _lastSupabaseAccessToken: string | null = null;
+
+async function getSupabaseAccessToken(): Promise<string | null> {
+  const supabase = getSupabaseClient();
+  try {
+    const result = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('SESSION_TIMEOUT')), SESSION_TOKEN_TIMEOUT_MS)
+      ),
+    ]);
+    const token = result?.data?.session?.access_token ?? null;
+    if (token) _lastSupabaseAccessToken = token;
+    return token ?? _lastSupabaseAccessToken;
+  } catch {
+    // getSession pendurou ou falhou — usa o último token conhecido, se houver.
+    return _lastSupabaseAccessToken;
+  }
+}
+
 // Request interceptor: prefer impersonation token, fall back to Supabase session token
 api.interceptors.request.use(async (config) => {
   const devSampleAdapter = createDevSampleApiAdapter();
@@ -193,10 +218,9 @@ api.interceptors.request.use(async (config) => {
       return config;
     }
   }
-  const supabase = getSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.access_token) {
-    config.headers.Authorization = `Bearer ${session.access_token}`;
+  const accessToken = await getSupabaseAccessToken();
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
   return config;
 });
