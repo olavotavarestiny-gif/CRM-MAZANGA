@@ -36,7 +36,7 @@ export async function uploadFile(
   const pathname = `${folder}/${safeScope}/${Date.now()}-${sanitized}`;
 
   const blob = await put(pathname, file, {
-    access: 'public',
+    access: 'private',
     contentType: file.type,
   });
 
