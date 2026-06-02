@@ -97,7 +97,7 @@ router.put('/field-config/:key', requirePermission('contacts', 'edit'), async (r
     const userId = req.user.effectiveUserId;
 
     if (!SYSTEM_FIELD_DEFAULTS.find(f => f.key === key)) {
-      return res.status(400).json({ error: 'Invalid field key' });
+      return res.status(400).json({ error: 'Campo inválido.' });
     }
 
     const data = {};
@@ -145,7 +145,7 @@ router.get('/fields', requirePermission('contacts', 'view'), async (req, res) =>
 router.post('/fields', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const { label, type, options, required } = req.body;
-    if (!label || !label.trim()) return res.status(400).json({ error: 'Label is required' });
+    if (!label || !label.trim()) return res.status(400).json({ error: 'Nome do campo é obrigatório.' });
     const fieldType = VALID_FIELD_TYPES.includes(type) ? type : 'text';
 
     const userId = req.user.effectiveUserId;
@@ -174,7 +174,7 @@ router.post('/fields', requirePermission('contacts', 'edit'), async (req, res) =
     });
     res.status(201).json({ ...field, options: field.options ? JSON.parse(field.options) : [] });
   } catch (error) {
-    if (error.code === 'P2002') return res.status(400).json({ error: 'A field with this key already exists' });
+    if (error.code === 'P2002') return res.status(400).json({ error: 'Já existe um campo com este nome.' });
     res.status(500).json({ error: error.message });
   }
 });
@@ -183,7 +183,7 @@ router.post('/fields', requirePermission('contacts', 'edit'), async (req, res) =
 router.put('/fields/reorder', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
     const { order } = req.body; // [{ id, order }, ...]
-    if (!Array.isArray(order)) return res.status(400).json({ error: 'Invalid order array' });
+    if (!Array.isArray(order)) return res.status(400).json({ error: 'Lista de ordenação inválida.' });
     await Promise.all(
       order.map(({ id, order: o }) =>
         prisma.contactFieldDef.updateMany({
@@ -204,7 +204,7 @@ router.put('/fields/:id', requirePermission('contacts', 'edit'), async (req, res
     const { label, type, options, required, order } = req.body;
     const existing = await prisma.contactFieldDef.findUnique({ where: { id: req.params.id } });
     if (!existing || existing.userId !== req.user.effectiveUserId) {
-      return res.status(404).json({ error: 'Field not found' });
+      return res.status(404).json({ error: 'Campo não encontrado.' });
     }
     const updateData = {};
     if (label !== undefined) updateData.label = label.trim();
@@ -225,7 +225,7 @@ router.delete('/fields/:id', requirePermission('contacts', 'edit'), async (req, 
   try {
     const existing = await prisma.contactFieldDef.findUnique({ where: { id: req.params.id } });
     if (!existing || existing.userId !== req.user.effectiveUserId) {
-      return res.status(404).json({ error: 'Field not found' });
+      return res.status(404).json({ error: 'Campo não encontrado.' });
     }
     // System fields are always soft-deleted so they can be restored later
     await prisma.contactFieldDef.update({ where: { id: req.params.id }, data: { active: false } });
@@ -242,9 +242,15 @@ const VALID_REVENUES = [
 ];
 const MAX_CONTACTS_PAGE_LIMIT = 100;
 
+// Strip spaces from phone number (e.g. "942 27 75 76" → "942277576")
+function normalizePhone(phone) {
+  if (!phone) return phone;
+  return phone.replace(/\s+/g, '');
+}
+
 // Phone format validation (basic: only digits and common symbols)
 function isValidPhone(phone) {
-  return /^[\d\s\+\-\(\)]{7,20}$/.test(phone);
+  return /^[\d\+\-\(\)]{7,20}$/.test(phone);
 }
 
 function parseDocuments(raw) {
@@ -696,15 +702,16 @@ router.get('/', requirePermission('contacts', 'view'), async (req, res) => {
 // POST create new contact
 router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
-    const { name, email, phone, company, location, birthDate, dealValueKz, revenue, sector, stage, tags, customFields, contactType, status, clienteType, nif, contactGroupId } = req.body;
+    const { name, email, company, location, birthDate, dealValueKz, revenue, sector, stage, tags, customFields, contactType, status, clienteType, nif, contactGroupId } = req.body;
+    const phone = normalizePhone(req.body.phone);
     const userId = req.user.effectiveUserId;
 
     if (!name || !phone) {
-      return res.status(400).json({ error: 'Name and phone are required' });
+      return res.status(400).json({ error: 'Nome e número de telefone são obrigatórios.' });
     }
 
     if (!isValidPhone(phone)) {
-      return res.status(400).json({ error: 'Phone format is invalid. Use only digits, spaces, +, -, (, )' });
+      return res.status(400).json({ error: 'Formato de número inválido. Use apenas dígitos, +, - ou parênteses.' });
     }
 
     const limitState = await canCreateContact(userId);
@@ -808,7 +815,7 @@ router.post('/', requirePermission('contacts', 'edit'), async (req, res) => {
     res.status(201).json(serialiseContact(contact));
   } catch (error) {
     if (error.code === 'P2002') {
-      return res.status(400).json({ error: 'Phone number already exists' });
+      return res.status(400).json({ error: 'Este número de telefone já está registado.' });
     }
     if (error.statusCode) {
       return res.status(error.statusCode).json({ error: error.message });
@@ -941,7 +948,7 @@ router.post('/import', requirePermission('contacts', 'edit'), async (req, res) =
     const userId = req.user.effectiveUserId;
 
     if (!Array.isArray(contacts) || contacts.length === 0) {
-      return res.status(400).json({ error: 'Invalid contacts array' });
+      return res.status(400).json({ error: 'Lista de contactos inválida.' });
     }
 
     const defaultStage = await getDefaultStageName(userId);
@@ -1150,7 +1157,7 @@ router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
     });
 
     if (!contact || contact.userId !== req.user.effectiveUserId) {
-      return res.status(404).json({ error: 'Contact not found' });
+      return res.status(404).json({ error: 'Contacto não encontrado.' });
     }
 
     res.json(serialiseContact(contact));
@@ -1163,7 +1170,8 @@ router.get('/:id', requirePermission('contacts', 'view'), async (req, res) => {
 // PUT update contact
 router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
-    const { name, email, phone, company, location, birthDate, dealValueKz, revenue, sector, stage, inPipeline, tags, customFields, contactType, status, documents, clienteType, nif, contactGroupId } = req.body;
+    const { name, email, company, location, birthDate, dealValueKz, revenue, sector, stage, inPipeline, tags, customFields, contactType, status, documents, clienteType, nif, contactGroupId } = req.body;
+    const phone = req.body.phone !== undefined ? normalizePhone(req.body.phone) : undefined;
     const updateData = {};
     const contactId = parseInt(req.params.id);
     const userId = req.user.effectiveUserId;
@@ -1171,11 +1179,11 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
     // Verify ownership
     const existing = await prisma.contact.findUnique({ where: { id: contactId } });
     if (!existing || existing.userId !== userId) {
-      return res.status(404).json({ error: 'Contact not found' });
+      return res.status(404).json({ error: 'Contacto não encontrado.' });
     }
 
     if (phone !== undefined && !isValidPhone(phone)) {
-      return res.status(400).json({ error: 'Phone format is invalid. Use only digits, spaces, +, -, (, )' });
+      return res.status(400).json({ error: 'Formato de número inválido. Use apenas dígitos, +, - ou parênteses.' });
     }
 
     const workspaceMode = await getWorkspaceModeForUser(userId);
@@ -1366,10 +1374,10 @@ router.put('/:id', requirePermission('contacts', 'edit'), async (req, res) => {
     res.json(serialiseContact(contact));
   } catch (error) {
     if (error.code === 'P2002') {
-      return res.status(400).json({ error: 'Phone number already exists' });
+      return res.status(400).json({ error: 'Este número de telefone já está registado.' });
     }
     if (error.code === 'P2025') {
-      return res.status(404).json({ error: 'Contact not found' });
+      return res.status(404).json({ error: 'Contacto não encontrado.' });
     }
     if (error.statusCode) {
       return res.status(error.statusCode).json({ error: error.message });
@@ -1392,7 +1400,7 @@ router.delete('/:id', requireDeletePermission, async (req, res) => {
     // Verify ownership
     const existing = await prisma.contact.findUnique({ where: { id: contactId } });
     if (!existing || existing.userId !== req.user.effectiveUserId) {
-      return res.status(404).json({ error: 'Contact not found' });
+      return res.status(404).json({ error: 'Contacto não encontrado.' });
     }
 
     await prisma.contact.delete({
@@ -1406,10 +1414,10 @@ router.delete('/:id', requireDeletePermission, async (req, res) => {
       action: 'deleted',
     });
 
-    res.json({ message: 'Contact deleted' });
+    res.json({ message: 'Contacto eliminado.' });
   } catch (error) {
     if (error.code === 'P2025') {
-      return res.status(404).json({ error: 'Contact not found' });
+      return res.status(404).json({ error: 'Contacto não encontrado.' });
     }
     console.error('Error deleting contact:', error);
     res.status(500).json({ error: error.message });
