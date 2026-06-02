@@ -469,42 +469,30 @@ function AttachmentList({
       {/* PDFs e documentos */}
       {docs.length > 0 && (
         <div className="mt-2 space-y-1">
-          {docs.map((doc, i) => {
-            const pdf = isPdf(doc.name, doc.contentType);
-            return (
-              <div key={i} className="group/doc flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                <FileText className={`w-4 h-4 flex-shrink-0 ${pdf ? 'text-red-400' : 'text-zinc-400'}`} />
-                <span className="flex-1 text-xs text-zinc-300 truncate">{doc.name}</span>
-                {doc.size && <span className="text-xs text-zinc-500 flex-shrink-0">{formatFileSize(doc.size)}</span>}
-                <a
-                  href={doc.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
-                    pdf
-                      ? 'bg-red-500/15 text-red-300 hover:bg-red-500/30'
-                      : 'bg-white/10 text-zinc-300 hover:bg-white/20'
-                  }`}
-                  title={pdf ? 'Abrir PDF' : 'Descarregar'}
+          {docs.map((doc, i) => (
+            <div key={i} className="group/doc flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+              <FileText className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+              <span className="flex-1 text-xs text-zinc-300 truncate">{doc.name}</span>
+              {doc.size && <span className="text-xs text-zinc-500 flex-shrink-0">{formatFileSize(doc.size)}</span>}
+              <a
+                href={doc.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-medium transition-colors"
+              >
+                <ExternalLink className="w-3 h-3" />Abrir
+              </a>
+              {onDelete && (
+                <button
+                  onClick={() => onDelete(doc.url)}
+                  className="flex-shrink-0 p-1 text-zinc-500 hover:text-red-400 transition-colors opacity-0 group-hover/doc:opacity-100"
+                  title="Remover"
                 >
-                  {pdf ? (
-                    <><ExternalLink className="w-3 h-3" />Abrir</>
-                  ) : (
-                    <><Download className="w-3 h-3" />Download</>
-                  )}
-                </a>
-                {onDelete && (
-                  <button
-                    onClick={() => onDelete(doc.url)}
-                    className="flex-shrink-0 p-1 text-zinc-500 hover:text-red-400 transition-colors opacity-0 group-hover/doc:opacity-100"
-                    title="Remover"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            );
-          })}
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </>
@@ -1361,44 +1349,34 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
                         <div className="space-y-1.5">
                           {documents
                             .filter(d => !isImage(d.name, (d as any).contentType))
-                            .map((doc, idx) => {
-                              const pdf = isPdf(doc.name, (doc as any).contentType);
-                              return (
-                                <div key={idx} className="group/doc flex items-center gap-3 p-3 rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] transition-colors">
-                                  <FileText className={`w-5 h-5 flex-shrink-0 ${pdf ? 'text-red-400' : 'text-zinc-400'}`} />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-white truncate">{doc.name}</p>
-                                    <p className="text-xs text-zinc-500">
-                                      {doc.size ? formatFileSize(doc.size) + ' · ' : ''}{formatDate(doc.uploadedAt)}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-2 flex-shrink-0">
-                                    <a
-                                      href={doc.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                                        pdf
-                                          ? 'bg-red-500/15 text-red-300 hover:bg-red-500/25'
-                                          : 'bg-white/10 text-zinc-300 hover:bg-white/20'
-                                      }`}
-                                    >
-                                      {pdf
-                                        ? <><ExternalLink className="w-3.5 h-3.5" />Abrir PDF</>
-                                        : <><Download className="w-3.5 h-3.5" />Download</>
-                                      }
-                                    </a>
-                                    <button
-                                      onClick={() => deleteDocument(doc.url)}
-                                      className="p-1.5 text-zinc-500 hover:text-red-400 rounded transition-colors opacity-0 group-hover/doc:opacity-100"
-                                      title="Apagar"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </div>
+                            .map((doc, idx) => (
+                              <div key={idx} className="group/doc flex items-center gap-3 p-3 rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] transition-colors">
+                                <FileText className="w-5 h-5 text-zinc-400 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-white truncate">{doc.name}</p>
+                                  <p className="text-xs text-zinc-500">
+                                    {doc.size ? formatFileSize(doc.size) + ' · ' : ''}{formatDate(doc.uploadedAt)}
+                                  </p>
                                 </div>
-                              );
-                            })}
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <a
+                                    href={doc.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-medium transition-colors"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />Abrir
+                                  </a>
+                                  <button
+                                    onClick={() => deleteDocument(doc.url)}
+                                    className="p-1.5 text-zinc-500 hover:text-red-400 rounded transition-colors opacity-0 group-hover/doc:opacity-100"
+                                    title="Apagar"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
                         </div>
                       </div>
                     )}
