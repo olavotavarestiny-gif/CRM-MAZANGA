@@ -1,4 +1,18 @@
 /**
+ * Returns a browser-safe URL for a blob.
+ * Private Vercel Blob URLs (*.private.blob.vercel-storage.com) cannot be loaded
+ * directly in <img> tags — they need the Authorization header which browsers
+ * never send. This function routes them through the /api/blob proxy.
+ */
+export function blobSrc(url: string | undefined | null): string {
+  if (!url) return '';
+  if (url.includes('.private.blob.vercel-storage.com')) {
+    return `/api/blob?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
+/**
  * Formats a byte count into a human-readable string.
  * Example: 1536000 → "1.5 MB"
  */

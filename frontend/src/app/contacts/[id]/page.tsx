@@ -9,6 +9,7 @@ import {
   getContactSummary, getContactGroups, getContactFormSubmissions,
 } from '@/lib/api';
 import type { ContactFieldConfig, ContactFieldDef, ContactNote, NoteAttachment, FormSubmission, Task } from '@/lib/types';
+import { blobSrc } from '@/lib/file-utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -400,13 +401,13 @@ function Lightbox({ url, name, onClose }: { url: string; name: string; onClose: 
         <X className="w-7 h-7" />
       </button>
       <img
-        src={url}
+        src={blobSrc(url)}
         alt={name}
         className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
         onClick={e => e.stopPropagation()}
       />
       <a
-        href={url}
+        href={blobSrc(url)}
         download={name}
         target="_blank"
         rel="noopener noreferrer"
@@ -447,7 +448,7 @@ function AttachmentList({
               onClick={() => setLightbox(img)}
               title="Clique para ver"
             >
-              <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+              <img src={blobSrc(img.url)} alt={img.name} className="w-full h-full object-cover" />
               {/* Overlay subtil com ícone permanente para indicar que é clicável */}
               <div className="absolute inset-0 bg-black/20 group-hover/img:bg-black/50 transition-colors flex items-end justify-between p-1">
                 <ZoomIn className="w-3.5 h-3.5 text-white/70 group-hover/img:text-white transition-colors" />
@@ -475,7 +476,7 @@ function AttachmentList({
               <span className="flex-1 text-xs text-zinc-300 truncate">{doc.name}</span>
               {doc.size && <span className="text-xs text-zinc-500 flex-shrink-0">{formatFileSize(doc.size)}</span>}
               <a
-                href={doc.url}
+                href={blobSrc(doc.url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-medium transition-colors"
@@ -512,7 +513,7 @@ function DocImageThumb({
     <>
       {lightbox && <Lightbox url={doc.url} name={doc.name} onClose={() => setLightbox(false)} />}
       <div className="relative group/thumb aspect-square rounded-lg overflow-hidden border border-white/10 bg-white/5">
-        <img src={doc.url} alt={doc.name} className="w-full h-full object-cover" />
+        <img src={blobSrc(doc.url)} alt={doc.name} className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-black/0 group-hover/thumb:bg-black/50 transition-colors" />
         <div className="absolute inset-0 flex items-center justify-center gap-1.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity">
           <button
@@ -523,7 +524,7 @@ function DocImageThumb({
             <ZoomIn className="w-4 h-4 text-white" />
           </button>
           <a
-            href={doc.url}
+            href={blobSrc(doc.url)}
             download={doc.name}
             target="_blank"
             rel="noopener noreferrer"
@@ -1360,7 +1361,7 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0">
                                   <a
-                                    href={doc.url}
+                                    href={blobSrc(doc.url)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-medium transition-colors"
