@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import type { UploadFolder, UploadResult } from '@/lib/storage';
+import { compressImage } from '@/lib/file-utils';
 
 interface UseFileUploadReturn {
   upload: (file: File, folder: UploadFolder) => Promise<UploadResult | null>;
@@ -29,8 +30,10 @@ export function useFileUpload(): UseFileUploadReturn {
       setProgress(10);
 
       try {
+        const fileToUpload = await compressImage(file);
+
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', fileToUpload);
         formData.append('folder', folder);
 
         setProgress(30);

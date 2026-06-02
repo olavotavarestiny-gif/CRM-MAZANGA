@@ -26,6 +26,72 @@ export function isImageFile(contentType: string): boolean {
   return contentType.startsWith('image/');
 }
 
+const IMAGE_COMPRESS_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+const MAX_DIMENSION = 1920;
+const JPEG_QUALITY = 0.82;
+
+/**
+ * Compresses an image File using the Canvas API.
+ * - Skips non-image files and HEIC/HEIF (browser cannot decode them).
+ * - Resizes so the longest side is at most MAX_DIMENSION px.
+ * - Re-encodes as JPEG at JPEG_QUALITY.
+ * Returns the original file unchanged if compression is not applicable or fails.
+ */
+export async function compressImage(file: File): Promise<File> {
+  if (!IMAGE_COMPRESS_TYPES.includes(file.type)) return file;
+
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+
+      let { width, height } = img;
+      if (width <= MAX_DIMENSION && height <= MAX_DIMENSION && file.size < 300 * 1024) {
+        // Already small enough — skip re-encoding
+        resolve(file);
+        return;
+      }
+
+      if (width > height && width > MAX_DIMENSION) {
+        height = Math.round((height * MAX_DIMENSION) / width);
+        width = MAX_DIMENSION;
+      } else if (height > width && height > MAX_DIMENSION) {
+        width = Math.round((width * MAX_DIMENSION) / height);
+        height = MAX_DIMENSION;
+      } else if (width > MAX_DIMENSION) {
+        height = Math.round((height * MAX_DIMENSION) / width);
+        width = MAX_DIMENSION;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(file); return; }
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve(file); return; }
+          // Keep original name but force .jpg extension since output is JPEG
+          const baseName = file.name.replace(/\.[^.]+$/, '');
+          const compressed = new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' });
+          // Only use compressed version if it actually saves space
+          resolve(compressed.size < file.size ? compressed : file);
+        },
+        'image/jpeg',
+        JPEG_QUALITY,
+      );
+    };
+
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 /**
  * Removes dangerous characters from a filename.
  * Spaces and hyphens become underscores; only alphanumeric, dots, and underscores are kept.
