@@ -376,6 +376,11 @@ function isImage(name: string, contentType?: string): boolean {
   return /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(name);
 }
 
+function isPdf(name: string, contentType?: string): boolean {
+  if (contentType === 'application/pdf') return true;
+  return /\.pdf$/i.test(name);
+}
+
 // ── Lightbox simples ────────────────────────────────────────────────────────────
 function Lightbox({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
   useEffect(() => {
@@ -434,27 +439,25 @@ function AttachmentList({
         <Lightbox url={lightbox.url} name={lightbox.name} onClose={() => setLightbox(null)} />
       )}
 
-      {/* Galeria de imagens */}
+      {/* Galeria de imagens — clique direto abre lightbox */}
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2 mt-2">
           {images.map((img, i) => (
-            <div key={i} className="relative group/img w-20 h-20 rounded-lg overflow-hidden border border-white/10 flex-shrink-0">
+            <div key={i} className="relative group/img w-20 h-20 rounded-lg overflow-hidden border border-white/10 flex-shrink-0 cursor-pointer"
+              onClick={() => setLightbox(img)}
+              title="Clique para ver"
+            >
               <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/40 transition-colors flex items-center justify-center gap-1">
-                <button
-                  onClick={() => setLightbox(img)}
-                  className="opacity-0 group-hover/img:opacity-100 transition-opacity p-1.5 bg-white/20 hover:bg-white/40 rounded-full backdrop-blur-sm"
-                  title="Ver imagem"
-                >
-                  <ZoomIn className="w-3.5 h-3.5 text-white" />
-                </button>
+              {/* Overlay subtil com ícone permanente para indicar que é clicável */}
+              <div className="absolute inset-0 bg-black/20 group-hover/img:bg-black/50 transition-colors flex items-end justify-between p-1">
+                <ZoomIn className="w-3.5 h-3.5 text-white/70 group-hover/img:text-white transition-colors" />
                 {onDelete && (
                   <button
-                    onClick={() => onDelete(img.url)}
-                    className="opacity-0 group-hover/img:opacity-100 transition-opacity p-1.5 bg-red-500/70 hover:bg-red-500 rounded-full backdrop-blur-sm"
+                    onClick={e => { e.stopPropagation(); onDelete(img.url); }}
+                    className="p-0.5 text-white/50 hover:text-red-400 transition-colors"
                     title="Remover"
                   >
-                    <Trash2 className="w-3.5 h-3.5 text-white" />
+                    <Trash2 className="w-3 h-3" />
                   </button>
                 )}
               </div>
@@ -463,34 +466,45 @@ function AttachmentList({
         </div>
       )}
 
-      {/* Lista de documentos */}
+      {/* PDFs e documentos */}
       {docs.length > 0 && (
         <div className="mt-2 space-y-1">
-          {docs.map((doc, i) => (
-            <div key={i} className="group/doc flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-              <FileText className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-              <span className="flex-1 text-xs text-zinc-300 truncate">{doc.name}</span>
-              {doc.size && <span className="text-xs text-zinc-500 flex-shrink-0">{formatFileSize(doc.size)}</span>}
-              <a
-                href={doc.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-shrink-0 p-1 text-zinc-400 hover:text-white transition-colors"
-                title="Download"
-              >
-                <Download className="w-3.5 h-3.5" />
-              </a>
-              {onDelete && (
-                <button
-                  onClick={() => onDelete(doc.url)}
-                  className="flex-shrink-0 p-1 text-zinc-500 hover:text-red-400 transition-colors opacity-0 group-hover/doc:opacity-100"
-                  title="Remover"
+          {docs.map((doc, i) => {
+            const pdf = isPdf(doc.name, doc.contentType);
+            return (
+              <div key={i} className="group/doc flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                <FileText className={`w-4 h-4 flex-shrink-0 ${pdf ? 'text-red-400' : 'text-zinc-400'}`} />
+                <span className="flex-1 text-xs text-zinc-300 truncate">{doc.name}</span>
+                {doc.size && <span className="text-xs text-zinc-500 flex-shrink-0">{formatFileSize(doc.size)}</span>}
+                <a
+                  href={doc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                    pdf
+                      ? 'bg-red-500/15 text-red-300 hover:bg-red-500/30'
+                      : 'bg-white/10 text-zinc-300 hover:bg-white/20'
+                  }`}
+                  title={pdf ? 'Abrir PDF' : 'Descarregar'}
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          ))}
+                  {pdf ? (
+                    <><ExternalLink className="w-3 h-3" />Abrir</>
+                  ) : (
+                    <><Download className="w-3 h-3" />Download</>
+                  )}
+                </a>
+                {onDelete && (
+                  <button
+                    onClick={() => onDelete(doc.url)}
+                    className="flex-shrink-0 p-1 text-zinc-500 hover:text-red-400 transition-colors opacity-0 group-hover/doc:opacity-100"
+                    title="Remover"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </>
@@ -1347,35 +1361,44 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
                         <div className="space-y-1.5">
                           {documents
                             .filter(d => !isImage(d.name, (d as any).contentType))
-                            .map((doc, idx) => (
-                              <div key={idx} className="group/doc flex items-center gap-3 p-3 rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] transition-colors">
-                                <FileText className="w-5 h-5 text-zinc-400 flex-shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-white truncate">{doc.name}</p>
-                                  <p className="text-xs text-zinc-500">
-                                    {doc.size ? formatFileSize(doc.size) + ' · ' : ''}{formatDate(doc.uploadedAt)}
-                                  </p>
+                            .map((doc, idx) => {
+                              const pdf = isPdf(doc.name, (doc as any).contentType);
+                              return (
+                                <div key={idx} className="group/doc flex items-center gap-3 p-3 rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] transition-colors">
+                                  <FileText className={`w-5 h-5 flex-shrink-0 ${pdf ? 'text-red-400' : 'text-zinc-400'}`} />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-white truncate">{doc.name}</p>
+                                    <p className="text-xs text-zinc-500">
+                                      {doc.size ? formatFileSize(doc.size) + ' · ' : ''}{formatDate(doc.uploadedAt)}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    <a
+                                      href={doc.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                        pdf
+                                          ? 'bg-red-500/15 text-red-300 hover:bg-red-500/25'
+                                          : 'bg-white/10 text-zinc-300 hover:bg-white/20'
+                                      }`}
+                                    >
+                                      {pdf
+                                        ? <><ExternalLink className="w-3.5 h-3.5" />Abrir PDF</>
+                                        : <><Download className="w-3.5 h-3.5" />Download</>
+                                      }
+                                    </a>
+                                    <button
+                                      onClick={() => deleteDocument(doc.url)}
+                                      className="p-1.5 text-zinc-500 hover:text-red-400 rounded transition-colors opacity-0 group-hover/doc:opacity-100"
+                                      title="Apagar"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-1 flex-shrink-0">
-                                  <a
-                                    href={doc.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="p-1.5 text-zinc-400 hover:text-white rounded transition-colors"
-                                    title="Abrir / Download"
-                                  >
-                                    <Download className="w-4 h-4" />
-                                  </a>
-                                  <button
-                                    onClick={() => deleteDocument(doc.url)}
-                                    className="p-1.5 text-zinc-500 hover:text-red-400 rounded transition-colors opacity-0 group-hover/doc:opacity-100"
-                                    title="Apagar"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                         </div>
                       </div>
                     )}
