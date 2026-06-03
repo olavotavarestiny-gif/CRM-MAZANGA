@@ -36,6 +36,18 @@ function buildRedirectUrl(request: NextRequest, pathname: string) {
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
+  // Assets que nunca precisam de autenticação — deixar passar sempre.
+  // O matcher no config deveria excluí-los mas o regex de lookahead negativo
+  // não funciona de forma fiável no Edge Runtime do Next.js em produção.
+  if (
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/favicon') ||
+    pathname.startsWith('/api/') ||
+    pathname === '/auth/signout'
+  ) {
+    return NextResponse.next();
+  }
+
   if (isServerDevAuthBypassEnabled()) {
     if (pathname === '/login') {
       return NextResponse.redirect(buildRedirectUrl(request, '/'));
