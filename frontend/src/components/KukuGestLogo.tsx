@@ -101,12 +101,12 @@ export function KukuGestLoginLogo({
   className?: string;
 }) {
   return (
-    <div className={className} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+    <div className={className} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
       <Image
-        src="/kukugest-logo.png"
+        src="/favicon.png"
         alt="KukuGest"
-        width={200}
-        height={80}
+        width={90}
+        height={90}
         style={{ objectFit: 'contain' }}
         priority
       />
@@ -117,7 +117,6 @@ export function KukuGestLoginLogo({
           fontSize: 8,
           color: 'rgba(255,255,255,0.42)',
           letterSpacing: '0.24em',
-          marginTop: 9,
           textTransform: 'uppercase' as const,
         }}>
           GESTÃO INTELIGENTE
