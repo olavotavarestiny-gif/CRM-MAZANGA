@@ -45,8 +45,8 @@ function KukuGestLogo({
   const badgePaddingY = Math.max(3, Math.round(height * 0.08));
   const badgePaddingX = Math.max(7, Math.round(height * 0.16));
 
-  // Determine width proportionally (assume image is roughly 3.27:1 ratio based on viewBox 360:110)
-  const aspectRatio = 360 / 110;
+  // Real image aspect ratio after trim: 3764x1906 ≈ 1.97
+  const aspectRatio = 3764 / 1906;
   const width = Math.round(height * aspectRatio);
 
   return (
