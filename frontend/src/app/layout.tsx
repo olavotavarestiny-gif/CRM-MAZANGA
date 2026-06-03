@@ -8,6 +8,11 @@ import { isServerDevAuthBypassEnabled } from '@/lib/dev-auth';
 export const metadata: Metadata = {
   title: 'KukuGest',
   description: 'Sistema de gestão de clientes e faturação AGT',
+  icons: {
+    icon: '/favicon.png',
+    shortcut: '/favicon.png',
+    apple: '/favicon.png',
+  },
 };
 
 export default function RootLayout({
