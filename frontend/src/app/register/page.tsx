@@ -1,0 +1,176 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
+import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
+import { KukuGestLoginLogo } from '@/components/KukuGestLogo';
+
+export default function RegisterPage() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      // 1. Create account in backend
+      const registerRes = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      const registerData = await registerRes.json().catch(() => ({}));
+
+      if (!registerRes.ok) {
+        setError(registerData?.error || 'Erro ao criar conta. Tente novamente.');
+        return;
+      }
+
+      // 2. Auto-login with created credentials
+      const loginRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const loginData = await loginRes.json().catch(() => ({}));
+
+      if (!loginRes.ok) {
+        // Registration succeeded but login failed — send to login page
+        window.location.assign('/login?registered=1');
+        return;
+      }
+
+      // 3. Redirect to app with new=1 flag to trigger onboarding tour
+      window.location.assign(loginData?.mustChangePassword ? '/change-password' : '/?new=1');
+    } catch {
+      setError('Erro de ligação. Verifique a sua conexão e tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <BackgroundGradientAnimation
+      containerClassName="min-h-screen"
+      interactive={false}
+      size="110%"
+      blendingValue="soft-light"
+    >
+      <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(140,169,255,0.28),transparent_28%),radial-gradient(circle_at_top_right,rgba(114,141,229,0.22),transparent_24%),linear-gradient(180deg,rgba(6,16,36,0.08),rgba(6,16,36,0.38))]" />
+
+      <div className="absolute inset-0 z-10 flex items-center justify-center px-4 py-10 sm:px-6">
+        <div className="relative w-full max-w-[28.5rem]">
+          <div className="absolute inset-x-10 -top-10 h-20 rounded-full bg-white/15 blur-3xl" />
+
+          <div className="relative overflow-hidden rounded-[2rem] border border-white/35 bg-[linear-gradient(180deg,rgba(181,191,205,0.42),rgba(111,124,141,0.52))] p-6 shadow-[0_30px_80px_rgba(6,16,36,0.38),inset_0_1px_0_rgba(255,255,255,0.3)] backdrop-blur-[22px] sm:p-8">
+            <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.22),transparent_32%,transparent_68%,rgba(255,255,255,0.08))]" />
+
+            <div className="relative text-center">
+              <KukuGestLoginLogo showTagline className="mx-auto mb-5" />
+              <p className="mt-1 text-sm text-white/75 sm:text-base">14 dias grátis, sem cartão</p>
+            </div>
+
+            {error && (
+              <div className="relative mt-6 rounded-2xl border border-[#ffb3bc]/40 bg-[#811b27]/22 px-4 py-3 text-sm text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleRegister} className="relative mt-7 space-y-5">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-white/88">Nome completo</label>
+                <div className="group relative">
+                  <User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/55 transition-colors group-focus-within:text-white/80" />
+                  <input
+                    type="text"
+                    placeholder="O seu nome"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    minLength={2}
+                    className="h-14 w-full rounded-[0.95rem] border border-white/55 bg-white/[0.06] pl-11 pr-4 text-[0.95rem] text-white placeholder:text-white/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] outline-none transition focus:border-white/80 focus:bg-white/[0.09] focus:ring-2 focus:ring-white/20"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-white/88">Email</label>
+                <div className="group relative">
+                  <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/55 transition-colors group-focus-within:text-white/80" />
+                  <input
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-14 w-full rounded-[0.95rem] border border-white/55 bg-white/[0.06] pl-11 pr-4 text-[0.95rem] text-white placeholder:text-white/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] outline-none transition focus:border-white/80 focus:bg-white/[0.09] focus:ring-2 focus:ring-white/20"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-white/88">Password</label>
+                <div className="group relative">
+                  <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/55 transition-colors group-focus-within:text-white/80" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Mínimo 6 caracteres"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="h-14 w-full rounded-[0.95rem] border border-white/55 bg-white/[0.06] pl-11 pr-12 text-[0.95rem] text-white placeholder:text-white/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] outline-none transition focus:border-white/80 focus:bg-white/[0.09] focus:ring-2 focus:ring-white/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 transition hover:text-white/80"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-1 h-12 w-full rounded-[0.95rem] bg-[linear-gradient(180deg,#ff6b35,#ff3d00)] text-sm font-semibold text-white shadow-[0_12px_30px_rgba(255,80,0,0.30),inset_0_1px_0_rgba(255,255,255,0.18)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? 'A criar conta...' : 'Criar conta grátis — 14 dias de trial'}
+              </button>
+
+              <p className="pt-1 text-center text-xs text-white/60">
+                Ao criar conta aceita os{' '}
+                <Link href="/termos" className="underline transition hover:text-white/85">
+                  termos de uso
+                </Link>{' '}
+                e a{' '}
+                <Link href="/privacidade" className="underline transition hover:text-white/85">
+                  política de privacidade
+                </Link>
+                .
+              </p>
+
+              <div className="pt-1 text-center">
+                <Link href="/login" className="text-sm text-white/78 transition hover:text-white">
+                  Já tem conta?{' '}
+                  <span className="font-semibold text-white">Entrar</span>
+                </Link>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </BackgroundGradientAnimation>
+  );
+}

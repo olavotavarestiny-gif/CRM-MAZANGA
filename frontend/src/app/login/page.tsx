@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Activity, Copy, Lock, Mail, RefreshCw } from 'lucide-react';
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
@@ -19,6 +19,17 @@ export default function LoginPage() {
   const [diagnostics, setDiagnostics] = useState<Record<string, unknown> | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [registered, setRegistered] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('registered') === '1') {
+        setRegistered(true);
+        window.history.replaceState({}, '', '/login');
+      }
+    }
+  }, []);
 
   const supportCode = error
     ? JSON.stringify({
@@ -143,6 +154,12 @@ export default function LoginPage() {
               <p className="mt-1 text-sm text-white/75 sm:text-base">Bem-vindo de volta</p>
             </div>
 
+            {registered && (
+              <div className="relative mt-7 rounded-2xl border border-[#6ee7b7]/40 bg-[#064e3b]/25 px-4 py-3 text-sm text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                Conta criada com sucesso! Faça login para entrar.
+              </div>
+            )}
+
             {error && (
               <div className="relative mt-7 space-y-3 rounded-2xl border border-[#ffb3bc]/40 bg-[#811b27]/22 px-4 py-3 text-sm text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
                 <div>{error.message}</div>
@@ -240,6 +257,13 @@ export default function LoginPage() {
               <div className="pt-1 text-center">
                 <Link href="/forgot-password" className="text-sm text-white/78 transition hover:text-white">
                   Esqueci a password
+                </Link>
+              </div>
+
+              <div className="pt-2 text-center">
+                <Link href="/register" className="text-sm text-white/78 transition hover:text-white">
+                  Não tem conta?{' '}
+                  <span className="font-semibold text-white">Criar conta grátis</span>
                 </Link>
               </div>
             </form>

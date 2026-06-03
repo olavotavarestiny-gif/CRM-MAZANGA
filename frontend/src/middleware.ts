@@ -11,6 +11,7 @@ import {
 
 const PUBLIC_PATHS = [
   '/login',
+  '/register',
   '/forgot-password',
   '/reset-password',
   '/auth/callback',
@@ -93,8 +94,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(buildRedirectUrl(request, '/login'));
   }
 
-  // Redirect authenticated users away from /login
-  if (session && pathname === '/login') {
+  // Redirect authenticated users away from /login and /register
+  if (session && (pathname === '/login' || pathname === '/register')) {
     return NextResponse.redirect(buildRedirectUrl(request, '/'));
   }
 

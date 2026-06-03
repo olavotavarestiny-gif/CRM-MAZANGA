@@ -101,6 +101,7 @@ function LayoutInner({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const fetchingCount = useIsFetching();
   const [isLoading, setIsLoading] = useState(true);
@@ -116,6 +117,7 @@ function LayoutInner({
   const [backendWaking, setBackendWaking] = useState(false);
   const authChecked = useRef(false);
   const currentSessionRef = useRef<string | null>(null);
+  const newUserTourFired = useRef(false);
 
   if (devAuthBypassEnabled && typeof window !== 'undefined' && !isDevAuthSessionActive()) {
     writeDevAuthSession(DEV_AUTH_USER);
@@ -128,6 +130,7 @@ function LayoutInner({
 
   const isPublicPage =
     pathname === '/login' ||
+    pathname === '/register' ||
     pathname === '/forgot-password' ||
     pathname === '/reset-password' ||
     pathname === '/change-password' ||
@@ -172,6 +175,18 @@ function LayoutInner({
 
     setShowWelcome(Boolean(onboardingQuery.data?.welcome?.show));
   }, [currentUser, devAuthBypassEnabled, isPublicPage, onboardingQuery.data?.welcome?.show]);
+
+  // Auto-start onboarding tour for newly registered users (?new=1)
+  useEffect(() => {
+    if (newUserTourFired.current) return;
+    if (isLoading || !currentUser || isPublicPage || devAuthBypassEnabled) return;
+    if (searchParams.get('new') !== '1') return;
+    newUserTourFired.current = true;
+    router.replace('/');
+    sessionStorage.setItem(TOUR_KEYS.ACTIVE, 'true');
+    sessionStorage.setItem(TOUR_KEYS.GROUP, '0');
+    setTimeout(() => window.dispatchEvent(new Event('kukugest:start-tour')), 600);
+  }, [isLoading, currentUser, isPublicPage, devAuthBypassEnabled, searchParams, router]);
 
   // Detect Supabase password recovery flow — fires when user clicks a reset-password email link
   // The link lands on / with hash tokens; Supabase fires PASSWORD_RECOVERY so we redirect.

@@ -5,7 +5,7 @@ const prisma = require('../lib/prisma');
 const requireAuth = require('../middleware/auth');
 const { isBootstrapSuperAdminEmail, verifySupabaseJwt } = require('../middleware/auth');
 const { intersectPermissions, parsePermissions } = require('../lib/permissions');
-const { normalizePlan } = require('../lib/plans');
+const { normalizePlan, DEFAULT_PLAN } = require('../lib/plans');
 const { getSerializedPlanCatalog } = require('../lib/plan-limits');
 const { getSubscriptionState } = require('../lib/subscription-access');
 const { DEV_AUTH_PUBLIC_USER } = require('../lib/dev-auth');
@@ -396,6 +396,88 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
     accountStatus: subscription?.accountStatus || user.accountStatus,
   };
 }
+
+// Simple in-memory rate limiter: max 5 registrations per IP per hour
+const _registerAttempts = new Map();
+function checkRegisterRateLimit(ip) {
+  const now = Date.now();
+  const window = 60 * 60 * 1000; // 1 hour
+  const entry = _registerAttempts.get(ip) || { count: 0, resetAt: now + window };
+  if (now > entry.resetAt) {
+    entry.count = 0;
+    entry.resetAt = now + window;
+  }
+  entry.count += 1;
+  _registerAttempts.set(ip, entry);
+  return entry.count <= 5;
+}
+
+// POST /api/auth/register — public self-registration with 14-day trial
+router.post('/register', async (req, res) => {
+  try {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
+    if (!checkRegisterRateLimit(ip)) {
+      return res.status(429).json({ error: 'Demasiadas tentativas. Tente novamente mais tarde.' });
+    }
+
+    const { name, email, password, workspaceMode } = req.body;
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+      return res.status(400).json({ error: 'Nome deve ter pelo menos 2 caracteres.' });
+    }
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'Email inválido.' });
+    }
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ error: 'Password deve ter pelo menos 6 caracteres.' });
+    }
+    if (workspaceMode && !['servicos', 'comercio'].includes(workspaceMode)) {
+      return res.status(400).json({ error: 'Workspace inválido.' });
+    }
+
+    const existing = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (existing) {
+      return res.status(400).json({ error: 'Este email já está registado.' });
+    }
+
+    const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
+      email: normalizedEmail,
+      password,
+      email_confirm: true,
+      user_metadata: { name: name.trim() },
+    });
+    if (authError) {
+      return res.status(400).json({ error: authError.message });
+    }
+
+    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
+    await prisma.user.create({
+      data: {
+        name: name.trim(),
+        email: normalizedEmail,
+        supabaseUid: authData.user.id,
+        role: 'user',
+        active: true,
+        mustChangePassword: false,
+        plan: DEFAULT_PLAN,
+        workspaceMode: workspaceMode || 'servicos',
+        billingType: 'trial',
+        trialEndsAt,
+        accountStatus: 'active',
+      },
+    });
+
+    res.status(201).json({ success: true, email: normalizedEmail });
+  } catch (error) {
+    console.error('[auth.register] error:', error);
+    res.status(500).json({ error: 'Erro ao criar conta. Tente novamente.' });
+  }
+});
 
 // POST /api/auth/sync
 // Called by the frontend after Supabase login to link supabaseUid → User record.
