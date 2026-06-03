@@ -512,37 +512,36 @@ function DocImageThumb({
   return (
     <>
       {lightbox && <Lightbox url={doc.url} name={doc.name} onClose={() => setLightbox(false)} />}
-      <div className="relative group/thumb aspect-square rounded-lg overflow-hidden border border-white/10 bg-white/5">
+      <div
+        className="relative group/thumb aspect-square rounded-lg overflow-hidden border border-white/10 bg-white/5 cursor-pointer"
+        onClick={() => setLightbox(true)}
+        title="Clique para ver"
+      >
         <img src={blobSrc(doc.url)} alt={doc.name} className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-black/0 group-hover/thumb:bg-black/50 transition-colors" />
-        <div className="absolute inset-0 flex items-center justify-center gap-1.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity">
-          <button
-            onClick={() => setLightbox(true)}
-            className="p-1.5 bg-white/20 hover:bg-white/40 rounded-full backdrop-blur-sm"
-            title="Ver foto"
-          >
-            <ZoomIn className="w-4 h-4 text-white" />
-          </button>
-          <a
-            href={blobSrc(doc.url)}
-            download={doc.name}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1.5 bg-white/20 hover:bg-white/40 rounded-full backdrop-blur-sm"
-            title="Download"
-          >
-            <Download className="w-4 h-4 text-white" />
-          </a>
-          <button
-            onClick={() => onDelete(doc.url)}
-            className="p-1.5 bg-red-500/70 hover:bg-red-500 rounded-full backdrop-blur-sm"
-            title="Apagar"
-          >
-            <Trash2 className="w-4 h-4 text-white" />
-          </button>
-        </div>
-        <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover/thumb:opacity-100 transition-opacity">
-          <p className="text-[10px] text-white/80 truncate">{doc.name}</p>
+        <div className="absolute inset-0 bg-black/10 group-hover/thumb:bg-black/50 transition-colors" />
+        {/* Ícone sempre visível no canto — indica que é clicável */}
+        <div className="absolute bottom-1 left-1 right-1 flex items-end justify-between">
+          <ZoomIn className="w-3.5 h-3.5 text-white/70 group-hover/thumb:text-white transition-colors drop-shadow" />
+          <div className="flex gap-1 opacity-0 group-hover/thumb:opacity-100 transition-opacity">
+            <a
+              href={blobSrc(doc.url)}
+              download={doc.name}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1 bg-white/20 hover:bg-white/40 rounded-full backdrop-blur-sm"
+              title="Download"
+              onClick={e => e.stopPropagation()}
+            >
+              <Download className="w-3 h-3 text-white" />
+            </a>
+            <button
+              onClick={e => { e.stopPropagation(); onDelete(doc.url); }}
+              className="p-1 bg-red-500/70 hover:bg-red-500 rounded-full backdrop-blur-sm"
+              title="Apagar"
+            >
+              <Trash2 className="w-3 h-3 text-white" />
+            </button>
+          </div>
         </div>
       </div>
     </>
