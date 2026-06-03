@@ -110,6 +110,15 @@ export function KukuGestLoginLogo({
         style={{ objectFit: 'contain' }}
         priority
       />
+      <span style={{
+        fontFamily: "'Montserrat', sans-serif",
+        fontWeight: 700,
+        fontSize: 22,
+        color: 'white',
+        letterSpacing: '0.04em',
+      }}>
+        KukuGest
+      </span>
       {showTagline && (
         <span style={{
           fontFamily: "'Montserrat', sans-serif",
