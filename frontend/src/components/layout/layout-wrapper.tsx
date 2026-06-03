@@ -101,7 +101,6 @@ function LayoutInner({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const fetchingCount = useIsFetching();
   const [isLoading, setIsLoading] = useState(true);
@@ -180,13 +179,15 @@ function LayoutInner({
   useEffect(() => {
     if (newUserTourFired.current) return;
     if (isLoading || !currentUser || isPublicPage || devAuthBypassEnabled) return;
-    if (searchParams.get('new') !== '1') return;
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') !== '1') return;
     newUserTourFired.current = true;
     router.replace('/');
     sessionStorage.setItem(TOUR_KEYS.ACTIVE, 'true');
     sessionStorage.setItem(TOUR_KEYS.GROUP, '0');
     setTimeout(() => window.dispatchEvent(new Event('kukugest:start-tour')), 600);
-  }, [isLoading, currentUser, isPublicPage, devAuthBypassEnabled, searchParams, router]);
+  }, [isLoading, currentUser, isPublicPage, devAuthBypassEnabled, router]);
 
   // Detect Supabase password recovery flow — fires when user clicks a reset-password email link
   // The link lands on / with hash tokens; Supabase fires PASSWORD_RECOVERY so we redirect.
