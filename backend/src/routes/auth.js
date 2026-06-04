@@ -5,7 +5,7 @@ const prisma = require('../lib/prisma');
 const requireAuth = require('../middleware/auth');
 const { isBootstrapSuperAdminEmail, verifySupabaseJwt } = require('../middleware/auth');
 const { intersectPermissions, parsePermissions } = require('../lib/permissions');
-const { normalizePlan, DEFAULT_PLAN } = require('../lib/plans');
+const { normalizePlan, DEFAULT_PLAN, isSupportedPlan } = require('../lib/plans');
 const { getSerializedPlanCatalog } = require('../lib/plan-limits');
 const { getSubscriptionState } = require('../lib/subscription-access');
 const { DEV_AUTH_PUBLIC_USER } = require('../lib/dev-auth');
@@ -420,7 +420,7 @@ router.post('/register', async (req, res) => {
       return res.status(429).json({ error: 'Demasiadas tentativas. Tente novamente mais tarde.' });
     }
 
-    const { name, email, password, workspaceMode } = req.body;
+    const { name, email, password, workspaceMode, plan } = req.body;
     const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
     if (!name || typeof name !== 'string' || name.trim().length < 2) {
@@ -435,6 +435,7 @@ router.post('/register', async (req, res) => {
     if (workspaceMode && !['servicos', 'comercio'].includes(workspaceMode)) {
       return res.status(400).json({ error: 'Workspace inválido.' });
     }
+    const resolvedPlan = plan && isSupportedPlan(plan) ? normalizePlan(plan) : DEFAULT_PLAN;
 
     const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
     const dbData = {
@@ -443,7 +444,7 @@ router.post('/register', async (req, res) => {
       role: 'user',
       active: true,
       mustChangePassword: false,
-      plan: DEFAULT_PLAN,
+      plan: resolvedPlan,
       workspaceMode: workspaceMode || 'servicos',
       billingType: 'trial',
       trialEndsAt,

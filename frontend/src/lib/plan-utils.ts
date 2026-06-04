@@ -567,3 +567,44 @@ export function getPlanLimitModalCopy({
     ctaLabel: 'Ver planos',
   };
 }
+
+// ── Dados de preços para a página de registo ─────────────────────────────────
+
+export function formatKz(amount: number) {
+  return amount.toLocaleString('pt-PT') + ' Kz';
+}
+
+export const REGISTER_PRICING = [
+  {
+    key: 'essencial' as const,
+    name: 'Inicial',
+    description: 'Para começar e validar o negócio.',
+    monthlyPrice: 9999,
+    annualMonthlyPrice: 6999,
+    annualTotalPrice: 83991,
+    features: ['Contactos e leads', 'Processos de venda (Kanban)', 'Tarefas', 'Calendário'],
+    badge: null as string | null,
+  },
+  {
+    key: 'profissional' as const,
+    name: 'Crescimento',
+    description: 'Para equipas a crescer com mais automação.',
+    monthlyPrice: 29999,
+    annualMonthlyPrice: 20999,
+    annualTotalPrice: 251991,
+    features: ['Tudo do Inicial', 'Conversas (WhatsApp + Email)', 'Automações', 'Formulários', 'Finanças'],
+    badge: 'Mais escolhido' as string | null,
+  },
+  {
+    key: 'enterprise' as const,
+    name: 'Estabilidade',
+    description: 'Para operações completas sem limites.',
+    monthlyPrice: 54999,
+    annualMonthlyPrice: 38499,
+    annualTotalPrice: 461991,
+    features: ['Tudo do Crescimento', 'Utilizadores ilimitados', 'Contactos ilimitados', 'Armazenamento máximo'],
+    badge: null as string | null,
+  },
+] as const;
+
+export type RegisterPlanKey = typeof REGISTER_PRICING[number]['key'];
