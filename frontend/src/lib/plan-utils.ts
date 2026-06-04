@@ -608,3 +608,71 @@ export const REGISTER_PRICING = [
 ] as const;
 
 export type RegisterPlanKey = typeof REGISTER_PRICING[number]['key'];
+
+// ── Questionário de recomendação (workspace + plano) no registo ──────────────
+
+export type WorkspaceRec = 'servicos' | 'comercio';
+export type PlanRec = RegisterPlanKey; // 'essencial' | 'profissional' | 'enterprise'
+
+export interface RegisterQuestionOption {
+  label: string;
+  hint?: string;
+  workspace?: WorkspaceRec;
+  plan?: PlanRec;
+}
+
+export interface RegisterQuestion {
+  id: 'tipo' | 'equipa' | 'prioridade';
+  question: string;
+  options: RegisterQuestionOption[];
+}
+
+export const REGISTER_QUESTIONS: RegisterQuestion[] = [
+  {
+    id: 'tipo',
+    question: 'O que vendes principalmente?',
+    options: [
+      { label: 'Serviços', hint: 'Consultoria, agência, clínica, assistência…', workspace: 'servicos' },
+      { label: 'Produtos físicos', hint: 'Loja, balcão, comércio', workspace: 'comercio' },
+    ],
+  },
+  {
+    id: 'equipa',
+    question: 'Quantas pessoas vão usar o sistema?',
+    options: [
+      { label: 'Só eu', plan: 'essencial' },
+      { label: '2 a 5 pessoas', plan: 'profissional' },
+      { label: 'Mais de 5', plan: 'enterprise' },
+    ],
+  },
+  {
+    id: 'prioridade',
+    question: 'O que é mais importante agora?',
+    options: [
+      { label: 'Organizar contactos e vendas', plan: 'essencial' },
+      { label: 'Automatizar e centralizar', plan: 'profissional' },
+      { label: 'Operação completa, sem limites', plan: 'enterprise' },
+    ],
+  },
+];
+
+const PLAN_ORDER: PlanRec[] = ['essencial', 'profissional', 'enterprise'];
+
+export interface RegisterAnswers {
+  tipo?: WorkspaceRec;
+  equipa?: PlanRec;
+  prioridade?: PlanRec;
+}
+
+export function recommendFromAnswers(answers: RegisterAnswers): { workspace: WorkspaceRec; plan: PlanRec } {
+  const workspace = answers.tipo ?? 'servicos';
+  const tiers = [answers.equipa, answers.prioridade].filter(Boolean) as PlanRec[];
+  const plan = tiers.length
+    ? tiers.reduce((hi, t) => (PLAN_ORDER.indexOf(t) > PLAN_ORDER.indexOf(hi) ? t : hi))
+    : 'profissional';
+  return { workspace, plan };
+}
+
+export function workspaceLabel(workspace: WorkspaceRec): string {
+  return workspace === 'comercio' ? 'Comércio' : 'Serviços';
+}
