@@ -171,9 +171,12 @@ function LayoutInner({
       setShowWelcome(false);
       return;
     }
-
-    setShowWelcome(Boolean(onboardingQuery.data?.welcome?.show));
-  }, [currentUser, devAuthBypassEnabled, isPublicPage, onboardingQuery.data?.welcome?.show]);
+    // Welcome modal removido — tour guiado é o único onboarding para novos utilizadores
+    if (onboardingQuery.data?.welcome?.show && !dismissWelcomeMutation.isPending) {
+      dismissWelcomeMutation.mutate();
+    }
+    setShowWelcome(false);
+  }, [currentUser, devAuthBypassEnabled, isPublicPage, onboardingQuery.data?.welcome?.show]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-start onboarding tour for newly registered users (?new=1)
   useEffect(() => {
