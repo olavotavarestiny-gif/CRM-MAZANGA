@@ -592,7 +592,7 @@ export const REGISTER_PRICING = [
     monthlyPrice: 29999,
     annualMonthlyPrice: 20999,
     annualTotalPrice: 251991,
-    features: ['Tudo do Inicial', 'Conversas (WhatsApp + Email)', 'Automações', 'Formulários', 'Finanças'],
+    features: ['Tudo do Inicial', 'Chat interno da equipa', 'Automações', 'Formulários', 'Finanças'],
     badge: 'Mais escolhido' as string | null,
   },
   {

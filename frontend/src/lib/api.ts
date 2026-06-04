@@ -2163,6 +2163,16 @@ export async function reopenOnboarding(): Promise<void> {
   await api.post('/api/onboarding/reopen');
 }
 
+export async function getModuleIntrosSeen(): Promise<string[]> {
+  const res = await api.get<{ seen: string[] }>('/api/onboarding/module-intros');
+  return res.data?.seen ?? [];
+}
+
+export async function markModuleIntroSeen(module: string): Promise<string[]> {
+  const res = await api.post<{ seen: string[] }>('/api/onboarding/module-intros', { module });
+  return res.data?.seen ?? [];
+}
+
 export interface StartupTemplate {
   key: string;
   label: string;
