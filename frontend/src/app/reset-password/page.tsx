@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Lock } from 'lucide-react';
@@ -26,6 +26,26 @@ function ResetPasswordForm() {
   const [success, setSuccess] = useState(false);
   const [hasSession, setHasSession] = useState(false);
   const [checking, setChecking] = useState(true);
+
+  // Track recovery-session state across the component lifetime so we can
+  // tear it down if the user leaves without completing the reset.
+  const hasSessionRef = useRef(false);
+  const completedRef = useRef(false);
+
+  useEffect(() => {
+    hasSessionRef.current = hasSession;
+  }, [hasSession]);
+
+  // If the user abandons the page with an active recovery session (clicks
+  // away, closes the tab, navigates manually) without setting a new password,
+  // sign them out so the recovery link does not grant lasting access.
+  useEffect(() => {
+    return () => {
+      if (hasSessionRef.current && !completedRef.current) {
+        createClient().auth.signOut().catch(() => { /* best-effort */ });
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -94,6 +114,7 @@ function ResetPasswordForm() {
       }
       // Clear mustChangePassword flag in our DB (avoids forced redirect after reset)
       try { await acknowledgePasswordChange(); } catch { /* non-critical */ }
+      completedRef.current = true;
       setSuccess(true);
       setTimeout(() => router.push('/'), 2000);
     } catch {
@@ -101,6 +122,14 @@ function ResetPasswordForm() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Cancelling must destroy the recovery session — otherwise returning to
+  // /login would log the user straight into the account without resetting.
+  const handleCancel = async () => {
+    completedRef.current = true; // prevent the unmount cleanup from double signing-out
+    try { await createClient().auth.signOut(); } catch { /* best-effort */ }
+    router.push('/login');
   };
 
   const content = () => {
@@ -201,9 +230,13 @@ function ResetPasswordForm() {
               {loading ? 'A guardar...' : 'Definir Nova Password'}
             </button>
             <div className="pt-1 text-center">
-              <Link href="/login" className="text-sm text-white/78 transition hover:text-white">
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="text-sm text-white/78 transition hover:text-white"
+              >
                 Cancelar
-              </Link>
+              </button>
             </div>
           </form>
         )}
