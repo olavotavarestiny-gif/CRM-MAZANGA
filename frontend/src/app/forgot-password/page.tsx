@@ -47,7 +47,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <BackgroundGradientAnimation containerClassName="min-h-screen">
-      <div className="absolute inset-0 flex items-center justify-center p-4 z-10">
+      <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-xl bg-white/90 backdrop-blur-sm">
           <div className="p-8">
             <div className="text-center mb-8">

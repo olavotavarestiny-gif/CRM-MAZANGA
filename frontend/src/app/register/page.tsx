@@ -101,9 +101,9 @@ export default function RegisterPage() {
       size="110%"
       blendingValue="soft-light"
     >
-      <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(140,169,255,0.28),transparent_28%),radial-gradient(circle_at_top_right,rgba(114,141,229,0.22),transparent_24%),linear-gradient(180deg,rgba(6,16,36,0.08),rgba(6,16,36,0.38))]" />
+      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(140,169,255,0.28),transparent_28%),radial-gradient(circle_at_top_right,rgba(114,141,229,0.22),transparent_24%),linear-gradient(180deg,rgba(6,16,36,0.08),rgba(6,16,36,0.38))]" />
 
-      <div className="absolute inset-0 z-10 flex items-center justify-center px-4 py-10 sm:px-6">
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10 sm:px-6">
         <div className={`relative w-full ${cardWidth} transition-all`}>
           <div className="absolute inset-x-10 -top-10 h-20 rounded-full bg-white/15 blur-3xl" />
 

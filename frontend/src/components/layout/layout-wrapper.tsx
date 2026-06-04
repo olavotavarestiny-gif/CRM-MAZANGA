@@ -82,11 +82,15 @@ type AuthLoadError = {
 };
 
 // Isolated component so useSearchParams is inside a Suspense boundary
+// Páginas de autenticação não mostram rodapé (ocupa espaço e atrapalha o scroll do conteúdo)
+const NO_FOOTER_PATHS = ['/login', '/register', '/forgot-password', '/reset-password', '/change-password'];
+
 function PublicFooter() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isEmbed = pathname.startsWith('/f/') && searchParams.get('embed') === '1';
-  return isEmbed ? null : <Footer />;
+  if (isEmbed || NO_FOOTER_PATHS.includes(pathname)) return null;
+  return <Footer />;
 }
 
 // ── Inner layout — consumes TourContext ──────────────────────────────────────
