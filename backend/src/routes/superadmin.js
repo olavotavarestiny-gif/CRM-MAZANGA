@@ -9,7 +9,7 @@ const { SUPER_ADMIN_EMAILS, isBootstrapSuperAdminEmail } = require('../middlewar
 
 const BILLING_TYPES = new Set(['trial', 'paid']);
 const ACCOUNT_STATUSES = new Set(['active', 'grace_period', 'suspended']);
-const DURATIONS = new Set([30, 90, 180, 365]);
+const DURATIONS = new Set([14, 30, 90, 180, 365]);
 
 function getClientAccountOwnerWhere(extra = {}) {
   const where = {

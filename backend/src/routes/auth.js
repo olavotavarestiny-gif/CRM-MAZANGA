@@ -5,7 +5,7 @@ const prisma = require('../lib/prisma');
 const requireAuth = require('../middleware/auth');
 const { isBootstrapSuperAdminEmail, verifySupabaseJwt } = require('../middleware/auth');
 const { intersectPermissions, parsePermissions } = require('../lib/permissions');
-const { normalizePlan } = require('../lib/plans');
+const { normalizePlan, DEFAULT_PLAN, isSupportedPlan } = require('../lib/plans');
 const { getSerializedPlanCatalog } = require('../lib/plan-limits');
 const { getSubscriptionState } = require('../lib/subscription-access');
 const { DEV_AUTH_PUBLIC_USER } = require('../lib/dev-auth');
@@ -396,6 +396,124 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
     accountStatus: subscription?.accountStatus || user.accountStatus,
   };
 }
+
+// Simple in-memory rate limiter: max 5 registrations per IP per hour
+const _registerAttempts = new Map();
+function checkRegisterRateLimit(ip) {
+  const now = Date.now();
+  const window = 60 * 60 * 1000; // 1 hour
+  const entry = _registerAttempts.get(ip) || { count: 0, resetAt: now + window };
+  if (now > entry.resetAt) {
+    entry.count = 0;
+    entry.resetAt = now + window;
+  }
+  entry.count += 1;
+  _registerAttempts.set(ip, entry);
+  return entry.count <= 5;
+}
+
+// POST /api/auth/register — public self-registration with 14-day trial
+router.post('/register', async (req, res) => {
+  try {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
+    if (!checkRegisterRateLimit(ip)) {
+      return res.status(429).json({ error: 'Demasiadas tentativas. Tente novamente mais tarde.' });
+    }
+
+    const { name, email, password, workspaceMode, plan } = req.body;
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+      return res.status(400).json({ error: 'Nome deve ter pelo menos 2 caracteres.' });
+    }
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'Email inválido.' });
+    }
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ error: 'Password deve ter pelo menos 6 caracteres.' });
+    }
+    if (workspaceMode && !['servicos', 'comercio'].includes(workspaceMode)) {
+      return res.status(400).json({ error: 'Workspace inválido.' });
+    }
+    const resolvedPlan = plan && isSupportedPlan(plan) ? normalizePlan(plan) : DEFAULT_PLAN;
+
+    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    const dbData = {
+      name: name.trim(),
+      email: normalizedEmail,
+      role: 'user',
+      active: true,
+      mustChangePassword: false,
+      plan: resolvedPlan,
+      workspaceMode: workspaceMode || 'servicos',
+      billingType: 'trial',
+      trialEndsAt,
+      accountStatus: 'active',
+    };
+
+    // Check if DB user already exists
+    const existingDb = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (existingDb) {
+      return res.status(400).json({ error: 'Este email já está registado.' });
+    }
+
+    // Try to create the Supabase user
+    const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
+      email: normalizedEmail,
+      password,
+      email_confirm: true,
+      user_metadata: { name: name.trim() },
+    });
+
+    let supabaseUid;
+
+    if (authError) {
+      // Recovery: Supabase user exists but DB record is missing (previous failed attempt)
+      const isAlreadyExists = authError.message?.toLowerCase().includes('already been registered') ||
+        authError.message?.toLowerCase().includes('already registered') ||
+        authError.message?.toLowerCase().includes('already exists');
+
+      if (!isAlreadyExists) {
+        return res.status(400).json({ error: authError.message });
+      }
+
+      // Find the orphaned Supabase user to get their UID
+      const { data: listData } = await getSupabaseAdmin().auth.admin.listUsers();
+      const orphanedUser = listData?.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
+      if (!orphanedUser) {
+        return res.status(400).json({ error: 'Este email já está registado.' });
+      }
+
+      // Update password to the one the user just provided
+      await getSupabaseAdmin().auth.admin.updateUserById(orphanedUser.id, { password });
+      supabaseUid = orphanedUser.id;
+    } else {
+      supabaseUid = authData.user.id;
+    }
+
+    // Create DB record — rollback Supabase user if this fails
+    try {
+      await prisma.user.create({
+        data: { ...dbData, supabaseUid },
+      });
+    } catch (dbError) {
+      console.error('[auth.register] DB create failed, rolling back Supabase user:', dbError.message);
+      // Only delete if we just created the user (not the recovery path)
+      if (!authError) {
+        await getSupabaseAdmin().auth.admin.deleteUser(supabaseUid).catch(() => {});
+      }
+      throw dbError;
+    }
+
+    res.status(201).json({ success: true, email: normalizedEmail });
+  } catch (error) {
+    console.error('[auth.register] error:', error);
+    res.status(500).json({ error: `Erro ao criar conta: ${error.message}` });
+  }
+});
 
 // POST /api/auth/sync
 // Called by the frontend after Supabase login to link supabaseUid → User record.

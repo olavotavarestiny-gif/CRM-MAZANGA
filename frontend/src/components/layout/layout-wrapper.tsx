@@ -3,13 +3,13 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, Suspense } from 'react';
 import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { dismissWelcomeOnboarding, getCurrentUser, getOnboarding, updateChatPresence, BACKEND_WAKING_EVENT, BACKEND_READY_EVENT } from '@/lib/api';
+import { dismissWelcomeOnboarding, getCurrentUser, getOnboarding, getModuleIntrosSeen, markModuleIntroSeen, updateChatPresence, BACKEND_WAKING_EVENT, BACKEND_READY_EVENT } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import Sidebar from './sidebar';
 import { Footer } from './footer';
-import WelcomeModal from '@/components/help/welcome-modal';
-import ProductTourProvider from '@/components/help/product-tour';
+import ModuleOnboardingModal from '@/components/onboarding/module-onboarding-modal';
+import { routeToModuleKey, resolveModuleIntro, type ModuleIntroContent } from '@/lib/module-onboarding';
 import { BillingSuspendedModal } from '@/components/billing/access-notice';
 import TrialStatusBadge from '@/components/billing/trial-status-badge';
 import KukuGestLogo from '@/components/KukuGestLogo';
@@ -23,7 +23,6 @@ import { isComercio } from '@/lib/business-modes';
 import { getBlockedFeatureCopy } from '@/lib/plan-utils';
 import { DEV_AUTH_USER, isDevAuthSessionActive, writeDevAuthSession } from '@/lib/dev-auth';
 import { getAccessRoleLabel } from '@/lib/roles';
-import { TOUR_KEYS } from '@/lib/tour-steps';
 
 const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
 
@@ -83,11 +82,15 @@ type AuthLoadError = {
 };
 
 // Isolated component so useSearchParams is inside a Suspense boundary
+// Páginas de autenticação não mostram rodapé (ocupa espaço e atrapalha o scroll do conteúdo)
+const NO_FOOTER_PATHS = ['/login', '/register', '/forgot-password', '/reset-password', '/change-password'];
+
 function PublicFooter() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isEmbed = pathname.startsWith('/f/') && searchParams.get('embed') === '1';
-  return isEmbed ? null : <Footer />;
+  if (isEmbed || NO_FOOTER_PATHS.includes(pathname)) return null;
+  return <Footer />;
 }
 
 // ── Inner layout — consumes TourContext ──────────────────────────────────────
@@ -106,7 +109,7 @@ function LayoutInner({
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [showWelcome, setShowWelcome] = useState(false);
+  const [moduleIntro, setModuleIntro] = useState<{ key: string; content: ModuleIntroContent } | null>(null);
   const [accessNotice, setAccessNotice] = useState<AccessNotice | null>(null);
   const [authLoadError, setAuthLoadError] = useState<AuthLoadError | null>(null);
   const [authRetryNonce, setAuthRetryNonce] = useState(0);
@@ -128,6 +131,7 @@ function LayoutInner({
 
   const isPublicPage =
     pathname === '/login' ||
+    pathname === '/register' ||
     pathname === '/forgot-password' ||
     pathname === '/reset-password' ||
     pathname === '/change-password' ||
@@ -164,14 +168,56 @@ function LayoutInner({
     },
   });
 
+  // Welcome modal legado: dismissar silenciosamente (substituído por intros por módulo)
   useEffect(() => {
-    if (devAuthBypassEnabled || isPublicPage || !currentUser) {
-      setShowWelcome(false);
-      return;
+    if (devAuthBypassEnabled || isPublicPage || !currentUser) return;
+    if (onboardingQuery.data?.welcome?.show && !dismissWelcomeMutation.isPending) {
+      dismissWelcomeMutation.mutate();
     }
+  }, [currentUser, devAuthBypassEnabled, isPublicPage, onboardingQuery.data?.welcome?.show]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    setShowWelcome(Boolean(onboardingQuery.data?.welcome?.show));
-  }, [currentUser, devAuthBypassEnabled, isPublicPage, onboardingQuery.data?.welcome?.show]);
+  // Limpa o ?new=1 da URL após o registo (a intro do módulo "painel" aparece naturalmente)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') === '1') {
+      router.replace('/');
+    }
+  }, [router]);
+
+  // ── Onboarding por módulo (modal na 1ª visita a cada secção) ──
+  const moduleIntrosQuery = useQuery({
+    queryKey: ['module-intros'],
+    queryFn: getModuleIntrosSeen,
+    staleTime: 5 * 60_000,
+    enabled: !!currentUser && !isPublicPage && !devAuthBypassEnabled,
+  });
+
+  const markModuleSeenMutation = useMutation({
+    mutationFn: markModuleIntroSeen,
+    onSuccess: (seen) => {
+      queryClient.setQueryData(['module-intros'], seen);
+    },
+  });
+
+  useEffect(() => {
+    if (!currentUser || isPublicPage || devAuthBypassEnabled) return;
+    if (moduleIntro) return; // já há um aberto
+    const seen = moduleIntrosQuery.data;
+    if (!seen) return; // ainda a carregar a lista
+    const moduleKey = routeToModuleKey(pathname);
+    if (!moduleKey || seen.includes(moduleKey)) return;
+    const content = resolveModuleIntro(moduleKey, currentUser.workspaceMode);
+    if (!content) return;
+    setModuleIntro({ key: moduleKey, content });
+  }, [pathname, currentUser, isPublicPage, devAuthBypassEnabled, moduleIntrosQuery.data, moduleIntro]);
+
+  const closeModuleIntro = () => {
+    if (moduleIntro) {
+      markModuleSeenMutation.mutate(moduleIntro.key);
+    }
+    setModuleIntro(null);
+  };
 
   // Detect Supabase password recovery flow — fires when user clicks a reset-password email link
   // The link lands on / with hash tokens; Supabase fires PASSWORD_RECOVERY so we redirect.
@@ -400,20 +446,6 @@ function LayoutInner({
     checkAuth();
   }, [pathname, authRetryNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const dismissWelcomeForAccount = () => {
-    setShowWelcome(false);
-    if (!dismissWelcomeMutation.isPending) {
-      dismissWelcomeMutation.mutate();
-    }
-  };
-
-  const handleStartChecklist = () => {
-    dismissWelcomeForAccount();
-    sessionStorage.setItem(TOUR_KEYS.ACTIVE, 'true');
-    sessionStorage.setItem(TOUR_KEYS.GROUP, '0');
-    window.dispatchEvent(new Event('kukugest:start-tour'));
-    router.push('/');
-  };
 
   if (isLoading && !isPublicPage) {
     return <AppBootLoading />;
@@ -566,11 +598,10 @@ function LayoutInner({
         </main>
       </div>
 
-      <WelcomeModal
-        open={showWelcome && !devAuthBypassEnabled}
-        onClose={dismissWelcomeForAccount}
-        onStartTour={handleStartChecklist}
-        comercio={comercio}
+      <ModuleOnboardingModal
+        content={moduleIntro?.content ?? null}
+        open={!!moduleIntro && !devAuthBypassEnabled}
+        onClose={closeModuleIntro}
       />
       <BillingSuspendedModal subscription={currentUser?.subscription} />
     </div>
@@ -633,9 +664,5 @@ export default function LayoutWrapper({
   children: ReactNode;
   devAuthBypassEnabled?: boolean;
 }) {
-  return (
-    <ProductTourProvider>
-      <LayoutInner devAuthBypassEnabled={devAuthBypassEnabled}>{children}</LayoutInner>
-    </ProductTourProvider>
-  );
+  return <LayoutInner devAuthBypassEnabled={devAuthBypassEnabled}>{children}</LayoutInner>;
 }

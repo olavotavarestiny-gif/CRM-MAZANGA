@@ -83,7 +83,7 @@ const WORKSPACE_PRICING_CATALOG: Record<WorkspaceMode, PricingTier[]> = {
       key: 'starter',
       internalPlan: 'essencial',
       name: 'Inicial',
-      price: '9.999 Kz',
+      price: '14.999 Kz',
       description: 'Para quem está a começar a organizar o negócio',
       features: [
         '1 utilizador',
@@ -100,7 +100,7 @@ const WORKSPACE_PRICING_CATALOG: Record<WorkspaceMode, PricingTier[]> = {
       key: 'growth',
       internalPlan: 'profissional',
       name: 'Crescimento',
-      price: '29.999 Kz',
+      price: '34.999 Kz',
       description: 'Para empresas em crescimento que precisam de mais controlo',
       features: [
         'Até 5 utilizadores',
@@ -119,10 +119,10 @@ const WORKSPACE_PRICING_CATALOG: Record<WorkspaceMode, PricingTier[]> = {
       key: 'pro',
       internalPlan: 'enterprise',
       name: 'Estabilidade',
-      price: '54.999 Kz',
+      price: '64.999 Kz',
       description: 'Para empresas estruturadas que querem crescer com mais inteligência',
       features: [
-        'Utilizadores ilimitados',
+        'Até 15 utilizadores',
         'Contactos ilimitados',
         'Tudo do Crescimento',
         'Relatórios avançados',
@@ -155,7 +155,7 @@ const WORKSPACE_PRICING_CATALOG: Record<WorkspaceMode, PricingTier[]> = {
       key: 'growth',
       internalPlan: 'profissional',
       name: 'Crescimento',
-      price: '29.999 Kz',
+      price: '22.999 Kz',
       description: 'Para lojas em crescimento com mais movimento',
       features: [
         'Até 5 utilizadores',
@@ -173,10 +173,10 @@ const WORKSPACE_PRICING_CATALOG: Record<WorkspaceMode, PricingTier[]> = {
       key: 'pro',
       internalPlan: 'enterprise',
       name: 'Estabilidade',
-      price: '54.999 Kz',
+      price: '44.999 Kz',
       description: 'Para operações estruturadas com controlo total',
       features: [
-        'Utilizadores ilimitados',
+        'Até 15 utilizadores',
         'Clientes ilimitados',
         'Tudo do Crescimento',
         'Multi-estabelecimento',
@@ -566,4 +566,155 @@ export function getPlanLimitModalCopy({
     description: 'Esta funcionalidade está disponível num plano superior do KukuGest.',
     ctaLabel: 'Ver planos',
   };
+}
+
+// ── Dados de preços para a página de registo ─────────────────────────────────
+
+export function formatKz(amount: number) {
+  return amount.toLocaleString('pt-PT') + ' Kz';
+}
+
+export type RegisterPlanKey = 'essencial' | 'profissional' | 'enterprise';
+
+export interface RegisterPlan {
+  key: RegisterPlanKey;
+  name: string;
+  description: string;
+  monthlyPrice: number;
+  annualMonthlyPrice: number;
+  annualTotalPrice: number;
+  features: string[];
+  badge: string | null;
+}
+
+// Preços diferem por workspace (serviços vs comércio)
+export const REGISTER_PRICING: Record<'servicos' | 'comercio', RegisterPlan[]> = {
+  servicos: [
+    {
+      key: 'essencial', name: 'Inicial', description: 'Para começar e validar o negócio.',
+      monthlyPrice: 14999, annualMonthlyPrice: 9583, annualTotalPrice: 115000,
+      features: ['1 utilizador', 'Contactos e leads', 'Processos de venda (Kanban)', 'Tarefas', 'Calendário'],
+      badge: null,
+    },
+    {
+      key: 'profissional', name: 'Crescimento', description: 'Para equipas a crescer com mais automação.',
+      monthlyPrice: 34999, annualMonthlyPrice: 22500, annualTotalPrice: 270000,
+      features: ['Até 5 utilizadores', 'Tudo do Inicial', 'Chat interno da equipa', 'Automações', 'Formulários', 'Finanças'],
+      badge: 'Mais escolhido',
+    },
+    {
+      key: 'enterprise', name: 'Estabilidade', description: 'Para operações completas com mais escala.',
+      monthlyPrice: 64999, annualMonthlyPrice: 41667, annualTotalPrice: 500000,
+      features: ['Até 15 utilizadores', 'Tudo do Crescimento', 'Contactos ilimitados', 'Armazenamento máximo'],
+      badge: null,
+    },
+  ],
+  comercio: [
+    {
+      key: 'essencial', name: 'Inicial', description: 'Para pequenas lojas venderem com simplicidade.',
+      monthlyPrice: 9999, annualMonthlyPrice: 6250, annualTotalPrice: 75000,
+      features: ['1 utilizador', 'Clientes', 'Produtos e stock', 'Tarefas', 'Caixa'],
+      badge: null,
+    },
+    {
+      key: 'profissional', name: 'Crescimento', description: 'Para lojas em crescimento com mais movimento.',
+      monthlyPrice: 22999, annualMonthlyPrice: 14583, annualTotalPrice: 175000,
+      features: ['Até 5 utilizadores', 'Tudo do Inicial', 'Faturação', 'Venda rápida', 'Finanças'],
+      badge: 'Mais escolhido',
+    },
+    {
+      key: 'enterprise', name: 'Estabilidade', description: 'Para operações estruturadas com escala.',
+      monthlyPrice: 44999, annualMonthlyPrice: 28333, annualTotalPrice: 340000,
+      features: ['Até 15 utilizadores', 'Tudo do Crescimento', 'Multi-estabelecimento', 'Relatórios avançados'],
+      badge: null,
+    },
+  ],
+};
+
+// Card de contacto (não é plano self-serve) — igual nos dois workspaces
+export const EXPANSAO_CARD = {
+  name: 'Expansão',
+  priceLabel: 'Sob cotação',
+  description: 'Para grandes operações com necessidades à medida.',
+  features: ['Utilizadores ilimitados', 'Tudo da Estabilidade', 'Limites personalizados', 'Suporte dedicado'],
+};
+
+// Desconto anual real por workspace (calculado do plano Crescimento)
+export function annualDiscountPct(mode: 'servicos' | 'comercio'): number {
+  const plan = REGISTER_PRICING[mode][1];
+  return Math.round((1 - plan.annualTotalPrice / (plan.monthlyPrice * 12)) * 100);
+}
+
+// Link de contacto para o plano Expansão (sob cotação)
+export function buildExpansaoLink(): string {
+  const message = 'Olá, tenho interesse no plano Expansão da KukuGest. Gostava de receber uma proposta à medida.';
+  return `https://wa.me/244942277576?text=${encodeURIComponent(message)}`;
+}
+
+// ── Questionário de recomendação (workspace + plano) no registo ──────────────
+
+export type WorkspaceRec = 'servicos' | 'comercio';
+export type PlanRec = RegisterPlanKey; // 'essencial' | 'profissional' | 'enterprise'
+
+export interface RegisterQuestionOption {
+  label: string;
+  hint?: string;
+  workspace?: WorkspaceRec;
+  plan?: PlanRec;
+}
+
+export interface RegisterQuestion {
+  id: 'tipo' | 'equipa' | 'prioridade';
+  question: string;
+  options: RegisterQuestionOption[];
+}
+
+export const REGISTER_QUESTIONS: RegisterQuestion[] = [
+  {
+    id: 'tipo',
+    question: 'O que vendes principalmente?',
+    options: [
+      { label: 'Serviços', hint: 'Consultoria, agência, clínica, assistência…', workspace: 'servicos' },
+      { label: 'Produtos físicos', hint: 'Loja, balcão, comércio', workspace: 'comercio' },
+    ],
+  },
+  {
+    id: 'equipa',
+    question: 'Quantas pessoas vão usar o sistema?',
+    options: [
+      { label: 'Só eu', plan: 'essencial' },
+      { label: '2 a 5 pessoas', plan: 'profissional' },
+      { label: '6 a 15 pessoas', plan: 'enterprise' },
+    ],
+  },
+  {
+    id: 'prioridade',
+    question: 'O que é mais importante agora?',
+    options: [
+      { label: 'Organizar contactos e vendas', plan: 'essencial' },
+      { label: 'Automatizar e centralizar', plan: 'profissional' },
+      { label: 'Operação completa, sem limites', plan: 'enterprise' },
+    ],
+  },
+];
+
+const PLAN_ORDER: PlanRec[] = ['essencial', 'profissional', 'enterprise'];
+
+export interface RegisterAnswers {
+  tipo?: WorkspaceRec;
+  equipa?: PlanRec;
+  prioridade?: PlanRec;
+}
+
+export function recommendFromAnswers(answers: RegisterAnswers): { workspace: WorkspaceRec; plan: PlanRec } {
+  const workspace = answers.tipo ?? 'servicos';
+  const tiers = [answers.equipa, answers.prioridade].filter(Boolean) as PlanRec[];
+  const plan = tiers.length
+    ? tiers.reduce((hi, t) => (PLAN_ORDER.indexOf(t) > PLAN_ORDER.indexOf(hi) ? t : hi))
+    : 'profissional';
+  return { workspace, plan };
+}
+
+export function workspaceLabel(workspace: WorkspaceRec): string {
+  return workspace === 'comercio' ? 'Comércio' : 'Serviços';
 }

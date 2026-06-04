@@ -6,6 +6,7 @@ const requireAuth = require('../middleware/auth');
 const router = express.Router();
 const FLOW_KEY = 'onboarding_v2';
 const WELCOME_FLOW_KEY = 'welcome_v1';
+const MODULE_INTROS_FLOW_KEY = 'module_intros_v1';
 const GLOBAL_WORKSPACE_MODE = 'global';
 const AUTO_SHOW_WINDOW_MS = 5 * 60_000;
 
@@ -393,6 +394,77 @@ router.post('/reopen', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[onboarding] reopen error:', err);
     return res.status(500).json({ error: 'Failed to reopen onboarding' });
+  }
+});
+
+// ── Module intros: modal de introdução por módulo (1ª visita) ────────────────
+
+// GET /api/onboarding/module-intros → { seen: string[] }
+router.get('/module-intros', requireAuth, async (req, res) => {
+  try {
+    const orgId = req.user.effectiveUserId;
+    const record = await prisma.onboardingProgress.findUnique({
+      where: {
+        organization_id_workspace_mode_flow_key: {
+          organization_id: String(orgId),
+          workspace_mode: GLOBAL_WORKSPACE_MODE,
+          flow_key: MODULE_INTROS_FLOW_KEY,
+        },
+      },
+      select: { completed_steps: true },
+    });
+    return res.json({ seen: record?.completed_steps ?? [] });
+  } catch (err) {
+    console.error('[onboarding] module-intros get error:', err);
+    return res.status(500).json({ error: 'Failed to load module intros' });
+  }
+});
+
+// POST /api/onboarding/module-intros  body { module } → marca o módulo como visto
+router.post('/module-intros', requireAuth, async (req, res) => {
+  try {
+    const orgId = req.user.effectiveUserId;
+    const moduleKey = typeof req.body?.module === 'string' ? req.body.module.trim() : '';
+    if (!moduleKey) {
+      return res.status(400).json({ error: 'module é obrigatório' });
+    }
+
+    const existing = await prisma.onboardingProgress.findUnique({
+      where: {
+        organization_id_workspace_mode_flow_key: {
+          organization_id: String(orgId),
+          workspace_mode: GLOBAL_WORKSPACE_MODE,
+          flow_key: MODULE_INTROS_FLOW_KEY,
+        },
+      },
+      select: { completed_steps: true },
+    });
+
+    const seen = new Set(existing?.completed_steps ?? []);
+    seen.add(moduleKey);
+    const completed_steps = Array.from(seen);
+
+    await prisma.onboardingProgress.upsert({
+      where: {
+        organization_id_workspace_mode_flow_key: {
+          organization_id: String(orgId),
+          workspace_mode: GLOBAL_WORKSPACE_MODE,
+          flow_key: MODULE_INTROS_FLOW_KEY,
+        },
+      },
+      create: {
+        organization_id: String(orgId),
+        workspace_mode: GLOBAL_WORKSPACE_MODE,
+        flow_key: MODULE_INTROS_FLOW_KEY,
+        completed_steps,
+      },
+      update: { completed_steps },
+    });
+
+    return res.json({ success: true, seen: completed_steps });
+  } catch (err) {
+    console.error('[onboarding] module-intros post error:', err);
+    return res.status(500).json({ error: 'Failed to mark module intro' });
   }
 });
 

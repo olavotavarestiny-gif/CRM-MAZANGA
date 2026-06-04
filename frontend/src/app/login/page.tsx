@@ -1,50 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Activity, Copy, Lock, Mail, RefreshCw } from 'lucide-react';
+import { Lock, Mail, RefreshCw } from 'lucide-react';
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
 import { KukuGestLoginLogo } from '@/components/KukuGestLogo';
-import {
-  getLoginUserMessage,
-  isRetryableLoginCode,
-  type LoginTechnicalError,
-} from '@/lib/auth-error-codes';
+import { getLoginUserMessage, isRetryableLoginCode, type LoginTechnicalError } from '@/lib/auth-error-codes';
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [retryingProfile, setRetryingProfile] = useState(false);
-  const [diagnosing, setDiagnosing] = useState(false);
   const [error, setError] = useState<LoginTechnicalError | null>(null);
-  const [diagnostics, setDiagnostics] = useState<Record<string, unknown> | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [registered, setRegistered] = useState(false);
 
-  const supportCode = error
-    ? JSON.stringify({
-      code: error.code,
-      requestId: error.requestId,
-      details: error.details,
-    })
-    : '';
-
-  const copySupportCode = async () => {
-    if (!supportCode || typeof navigator === 'undefined') return;
-    await navigator.clipboard?.writeText(supportCode).catch(() => {});
-  };
-
-  const runDiagnostics = async () => {
-    setDiagnosing(true);
-    try {
-      const response = await fetch('/api/auth/diagnostics', { cache: 'no-store' });
-      const payload = await response.json().catch(() => null);
-      setDiagnostics(payload || { ok: false, code: 'LOGIN_DIAGNOSTICS_FAILED' });
-    } catch {
-      setDiagnostics({ ok: false, code: 'LOGIN_NETWORK_ERROR' });
-    } finally {
-      setDiagnosing(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('registered') === '1') {
+        setRegistered(true);
+        window.history.replaceState({}, '', '/login');
+      }
     }
-  };
+  }, []);
 
   const retryProfileLoad = async () => {
     setRetryingProfile(true);
@@ -77,7 +56,6 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setDiagnostics(null);
     setLoading(true);
 
     try {
@@ -129,9 +107,9 @@ export default function LoginPage() {
       size="110%"
       blendingValue="soft-light"
     >
-      <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(140,169,255,0.28),transparent_28%),radial-gradient(circle_at_top_right,rgba(114,141,229,0.22),transparent_24%),linear-gradient(180deg,rgba(6,16,36,0.08),rgba(6,16,36,0.38))]" />
+      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(140,169,255,0.28),transparent_28%),radial-gradient(circle_at_top_right,rgba(114,141,229,0.22),transparent_24%),linear-gradient(180deg,rgba(6,16,36,0.08),rgba(6,16,36,0.38))]" />
 
-      <div className="absolute inset-0 z-10 flex items-center justify-center px-4 py-10 sm:px-6">
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10 sm:px-6">
         <div className="relative w-full max-w-[28.5rem]">
           <div className="absolute inset-x-10 -top-10 h-20 rounded-full bg-white/15 blur-3xl" />
 
@@ -143,58 +121,26 @@ export default function LoginPage() {
               <p className="mt-1 text-sm text-white/75 sm:text-base">Bem-vindo de volta</p>
             </div>
 
-            {error && (
-              <div className="relative mt-7 space-y-3 rounded-2xl border border-[#ffb3bc]/40 bg-[#811b27]/22 px-4 py-3 text-sm text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                <div>{error.message}</div>
-
-                <div className="rounded-xl border border-white/15 bg-black/15 p-3 text-xs text-white/80">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <span className="font-semibold text-white/90">Código para suporte</span>
-                    <button
-                      type="button"
-                      onClick={copySupportCode}
-                      className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-white/20 px-2 text-[11px] text-white/85 transition hover:bg-white/10"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                      Copiar
-                    </button>
-                  </div>
-                  <code className="block break-words font-mono text-[11px] leading-relaxed text-white/75">
-                    {supportCode}
-                  </code>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {isRetryableLoginCode(error.code) && (
-                    <button
-                      type="button"
-                      onClick={retryProfileLoad}
-                      disabled={retryingProfile}
-                      className="inline-flex h-9 items-center gap-2 rounded-lg bg-white/15 px-3 text-xs font-semibold text-white transition hover:bg-white/22 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <RefreshCw className={`h-3.5 w-3.5 ${retryingProfile ? 'animate-spin' : ''}`} />
-                      {retryingProfile ? 'A tentar...' : 'Tentar novamente'}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={runDiagnostics}
-                    disabled={diagnosing}
-                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/20 px-3 text-xs font-semibold text-white/85 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Activity className={`h-3.5 w-3.5 ${diagnosing ? 'animate-pulse' : ''}`} />
-                    {diagnosing ? 'A diagnosticar...' : 'Diagnóstico'}
-                  </button>
-                </div>
+            {registered && (
+              <div className="relative mt-7 rounded-2xl border border-[#6ee7b7]/40 bg-[#064e3b]/25 px-4 py-3 text-sm text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                Conta criada com sucesso! Faça login para entrar.
               </div>
             )}
 
-            {diagnostics && (
-              <div className="relative mt-3 rounded-2xl border border-white/18 bg-black/18 px-4 py-3 text-xs text-white/78">
-                <div className="mb-2 font-semibold text-white/90">Diagnóstico técnico</div>
-                <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">
-                  {JSON.stringify(diagnostics, null, 2)}
-                </pre>
+            {error && (
+              <div className="relative mt-7 rounded-2xl border border-[#ffb3bc]/40 bg-[#811b27]/22 px-4 py-3 text-sm text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                <p>{error.message}</p>
+                {isRetryableLoginCode(error.code) && (
+                  <button
+                    type="button"
+                    onClick={retryProfileLoad}
+                    disabled={retryingProfile}
+                    className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/15 px-3 text-xs font-semibold text-white transition hover:bg-white/22 disabled:opacity-60"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${retryingProfile ? 'animate-spin' : ''}`} />
+                    {retryingProfile ? 'A tentar...' : 'Tentar novamente'}
+                  </button>
+                )}
               </div>
             )}
 
@@ -240,6 +186,13 @@ export default function LoginPage() {
               <div className="pt-1 text-center">
                 <Link href="/forgot-password" className="text-sm text-white/78 transition hover:text-white">
                   Esqueci a password
+                </Link>
+              </div>
+
+              <div className="pt-2 text-center">
+                <Link href="/register" className="text-sm text-white/78 transition hover:text-white">
+                  Não tem conta?{' '}
+                  <span className="font-semibold text-white">Criar conta grátis</span>
                 </Link>
               </div>
             </form>
