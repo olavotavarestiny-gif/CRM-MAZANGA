@@ -436,46 +436,81 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Workspace inválido.' });
     }
 
-    const existing = await prisma.user.findFirst({
+    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    const dbData = {
+      name: name.trim(),
+      email: normalizedEmail,
+      role: 'user',
+      active: true,
+      mustChangePassword: false,
+      plan: DEFAULT_PLAN,
+      workspaceMode: workspaceMode || 'servicos',
+      billingType: 'trial',
+      trialEndsAt,
+      accountStatus: 'active',
+    };
+
+    // Check if DB user already exists
+    const existingDb = await prisma.user.findFirst({
       where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
       select: { id: true },
     });
-    if (existing) {
+    if (existingDb) {
       return res.status(400).json({ error: 'Este email já está registado.' });
     }
 
+    // Try to create the Supabase user
     const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
       email: normalizedEmail,
       password,
       email_confirm: true,
       user_metadata: { name: name.trim() },
     });
+
+    let supabaseUid;
+
     if (authError) {
-      return res.status(400).json({ error: authError.message });
+      // Recovery: Supabase user exists but DB record is missing (previous failed attempt)
+      const isAlreadyExists = authError.message?.toLowerCase().includes('already been registered') ||
+        authError.message?.toLowerCase().includes('already registered') ||
+        authError.message?.toLowerCase().includes('already exists');
+
+      if (!isAlreadyExists) {
+        return res.status(400).json({ error: authError.message });
+      }
+
+      // Find the orphaned Supabase user to get their UID
+      const { data: listData } = await getSupabaseAdmin().auth.admin.listUsers();
+      const orphanedUser = listData?.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
+      if (!orphanedUser) {
+        return res.status(400).json({ error: 'Este email já está registado.' });
+      }
+
+      // Update password to the one the user just provided
+      await getSupabaseAdmin().auth.admin.updateUserById(orphanedUser.id, { password });
+      supabaseUid = orphanedUser.id;
+    } else {
+      supabaseUid = authData.user.id;
     }
 
-    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-
-    await prisma.user.create({
-      data: {
-        name: name.trim(),
-        email: normalizedEmail,
-        supabaseUid: authData.user.id,
-        role: 'user',
-        active: true,
-        mustChangePassword: false,
-        plan: DEFAULT_PLAN,
-        workspaceMode: workspaceMode || 'servicos',
-        billingType: 'trial',
-        trialEndsAt,
-        accountStatus: 'active',
-      },
-    });
+    // Create DB record — rollback Supabase user if this fails
+    try {
+      await prisma.user.create({
+        data: { ...dbData, supabaseUid },
+      });
+    } catch (dbError) {
+      console.error('[auth.register] DB create failed, rolling back Supabase user:', dbError.message);
+      // Only delete if we just created the user (not the recovery path)
+      if (!authError) {
+        await getSupabaseAdmin().auth.admin.deleteUser(supabaseUid).catch(() => {});
+      }
+      throw dbError;
+    }
 
     res.status(201).json({ success: true, email: normalizedEmail });
   } catch (error) {
     console.error('[auth.register] error:', error);
-    res.status(500).json({ error: 'Erro ao criar conta. Tente novamente.' });
+    res.status(500).json({ error: `Erro ao criar conta: ${error.message}` });
   }
 });
 
