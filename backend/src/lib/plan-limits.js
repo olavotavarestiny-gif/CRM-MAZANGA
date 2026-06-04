@@ -21,7 +21,7 @@ const PLAN_CATALOG = {
       label: 'Inicial',
       description: 'Ideal para pequenas equipas a organizar operação e vendas.',
       limits: {
-        users: 3,
+        users: 1,
         contacts: 500,
         tasks: 50,
         automations: 0,
@@ -52,14 +52,14 @@ const PLAN_CATALOG = {
         formSubmissionsPerMonth: 500,
         storageGb: 5,
         maxFileSizeMb: 10,
-        teamMembers: 5,
+        teamMembers: 1,
       },
     },
     profissional: {
       label: 'Crescimento',
       description: 'Ideal para equipas em crescimento com mais colaboração e automação.',
       limits: {
-        users: 10,
+        users: 5,
         contacts: 5000,
         tasks: Infinity,
         automations: 10,
@@ -90,14 +90,14 @@ const PLAN_CATALOG = {
         formSubmissionsPerMonth: 5000,
         storageGb: 50,
         maxFileSizeMb: 25,
-        teamMembers: 25,
+        teamMembers: 5,
       },
     },
     enterprise: {
       label: 'Estabilidade',
       description: 'Plano personalizado para operações avançadas e maior escala.',
       limits: {
-        users: Infinity,
+        users: 15,
         contacts: Infinity,
         tasks: Infinity,
         automations: Infinity,
@@ -128,7 +128,7 @@ const PLAN_CATALOG = {
         formSubmissionsPerMonth: Infinity,
         storageGb: Infinity,
         maxFileSizeMb: Infinity,
-        teamMembers: Infinity,
+        teamMembers: 15,
       },
     },
   },
@@ -137,7 +137,7 @@ const PLAN_CATALOG = {
       label: 'Inicial',
       description: 'Para pequenas lojas que precisam de vender com simplicidade.',
       limits: {
-        users: 0,
+        users: 1,
         contacts: 300,
         tasks: Infinity,
         automations: 0,
@@ -168,14 +168,14 @@ const PLAN_CATALOG = {
         formSubmissionsPerMonth: 0,
         storageGb: 5,
         maxFileSizeMb: 10,
-        teamMembers: 0,
+        teamMembers: 1,
       },
     },
     profissional: {
       label: 'Crescimento',
       description: 'Para lojas em crescimento com mais movimento e mais controlo operacional.',
       limits: {
-        users: 4,
+        users: 5,
         contacts: 3000,
         tasks: Infinity,
         automations: 0,
@@ -206,14 +206,14 @@ const PLAN_CATALOG = {
         formSubmissionsPerMonth: 0,
         storageGb: 50,
         maxFileSizeMb: 25,
-        teamMembers: 4,
+        teamMembers: 5,
       },
     },
     enterprise: {
       label: 'Estabilidade',
       description: 'Para operações estruturadas com escala, multi-estabelecimento e controlo total.',
       limits: {
-        users: Infinity,
+        users: 15,
         contacts: Infinity,
         tasks: Infinity,
         automations: 0,
@@ -244,7 +244,7 @@ const PLAN_CATALOG = {
         formSubmissionsPerMonth: 0,
         storageGb: Infinity,
         maxFileSizeMb: Infinity,
-        teamMembers: Infinity,
+        teamMembers: 15,
       },
     },
   },
@@ -386,7 +386,8 @@ async function getUsage(orgId, key) {
 
   switch (key) {
     case 'users':
-      return prisma.user.count({ where: { accountOwnerId: orgId, active: true } });
+      // +1 para incluir o dono da conta (não tem accountOwnerId, logo não é contado)
+      return (await prisma.user.count({ where: { accountOwnerId: orgId, active: true } })) + 1;
     case 'contacts':
       return prisma.contact.count({ where: { userId: orgId } });
     case 'tasks':
@@ -414,7 +415,8 @@ async function getUsage(orgId, key) {
     case 'customFields':
       return prisma.contactFieldDef.count({ where: { userId: orgId, active: true } });
     case 'teamMembers':
-      return prisma.user.count({ where: { accountOwnerId: orgId, active: true } });
+      // +1 para incluir o dono da conta
+      return (await prisma.user.count({ where: { accountOwnerId: orgId, active: true } })) + 1;
     default:
       return 0;
   }

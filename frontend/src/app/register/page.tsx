@@ -8,6 +8,9 @@ import { KukuGestLoginLogo } from '@/components/KukuGestLogo';
 import {
   REGISTER_PRICING,
   REGISTER_QUESTIONS,
+  EXPANSAO_CARD,
+  annualDiscountPct,
+  buildExpansaoLink,
   recommendFromAnswers,
   workspaceLabel,
   formatKz,
@@ -92,7 +95,8 @@ export default function RegisterPage() {
     }
   };
 
-  const cardWidth = step === 2 ? 'max-w-[58rem]' : 'max-w-[28.5rem]';
+  const cardWidth = step === 2 ? 'max-w-[68rem]' : 'max-w-[28.5rem]';
+  const plans = REGISTER_PRICING[selectedWorkspace];
 
   return (
     <BackgroundGradientAnimation
@@ -238,14 +242,14 @@ export default function RegisterPage() {
                       className={`flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition ${billing === 'annual' ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white/80'}`}
                     >
                       Anual
-                      <span className="rounded-full bg-[#ff6b35] px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">-30%</span>
+                      <span className="rounded-full bg-[#ff6b35] px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">-{annualDiscountPct(selectedWorkspace)}%</span>
                     </button>
                   </div>
                 </div>
 
                 {/* Cards */}
-                <div className="relative grid gap-3 mt-2 sm:grid-cols-3">
-                  {REGISTER_PRICING.map((tier) => {
+                <div className="relative grid gap-3 mt-2 sm:grid-cols-2 lg:grid-cols-4">
+                  {plans.map((tier) => {
                     const isSelected = selectedPlan === tier.key;
                     const isRecommended = hasRecommendation && tier.key === selectedPlan;
                     const price = billing === 'annual' ? tier.annualMonthlyPrice : tier.monthlyPrice;
@@ -296,6 +300,31 @@ export default function RegisterPage() {
                       </button>
                     );
                   })}
+
+                  {/* Card Expansão — sob cotação (não selecionável) */}
+                  <div className="relative flex flex-col rounded-[1.25rem] border border-dashed border-white/25 bg-white/[0.04] p-5 text-left">
+                    <p className="text-sm font-semibold text-white/80">{EXPANSAO_CARD.name}</p>
+                    <div className="mt-2 mb-1">
+                      <span className="text-xl font-bold text-white">{EXPANSAO_CARD.priceLabel}</span>
+                    </div>
+                    <p className="text-[12px] text-white/55 mb-4 leading-snug">{EXPANSAO_CARD.description}</p>
+                    <ul className="space-y-1.5 mb-4">
+                      {EXPANSAO_CARD.features.map((f) => (
+                        <li key={f} className="flex items-start gap-2 text-[12px] text-white/75">
+                          <Check className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[#ff6b35]" strokeWidth={2.5} />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                    <a
+                      href={buildExpansaoLink()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-auto block rounded-lg border border-white/25 py-2 text-center text-xs font-semibold text-white transition hover:bg-white/10"
+                    >
+                      Falar connosco
+                    </a>
+                  </div>
                 </div>
 
                 <div className="relative mt-6 space-y-3">
@@ -325,7 +354,7 @@ export default function RegisterPage() {
                   <KukuGestLoginLogo className="mx-auto mb-4" />
                   <h2 className="text-lg font-bold text-white">Cria a tua conta</h2>
                   <p className="mt-1 text-sm text-white/70">
-                    Plano <span className="font-semibold text-white">{REGISTER_PRICING.find((t) => t.key === selectedPlan)?.name}</span>
+                    Plano <span className="font-semibold text-white">{plans.find((t) => t.key === selectedPlan)?.name}</span>
                     {' · '}{workspaceLabel(selectedWorkspace)} · 14 dias grátis
                   </p>
                 </div>
