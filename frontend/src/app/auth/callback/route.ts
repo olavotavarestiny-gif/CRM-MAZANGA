@@ -10,20 +10,12 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get('type') as EmailOtpType | null;
   const env = getSupabaseEnv();
 
-  if (type === 'recovery' || next === '/reset-password') {
-    const redirectUrl = new URL('/reset-password', origin);
-
-    for (const key of ['code', 'token_hash', 'type', 'error', 'error_code', 'error_description']) {
-      const value = searchParams.get(key);
-      if (value) {
-        redirectUrl.searchParams.set(key, value);
-      }
-    }
-
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  const safeNext = next && next.startsWith('/') ? next : '/';
+  const isRecovery = type === 'recovery' || next === '/reset-password';
+  const safeNext = isRecovery
+    ? '/reset-password'
+    : next && next.startsWith('/')
+      ? next
+      : '/';
   const redirectUrl = new URL(safeNext, origin);
   const code = searchParams.get('code');
   const tokenHash = searchParams.get('token_hash');

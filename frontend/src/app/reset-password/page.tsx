@@ -1,18 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { Lock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { acknowledgePasswordChange } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import Link from 'next/link';
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
-import { Suspense } from 'react';
+import { KukuGestLoginLogo } from '@/components/KukuGestLogo';
 import { PasswordRequirements } from '@/components/password-requirements';
-import { KukuGestIcon } from '@/components/KukuGestLogo';
 import {
   formatPasswordProviderError,
   getPasswordValidationError,
@@ -111,9 +107,9 @@ function ResetPasswordForm() {
     // Show spinner while checking session
     if (checking) {
       return (
-        <div className="p-8 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0A2540] mx-auto mb-3" />
-          <p className="text-[#6b7e9a] text-sm">A verificar...</p>
+        <div className="relative py-10 text-center">
+          <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-b-2 border-white" />
+          <p className="text-sm text-white/75">A verificar...</p>
         </div>
       );
     }
@@ -121,23 +117,20 @@ function ResetPasswordForm() {
     // Link expired or missing session
     if (linkError === 'link_expired' || (!hasSession && !checking)) {
       return (
-        <div className="p-8 text-center">
-          <div className="text-center mb-6">
-            <KukuGestIcon size={28} />
-          </div>
-          <h1 className="text-xl font-bold text-[#0A2540] mb-3" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-            Link expirado
-          </h1>
-          <p className="text-[#6b7e9a] text-sm mb-6">
+        <div className="relative text-center">
+          <KukuGestLoginLogo className="mx-auto mb-5" />
+          <h1 className="text-xl font-semibold text-white sm:text-2xl">Link expirado</h1>
+          <p className="mt-2 text-sm text-white/75">
             Este link de reset expirou ou já foi usado. Solicita um novo.
           </p>
-          <Link href="/forgot-password">
-            <Button className="w-full bg-[#0A2540] hover:bg-[#0d3060]">
-              Pedir novo link
-            </Button>
+          <Link
+            href="/forgot-password"
+            className="mt-7 flex h-12 w-full items-center justify-center rounded-[0.95rem] bg-[linear-gradient(180deg,#12356b,#071a36)] text-sm font-semibold text-white shadow-[0_12px_30px_rgba(4,16,38,0.35),inset_0_1px_0_rgba(255,255,255,0.12)] transition hover:brightness-110"
+          >
+            Pedir novo link
           </Link>
-          <div className="mt-3 text-center">
-            <Link href="/login" className="text-sm text-[#0A2540] hover:text-[#0d3060]">
+          <div className="pt-3 text-center">
+            <Link href="/login" className="text-sm text-white/78 transition hover:text-white">
               Voltar para Login
             </Link>
           </div>
@@ -147,79 +140,95 @@ function ResetPasswordForm() {
 
     // Password form
     return (
-      <div className="p-8">
-        <div className="text-center mb-8">
-          <KukuGestIcon size={28} />
-          <h1 className="text-2xl font-bold text-[#0A2540]" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-            Nova Password
-          </h1>
-          <p className="text-[#6b7e9a] text-sm mt-1">
+      <>
+        <div className="relative text-center">
+          <KukuGestLoginLogo className="mx-auto mb-5" />
+          <h1 className="text-xl font-semibold text-white sm:text-2xl">Nova password</h1>
+          <p className="mt-1 text-sm text-white/75">
             Escolhe uma password segura com maiúsculas, minúsculas, número e símbolo.
           </p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+          <div className="relative mt-7 rounded-2xl border border-[#ffb3bc]/40 bg-[#811b27]/22 px-4 py-3 text-sm text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
             {error}
           </div>
         )}
 
         {success ? (
-          <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center">
-            <p className="text-green-700 font-semibold">Password definida!</p>
-            <p className="text-green-600 text-sm mt-1">A redirecionar...</p>
+          <div className="relative mt-7 rounded-2xl border border-[#6ee7b7]/40 bg-[#064e3b]/25 px-4 py-4 text-center text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+            <p className="font-semibold text-white">Password definida!</p>
+            <p className="mt-1 text-sm text-white/80">A redirecionar...</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="relative mt-7 space-y-5">
             <div>
-              <Label className="text-[#0A2540]">Nova Password</Label>
-              <Input
-                type="password"
-                placeholder="Ex: MinhaSenha@2026"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="mt-1"
-                autoFocus
-              />
-              <PasswordRequirements password={password} className="mt-2" />
+              <label className="mb-2 block text-sm font-medium text-white/88">Nova Password</label>
+              <div className="group relative">
+                <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/55 transition-colors group-focus-within:text-white/80" />
+                <input
+                  type="password"
+                  placeholder="Ex: MinhaSenha@2026"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  autoFocus
+                  className="h-14 w-full rounded-[0.95rem] border border-white/55 bg-white/[0.06] pl-11 pr-4 text-[0.95rem] text-white placeholder:text-white/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] outline-none transition focus:border-white/80 focus:bg-white/[0.09] focus:ring-2 focus:ring-white/20"
+                />
+              </div>
+              <PasswordRequirements password={password} className="mt-2 text-white/70" />
             </div>
             <div>
-              <Label className="text-[#0A2540]">Confirmar Password</Label>
-              <Input
-                type="password"
-                placeholder="Repete a password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="mt-1"
-              />
+              <label className="mb-2 block text-sm font-medium text-white/88">Confirmar Password</label>
+              <div className="group relative">
+                <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/55 transition-colors group-focus-within:text-white/80" />
+                <input
+                  type="password"
+                  placeholder="Repete a password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="h-14 w-full rounded-[0.95rem] border border-white/55 bg-white/[0.06] pl-11 pr-4 text-[0.95rem] text-white placeholder:text-white/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] outline-none transition focus:border-white/80 focus:bg-white/[0.09] focus:ring-2 focus:ring-white/20"
+                />
+              </div>
             </div>
-            <Button
+            <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#0A2540] hover:bg-[#0d3060]"
+              className="mt-1 h-12 w-full rounded-[0.95rem] bg-[linear-gradient(180deg,#12356b,#071a36)] text-sm font-semibold text-white shadow-[0_12px_30px_rgba(4,16,38,0.35),inset_0_1px_0_rgba(255,255,255,0.12)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? 'A guardar...' : 'Definir Nova Password'}
-            </Button>
-            <div className="text-center">
-              <Link href="/login" className="text-sm text-[#0A2540] hover:text-[#0d3060]">
+            </button>
+            <div className="pt-1 text-center">
+              <Link href="/login" className="text-sm text-white/78 transition hover:text-white">
                 Cancelar
               </Link>
             </div>
           </form>
         )}
-      </div>
+      </>
     );
   };
 
   return (
-    <BackgroundGradientAnimation containerClassName="min-h-screen">
-      <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
-        <Card className="w-full max-w-md shadow-xl bg-white/90 backdrop-blur-sm">
-          {content()}
-        </Card>
+    <BackgroundGradientAnimation
+      containerClassName="min-h-screen"
+      interactive={false}
+      size="110%"
+      blendingValue="soft-light"
+    >
+      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(140,169,255,0.28),transparent_28%),radial-gradient(circle_at_top_right,rgba(114,141,229,0.22),transparent_24%),linear-gradient(180deg,rgba(6,16,36,0.08),rgba(6,16,36,0.38))]" />
+
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10 sm:px-6">
+        <div className="relative w-full max-w-[28.5rem]">
+          <div className="absolute inset-x-10 -top-10 h-20 rounded-full bg-white/15 blur-3xl" />
+
+          <div className="relative overflow-hidden rounded-[2rem] border border-white/35 bg-[linear-gradient(180deg,rgba(181,191,205,0.42),rgba(111,124,141,0.52))] p-6 shadow-[0_30px_80px_rgba(6,16,36,0.38),inset_0_1px_0_rgba(255,255,255,0.3)] backdrop-blur-[22px] sm:p-8">
+            <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.22),transparent_32%,transparent_68%,rgba(255,255,255,0.08))]" />
+            {content()}
+          </div>
+        </div>
       </div>
     </BackgroundGradientAnimation>
   );
@@ -228,8 +237,8 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0A2540]" />
+      <div className="flex min-h-screen items-center justify-center bg-[#06101f]">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-white" />
       </div>
     }>
       <ResetPasswordForm />
