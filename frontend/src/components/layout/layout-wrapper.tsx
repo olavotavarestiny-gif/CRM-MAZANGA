@@ -559,7 +559,7 @@ function LayoutInner({
           </div>
         )}
 
-        {devAuthBypassEnabled && (
+        {devAuthBypassEnabled && process.env.NEXT_PUBLIC_HIDE_DEV_BANNER !== 'true' && (
           <div className="flex items-center justify-center bg-red-700 px-4 py-2 text-center text-sm font-black text-white shadow-sm">
             ⚠️ MODO DEV — Auth desactivado — Não é produção
           </div>
