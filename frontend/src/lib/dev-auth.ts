@@ -24,28 +24,21 @@ const DEV_PLAN_LIMITS = {
   automations: null,
 };
 
-// Modo de workspace da conta de demonstração local.
-// Define NEXT_PUBLIC_DEV_WORKSPACE_MODE=comercio para capturar os ecrãs de
-// Caixa/POS, Produtos e Faturação; o valor por omissão ('servicos') mostra o
-// CRM completo (pipeline, conversas, automações, formulários).
-const DEV_WORKSPACE_MODE: 'servicos' | 'comercio' =
-  process.env.NEXT_PUBLIC_DEV_WORKSPACE_MODE === 'comercio' ? 'comercio' : 'servicos';
-
 export const DEV_AUTH_USER = {
   id: 'dev-user-local-001',
-  name: 'Carla Mendes',
-  email: 'carla@mazanga.ao',
+  name: 'Dev Tester',
+  email: 'dev@local.test',
   role: 'OrgAdmin',
   accessRole: ACCESS_ROLES.ORG_ADMIN,
   orgId: 'dev-org-local-001',
-  orgName: 'Mazanga Soluções',
+  orgName: 'Dev Org Local',
   active: true,
   accountOwnerId: null,
-  accountOwnerName: 'Mazanga Soluções',
+  accountOwnerName: 'Dev Org Local',
   isSuperAdmin: false,
   permissions: null,
   mustChangePassword: false,
-  workspaceMode: DEV_WORKSPACE_MODE,
+  workspaceMode: 'servicos',
   plan: 'enterprise',
   planDetails: {
     label: 'Enterprise',
