@@ -8,13 +8,13 @@ import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
 import DealsKanbanBoard from '@/components/pipeline/deals-kanban-board';
 import DealStageManager from '@/components/pipeline/deal-stage-manager';
+import NewDealDialog from '@/components/pipeline/new-deal-dialog';
 import { getApiErrorMessage } from '@/lib/api-error-message';
 import { Settings2, Handshake } from 'lucide-react';
 
 export default function NegociacoesPage() {
   const [isStageManagerOpen, setIsStageManagerOpen] = useState(false);
-  // TODO Task 11: o diálogo de "Nova negociação" liga-se aqui.
-  const [, setIsNewDealOpen] = useState(false);
+  const [isNewDealOpen, setIsNewDealOpen] = useState(false);
 
   const {
     data: currentUser,
@@ -118,7 +118,10 @@ export default function NegociacoesPage() {
         onClose={() => setIsStageManagerOpen(false)}
       />
 
-      {/* TODO Task 11: <NewDealDialog open={isNewDealOpen} onClose={() => setIsNewDealOpen(false)} /> */}
+      <NewDealDialog
+        open={isNewDealOpen}
+        onClose={() => setIsNewDealOpen(false)}
+      />
     </div>
   );
 }
