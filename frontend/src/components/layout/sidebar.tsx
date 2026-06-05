@@ -8,7 +8,7 @@ import {
   BarChart3, Users, MessageSquare, Zap, Kanban,
   CheckSquare, FileText, LogOut, X, DollarSign, CalendarDays,
   Package, Settings, HelpCircle, ShieldAlert, ShoppingBag, ShoppingCart,
-  ChevronDown, CreditCard, Clock3,
+  ChevronDown, CreditCard, Clock3, Building2,
 } from 'lucide-react';
 import { isComercio } from '@/lib/business-modes';
 import KukuGestLogo from '@/components/KukuGestLogo';
@@ -21,9 +21,10 @@ import type { ModuleKey } from '@/lib/permissions';
 import { buildWhatsAppSupportLink, getPlanBadgeClasses, getPricingTierLabel } from '@/lib/plan-utils';
 
 const TOUR_ATTR: Record<string, string> = {
-  '/':          'sidebar-painel',
-  '/pipeline':  'sidebar-negociacoes',
-  '/contacts':  'sidebar-contactos',
+  '/':            'sidebar-painel',
+  '/pipeline':    'sidebar-negociacoes',
+  '/negociacoes': 'sidebar-negociacoes',
+  '/contacts':    'sidebar-contactos',
 };
 
 export default function Sidebar({
@@ -100,6 +101,7 @@ export default function Sidebar({
     '/':                null, // always visible
     '/contacts':        'contacts',
     '/pipeline':        'pipeline',
+    '/negociacoes':     'pipeline',
     '/tasks':           'tasks',
     '/calendario':      'calendario',
     '/chat':            'chat',
@@ -128,6 +130,7 @@ export default function Sidebar({
     { href: '/', label: 'Painel', icon: BarChart3 },
     { href: '/contacts', label: 'Contactos', icon: Users, module: 'contacts' as const },
     { href: '/pipeline', label: 'Processos de Venda', icon: Kanban, module: 'pipeline' as const },
+    { href: '/negociacoes', label: 'Negociações', icon: Building2, module: 'pipeline' as const },
     { href: '/tasks', label: 'Tarefas', icon: CheckSquare, module: 'tasks' as const },
     { href: '/vendas', label: 'Vendas', icon: ShoppingBag, module: 'vendas' as const },
     { href: '/chat', label: 'Conversas', icon: MessageSquare, module: 'chat' as const },
