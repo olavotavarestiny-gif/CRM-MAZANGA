@@ -75,6 +75,9 @@ model User {
   startupTemplatesAppliedBy StartupTemplateApplication[] @relation("StartupTemplateAppliedBy")
   serviceDashboardSettings  ServiceDashboardSettings?
   financialCategories       FinancialCategory[]
+  companies                 Company[]              @relation("CompanyUser")
+  deals                     Deal[]                 @relation("DealUser")
+  dealStages                DealStage[]            @relation("DealStageUser")
 
   @@index([assignedEstabelecimentoId])
   @@index([accountStatus])
@@ -128,6 +131,8 @@ model Contact {
   nif             String?
   dealValueKz     Float?
   contactGroupId  String?
+  companyId       String?
+  company_rel     Company?         @relation(fields: [companyId], references: [id], onDelete: SetNull)
   contactGroup    ContactGroup?    @relation(fields: [contactGroupId], references: [id], onDelete: SetNull)
   user            User?            @relation("ContactUser", fields: [userId], references: [id], onDelete: SetNull)
   notes           ContactNote[]
@@ -135,11 +140,13 @@ model Contact {
   calendarEvents  CalendarEvent[]
   messages        Message[]
   tasks           Task[]
+  dealStakeholders DealStakeholder[]
   transactions    Transaction[]
   automationLogs  AutomationLog[]
   automationAlerts AutomationAlert[]
 
   @@unique([userId, phone], name: "user_phone_unique")
+  @@index([companyId])
   @@index([contactGroupId])
   @@index([userId])
   @@index([userId, createdAt])
@@ -1031,4 +1038,79 @@ model MessagingOptOut {
   updatedAt       DateTime @updatedAt
 
   @@index([isActive])
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  userId    Int
+  name      String
+  nif       String?
+  sector    String?
+  website   String?
+  location  String?
+  sizeTier  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User      @relation("CompanyUser", fields: [userId], references: [id], onDelete: Cascade)
+  deals     Deal[]
+  contacts  Contact[]
+
+  @@index([userId])
+  @@index([userId, createdAt])
+}
+
+model DealStage {
+  id        String   @id @default(cuid())
+  userId    Int
+  name      String
+  color     String   @default("#6b7e9a")
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  user      User     @relation("DealStageUser", fields: [userId], references: [id], onDelete: Cascade)
+  deals     Deal[]
+
+  @@unique([userId, name])
+}
+
+model Deal {
+  id                String            @id @default(cuid())
+  userId            Int
+  companyId         String
+  stageId           String
+  title             String
+  valueKz           Float?
+  status            String            @default("aberto")
+  lossReason        String?
+  ownerUserId       Int?
+  expectedCloseDate DateTime?
+  stageEnteredAt    DateTime          @default(now())
+  closedAt          DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  user              User              @relation("DealUser", fields: [userId], references: [id], onDelete: Cascade)
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stage             DealStage         @relation(fields: [stageId], references: [id])
+  stakeholders      DealStakeholder[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, stageId])
+  @@index([companyId])
+}
+
+model DealStakeholder {
+  id        String   @id @default(cuid())
+  dealId    String
+  contactId Int
+  role      String   @default("outro")
+  influence String?
+  isPrimary Boolean  @default(false)
+  notes     String?
+  addedAt   DateTime @default(now())
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, contactId])
+  @@index([dealId])
+  @@index([contactId])
 }
