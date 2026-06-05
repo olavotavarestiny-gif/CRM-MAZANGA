@@ -29,6 +29,7 @@ const financesRouter = require('./routes/finances');
 const accountRouter = require('./routes/account');
 const pipelineStagesRouter = require('./routes/pipeline-stages');
 const dealStagesRouter = require('./routes/deal-stages');
+const companiesRouter = require('./routes/companies');
 const pipelineAnalyticsRouter = require('./routes/pipeline-analytics');
 const calendarRouter = require('./routes/calendar');
 const faturacaoConfigRouter = require('./routes/faturacao-config');
@@ -342,6 +343,7 @@ app.use('/api/finances', requireAuth, checkSubscriptionAccess, requirePlanFeatur
 app.use('/api/account', requireAuth, checkSubscriptionAccess, accountRouter);
 app.use('/api/pipeline-stages', requireAuth, checkSubscriptionAccess, pipelineStagesRouter);
 app.use('/api/deal-stages', requireAuth, checkSubscriptionAccess, requirePlanFeature('processos'), dealStagesRouter);
+app.use('/api/companies', requireAuth, checkSubscriptionAccess, requirePlanFeature('processos'), companiesRouter);
 app.use('/api/pipeline/analytics', requireAuth, checkSubscriptionAccess, requirePlanFeature('processos'), pipelineAnalyticsRouter);
 app.use('/api/calendar', calendarRouter);
 // Faturação AGT
