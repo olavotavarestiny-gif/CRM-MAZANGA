@@ -26,8 +26,13 @@ import type {
   ContactGroup,
   ContactFieldConfig,
   ContactFieldDef,
+  Company,
   CRMForm,
   DashboardStats,
+  Deal,
+  DealStage,
+  DealStakeholder,
+  DealStatus,
   Estabelecimento,
   Factura,
   FacturaLine,
@@ -55,6 +60,8 @@ import type {
   ServicesAdvancedTeamResponse,
   ServicesDashboardBase,
   ServicesDashboardSettings,
+  StakeholderInfluence,
+  StakeholderRole,
   StockMovement,
   SystemFieldKey,
   Task,
@@ -549,6 +556,87 @@ export async function deletePipelineStage(id: string) {
 export async function reorderPipelineStages(order: { id: string; order: number }[]) {
   const response = await api.put<PipelineStage[]>('/api/pipeline-stages/reorder', { order });
   return asArray<PipelineStage>(response.data);
+}
+
+// ---- Negociações B2B ----
+export async function getDealStages() {
+  const response = await api.get<DealStage[]>('/api/deal-stages');
+  return asArray<DealStage>(response.data);
+}
+export async function createDealStage(data: { name: string; color: string }) {
+  const response = await api.post<DealStage>('/api/deal-stages', data);
+  return response.data;
+}
+export async function updateDealStage(id: string, data: { name?: string; color?: string }) {
+  const response = await api.put<DealStage>(`/api/deal-stages/${id}`, data);
+  return response.data;
+}
+export async function deleteDealStage(id: string) {
+  await api.delete(`/api/deal-stages/${id}`);
+}
+export async function reorderDealStages(order: { id: string; order: number }[]) {
+  const response = await api.put<DealStage[]>('/api/deal-stages/reorder', { order });
+  return asArray<DealStage>(response.data);
+}
+
+export async function getCompanies() {
+  const response = await api.get<Company[]>('/api/companies');
+  return asArray<Company>(response.data);
+}
+export async function getCompany(id: string) {
+  const response = await api.get<Company & { deals: Deal[]; contacts: { id: number; name: string; email: string; phone: string }[] }>(`/api/companies/${id}`);
+  return response.data;
+}
+export async function createCompany(data: Partial<Company>) {
+  const response = await api.post<Company>('/api/companies', data);
+  return response.data;
+}
+
+export async function getDeals(status?: DealStatus) {
+  const response = await api.get<Deal[]>('/api/deals', { params: status ? { status } : undefined });
+  return asArray<Deal>(response.data);
+}
+export async function getDeal(id: string) {
+  const response = await api.get<Deal>(`/api/deals/${id}`);
+  return response.data;
+}
+export async function createDeal(data: { title: string; companyId?: string; newCompanyName?: string; valueKz?: number | null; stageId?: string }) {
+  const response = await api.post<Deal>('/api/deals', data);
+  return response.data;
+}
+export async function updateDeal(id: string, data: { title?: string; valueKz?: number | null; stageId?: string; expectedCloseDate?: string | null }) {
+  const response = await api.put<Deal>(`/api/deals/${id}`, data);
+  return response.data;
+}
+export async function closeDeal(id: string, data: { status: 'ganho' | 'perdido'; lossReason?: string }) {
+  const response = await api.post<Deal>(`/api/deals/${id}/close`, data);
+  return response.data;
+}
+export async function reopenDeal(id: string) {
+  const response = await api.post<Deal>(`/api/deals/${id}/reopen`, {});
+  return response.data;
+}
+export async function deleteDeal(id: string) {
+  await api.delete(`/api/deals/${id}`);
+}
+
+export async function addStakeholder(dealId: string, data: {
+  contactId?: number;
+  newContact?: { name: string; phone?: string; email?: string };
+  role: StakeholderRole;
+  influence?: StakeholderInfluence | null;
+  isPrimary?: boolean;
+  notes?: string | null;
+}) {
+  const response = await api.post<DealStakeholder>(`/api/deals/${dealId}/stakeholders`, data);
+  return response.data;
+}
+export async function updateStakeholder(dealId: string, stakeholderId: string, data: Partial<Pick<DealStakeholder, 'role' | 'influence' | 'isPrimary' | 'notes'>>) {
+  const response = await api.put<DealStakeholder>(`/api/deals/${dealId}/stakeholders/${stakeholderId}`, data);
+  return response.data;
+}
+export async function removeStakeholder(dealId: string, stakeholderId: string) {
+  await api.delete(`/api/deals/${dealId}/stakeholders/${stakeholderId}`);
 }
 
 export async function getPipelineAnalyticsConversion(params: {

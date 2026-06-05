@@ -1469,3 +1469,62 @@ export interface ContactNote {
   updatedAt: string;
   user?: { id: number; name: string };
 }
+
+export interface Company {
+  id: string;
+  userId: number;
+  name: string;
+  nif?: string | null;
+  sector?: string | null;
+  website?: string | null;
+  location?: string | null;
+  sizeTier?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { deals: number };
+}
+
+export interface DealStage {
+  id: string;
+  userId: number;
+  name: string;
+  color: string;
+  order: number;
+}
+
+export type DealStatus = 'aberto' | 'ganho' | 'perdido';
+export type StakeholderRole = 'tecnico' | 'decisor' | 'financeiro' | 'influenciador' | 'outro';
+export type StakeholderInfluence = 'alto' | 'medio' | 'baixo';
+
+export interface DealStakeholder {
+  id: string;
+  dealId: string;
+  contactId: number;
+  role: StakeholderRole;
+  influence?: StakeholderInfluence | null;
+  isPrimary: boolean;
+  notes?: string | null;
+  addedAt: string;
+  contact?: { id: number; name: string; email: string; phone: string };
+}
+
+export interface Deal {
+  id: string;
+  userId: number;
+  companyId: string;
+  stageId: string;
+  title: string;
+  valueKz?: number | null;
+  status: DealStatus;
+  lossReason?: string | null;
+  ownerUserId?: number | null;
+  expectedCloseDate?: string | null;
+  stageEnteredAt: string;
+  closedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  company?: Company;
+  stage?: DealStage;
+  stakeholders?: DealStakeholder[];
+  _count?: { stakeholders: number };
+}
