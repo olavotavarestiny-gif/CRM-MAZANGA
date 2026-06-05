@@ -8,6 +8,13 @@ const { logRouteError } = require('../lib/request-log');
 const VALID_ROLES = ['tecnico', 'decisor', 'financeiro', 'influenciador', 'outro'];
 const VALID_INFLUENCE = ['alto', 'medio', 'baixo'];
 
+// Coage valueKz para número finito ou null (evita NaN a chegar ao Prisma)
+function toValueKz(raw) {
+  if (raw == null || raw === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 const dealInclude = {
   company: true,
   stage: true,
@@ -81,7 +88,7 @@ router.post('/', requirePermission('pipeline', 'edit'), async (req, res) => {
       data: {
         userId, companyId: resolvedCompanyId, stageId: resolvedStageId,
         title: title.trim(),
-        valueKz: valueKz != null ? Number(valueKz) : null,
+        valueKz: toValueKz(valueKz),
         ownerUserId: req.user.id,
         stageEnteredAt: new Date(),
       },
@@ -104,7 +111,7 @@ router.put('/:id', requirePermission('pipeline', 'edit'), async (req, res) => {
     const { title, valueKz, stageId, expectedCloseDate } = req.body;
     const data = {};
     if (title !== undefined) data.title = title.trim();
-    if (valueKz !== undefined) data.valueKz = valueKz != null ? Number(valueKz) : null;
+    if (valueKz !== undefined) data.valueKz = toValueKz(valueKz);
     if (expectedCloseDate !== undefined) data.expectedCloseDate = expectedCloseDate ? new Date(expectedCloseDate) : null;
 
     let stageChanged = false;

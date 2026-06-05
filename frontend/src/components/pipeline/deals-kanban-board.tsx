@@ -145,8 +145,8 @@ export default function DealsKanbanBoard({
       {/* Desktop View */}
       <DragDropContext onDragEnd={handleDragEnd}>
         <div
-          className="hidden md:grid gap-4"
-          style={{ gridTemplateColumns: `repeat(${Math.min(stages.length, 4)}, minmax(0, 1fr))` }}
+          className="hidden md:grid gap-4 overflow-x-auto pb-2"
+          style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(240px, 1fr))` }}
         >
           {stages.map((stage) => {
             const stageDeals = openDeals.filter((d) => d.stageId === stage.id);
