@@ -1277,6 +1277,13 @@ export async function seedFinancialCategories(): Promise<void> {
   await api.post('/api/finances/seed-categories');
 }
 
+export async function importStatement(
+  rows: { date: string; description: string; amountKz: number; category: string }[],
+): Promise<{ created: number; errors: { index: number; reason: string }[] }> {
+  const response = await api.post('/api/finances/import-statement', { transactions: rows });
+  return response.data;
+}
+
 export async function downloadTransactionsCSV(params?: { dateFrom?: string; dateTo?: string; type?: string; status?: string }): Promise<void> {
   const response = await api.get('/api/finances/export-csv', { params, responseType: 'blob' });
   const url = window.URL.createObjectURL(new Blob([response.data]));

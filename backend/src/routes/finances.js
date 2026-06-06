@@ -945,4 +945,64 @@ router.get('/export-csv', requirePermission('finances', 'transactions_view'), as
   }
 });
 
+// ─── POST /api/finances/import-statement ────────────────────────────────────
+// Recebe array de transações já parseadas pelo frontend e cria-as em massa.
+router.post('/import-statement', async (req, res) => {
+  try {
+    const { transactions: rows } = req.body;
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ error: 'Nenhuma transação fornecida.' });
+    }
+
+    if (rows.length > 500) {
+      return res.status(400).json({ error: 'Máximo de 500 transações por importação.' });
+    }
+
+    const created = [];
+    const errors = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const { date, description, amountKz, category } = row;
+
+      if (!date || !amountKz || isNaN(parseFloat(amountKz)) || parseFloat(amountKz) <= 0) {
+        errors.push({ index: i, reason: 'Data ou valor inválido.' });
+        continue;
+      }
+
+      const parsedDate = new Date(date);
+      if (isNaN(parsedDate.getTime())) {
+        errors.push({ index: i, reason: 'Data inválida.' });
+        continue;
+      }
+
+      try {
+        const tx = await prisma.transaction.create({
+          data: {
+            userId: req.user.effectiveUserId,
+            date: parsedDate,
+            type: 'saida',
+            category: category || 'Importado',
+            description: description || null,
+            amountKz: parseFloat(amountKz),
+            currencyOrigin: 'KZ',
+            exchangeRate: 1.0,
+            status: 'pago',
+            attachments: '[]',
+          },
+        });
+        created.push(tx.id);
+      } catch (txErr) {
+        errors.push({ index: i, reason: txErr.message });
+      }
+    }
+
+    res.json({ created: created.length, errors });
+  } catch (error) {
+    console.error('Error importing statement:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

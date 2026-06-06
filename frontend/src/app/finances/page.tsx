@@ -25,7 +25,8 @@ import { isComercio } from '@/lib/business-modes';
 import TransactionForm from '@/components/finances/transaction-form';
 import ClientProfitabilityModal from '@/components/finances/client-profitability-modal';
 import CategoryManagerModal from '@/components/finances/category-manager-modal';
-import { TrendingUp, TrendingDown, DollarSign, RefreshCw, Plus, Download, ChevronLeft, ChevronRight, Pencil, Trash2, BarChart2, ArrowDownUp, Wallet, Landmark, Paperclip, Settings2 } from 'lucide-react';
+import ImportStatementDialog from '@/components/finances/import-statement-dialog';
+import { TrendingUp, TrendingDown, DollarSign, RefreshCw, Plus, Download, ChevronLeft, ChevronRight, Pencil, Trash2, BarChart2, ArrowDownUp, Wallet, Landmark, Paperclip, Settings2, FileUp } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FilterBar } from '@/components/ui/filter-bar';
 
@@ -65,6 +66,7 @@ export default function FinancesPage() {
   const [profitabilityClient, setProfitabilityClient] = useState<ClientProfitability | null>(null);
   const [activeTab, setActiveTab] = useState<'transacoes' | 'rentabilidade'>('transacoes');
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser'],
@@ -186,6 +188,16 @@ export default function FinancesPage() {
             <Settings2 className="w-4 h-4" />
             Categorias
           </Button>
+          {activeTab === 'transacoes' && (
+            <Button
+              variant="outline"
+              onClick={() => setImportOpen(true)}
+              className="w-full gap-2 lg:w-auto border-violet-200 text-violet-700 hover:bg-violet-50"
+            >
+              <FileUp className="w-4 h-4" />
+              Importar Extrato
+            </Button>
+          )}
           {activeTab === 'transacoes' && (
             <Button
               onClick={() => { setEditTransaction(undefined); setFormOpen(true); }}
@@ -565,6 +577,14 @@ export default function FinancesPage() {
       <CategoryManagerModal
         open={categoryManagerOpen}
         onClose={() => setCategoryManagerOpen(false)}
+      />
+      <ImportStatementDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => {
+          queryClient.invalidateQueries({ queryKey: ['transactions'] });
+          queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] });
+        }}
       />
       </div>}
     </div>
