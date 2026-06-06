@@ -59,9 +59,29 @@ const CATEGORY_OPTIONS = [
 
 function parseAmount(raw: string): number | null {
   if (!raw || raw.trim() === '') return null;
-  // Remove spaces, currency symbols, and normalise decimal
-  const cleaned = raw.replace(/[^\d,.\-]/g, '').replace(/,(?=\d{3})/g, '').replace(',', '.');
-  const n = parseFloat(cleaned);
+
+  let s = raw.trim().replace(/[^\d,.\-]/g, '');
+  if (!s) return null;
+
+  const lastDot = s.lastIndexOf('.');
+  const lastComma = s.lastIndexOf(',');
+
+  if (lastDot !== -1 && lastComma !== -1) {
+    // Both separators present — whichever comes last is the decimal separator
+    if (lastComma > lastDot) {
+      // European format: 15.800,9 → remove dots, comma becomes decimal point
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      // US format: 15,800.90 → remove commas
+      s = s.replace(/,/g, '');
+    }
+  } else if (lastComma !== -1) {
+    // Only comma → treat as decimal separator (European)
+    s = s.replace(',', '.');
+  }
+  // Only dot or plain integer: parseFloat handles as-is
+
+  const n = parseFloat(s);
   return isNaN(n) ? null : n;
 }
 
