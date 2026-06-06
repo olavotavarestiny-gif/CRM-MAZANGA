@@ -13,7 +13,8 @@ import PipelineStageManager from '@/components/pipeline/pipeline-stage-manager';
 import PipelineAnalyticsView from '@/components/pipeline/pipeline-analytics-view';
 import { EmptyState } from '@/components/ui/empty-state';
 import { getApiErrorMessage } from '@/lib/api-error-message';
-import { Settings2, Users } from 'lucide-react';
+import Link from 'next/link';
+import { Settings2, Users, User, Building2 } from 'lucide-react';
 
 export default function PipelinePage() {
   const router = useRouter();
@@ -128,6 +129,21 @@ export default function PipelinePage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
+      {/* Toggle modo */}
+      <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl w-fit shadow-sm">
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#0A2540] text-white shadow-sm">
+          <User className="w-4 h-4" />
+          Cliente Individual
+        </div>
+        <Link
+          href="/negociacoes"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540] transition-colors"
+        >
+          <Building2 className="w-4 h-4" />
+          Empresa
+        </Link>
+      </div>
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">{pageTitle}</h1>

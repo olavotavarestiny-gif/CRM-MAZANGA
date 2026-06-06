@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { getDeals, getDealStages, getCurrentUser } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,7 @@ import DealsKanbanBoard from '@/components/pipeline/deals-kanban-board';
 import DealStageManager from '@/components/pipeline/deal-stage-manager';
 import NewDealDialog from '@/components/pipeline/new-deal-dialog';
 import { getApiErrorMessage } from '@/lib/api-error-message';
-import { Settings2, Handshake } from 'lucide-react';
+import { Settings2, Handshake, User, Building2 } from 'lucide-react';
 
 export default function NegociacoesPage() {
   const [isStageManagerOpen, setIsStageManagerOpen] = useState(false);
@@ -61,6 +62,21 @@ export default function NegociacoesPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
+      {/* Toggle modo */}
+      <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl w-fit shadow-sm">
+        <Link
+          href="/pipeline"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540] transition-colors"
+        >
+          <User className="w-4 h-4" />
+          Cliente Individual
+        </Link>
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#0A2540] text-white shadow-sm">
+          <Building2 className="w-4 h-4" />
+          Empresa
+        </div>
+      </div>
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Negociações</h1>

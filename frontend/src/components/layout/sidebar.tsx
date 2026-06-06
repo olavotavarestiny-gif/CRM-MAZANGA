@@ -8,7 +8,7 @@ import {
   BarChart3, Users, MessageSquare, Zap, Kanban,
   CheckSquare, FileText, LogOut, X, DollarSign, CalendarDays,
   Package, Settings, HelpCircle, ShieldAlert, ShoppingBag, ShoppingCart,
-  ChevronDown, CreditCard, Clock3, Building2,
+  ChevronDown, CreditCard, Clock3, Building2, Handshake,
 } from 'lucide-react';
 import { isComercio } from '@/lib/business-modes';
 import KukuGestLogo from '@/components/KukuGestLogo';
@@ -129,8 +129,7 @@ export default function Sidebar({
   const allMainLinks = [
     { href: '/', label: 'Painel', icon: BarChart3 },
     { href: '/contacts', label: 'Contactos', icon: Users, module: 'contacts' as const },
-    { href: '/pipeline', label: 'Processos de Venda', icon: Kanban, module: 'pipeline' as const },
-    { href: '/negociacoes', label: 'Negociações', icon: Building2, module: 'pipeline' as const },
+    { href: '/negociacoes', label: 'Negociações', icon: Handshake, module: 'pipeline' as const },
     { href: '/tasks', label: 'Tarefas', icon: CheckSquare, module: 'tasks' as const },
     { href: '/vendas', label: 'Vendas', icon: ShoppingBag, module: 'vendas' as const },
     { href: '/chat', label: 'Conversas', icon: MessageSquare, module: 'chat' as const },

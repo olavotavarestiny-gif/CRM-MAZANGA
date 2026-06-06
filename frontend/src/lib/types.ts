@@ -1528,3 +1528,16 @@ export interface Deal {
   stakeholders?: DealStakeholder[];
   _count?: { stakeholders: number };
 }
+
+export type DealNoteType = 'nota' | 'reuniao' | 'chamada' | 'email' | 'proximo_passo';
+
+export interface DealNote {
+  id: string;
+  dealId: string;
+  userId: number;
+  content: string;
+  noteType: DealNoteType;
+  createdAt: string;
+  updatedAt: string;
+  user?: { id: number; name: string };
+}

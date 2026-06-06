@@ -620,6 +620,25 @@ export async function deleteDeal(id: string) {
   await api.delete(`/api/deals/${id}`);
 }
 
+export async function getDealNotes(dealId: string, skip = 0) {
+  const res = await api.get(`/api/deals/${dealId}/notes?skip=${skip}`);
+  return res.data as import('./types').DealNote[];
+}
+
+export async function createDealNote(dealId: string, content: string, noteType: import('./types').DealNoteType = 'nota') {
+  const res = await api.post(`/api/deals/${dealId}/notes`, { content, noteType });
+  return res.data as import('./types').DealNote;
+}
+
+export async function updateDealNote(noteId: string, content: string, noteType?: import('./types').DealNoteType) {
+  const res = await api.put(`/api/deals/notes/${noteId}`, { content, noteType });
+  return res.data as import('./types').DealNote;
+}
+
+export async function deleteDealNote(noteId: string) {
+  await api.delete(`/api/deals/notes/${noteId}`);
+}
+
 export async function addStakeholder(dealId: string, data: {
   contactId?: number;
   newContact?: { name: string; phone?: string; email?: string };

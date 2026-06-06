@@ -301,4 +301,102 @@ router.delete('/:id/stakeholders/:stakeholderId', requirePermission('pipeline', 
   }
 });
 
+// ── Deal Notes ─────────────────────────────────────────────────────────────────
+
+const VALID_NOTE_TYPES = ['nota', 'reuniao', 'chamada', 'email', 'proximo_passo'];
+
+// GET /api/deals/:id/notes
+router.get('/:id/notes', requirePermission('pipeline', 'view'), async (req, res) => {
+  try {
+    const userId = req.user.effectiveUserId;
+    const deal = await loadOwnedDeal(req.params.id, userId);
+    if (!deal) return res.status(404).json({ error: 'Negociação não encontrada' });
+
+    const skip = parseInt(req.query.skip) || 0;
+    const notes = await prisma.dealNote.findMany({
+      where: { dealId: deal.id },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      skip,
+      include: { user: { select: { id: true, name: true } } },
+    });
+    res.json(notes);
+  } catch (error) {
+    logRouteError('[deals.notes.list] error', req, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/deals/:id/notes
+router.post('/:id/notes', requirePermission('pipeline', 'edit'), async (req, res) => {
+  try {
+    const userId = req.user.effectiveUserId;
+    const deal = await loadOwnedDeal(req.params.id, userId);
+    if (!deal) return res.status(404).json({ error: 'Negociação não encontrada' });
+
+    const { content, noteType } = req.body;
+    if (!content || !content.trim()) return res.status(400).json({ error: 'Conteúdo é obrigatório' });
+    const type = VALID_NOTE_TYPES.includes(noteType) ? noteType : 'nota';
+
+    const note = await prisma.dealNote.create({
+      data: { dealId: deal.id, userId: req.user.id, content: content.trim(), noteType: type },
+      include: { user: { select: { id: true, name: true } } },
+    });
+    res.status(201).json(note);
+  } catch (error) {
+    logRouteError('[deals.notes.create] error', req, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/deals/notes/:noteId
+router.put('/notes/:noteId', requirePermission('pipeline', 'edit'), async (req, res) => {
+  try {
+    const userId = req.user.effectiveUserId;
+    const note = await prisma.dealNote.findUnique({
+      where: { id: req.params.noteId },
+      include: { deal: { select: { userId: true } } },
+    });
+    if (!note || note.deal?.userId !== userId) return res.status(404).json({ error: 'Nota não encontrada' });
+    if (note.userId !== req.user.id && req.user.role !== 'admin' && !req.user.isAccountOwner) {
+      return res.status(403).json({ error: 'Sem permissão para editar esta nota' });
+    }
+
+    const { content, noteType } = req.body;
+    if (!content || !content.trim()) return res.status(400).json({ error: 'Conteúdo é obrigatório' });
+    const data = { content: content.trim() };
+    if (noteType && VALID_NOTE_TYPES.includes(noteType)) data.noteType = noteType;
+
+    const updated = await prisma.dealNote.update({
+      where: { id: note.id },
+      data,
+      include: { user: { select: { id: true, name: true } } },
+    });
+    res.json(updated);
+  } catch (error) {
+    logRouteError('[deals.notes.update] error', req, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/deals/notes/:noteId
+router.delete('/notes/:noteId', requirePermission('pipeline', 'edit'), async (req, res) => {
+  try {
+    const userId = req.user.effectiveUserId;
+    const note = await prisma.dealNote.findUnique({
+      where: { id: req.params.noteId },
+      include: { deal: { select: { userId: true } } },
+    });
+    if (!note || note.deal?.userId !== userId) return res.status(404).json({ error: 'Nota não encontrada' });
+    if (note.userId !== req.user.id && req.user.role !== 'admin' && !req.user.isAccountOwner) {
+      return res.status(403).json({ error: 'Sem permissão para apagar esta nota' });
+    }
+    await prisma.dealNote.delete({ where: { id: note.id } });
+    res.json({ ok: true });
+  } catch (error) {
+    logRouteError('[deals.notes.delete] error', req, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

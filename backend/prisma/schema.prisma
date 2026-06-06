@@ -78,6 +78,7 @@ model User {
   companies                 Company[]              @relation("CompanyUser")
   deals                     Deal[]                 @relation("DealUser")
   dealStages                DealStage[]            @relation("DealStageUser")
+  dealNotes                 DealNote[]             @relation("DealNoteAuthor")
 
   @@index([assignedEstabelecimentoId])
   @@index([accountStatus])
@@ -1091,11 +1092,27 @@ model Deal {
   company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   stage             DealStage         @relation(fields: [stageId], references: [id])
   stakeholders      DealStakeholder[]
+  notes             DealNote[]
 
   @@index([userId])
   @@index([userId, status])
   @@index([userId, stageId])
   @@index([companyId])
+}
+
+model DealNote {
+  id        String   @id @default(cuid())
+  dealId    String
+  userId    Int
+  content   String
+  noteType  String   @default("nota")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user      User     @relation("DealNoteAuthor", fields: [userId], references: [id])
+
+  @@index([dealId])
+  @@index([dealId, createdAt])
 }
 
 model DealStakeholder {
