@@ -4,10 +4,10 @@
   "description": "CRM backend",
   "main": "src/index.js",
   "scripts": {
-    "build": "prisma generate",
+    "build": "prisma generate && prisma migrate deploy",
     "dev": "nodemon src/index.js",
     "postinstall": "prisma generate",
-    "prestart": "prisma generate",
+    "prestart": "prisma migrate deploy && prisma generate",
     "start": "node src/index.js",
     "db:push": "prisma db push",
     "db:migrate:deploy": "prisma migrate deploy",
