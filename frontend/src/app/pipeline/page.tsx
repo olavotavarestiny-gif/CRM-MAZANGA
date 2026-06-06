@@ -130,17 +130,17 @@ export default function PipelinePage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
       {/* Toggle modo */}
-      <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl w-fit shadow-sm">
-        <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#0A2540] text-white shadow-sm">
-          <User className="w-4 h-4" />
-          Cliente Individual
+      <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl w-full sm:w-fit shadow-sm">
+        <div className="flex flex-1 sm:flex-initial items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium bg-[#0A2540] text-white shadow-sm">
+          <User className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">Cliente Individual</span>
         </div>
         <Link
           href="/negociacoes"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540] transition-colors"
+          className="flex flex-1 sm:flex-initial items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540] transition-colors"
         >
-          <Building2 className="w-4 h-4" />
-          Empresa
+          <Building2 className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">Empresa</span>
         </Link>
       </div>
 

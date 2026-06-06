@@ -63,23 +63,23 @@ export default function NegociacoesPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
       {/* Toggle modo */}
-      <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl w-fit shadow-sm">
+      <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl w-full sm:w-fit shadow-sm">
         <Link
           href="/pipeline"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540] transition-colors"
+          className="flex flex-1 sm:flex-initial items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium text-[#6b7e9a] hover:bg-slate-50 hover:text-[#0A2540] transition-colors"
         >
-          <User className="w-4 h-4" />
-          Cliente Individual
+          <User className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">Cliente Individual</span>
         </Link>
-        <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#0A2540] text-white shadow-sm">
-          <Building2 className="w-4 h-4" />
-          Empresa
+        <div className="flex flex-1 sm:flex-initial items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium bg-[#0A2540] text-white shadow-sm">
+          <Building2 className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">Empresa</span>
         </div>
       </div>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-[#2c2f31]">Negociações</h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#2c2f31]">Negociações</h1>
           <p className="mt-1 text-sm text-[#6b7e9a]">
             Acompanha as negociações B2B por fase com gestão rápida de oportunidades.
           </p>

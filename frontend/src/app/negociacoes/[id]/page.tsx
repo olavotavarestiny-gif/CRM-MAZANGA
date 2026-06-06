@@ -155,18 +155,18 @@ function NoteTimelineItem({
           <div>
             <p className="text-sm text-[#0A2540] whitespace-pre-wrap break-words">{note.content}</p>
             {canEdit && (
-              <div className="mt-1 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="mt-1.5 flex gap-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={() => { setDraft(note.content); setDraftType(note.noteType); setEditing(true); }}
-                  className="text-xs text-[#6b7e9a] hover:text-[#0A2540] flex items-center gap-0.5"
+                  className="text-xs text-[#6b7e9a] hover:text-[#0A2540] flex items-center gap-1 py-1"
                 >
-                  <Pencil className="w-3 h-3" />Editar
+                  <Pencil className="w-3.5 h-3.5" />Editar
                 </button>
                 <button
                   onClick={() => onDelete(note.id)}
-                  className="text-xs text-[#6b7e9a] hover:text-red-500 flex items-center gap-0.5"
+                  className="text-xs text-[#6b7e9a] hover:text-red-500 flex items-center gap-1 py-1"
                 >
-                  <Trash2 className="w-3 h-3" />Apagar
+                  <Trash2 className="w-3.5 h-3.5" />Apagar
                 </button>
               </div>
             )}
@@ -278,7 +278,7 @@ export default function DealDetailPage() {
                 {deal.company.name}
               </p>
             )}
-            <h1 className="text-3xl font-extrabold tracking-tight text-[#0A2540]">
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#0A2540] break-words">
               {deal.title}
             </h1>
             <div className="flex flex-wrap items-center gap-2">
@@ -298,20 +298,20 @@ export default function DealDetailPage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+          <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto lg:flex-col">
             {isOpen ? (
               <>
-                <Button onClick={() => winMutation.mutate()} disabled={winMutation.isPending} className="bg-emerald-600 hover:bg-emerald-700">
+                <Button onClick={() => winMutation.mutate()} disabled={winMutation.isPending} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700">
                   <CheckCircle2 className="mr-2 h-4 w-4" />
                   {winMutation.isPending ? 'A fechar...' : 'Marcar como Ganho'}
                 </Button>
-                <Button variant="outline" onClick={() => setIsLossOpen(true)} className="border-red-200 text-red-600 hover:bg-red-50">
+                <Button variant="outline" onClick={() => setIsLossOpen(true)} className="w-full sm:w-auto border-red-200 text-red-600 hover:bg-red-50">
                   <XCircle className="mr-2 h-4 w-4" />
                   Marcar como Perdido
                 </Button>
               </>
             ) : (
-              <Button variant="outline" onClick={() => reopenMutation.mutate()} disabled={reopenMutation.isPending}>
+              <Button variant="outline" onClick={() => reopenMutation.mutate()} disabled={reopenMutation.isPending} className="w-full sm:w-auto">
                 <RotateCcw className="mr-2 h-4 w-4" />
                 {reopenMutation.isPending ? 'A reabrir...' : 'Reabrir'}
               </Button>
