@@ -2264,6 +2264,149 @@ export async function createClientAccount(data: {
 }
 
 // ============================================
+// SMS INTERNO DA PLATAFORMA (Superadmin)
+// ============================================
+
+export type PlatformSmsSegmentType =
+  | 'all_users'
+  | 'inactive_7_days'
+  | 'inactive_14_days'
+  | 'trial_ending'
+  | 'trial_expired'
+  | 'payment_due_soon'
+  | 'payment_overdue'
+  | 'onboarding_incomplete'
+  | 'workspace_servicos'
+  | 'workspace_comercio';
+
+export interface PlatformSmsSegment {
+  type: PlatformSmsSegmentType;
+  label: string;
+}
+
+export interface PlatformSmsPreview {
+  segmentType: PlatformSmsSegmentType;
+  totalRecipients: number;
+  totalCandidates: number;
+  withoutPhone: number;
+  sample: { name: string; phone: string; email?: string | null; plan?: string | null }[];
+}
+
+export interface PlatformSmsCampaign {
+  id: string;
+  name: string;
+  message: string;
+  segmentType: string;
+  segmentFiltersJson?: Record<string, unknown> | null;
+  status: 'draft' | 'sending' | 'completed' | 'failed';
+  totalRecipients: number;
+  sentCount: number;
+  failedCount: number;
+  senderName?: string | null;
+  createdByUserId: number;
+  scheduledAt?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { messages: number };
+}
+
+export interface PlatformSmsMessage {
+  id: string;
+  provider: string;
+  targetUserId: number;
+  targetAccountOwnerId?: number | null;
+  phone: string;
+  recipientName?: string | null;
+  message: string;
+  senderName?: string | null;
+  status: 'queued' | 'sent' | 'delivered' | 'failed';
+  providerMessageId?: string | null;
+  providerStatus?: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  triggerSource: string;
+  campaignId?: string | null;
+  automationRuleId?: string | null;
+  isTest: boolean;
+  sentAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlatformSmsPaginated<T> {
+  items: T[];
+  pagination: { page: number; pageSize: number; total: number; totalPages: number };
+}
+
+export interface PlatformSmsStats {
+  totals: { total: number; sent: number; failed: number; queued: number; impactedUsers: number };
+  byTrigger: { triggerSource: string; count: number }[];
+  recentCampaigns: PlatformSmsCampaign[];
+}
+
+export async function listPlatformSmsSegments(): Promise<PlatformSmsSegment[]> {
+  const res = await api.get('/api/superadmin/platform-sms/segments');
+  return res.data.segments;
+}
+
+export async function previewPlatformSmsCampaign(payload: {
+  segmentType: PlatformSmsSegmentType;
+  segmentFilters?: { days?: number } | null;
+}): Promise<PlatformSmsPreview> {
+  const res = await api.post('/api/superadmin/platform-sms/campaigns/preview', payload);
+  return res.data;
+}
+
+export async function sendPlatformSmsCampaign(payload: {
+  name: string;
+  message: string;
+  segmentType: PlatformSmsSegmentType;
+  segmentFilters?: { days?: number } | null;
+  senderName?: string | null;
+  isTest?: boolean;
+}): Promise<PlatformSmsCampaign> {
+  const res = await api.post('/api/superadmin/platform-sms/campaigns', payload);
+  return res.data;
+}
+
+export async function listPlatformSmsCampaigns(params?: {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  segmentType?: string;
+}): Promise<PlatformSmsPaginated<PlatformSmsCampaign>> {
+  const res = await api.get('/api/superadmin/platform-sms/campaigns', { params });
+  return res.data;
+}
+
+export async function getPlatformSmsCampaign(
+  id: string,
+  params?: { page?: number; pageSize?: number }
+): Promise<{ campaign: PlatformSmsCampaign; messages: PlatformSmsMessage[]; pagination: PlatformSmsPaginated<PlatformSmsMessage>['pagination'] }> {
+  const res = await api.get(`/api/superadmin/platform-sms/campaigns/${id}`, { params });
+  return res.data;
+}
+
+export async function listPlatformSmsMessages(params?: {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  campaignId?: string;
+  triggerSource?: string;
+  search?: string;
+}): Promise<PlatformSmsPaginated<PlatformSmsMessage>> {
+  const res = await api.get('/api/superadmin/platform-sms/messages', { params });
+  return res.data;
+}
+
+export async function getPlatformSmsStats(): Promise<PlatformSmsStats> {
+  const res = await api.get('/api/superadmin/platform-sms/stats');
+  return res.data;
+}
+
+// ============================================
 // QUICK SALES (Workspace COMERCIO)
 // ============================================
 

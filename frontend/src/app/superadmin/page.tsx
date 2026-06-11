@@ -40,6 +40,7 @@ import {
   History,
   LayoutDashboard,
   MessageSquareText,
+  Send,
   Plus,
   RefreshCw,
   Search,
@@ -64,6 +65,7 @@ import { LoadingButton } from '@/components/ui/loading-button';
 import { useToast } from '@/components/ui/toast-provider';
 import { getPricingTierLabel } from '@/lib/plan-utils';
 import { SuperAdminMessagingSection } from '@/components/superadmin/messaging-section';
+import { PlatformSmsSection } from '@/components/superadmin/platform-sms-section';
 
 const ADMIN_SECTIONS = [
   { id: 'users', label: 'Utilizadores', icon: Users },
@@ -75,6 +77,7 @@ const SUPERADMIN_SECTIONS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'clientes', label: 'Clientes', icon: ShieldCheck },
   { id: 'messaging', label: 'Messaging', icon: MessageSquareText },
+  { id: 'platform-sms', label: 'SMS Interno', icon: Send },
   { id: 'usage', label: 'Utilização', icon: BarChart3 },
   { id: 'storage', label: 'Armazenamento', icon: HardDrive },
 ] as const;
@@ -356,6 +359,7 @@ export default function SuperAdminPage() {
     currentSection === 'dashboard' ? dashboardError :
     currentSection === 'clientes' ? orgsError :
     currentSection === 'messaging' ? false :
+    currentSection === 'platform-sms' ? false :
     currentSection === 'usage' ? usageError :
     currentSection === 'storage' ? storageError :
     false;
@@ -367,6 +371,7 @@ export default function SuperAdminPage() {
     if (currentSection === 'dashboard') { refetchDashboard(); return; }
     if (currentSection === 'clientes') { refetchOrgs(); return; }
     if (currentSection === 'messaging') { return; }
+    if (currentSection === 'platform-sms') { return; }
     if (currentSection === 'usage') { refetchUsage(); return; }
     if (currentSection === 'storage') { refetchStorage(); }
   };
@@ -1055,6 +1060,10 @@ export default function SuperAdminPage() {
 
         {currentSection === 'messaging' && isSuperAdmin && !currentSectionError && (
           <SuperAdminMessagingSection />
+        )}
+
+        {currentSection === 'platform-sms' && isSuperAdmin && !currentSectionError && (
+          <PlatformSmsSection />
         )}
 
         {currentSection === 'usage' && isSuperAdmin && !currentSectionError && (

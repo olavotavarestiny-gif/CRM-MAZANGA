@@ -5,6 +5,7 @@ const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
 const { DEFAULT_PLAN, isSupportedPlan, normalizePlan } = require('../lib/plans');
 const superadminMessagingRouter = require('./superadmin-messaging');
+const superadminPlatformSmsRouter = require('./superadmin-platform-sms');
 const { SUPER_ADMIN_EMAILS, isBootstrapSuperAdminEmail } = require('../middleware/auth');
 
 const BILLING_TYPES = new Set(['trial', 'paid']);
@@ -84,6 +85,7 @@ function getSupabaseAdmin() {
 }
 
 router.use('/messaging', superadminMessagingRouter);
+router.use('/platform-sms', superadminPlatformSmsRouter);
 
 // GET /api/superadmin/orgs — list all client account owners
 router.get('/orgs', async (req, res) => {
