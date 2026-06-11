@@ -203,7 +203,10 @@ async function getSupabaseAccessToken(): Promise<string | null> {
 // Request interceptor: prefer impersonation token, fall back to Supabase session token
 api.interceptors.request.use(async (config) => {
   const devSampleAdapter = createDevSampleApiAdapter();
-  if (devSampleAdapter) {
+  const requestUrl = String(config.url || '');
+  const useRealBackendInDev = requestUrl.startsWith('/api/messaging');
+
+  if (devSampleAdapter && !useRealBackendInDev) {
     config.adapter = devSampleAdapter;
     config.headers[DEV_AUTH_HEADER] = DEV_AUTH_TOKEN;
     return config;
@@ -1066,6 +1069,7 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  phone?: string | null;
   role: string;
   accessRole?: AccessRole;
   jobTitle?: string | null;
@@ -1877,6 +1881,7 @@ export async function updateSuperAdminOrg(
     billingType?: 'trial' | 'paid';
     durationDays?: 30 | 90 | 180 | 365;
     accountStatus?: 'active' | 'grace_period' | 'suspended';
+    phone?: string | null;
   }
 ): Promise<void> {
   await api.patch(`/api/superadmin/orgs/${id}`, data);
@@ -2196,6 +2201,40 @@ export async function syncSuperadminMessage(id: string): Promise<SuperAdminMessa
   return res.data;
 }
 
+export type MessagingSummary = SuperAdminMessagingSummary;
+export type MessagingRecipientInput = SuperAdminMessagingRecipientInput;
+export type MessagingMessage = SuperAdminMessagingMessage;
+export type MessagingPaginatedResponse<T> = SuperAdminMessagingPaginatedResponse<T>;
+
+export async function listMessagingMessages(params?: {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+  isTest?: boolean;
+}): Promise<MessagingPaginatedResponse<MessagingMessage>> {
+  const res = await api.get('/api/messaging/messages', { params });
+  return res.data;
+}
+
+export async function sendMessagingSingleMessage(payload: {
+  phone: string;
+  content: string;
+  remitterId?: string;
+  countryAlpha2?: string;
+  isTest?: boolean;
+  saveContact?: boolean;
+  contactId?: number | null;
+}): Promise<MessagingMessage> {
+  const res = await api.post('/api/messaging/messages/send-single', payload);
+  return res.data;
+}
+
+export async function syncMessagingMessage(id: string): Promise<MessagingMessage> {
+  const res = await api.post(`/api/messaging/messages/${id}/sync`);
+  return res.data;
+}
+
 // Admin: list all client accounts
 export async function getClientAccounts(): Promise<import('./types').ClientAccount[]> {
   const res = await api.get('/api/admin/accounts');
@@ -2212,6 +2251,7 @@ export async function createClientAccount(data: {
   name: string;
   email: string;
   password: string;
+  phone?: string | null;
   plan?: PlanName;
   workspaceMode?: 'servicos' | 'comercio';
   permissions?: UserPermissions | null;

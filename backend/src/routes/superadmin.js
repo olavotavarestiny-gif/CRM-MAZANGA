@@ -91,7 +91,7 @@ router.get('/orgs', async (req, res) => {
     const orgs = await prisma.user.findMany({
       where: getClientAccountOwnerWhere(),
       select: {
-        id: true, name: true, email: true, active: true, plan: true,
+        id: true, name: true, email: true, phone: true, active: true, plan: true,
         permissions: true, workspaceMode: true, billingType: true, trialEndsAt: true,
         expiresAt: true, graceEndsAt: true, accountStatus: true, createdAt: true,
         accountMembers: {
@@ -122,9 +122,12 @@ router.get('/orgs', async (req, res) => {
 router.patch('/orgs/:id', async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
-    const { plan, active, permissions, workspaceMode } = req.body;
+    const { plan, active, permissions, workspaceMode, phone } = req.body;
 
     const data = {};
+    if (phone !== undefined) {
+      data.phone = typeof phone === 'string' && phone.trim() ? phone.trim() : null;
+    }
     if (plan !== undefined) {
       if (!isSupportedPlan(plan)) {
         return res.status(400).json({ error: 'Plano inválido. Use inicial, crescimento ou estabilidade.' });
@@ -157,7 +160,7 @@ router.patch('/orgs/:id', async (req, res) => {
       where: { id: userId },
       data,
       select: {
-        id: true, name: true, email: true, plan: true, active: true, permissions: true,
+        id: true, name: true, email: true, phone: true, plan: true, active: true, permissions: true,
         workspaceMode: true, billingType: true, trialEndsAt: true, expiresAt: true,
         graceEndsAt: true, accountStatus: true,
       },
@@ -270,8 +273,9 @@ router.post('/impersonate/:userId', async (req, res) => {
 // POST /api/superadmin/users — create a new client account (same as admin but superadmin version)
 router.post('/users', async (req, res) => {
   try {
-    const { name, email, password, plan, permissions, workspaceMode, billingType, durationDays, accountStatus } = req.body;
+    const { name, email, password, plan, permissions, workspaceMode, billingType, durationDays, accountStatus, phone } = req.body;
     const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const normalizedPhone = typeof phone === 'string' && phone.trim() ? phone.trim() : null;
 
     if (!name || !normalizedEmail || !password) {
       return res.status(400).json({ error: 'Nome, email e password são obrigatórios' });
@@ -308,12 +312,13 @@ router.post('/users', async (req, res) => {
         plan: plan ? normalizePlan(plan) : DEFAULT_PLAN,
         workspaceMode: workspaceMode || 'servicos',
         permissions: permissions ? JSON.stringify(permissions) : null,
+        phone: normalizedPhone,
         ...buildAccessFields({ billingType, durationDays, accountStatus }),
       },
     });
 
     res.status(201).json({
-      id: user.id, name: user.name, email: user.email,
+      id: user.id, name: user.name, email: user.email, phone: user.phone,
       plan: normalizePlan(user.plan), active: user.active, workspaceMode: user.workspaceMode, createdAt: user.createdAt,
       billingType: user.billingType, trialEndsAt: user.trialEndsAt, expiresAt: user.expiresAt,
       graceEndsAt: user.graceEndsAt, accountStatus: user.accountStatus,

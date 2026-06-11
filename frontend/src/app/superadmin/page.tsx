@@ -135,6 +135,7 @@ export default function SuperAdminPage() {
     name: '',
     email: '',
     password: '',
+    phone: '',
     plan: 'essencial' as PlanName,
     workspaceMode: 'servicos' as 'servicos' | 'comercio',
     billingType: 'trial' as 'trial' | 'paid',
@@ -233,7 +234,7 @@ export default function SuperAdminPage() {
       qc.invalidateQueries({ queryKey: ['admin-accounts'] });
       qc.invalidateQueries({ queryKey: ['superadmin-orgs'] });
       setShowCreateAccount(false);
-      setCreateAccountForm({ name: '', email: '', password: '', plan: 'essencial', workspaceMode: 'servicos', billingType: 'trial', durationDays: 30 });
+      setCreateAccountForm({ name: '', email: '', password: '', phone: '', plan: 'essencial', workspaceMode: 'servicos', billingType: 'trial', durationDays: 30 });
       setAccountError('');
       toast({
         variant: 'success',
@@ -855,6 +856,19 @@ export default function SuperAdminPage() {
                               <td className="px-4 py-3">
                                 <div className="font-medium text-[#0A2540]">{org.name}</div>
                                 <div className="text-xs text-[#6b7e9a]">{org.email}</div>
+                                <input
+                                  type="tel"
+                                  defaultValue={org.phone || ''}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onBlur={(event) => {
+                                    const value = event.target.value.trim();
+                                    if (value !== (org.phone || '')) {
+                                      orgUpdateMutation.mutate({ id: org.id, data: { phone: value || null } });
+                                    }
+                                  }}
+                                  placeholder="Telefone SMS"
+                                  className="mt-1 w-40 rounded border border-[#dde3ec] bg-white px-1.5 py-0.5 text-[11px] text-[#0A2540] placeholder:text-[#9aa7bd] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
                               </td>
                               <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
                                 <div className="relative inline-block">
@@ -1200,6 +1214,15 @@ export default function SuperAdminPage() {
                 value={createAccountForm.password}
                 onChange={(event) => setCreateAccountForm({ ...createAccountForm, password: event.target.value })}
                 placeholder="Mínimo 6 caracteres"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0A2540]">Telefone (SMS)</label>
+              <Input
+                type="tel"
+                value={createAccountForm.phone}
+                onChange={(event) => setCreateAccountForm({ ...createAccountForm, phone: event.target.value })}
+                placeholder="9XXXXXXXX ou +2449XXXXXXXX (opcional)"
               />
             </div>
             <div>

@@ -24,6 +24,7 @@ model User {
   isSuperAdmin              Boolean                @default(false)
   permissions               String?
   jobTitle                  String?
+  phone                     String?
   workspaceMode             String                 @default("servicos")
   assignedEstabelecimentoId String?
   billingType               String                 @default("trial")
@@ -1039,6 +1040,100 @@ model MessagingOptOut {
   updatedAt       DateTime @updatedAt
 
   @@index([isActive])
+}
+
+// ── SMS interno da plataforma (comunicação com utilizadores KukuGest) ──────────
+// Separado dos modelos Messaging* (que são para os contactos dos clientes).
+// O prefixo Platform* identifica a comunicação interna da própria KukuGest.
+
+model PlatformSmsCampaign {
+  id                 String               @id @default(cuid())
+  name               String
+  message            String
+  segmentType        String
+  segmentFiltersJson Json?
+  status             String               @default("draft")
+  totalRecipients    Int                  @default(0)
+  sentCount          Int                  @default(0)
+  failedCount        Int                  @default(0)
+  senderName         String?
+  createdByUserId    Int
+  scheduledAt        DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  messages           PlatformSmsMessage[]
+
+  @@index([status])
+  @@index([segmentType])
+  @@index([createdAt])
+}
+
+model PlatformAutomationRule {
+  id              String                  @id @default(cuid())
+  name            String
+  triggerType     String
+  conditionsJson  Json?
+  messageTemplate String
+  senderName      String?
+  isActive        Boolean                 @default(false)
+  lastRunAt       DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  logs            PlatformAutomationLog[]
+  smsMessages     PlatformSmsMessage[]
+
+  @@index([isActive])
+  @@index([triggerType])
+}
+
+model PlatformSmsMessage {
+  id                   String                  @id @default(cuid())
+  provider             String                  @default("ZIETT")
+  targetUserId         Int
+  targetAccountOwnerId Int?
+  phone                String
+  recipientName        String?
+  message              String
+  senderName           String?
+  status               String                  @default("queued")
+  providerMessageId    String?
+  providerStatus       String?
+  errorCode            String?
+  errorMessage         String?
+  triggerSource        String                  @default("MANUAL")
+  campaignId           String?
+  automationRuleId     String?
+  isTest               Boolean                 @default(false)
+  rawResponseJson      Json?
+  sentAt               DateTime?
+  createdByUserId      Int?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  campaign             PlatformSmsCampaign?    @relation(fields: [campaignId], references: [id])
+  automationRule       PlatformAutomationRule? @relation(fields: [automationRuleId], references: [id])
+
+  @@index([targetUserId, createdAt])
+  @@index([status])
+  @@index([campaignId])
+  @@index([automationRuleId, targetUserId, createdAt])
+}
+
+model PlatformAutomationLog {
+  id           String                 @id @default(cuid())
+  ruleId       String
+  targetUserId Int
+  status       String
+  message      String?
+  errorMessage String?
+  smsMessageId String?
+  executedAt   DateTime               @default(now())
+  rule         PlatformAutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId, executedAt])
+  @@index([ruleId, targetUserId, executedAt])
+  @@index([targetUserId, executedAt])
 }
 
 model Company {
