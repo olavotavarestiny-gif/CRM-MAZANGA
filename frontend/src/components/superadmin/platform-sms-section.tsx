@@ -37,6 +37,21 @@ type Tab = 'campanhas' | 'historico' | 'estatisticas';
 const DAYS_SEGMENTS: PlatformSmsSegmentType[] = ['trial_ending', 'payment_due_soon'];
 const MAX_MESSAGE_LEN = 480;
 
+// Lista estática (espelha o backend) — usada como fallback para o seletor nunca
+// ficar vazio, mesmo que o endpoint /segments não esteja disponível.
+const STATIC_SEGMENTS: { type: PlatformSmsSegmentType; label: string }[] = [
+  { type: 'all_users', label: 'Todos os utilizadores' },
+  { type: 'inactive_7_days', label: 'Inativos há 7 dias' },
+  { type: 'inactive_14_days', label: 'Inativos há 14 dias' },
+  { type: 'trial_ending', label: 'Trial a terminar' },
+  { type: 'trial_expired', label: 'Trial expirado' },
+  { type: 'payment_due_soon', label: 'Pagamento próximo' },
+  { type: 'payment_overdue', label: 'Pagamento vencido' },
+  { type: 'onboarding_incomplete', label: 'Onboarding incompleto' },
+  { type: 'workspace_servicos', label: 'Workspace Serviços' },
+  { type: 'workspace_comercio', label: 'Workspace Comércio' },
+];
+
 function formatDateTime(value?: string | null) {
   if (!value) return '—';
   try {
@@ -77,11 +92,12 @@ export function PlatformSmsSection() {
   const [searchInput, setSearchInput] = useState('');
 
   const segmentsQuery = useQuery({ queryKey: ['platform-sms-segments'], queryFn: listPlatformSmsSegments });
+  const segments = segmentsQuery.data && segmentsQuery.data.length > 0 ? segmentsQuery.data : STATIC_SEGMENTS;
   const segmentLabel = useMemo(() => {
     const map: Record<string, string> = {};
-    (segmentsQuery.data || []).forEach((s) => { map[s.type] = s.label; });
+    segments.forEach((s) => { map[s.type] = s.label; });
     return (type: string) => map[type] || type;
-  }, [segmentsQuery.data]);
+  }, [segments]);
 
   const campaignsQuery = useQuery({
     queryKey: ['platform-sms-campaigns'],
@@ -174,7 +190,7 @@ export function PlatformSmsSection() {
                     onChange={(e) => resetPreviewOnChange(() => setSegmentType(e.target.value as PlatformSmsSegmentType))}
                     className="mt-1 w-full rounded-lg border border-[#dde3ec] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    {(segmentsQuery.data || []).map((s) => (
+                    {segments.map((s) => (
                       <option key={s.type} value={s.type}>{s.label}</option>
                     ))}
                   </select>
