@@ -2406,6 +2406,70 @@ export async function getPlatformSmsStats(): Promise<PlatformSmsStats> {
   return res.data;
 }
 
+export interface PlatformAutomationRule {
+  id: string;
+  name: string;
+  triggerType: string;
+  conditionsJson?: Record<string, unknown> | null;
+  messageTemplate: string;
+  senderName?: string | null;
+  isActive: boolean;
+  lastRunAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  sentCount?: number;
+}
+
+export interface PlatformAutomationRunResult {
+  ruleId: string;
+  triggerType: string;
+  eligible: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+  cappedAt?: number | null;
+  sample?: { name: string; phone: string }[];
+}
+
+export interface PlatformAutomationLog {
+  id: string;
+  ruleId: string;
+  targetUserId: number;
+  status: 'sent' | 'skipped' | 'failed';
+  message?: string | null;
+  errorMessage?: string | null;
+  smsMessageId?: string | null;
+  executedAt: string;
+}
+
+export async function listPlatformSmsAutomations(): Promise<PlatformAutomationRule[]> {
+  const res = await api.get('/api/superadmin/platform-sms/automations');
+  return res.data.rules;
+}
+
+export async function updatePlatformSmsAutomation(
+  id: string,
+  data: Partial<Pick<PlatformAutomationRule, 'name' | 'messageTemplate' | 'senderName' | 'isActive'>> & {
+    conditionsJson?: Record<string, unknown> | null;
+  }
+): Promise<PlatformAutomationRule> {
+  const res = await api.patch(`/api/superadmin/platform-sms/automations/${id}`, data);
+  return res.data;
+}
+
+export async function runPlatformSmsAutomation(
+  id: string,
+  options?: { dryRun?: boolean; isTest?: boolean }
+): Promise<PlatformAutomationRunResult> {
+  const res = await api.post(`/api/superadmin/platform-sms/automations/${id}/run`, options || {});
+  return res.data;
+}
+
+export async function listPlatformSmsAutomationLogs(id: string): Promise<{ logs: PlatformAutomationLog[] }> {
+  const res = await api.get(`/api/superadmin/platform-sms/automations/${id}/logs`);
+  return res.data;
+}
+
 // ============================================
 // QUICK SALES (Workspace COMERCIO)
 // ============================================

@@ -393,6 +393,15 @@ try {
       .catch((err) => console.error('[Scheduler] Erro nas automações de follow-up:', err.message));
   });
   console.log('[Scheduler] Cron de automações de follow-up iniciado (06:15 UTC diário)');
+
+  const { runAllActiveRules } = require('./services/platform-automation.service');
+  cron.schedule('30 6 * * *', () => {
+    console.log('[Scheduler] A processar automações internas de SMS...');
+    runAllActiveRules()
+      .then((results) => console.log('[Scheduler] Automações internas de SMS:', JSON.stringify(results)))
+      .catch((err) => console.error('[Scheduler] Erro nas automações internas de SMS:', err.message));
+  });
+  console.log('[Scheduler] Cron de automações internas de SMS iniciado (06:30 UTC diário)');
 } catch (err) {
   console.warn('[Scheduler] node-cron não disponível:', err.message);
 }

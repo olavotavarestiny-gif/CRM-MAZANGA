@@ -2,14 +2,18 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, BarChart3, Eye, History, Megaphone, Send } from 'lucide-react';
+import { AlertTriangle, BarChart3, Eye, History, Megaphone, Play, Send, Zap } from 'lucide-react';
 import {
   getPlatformSmsStats,
+  listPlatformSmsAutomations,
   listPlatformSmsCampaigns,
   listPlatformSmsMessages,
   listPlatformSmsSegments,
   previewPlatformSmsCampaign,
+  runPlatformSmsAutomation,
   sendPlatformSmsCampaign,
+  updatePlatformSmsAutomation,
+  type PlatformAutomationRule,
   type PlatformSmsCampaign,
   type PlatformSmsMessage,
   type PlatformSmsPreview,
@@ -32,7 +36,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast-provider';
 
-type Tab = 'campanhas' | 'historico' | 'estatisticas';
+type Tab = 'campanhas' | 'automacoes' | 'historico' | 'estatisticas';
 
 const DAYS_SEGMENTS: PlatformSmsSegmentType[] = ['trial_ending', 'payment_due_soon'];
 const MAX_MESSAGE_LEN = 480;
@@ -117,6 +121,12 @@ export function PlatformSmsSection() {
     enabled: tab === 'estatisticas',
   });
 
+  const automationsQuery = useQuery({
+    queryKey: ['platform-sms-automations'],
+    queryFn: listPlatformSmsAutomations,
+    enabled: tab === 'automacoes',
+  });
+
   const segmentFilters = DAYS_SEGMENTS.includes(segmentType) ? { days } : null;
 
   const previewMutation = useMutation({
@@ -152,6 +162,7 @@ export function PlatformSmsSection() {
       <div className="flex flex-wrap gap-2">
         {([
           { id: 'campanhas', label: 'Campanhas', icon: Megaphone },
+          { id: 'automacoes', label: 'Automações', icon: Zap },
           { id: 'historico', label: 'Histórico', icon: History },
           { id: 'estatisticas', label: 'Estatísticas', icon: BarChart3 },
         ] as const).map(({ id, label, icon: Icon }) => (
@@ -337,6 +348,23 @@ export function PlatformSmsSection() {
         </>
       )}
 
+      {tab === 'automacoes' && (
+        <div className="space-y-4">
+          <p className="text-sm text-[#6b7e9a]">
+            Automações enviam SMS aos utilizadores conforme o gatilho. Estão <strong>desativadas por defeito</strong> —
+            ative só as que quiser. Para evitar duplicados, não reenviam ao mesmo utilizador dentro de 7 dias.
+            O scheduler corre uma vez por dia; &laquo;Correr teste&raquo; envia apenas para a allowlist.
+          </p>
+          {automationsQuery.isLoading ? (
+            <p className="py-8 text-center text-sm text-[#6b7e9a]">A carregar...</p>
+          ) : (
+            (automationsQuery.data || []).map((rule) => (
+              <AutomationCard key={rule.id} rule={rule} />
+            ))
+          )}
+        </div>
+      )}
+
       {tab === 'historico' && (
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
@@ -445,5 +473,86 @@ export function PlatformSmsSection() {
         </div>
       )}
     </div>
+  );
+}
+
+function AutomationCard({ rule }: { rule: PlatformAutomationRule }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [message, setMessage] = useState(rule.messageTemplate);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['platform-sms-automations'] });
+    qc.invalidateQueries({ queryKey: ['platform-sms-messages'] });
+    qc.invalidateQueries({ queryKey: ['platform-sms-stats'] });
+  };
+
+  const updateMutation = useMutation({
+    mutationFn: (data: Parameters<typeof updatePlatformSmsAutomation>[1]) => updatePlatformSmsAutomation(rule.id, data),
+    onSuccess: () => { invalidate(); toast({ variant: 'success', title: 'Automação atualizada' }); },
+    onError: (err: Error) => toast({ variant: 'error', title: 'Erro', description: err.message }),
+  });
+
+  const runMutation = useMutation({
+    mutationFn: (opts: { dryRun?: boolean; isTest?: boolean }) => runPlatformSmsAutomation(rule.id, opts),
+    onSuccess: (res, opts) => {
+      invalidate();
+      if (opts.dryRun) {
+        toast({ variant: 'info', title: 'Pré-visualização', description: `${res.eligible} utilizador(es) elegível(eis).` });
+      } else {
+        toast({
+          variant: res.failed > 0 && res.sent === 0 ? 'error' : 'success',
+          title: 'Execução concluída',
+          description: `Elegíveis ${res.eligible} · enviados ${res.sent} · falhados ${res.failed} · ignorados ${res.skipped} (modo teste).`,
+        });
+      }
+    },
+    onError: (err: Error) => toast({ variant: 'error', title: 'Erro ao correr', description: err.message }),
+  });
+
+  const messageChanged = message.trim() !== rule.messageTemplate;
+
+  return (
+    <Card className="border-slate-200 shadow-sm">
+      <CardContent className="space-y-3 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="font-medium text-[#0A2540]">{rule.name}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#6b7e9a]">
+              <Badge className="bg-slate-100 text-slate-600">{rule.triggerType}</Badge>
+              <span>Última execução: {rule.lastRunAt ? formatDateTime(rule.lastRunAt) : 'nunca'}</span>
+              <span>· {rule.sentCount ?? 0} enviado(s)</span>
+            </div>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={rule.isActive}
+              disabled={updateMutation.isPending}
+              onChange={(e) => updateMutation.mutate({ isActive: e.target.checked })}
+            />
+            <span className={rule.isActive ? 'font-medium text-emerald-700' : 'text-[#6b7e9a]'}>
+              {rule.isActive ? 'Ativa' : 'Inativa'}
+            </span>
+          </label>
+        </div>
+
+        <Textarea value={message} onChange={(e) => setMessage(e.target.value.slice(0, 480))} rows={2} />
+
+        <div className="flex flex-wrap items-center gap-2">
+          {messageChanged && (
+            <Button size="sm" onClick={() => updateMutation.mutate({ messageTemplate: message.trim() })} disabled={updateMutation.isPending}>
+              Guardar mensagem
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => runMutation.mutate({ dryRun: true })} disabled={runMutation.isPending}>
+            <Eye className="mr-1 h-4 w-4" /> Pré-ver elegíveis
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => runMutation.mutate({ dryRun: false, isTest: true })} disabled={runMutation.isPending}>
+            <Play className="mr-1 h-4 w-4" /> Correr teste
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

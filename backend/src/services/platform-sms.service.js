@@ -398,4 +398,8 @@ module.exports = {
   getCampaignDetail,
   listMessages,
   getStats,
+  // helpers reutilizados pelo motor de automações
+  baseOwnerWhere,
+  renderTemplate,
+  addDays,
 };
