@@ -257,7 +257,13 @@ api.interceptors.response.use(
       }
     }
 
-    if (error.response?.status === 401 && !isLoggingOut) {
+    // 401 (token inválido/expirado) ou 403 de conta desactivada → logout forçado.
+    // Só o código ACCOUNT_DEACTIVATED força logout; outros 403 (permissões,
+    // limites de plano) continuam a ser tratados como erros normais.
+    const isDeactivated =
+      error.response?.status === 403 &&
+      error.response?.data?.code === 'ACCOUNT_DEACTIVATED';
+    if ((error.response?.status === 401 || isDeactivated) && !isLoggingOut) {
       isLoggingOut = true;
       if (typeof window !== 'undefined') {
         window.location.href = '/auth/signout';
@@ -1111,6 +1117,67 @@ export interface SubscriptionAccess {
   showExpiryWarning?: boolean;
   readOnly?: boolean;
   message?: string | null;
+}
+
+// ── Pagamento de subscrição (E+ Kwanza) ──────────────────────────────────────
+export type BillingCycle = 'monthly' | 'annual';
+export type PaymentMethodCode = 'GPO' | 'REF';
+export type SubscriptionPaymentStatus = 'pending' | 'paid' | 'failed' | 'expired';
+
+export interface SubscriptionPricing {
+  workspaceMode: 'servicos' | 'comercio';
+  currency: string;
+  plans: Record<string, { monthly: number; annual: number }>;
+}
+
+export interface SubscriptionChargeResult {
+  ok: boolean;
+  merchantTransactionId: string;
+  amount: number;
+  method: PaymentMethodCode;
+  plan: string;
+  cycle: BillingCycle;
+  status: SubscriptionPaymentStatus;
+  successful?: boolean;
+  providerTransactionId?: string | null;
+  reference?: string | null;
+  message?: string | null;
+  gatewayCode?: number | string | null;
+}
+
+export async function getSubscriptionPricing(): Promise<SubscriptionPricing> {
+  const response = await api.get<SubscriptionPricing>('/api/payments/subscription/pricing');
+  return response.data;
+}
+
+export async function createSubscriptionCharge(data: {
+  plan: string;
+  cycle: BillingCycle;
+  method: PaymentMethodCode;
+  phoneNumber?: string;
+}): Promise<SubscriptionChargeResult> {
+  const response = await api.post<SubscriptionChargeResult>(
+    '/api/payments/subscription/charge',
+    data
+  );
+  return response.data;
+}
+
+export async function getSubscriptionPaymentStatus(merchantTransactionId: string): Promise<{
+  ok: boolean;
+  status: SubscriptionPaymentStatus;
+  plan: string;
+  cycle: BillingCycle;
+  amount: number;
+  method: PaymentMethodCode;
+  reference?: string | null;
+  merchantTransactionId: string;
+  gatewayMessage?: string | null;
+}> {
+  const response = await api.get(
+    `/api/payments/subscription/status/${encodeURIComponent(merchantTransactionId)}`
+  );
+  return response.data;
 }
 
 export interface LoginLog {
@@ -2346,6 +2413,13 @@ export interface PlatformSmsStats {
   recentCampaigns: PlatformSmsCampaign[];
 }
 
+export interface PlatformSmsCampaignSyncResult {
+  campaign: PlatformSmsCampaign;
+  synced: number;
+  failedSync: number;
+  totalSyncable: number;
+}
+
 export async function listPlatformSmsSegments(): Promise<PlatformSmsSegment[]> {
   const res = await api.get('/api/superadmin/platform-sms/segments');
   return res.data.segments;
@@ -2389,6 +2463,11 @@ export async function getPlatformSmsCampaign(
   return res.data;
 }
 
+export async function syncPlatformSmsCampaign(id: string): Promise<PlatformSmsCampaignSyncResult> {
+  const res = await api.post(`/api/superadmin/platform-sms/campaigns/${id}/sync`);
+  return res.data;
+}
+
 export async function listPlatformSmsMessages(params?: {
   page?: number;
   pageSize?: number;
@@ -2398,6 +2477,11 @@ export async function listPlatformSmsMessages(params?: {
   search?: string;
 }): Promise<PlatformSmsPaginated<PlatformSmsMessage>> {
   const res = await api.get('/api/superadmin/platform-sms/messages', { params });
+  return res.data;
+}
+
+export async function syncPlatformSmsMessage(id: string): Promise<PlatformSmsMessage> {
+  const res = await api.post(`/api/superadmin/platform-sms/messages/${id}/sync`);
   return res.data;
 }
 
@@ -2440,6 +2524,7 @@ export interface PlatformAutomationLog {
   errorMessage?: string | null;
   smsMessageId?: string | null;
   executedAt: string;
+  targetUser?: { id: number; name: string; phone?: string | null } | null;
 }
 
 export async function listPlatformSmsAutomations(): Promise<PlatformAutomationRule[]> {
@@ -2465,8 +2550,11 @@ export async function runPlatformSmsAutomation(
   return res.data;
 }
 
-export async function listPlatformSmsAutomationLogs(id: string): Promise<{ logs: PlatformAutomationLog[] }> {
-  const res = await api.get(`/api/superadmin/platform-sms/automations/${id}/logs`);
+export async function listPlatformSmsAutomationLogs(
+  id: string,
+  params?: { pageSize?: number }
+): Promise<{ logs: PlatformAutomationLog[] }> {
+  const res = await api.get(`/api/superadmin/platform-sms/automations/${id}/logs`, { params });
   return res.data;
 }
 

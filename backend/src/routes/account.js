@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const prisma = require('../lib/prisma');
-const { requireAccountOwner } = require('../middleware/auth');
+const { requireAccountOwner, invalidateAuthUserCacheByUserId } = require('../middleware/auth');
 const { parsePermissions, intersectPermissions } = require('../lib/permissions');
 const { canCreateUser, buildLimitErrorPayload } = require('../lib/plan-limits');
 
@@ -265,6 +265,10 @@ router.delete('/team/:memberId', requireAccountOwner, async (req, res) => {
       where: { id: memberId },
       data: { active: false },
     });
+
+    // Invalidar a cache de auth de imediato para que a remoção tenha efeito
+    // sem esperar pelo TTL (~15s) — o próximo pedido do membro devolve 403.
+    invalidateAuthUserCacheByUserId(memberId);
 
     res.json({ message: 'Membro removido da conta' });
   } catch (error) {

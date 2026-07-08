@@ -97,6 +97,19 @@ function pruneAuthUserCache() {
   }
 }
 
+// Invalida entradas de cache de uma conta (ex.: após pagamento/reativação),
+// para que o novo estado de subscrição seja lido de imediato.
+function invalidateAuthUserCacheByUserId(userId) {
+  if (userId === undefined || userId === null) return;
+  const target = Number(userId);
+  for (const [key, entry] of authUserCache.entries()) {
+    const cachedUser = entry?.user;
+    if (cachedUser && (Number(cachedUser.effectiveUserId) === target || Number(cachedUser.id) === target)) {
+      authUserCache.delete(key);
+    }
+  }
+}
+
 function cloneCachedRequestUser(user) {
   return {
     ...user,
@@ -204,7 +217,12 @@ async function requireAuth(req, res, next) {
   if (isDevAuthBypassEnabled() && hasValidDevAuthHeader(req)) {
     req.user = buildDevAuthRequestUser();
 
-    if (isDevAuthWrite(req) && !String(req.originalUrl || '').startsWith('/api/auth/log-login')) {
+    const originalUrl = String(req.originalUrl || '');
+    const devWriteAllowed =
+      originalUrl.startsWith('/api/auth/log-login') ||
+      originalUrl.startsWith('/api/messaging');
+
+    if (isDevAuthWrite(req) && !devWriteAllowed) {
       return res.status(403).json({
         error: 'Modo DEV com auth desactivado não permite operações de escrita.',
         code: 'DEV_AUTH_WRITE_BLOCKED',
@@ -287,6 +305,7 @@ async function requireAuth(req, res, next) {
       if (!user.active) {
         const error = new Error('Conta desactivada. Contacte o administrador.');
         error.statusCode = 403;
+        error.code = 'ACCOUNT_DEACTIVATED';
         throw error;
       }
       return buildRequestUser(user, { supabaseUid });
@@ -300,7 +319,7 @@ async function requireAuth(req, res, next) {
     next();
   } catch (error) {
     if (error.statusCode === 403) {
-      return res.status(403).json({ error: error.message });
+      return res.status(403).json({ error: error.message, code: error.code });
     }
     console.error('[auth] DB error:', error.message);
     res.status(500).json({ error: 'Erro ao verificar autenticação' });
@@ -345,3 +364,4 @@ module.exports.SUPER_ADMIN_EMAILS = SUPER_ADMIN_EMAILS;
 module.exports.isBootstrapSuperAdminEmail = isBootstrapSuperAdminEmail;
 module.exports.ACCESS_ROLES = ACCESS_ROLES;
 module.exports.verifySupabaseJwt = verifySupabaseJwt;
+module.exports.invalidateAuthUserCacheByUserId = invalidateAuthUserCacheByUserId;

@@ -451,24 +451,43 @@ router.post('/register', async (req, res) => {
       accountStatus: 'active',
     };
 
-    // Check if DB user already exists
+    // Check if DB user already exists.
+    // Uma linha inativa (active:false) só é criada pela remoção de um membro de
+    // equipa (account.js). Nesse caso libertamos o "slot" do email: reutilizamos
+    // e desanexamos a linha para uma nova conta independente, em vez de bloquear.
     const existingDb = await prisma.user.findFirst({
       where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
-      select: { id: true },
+      select: { id: true, active: true, supabaseUid: true, isSuperAdmin: true },
     });
-    if (existingDb) {
+    if (existingDb && (existingDb.active || existingDb.isSuperAdmin)) {
       return res.status(400).json({ error: 'Este email já está registado.' });
     }
+    const reuseRow = existingDb || null; // linha inativa a reutilizar (ou null)
 
+    let supabaseUid;
+    let authError = null;
+
+    if (reuseRow?.supabaseUid) {
+      // Já existe um utilizador Supabase para este email — repor a password
+      // que a pessoa acabou de escolher, em vez de criar um novo (evita o
+      // conflito "already registered").
+      supabaseUid = reuseRow.supabaseUid;
+      const { error: updateAuthError } = await getSupabaseAdmin().auth.admin.updateUserById(supabaseUid, {
+        password,
+        user_metadata: { name: name.trim() },
+      });
+      if (updateAuthError) {
+        return res.status(400).json({ error: updateAuthError.message });
+      }
+    } else {
     // Try to create the Supabase user
-    const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
+    const { data: authData, error: createError } = await getSupabaseAdmin().auth.admin.createUser({
       email: normalizedEmail,
       password,
       email_confirm: true,
       user_metadata: { name: name.trim() },
     });
-
-    let supabaseUid;
+    authError = createError;
 
     if (authError) {
       // Recovery: Supabase user exists but DB record is missing (previous failed attempt)
@@ -493,16 +512,33 @@ router.post('/register', async (req, res) => {
     } else {
       supabaseUid = authData.user.id;
     }
+    } // fim do bloco de criação Supabase (reuseRow?.supabaseUid saltou este bloco)
 
-    // Create DB record — rollback Supabase user if this fails
+    // Escrever o registo na BD — rollback do utilizador Supabase se falhar.
     try {
-      await prisma.user.create({
-        data: { ...dbData, supabaseUid },
-      });
+      if (reuseRow) {
+        // Reutilizar a linha inativa como nova conta independente: desanexar da
+        // conta anterior e repor o estado de uma conta fresca em trial.
+        await prisma.user.update({
+          where: { id: reuseRow.id },
+          data: {
+            ...dbData,
+            supabaseUid,
+            accountOwnerId: null,
+            permissions: null,
+            assignedEstabelecimentoId: null,
+          },
+        });
+      } else {
+        await prisma.user.create({
+          data: { ...dbData, supabaseUid },
+        });
+      }
     } catch (dbError) {
-      console.error('[auth.register] DB create failed, rolling back Supabase user:', dbError.message);
-      // Only delete if we just created the user (not the recovery path)
-      if (!authError) {
+      console.error('[auth.register] DB write failed, rolling back Supabase user:', dbError.message);
+      // Só apagar o utilizador Supabase se o tivermos acabado de criar
+      // (não no caminho de recuperação/orphan nem ao reutilizar um existente).
+      if (!authError && !reuseRow?.supabaseUid) {
         await getSupabaseAdmin().auth.admin.deleteUser(supabaseUid).catch(() => {});
       }
       throw dbError;
