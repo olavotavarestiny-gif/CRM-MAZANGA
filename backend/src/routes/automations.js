@@ -11,7 +11,7 @@ const {
 } = require('../services/automation-logger.service');
 
 const VALID_TRIGGERS = ['new_contact', 'form_submission', 'contact_tag', 'contact_revenue', 'contact_sector', 'stage_changed', 'contact_inactivity', 'contact_birthday'];
-const VALID_ACTIONS = ['send_email', 'send_whatsapp_template', 'send_whatsapp_text', 'update_stage', 'create_task', 'create_alert'];
+const VALID_ACTIONS = ['send_email', 'send_whatsapp_template', 'send_whatsapp_text', 'update_stage', 'create_task', 'create_alert', 'add_tag'];
 const VALID_TASK_PRIORITIES = ['Baixa', 'Media', 'Alta'];
 
 async function validateFormOwnership(userId, formId) {
@@ -47,6 +47,17 @@ async function validateOrgMember(userId, assignedToUserId) {
   return member ? numericAssignedToUserId : false;
 }
 
+async function validateConditionField(formId, conditionFieldId) {
+  if (!conditionFieldId) {
+    return null;
+  }
+
+  return prisma.formField.findFirst({
+    where: { id: conditionFieldId, formId },
+    select: { id: true },
+  });
+}
+
 async function validateAutomationPayload({
   userId,
   trigger,
@@ -57,11 +68,14 @@ async function validateAutomationPayload({
   emailSubject,
   emailBody,
   formId,
+  conditionFieldId,
+  conditionValue,
   taskTitle,
   taskNotes,
   taskPriority,
   taskDueDays,
   taskAssignedToUserId,
+  tagValue,
 }) {
   if (!trigger || !action) {
     return 'trigger and action are required';
@@ -108,6 +122,29 @@ async function validateAutomationPayload({
     return 'formId is only supported for form_submission trigger';
   }
 
+  if (conditionFieldId) {
+    if (trigger !== 'form_submission' || !formId) {
+      return 'conditionFieldId is only supported for form_submission trigger with a specific form';
+    }
+
+    const field = await validateConditionField(formId, conditionFieldId);
+    if (!field) {
+      return 'conditionFieldId does not belong to the selected form';
+    }
+
+    if (!conditionValue || !String(conditionValue).trim()) {
+      return 'conditionValue is required when conditionFieldId is set';
+    }
+  }
+
+  if (conditionValue && !conditionFieldId) {
+    return 'conditionFieldId is required when conditionValue is set';
+  }
+
+  if (trigger !== 'form_submission' && conditionValue) {
+    return 'conditionValue is only supported for form_submission trigger';
+  }
+
   if (action === 'update_stage') {
     if (!targetStage) {
       return 'targetStage is required for update_stage action';
@@ -131,6 +168,10 @@ async function validateAutomationPayload({
     if (!taskTitle || !String(taskTitle).trim()) {
       return `taskTitle is required for ${action} action`;
     }
+  }
+
+  if (action === 'add_tag' && (!tagValue || !String(tagValue).trim())) {
+    return 'tagValue is required for add_tag action';
   }
 
   if (action === 'create_task') {
@@ -162,6 +203,9 @@ router.get('/', requirePermission('automations', 'view'), async (req, res) => {
       include: {
         form: {
           select: { id: true, title: true },
+        },
+        conditionField: {
+          select: { id: true, label: true },
         },
       },
     });
@@ -251,11 +295,14 @@ router.post('/', requirePermission('automations', 'edit'), async (req, res) => {
       emailSubject,
       emailBody,
       formId,
+      conditionFieldId,
+      conditionValue,
       taskTitle,
       taskNotes,
       taskPriority,
       taskDueDays,
       taskAssignedToUserId,
+      tagValue,
     } = req.body;
 
     const validationError = await validateAutomationPayload({
@@ -268,11 +315,14 @@ router.post('/', requirePermission('automations', 'edit'), async (req, res) => {
       emailSubject,
       emailBody,
       formId,
+      conditionFieldId,
+      conditionValue,
       taskTitle,
       taskNotes,
       taskPriority,
       taskDueDays,
       taskAssignedToUserId,
+      tagValue,
     });
     if (validationError) {
       return res.status(400).json({ error: validationError });
@@ -294,7 +344,11 @@ router.post('/', requirePermission('automations', 'edit'), async (req, res) => {
     if (templateName) data.templateName = templateName;
     if (emailSubject) data.emailSubject = emailSubject;
     if (emailBody) data.emailBody = emailBody;
-    if (trigger === 'form_submission') data.formId = formId || null;
+    if (trigger === 'form_submission') {
+      data.formId = formId || null;
+      data.conditionFieldId = conditionFieldId || null;
+      data.conditionValue = conditionFieldId ? conditionValue : null;
+    }
     if (taskTitle !== undefined) data.taskTitle = taskTitle?.trim() || null;
     if (taskNotes !== undefined) data.taskNotes = taskNotes?.trim() || null;
     if (taskPriority !== undefined) data.taskPriority = taskPriority || null;
@@ -306,12 +360,16 @@ router.post('/', requirePermission('automations', 'edit'), async (req, res) => {
     if (taskAssignedToUserId !== undefined) {
       data.taskAssignedToUserId = taskAssignedToUserId ? parseInt(taskAssignedToUserId, 10) : null;
     }
+    if (tagValue !== undefined) data.tagValue = tagValue?.trim() || null;
 
     const automation = await prisma.automation.create({
       data,
       include: {
         form: {
           select: { id: true, title: true },
+        },
+        conditionField: {
+          select: { id: true, label: true },
         },
       },
     });
@@ -338,11 +396,14 @@ router.put('/:id', requirePermission('automations', 'edit'), async (req, res) =>
         emailSubject: true,
         emailBody: true,
         formId: true,
+        conditionFieldId: true,
+        conditionValue: true,
         taskTitle: true,
         taskNotes: true,
         taskPriority: true,
         taskDueDays: true,
         taskAssignedToUserId: true,
+        tagValue: true,
       },
     });
     if (!automation || automation.userId !== req.user.effectiveUserId) {
@@ -359,11 +420,14 @@ router.put('/:id', requirePermission('automations', 'edit'), async (req, res) =>
       emailSubject,
       emailBody,
       formId,
+      conditionFieldId,
+      conditionValue,
       taskTitle,
       taskNotes,
       taskPriority,
       taskDueDays,
       taskAssignedToUserId,
+      tagValue,
     } = req.body;
 
     const nextTrigger = trigger ?? automation.trigger;
@@ -374,11 +438,14 @@ router.put('/:id', requirePermission('automations', 'edit'), async (req, res) =>
     const nextEmailSubject = emailSubject !== undefined ? emailSubject : automation.emailSubject;
     const nextEmailBody = emailBody !== undefined ? emailBody : automation.emailBody;
     const nextFormId = formId !== undefined ? formId : automation.formId;
+    const nextConditionFieldId = conditionFieldId !== undefined ? conditionFieldId : automation.conditionFieldId;
+    const nextConditionValue = conditionValue !== undefined ? conditionValue : automation.conditionValue;
     const nextTaskTitle = taskTitle !== undefined ? taskTitle : automation.taskTitle;
     const nextTaskNotes = taskNotes !== undefined ? taskNotes : automation.taskNotes;
     const nextTaskPriority = taskPriority !== undefined ? taskPriority : automation.taskPriority;
     const nextTaskDueDays = taskDueDays !== undefined ? taskDueDays : automation.taskDueDays;
     const nextTaskAssignedToUserId = taskAssignedToUserId !== undefined ? taskAssignedToUserId : automation.taskAssignedToUserId;
+    const nextTagValue = tagValue !== undefined ? tagValue : automation.tagValue;
 
     const validationError = await validateAutomationPayload({
       userId: req.user.effectiveUserId,
@@ -390,11 +457,14 @@ router.put('/:id', requirePermission('automations', 'edit'), async (req, res) =>
       emailSubject: nextEmailSubject,
       emailBody: nextEmailBody,
       formId: nextFormId,
+      conditionFieldId: nextConditionFieldId,
+      conditionValue: nextConditionValue,
       taskTitle: nextTaskTitle,
       taskNotes: nextTaskNotes,
       taskPriority: nextTaskPriority,
       taskDueDays: nextTaskDueDays,
       taskAssignedToUserId: nextTaskAssignedToUserId,
+      tagValue: nextTagValue,
     });
     if (validationError) {
       return res.status(400).json({ error: validationError });
@@ -411,6 +481,10 @@ router.put('/:id', requirePermission('automations', 'edit'), async (req, res) =>
     if (emailSubject !== undefined) updateData.emailSubject = emailSubject;
     if (emailBody !== undefined) updateData.emailBody = emailBody;
     if (formId !== undefined) updateData.formId = formId || null;
+    if (conditionFieldId !== undefined || conditionValue !== undefined) {
+      updateData.conditionFieldId = nextConditionFieldId || null;
+      updateData.conditionValue = nextConditionFieldId ? (nextConditionValue || null) : null;
+    }
     if (taskTitle !== undefined) updateData.taskTitle = taskTitle?.trim() || null;
     if (taskNotes !== undefined) updateData.taskNotes = taskNotes?.trim() || null;
     if (taskPriority !== undefined) updateData.taskPriority = taskPriority || null;
@@ -420,6 +494,7 @@ router.put('/:id', requirePermission('automations', 'edit'), async (req, res) =>
     if (taskAssignedToUserId !== undefined) {
       updateData.taskAssignedToUserId = taskAssignedToUserId ? parseInt(taskAssignedToUserId, 10) : null;
     }
+    if (tagValue !== undefined) updateData.tagValue = tagValue?.trim() || null;
 
     const updatedAutomation = await prisma.automation.update({
       where: { id: req.params.id },
@@ -427,6 +502,9 @@ router.put('/:id', requirePermission('automations', 'edit'), async (req, res) =>
       include: {
         form: {
           select: { id: true, title: true },
+        },
+        conditionField: {
+          select: { id: true, label: true },
         },
       },
     });

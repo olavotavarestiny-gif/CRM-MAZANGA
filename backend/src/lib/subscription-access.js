@@ -2,7 +2,10 @@
 
 const prisma = require('./prisma');
 
-const GRACE_DAYS = 5;
+// Bloqueio total imediato: ao expirar o trial/período, a conta é suspensa de
+// imediato (sem período de tolerância). GRACE_DAYS=0 mantém compatibilidade
+// com o campo graceEndsAt mas não adia a suspensão.
+const GRACE_DAYS = 0;
 const WARNING_DAYS = 7;
 const STATUS_ACTIVE = 'active';
 const STATUS_GRACE = 'grace_period';
@@ -31,8 +34,9 @@ function buildSubscriptionState(account, now = new Date()) {
   let graceEndsAt = account.graceEndsAt || null;
 
   if (accessEndsAt && now > accessEndsAt) {
-    graceEndsAt = graceEndsAt || addDays(accessEndsAt, GRACE_DAYS);
-    status = now > graceEndsAt ? STATUS_SUSPENDED : STATUS_GRACE;
+    // Bloqueio total imediato ao expirar.
+    status = STATUS_SUSPENDED;
+    graceEndsAt = null;
   }
 
   const daysUntilExpiry = accessEndsAt ? differenceInCalendarDays(accessEndsAt, now) : null;

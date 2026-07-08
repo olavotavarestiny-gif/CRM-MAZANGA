@@ -6,3 +6,7 @@ node_modules/
 .env.local
 .env.*
 !.env.example
+
+# Build output e credenciais sensíveis do gateway de pagamento
+.next/
+backend/.next/

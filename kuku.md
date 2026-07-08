@@ -49,6 +49,7 @@ O KukuGest é uma aplicação de gestão orientada a pequenas e médias empresas
 Na prática, o produto hoje funciona como um sistema híbrido entre:
 
 - CRM de relacionamento e acompanhamento comercial
+- CRM B2B com negociações empresariais multi-stakeholder
 - ERP operacional leve
 - ponto de venda com sessão de caixa
 - sistema de faturação com regras fiscais
@@ -75,6 +76,7 @@ O modo `servicos` é orientado a empresas que precisam de:
 - captar leads
 - acompanhar contactos
 - gerir processos de venda
+- gerir negociações B2B com empresas e múltiplos stakeholders
 - transformar interessados em clientes
 - ligar vendas, faturação e receita recorrente
 
@@ -105,17 +107,20 @@ O `workspaceMode` vive hoje no utilizador/conta e pode assumir:
 
 - o dashboard principal é o `DashboardCrm`
 - o módulo de `pipeline` é apresentado ao utilizador como `Processos de Venda`
+- o módulo `Negociações` é central para ciclos de venda B2B
 - o acompanhamento comercial é central
 - a receita mensal baseada em recorrência é relevante
 - contactos podem ser `interessado` ou `cliente`
+- relatórios focam em funil, automações e receita
 
 #### Em `comercio`
 
 - o dashboard principal é o `PainelComercialPage`
 - o foco vai para `produtos`, `vendas`, `caixa`, `clientes` e `tarefas`
 - contactos são tratados como clientes
-- `Processos de Venda` não é o fluxo principal do workspace
+- `Processos de Venda` e `Negociações` não são os fluxos principais do workspace
 - operação diária pesa mais do que funil comercial
+- relatórios focam em vendas, produtos e caixa
 
 ### O que não muda entre workspaces
 
@@ -183,6 +188,7 @@ Hoje existem, em termos práticos:
 - é o dono da conta
 - define workspace
 - controla equipa, módulos, planos e configuração estrutural
+- pode ter registo de self-service com trial de 14 dias
 
 #### Admin
 
@@ -198,6 +204,7 @@ Hoje existem, em termos práticos:
 
 - perfil de plataforma
 - vê contas, métricas globais, logins, uso e pode fazer impersonation
+- tem acesso ao painel de campanhas de messaging
 
 ---
 
@@ -215,7 +222,7 @@ O repositório está dividido em duas aplicações principais:
 - Node.js
 - Express
 - Prisma
-- PostgreSQL
+- PostgreSQL (Supabase em produção)
 - CommonJS
 
 #### Frontend
@@ -230,8 +237,8 @@ O repositório está dividido em duas aplicações principais:
 #### Infra de autenticação e dados
 
 - Supabase Auth para sessão/JWT
-- PostgreSQL como base de dados principal
-- Supabase Storage para uploads atuais
+- PostgreSQL como base de dados principal (Supabase)
+- Vercel Blob para uploads e ficheiros (substituiu Supabase Storage)
 
 ### Filosofia arquitetural
 
@@ -311,20 +318,27 @@ Rotas principais atualmente:
 - `faturacao-recorrentes.js`
 - `produto-categorias.js`
 - `comercial-dashboard.js`
+- `service-dashboard.js`
 - `quick-sales.js`
 - `caixa-sessoes.js`
 - `activity.js`
 - `daily-tip.js`
 - `onboarding.js`
-- `uploads.js`
+- `notes.js`
+- `reports.js`
+- `companies.js`
+- `deals.js`
+- `deal-stages.js`
+- `startup-templates.js`
+- `public-lead.js`
 - `admin.js`
 - `superadmin.js`
+- `superadmin-messaging.js`
 - `account.js`
 - `setup.js`
 - `webhook.js`
 - `whatsapp.js`
 - `send.js`
-- `notes.js`
 
 #### `backend/src/lib/`
 
@@ -392,6 +406,7 @@ As rotas são montadas por grupos:
 - `/api/webhook`
 - `/api/forms`
 - `/api/setup`
+- `/api/public-lead`
 
 #### Protegidas com `requireAuth`
 
@@ -410,6 +425,11 @@ As rotas são montadas por grupos:
 - `/api/activity`
 - `/api/daily-tip`
 - `/api/onboarding`
+- `/api/reports`
+- `/api/companies`
+- `/api/deals`
+- `/api/deal-stages`
+- `/api/startup-templates`
 - `/api`
 
 #### Protegidas com `requireAuth` + `requirePlanFeature`
@@ -419,11 +439,13 @@ As rotas são montadas por grupos:
 - `/api/faturacao/*`
 - `/api/produto-categorias`
 - `/api/comercial`
+- `/api/service-dashboard`
 
 #### Administração
 
 - `/api/admin`
 - `/api/superadmin`
+- `/api/superadmin/messaging`
 
 ### 5.5 Scheduler backend
 
@@ -460,6 +482,8 @@ A pasta `app` contém as rotas principais do produto:
 - `/contacts`
 - `/tasks`
 - `/pipeline`
+- `/negociacoes`
+- `/negociacoes/[id]`
 - `/finances`
 - `/faturacao`
 - `/vendas`
@@ -469,17 +493,27 @@ A pasta `app` contém as rotas principais do produto:
 - `/chat`
 - `/calendario`
 - `/forms`
+- `/forms/[id]/edit`
 - `/automations`
+- `/relatorios`
+- `/relatorios/servicos`
+- `/relatorios/comercio`
+- `/planos`
 - `/configuracoes`
 - `/equipa`
 - `/activity`
+- `/profile`
 - `/superadmin`
+- `/admin/users`
+- `/f/[id]` (formulário público)
 
 Também inclui:
 
-- páginas públicas de auth
+- páginas públicas de auth (`/login`, `/register`, `/forgot-password`, `/reset-password`, `/change-password`)
 - preview/demo
 - middleware e layout global
+- `/manutencao` (página de manutenção)
+- `/termos` e `/privacidade`
 
 ### 6.3 `components/`
 
@@ -498,6 +532,13 @@ A pasta `components` organiza a UI por domínio:
 - `onboarding/`
 - `layout/`
 - `ui/`
+- `billing/`
+- `reports/`
+- `search/`
+- `help/`
+- `configuracoes/`
+- `superadmin/`
+- `common/`
 
 ### 6.4 `lib/`
 
@@ -568,6 +609,13 @@ Campos importantes:
 - `workspaceMode`
 - `permissions`
 - `assignedEstabelecimentoId`
+- `plan`
+- `billingType` (`trial`, `paid`, etc.)
+- `trialEndsAt`
+- `expiresAt`
+- `graceEndsAt`
+- `accountStatus`
+- `lastSeenAt`
 
 Relações relevantes:
 
@@ -581,6 +629,10 @@ Relações relevantes:
 - caixa
 - login logs
 - dicas diárias
+- empresas e negociações
+- categorias financeiras
+- templates de onboarding aplicados
+- configurações de dashboard de serviços
 
 ### 7.2 CRM
 
@@ -612,10 +664,19 @@ Relações:
 - `ContactNote`
 - `FormSubmission`
 - `Message`
+- `DealStakeholder` (quando participa numa negociação B2B)
+- `Company` (ligação opcional a empresa)
+- `ContactGroup`
+
+#### `ContactGroup`
+
+Agrupamento manual de contactos para organização interna.
 
 #### `PipelineStage`
 
-Etapas personalizadas por conta para o funil/processos de venda.
+Etapas personalizadas por conta para o funil de contactos/leads (Processos de Venda).
+
+Nota: este modelo é distinto das `DealStage` do módulo de Negociações.
 
 #### `Task`
 
@@ -627,8 +688,84 @@ Tarefa com:
 - prioridade
 - data limite
 - estado concluída/não concluída
+- notas em markdown
 
-### 7.3 Formulários e automações
+### 7.3 Negociações B2B
+
+Este é um submódulo autónomo do CRM, orientado a ciclos de venda entre empresas.
+
+#### `Company`
+
+Representa uma empresa com quem existe uma relação comercial.
+
+Campos:
+
+- `name`
+- `nif`
+- `sector`
+- `website`
+- `location`
+- `sizeTier`
+
+Relações:
+
+- `Deal[]`
+- `Contact[]`
+
+#### `DealStage`
+
+Fases do funil de negociações, personalizáveis por conta.
+
+Campos:
+
+- `name`
+- `color`
+- `order`
+
+Nota: independente das `PipelineStage` dos contactos.
+
+#### `Deal`
+
+Negociação associada a uma empresa.
+
+Campos:
+
+- `title`
+- `valueKz`
+- `status` (`aberto`, `ganho`, `perdido`)
+- `lossReason`
+- `ownerUserId`
+- `expectedCloseDate`
+- `stageEnteredAt`
+- `closedAt`
+
+Relações:
+
+- `Company`
+- `DealStage`
+- `DealStakeholder[]`
+- `DealNote[]`
+
+#### `DealStakeholder`
+
+Contacto associado a uma negociação com papel específico.
+
+Campos:
+
+- `role` (ex: decisor, influenciador, utilizador final)
+- `influence`
+- `isPrimary`
+- `notes`
+
+Relação:
+
+- `Contact` (contacto interno do CRM ligado ao deal)
+
+#### `DealNote`
+
+Nota cronológica sobre o andamento de uma negociação.
+
+### 7.4 Formulários e automações
 
 Modelos:
 
@@ -638,8 +775,9 @@ Modelos:
 - `FormAnswer`
 - `Automation`
 - `AutomationLog`
+- `AutomationAlert`
 
-### 7.4 Finanças
+### 7.5 Finanças
 
 #### `Transaction`
 
@@ -668,7 +806,23 @@ Regras atuais:
 - anexos são hoje relevantes sobretudo em saídas
 - ligação a `Contact` é a base da rentabilidade por cliente
 
-### 7.5 Faturação
+#### `FinancialCategory`
+
+Categorias financeiras personalizáveis por conta.
+
+Campos:
+
+- `type` (entrada/saída)
+- `category`
+- `subcategories`
+- `color`
+- `icon`
+- `active`
+- `sortOrder`
+
+Regra: `userId = null` significa categoria de sistema (partilhada); `userId` definido significa categoria personalizada da conta.
+
+### 7.6 Faturação
 
 #### `ConfiguracaoFaturacao`
 
@@ -750,7 +904,7 @@ Template recorrente que gera faturas reais.
 
 Hoje é a base da `Receita Mensal`.
 
-### 7.6 Caixa e operação comercial
+### 7.7 Caixa e operação comercial
 
 #### `CaixaSessao`
 
@@ -769,7 +923,7 @@ Campos importantes:
 - `totalTransferencia`
 - `status`
 
-### 7.7 Colaboração
+### 7.8 Colaboração
 
 #### `ChatChannel`
 
@@ -779,11 +933,15 @@ Canal ou DM interno.
 
 Mensagem com texto, anexos e mentions.
 
-### 7.8 Histórico, onboarding e login
+### 7.9 Histórico, onboarding e login
 
 #### `ActivityLog`
 
 Histórico transversal por entidade e organização.
+
+#### `AuditoriaEvento`
+
+Modelo dedicado a auditoria formal de eventos do sistema.
 
 #### `LoginLog`
 
@@ -799,6 +957,60 @@ Estado do onboarding por:
 #### `DailyTipDelivery`
 
 Controlo por utilizador e dia para a dica do dia.
+
+#### `StartupTemplateApplication`
+
+Registo do template de startup aplicado durante o onboarding.
+
+Campos:
+
+- `templateKey`
+- `workspaceMode`
+- `appliedAt`
+
+Garante que o template é aplicado apenas uma vez por conta.
+
+#### `ServiceDashboardSettings`
+
+Configurações personalizadas do dashboard de serviços.
+
+Campos:
+
+- `monthlyRevenueGoalKz` — meta mensal de receita definida pelo utilizador
+
+### 7.10 Planos e billing
+
+O modelo `User` possui:
+
+- `plan` — plano atual (`essencial`, `starter`, `growth`, `pro`, etc.)
+- `billingType` — tipo de faturação (`trial`, `paid`, `manual`, etc.)
+- `trialEndsAt` — data de fim do trial
+- `expiresAt` — data de expiração do plano
+- `graceEndsAt` — fim do período de graça após expiração
+- `accountStatus` — estado da conta (`active`, `suspended`, etc.)
+
+### 7.11 Messaging campaigns (Superadmin)
+
+#### `MessagingCampaign`
+
+Campanha de envio massivo de mensagens gerida pelo superadmin.
+
+Campos:
+
+- `provider` (ex: `ZIETT`)
+- `channelType` (ex: `SMS`)
+- `name`, `content`
+- `remitterId`
+- `countryAlpha2`
+- contadores de destinatários por estado (accepted, invalid, duplicate, optedOut, notAllowed)
+- `status`, `providerStatus`
+- `triggerSource`
+
+Relações:
+
+- `MessagingCampaignRecipient[]`
+- `MessagingMessageLog[]`
+- `MessagingOptOut[]`
 
 ---
 
@@ -817,6 +1029,7 @@ O dashboard de serviços mostra métricas como:
 - receita do mês
 - faturas por cobrar
 - widgets configuráveis
+- meta mensal de receita (configurável via `ServiceDashboardSettings`)
 - dica do dia
 - onboarding contextual
 
@@ -842,16 +1055,21 @@ Capacidades:
 - importação CSV
 - campos personalizados
 - tags
-- documentos
+- grupos de contactos
+- documentos e anexos em notas
+- galeria de ficheiros/fotos
 - notas
 - histórico de atividade
 - resumo financeiro/comercial do contacto
+- ações em massa (bulk actions)
+- ligação a empresas e negociações B2B
 
 Regras:
 
 - em `servicos`, há distinção entre `interessado` e `cliente`
 - em `comercio`, o ecrã trabalha como clientes
 - contactos podem ligar com transações, tarefas e processos de venda
+- contactos podem ser stakeholders em negociações B2B
 
 ### 8.3 Processos de Venda
 
@@ -873,8 +1091,42 @@ Regras:
 - o módulo é central em `servicos`
 - existe no código como `pipeline`
 - em `comercio`, não é o fluxo dominante da operação
+- é distinto do módulo de Negociações B2B (opera sobre contactos individuais)
 
-### 8.4 Tarefas
+### 8.4 Negociações B2B
+
+Módulo autónomo para gestão de negócios entre empresas.
+
+Conceito central: uma negociação (`Deal`) está sempre ligada a uma empresa (`Company`) e pode ter múltiplos contactos internos do CRM como stakeholders.
+
+Capacidades:
+
+- CRUD de empresas (`Company`) com criação inline ao criar um deal
+- funil de negociações Kanban com fases personalizáveis (`DealStage`)
+- CRUD de deals com valor, data de fecho esperada, dono do deal
+- painel de stakeholders por deal — adicionar, atribuir papel e influência, marcar primário
+- fechar deal como ganho ou perdido (com razão de perda)
+- reabrir deal fechado
+- notas cronológicas por deal (`DealNote`) com diferentes tipos
+- timeline de atividade no detalhe do deal
+- navegação mobile-friendly
+
+Fluxo típico:
+
+1. criar empresa ou usar empresa existente
+2. criar deal associado à empresa
+3. adicionar stakeholders (contactos do CRM) com papel específico
+4. mover deal pelo Kanban à medida que o processo avança
+5. registar notas de acompanhamento
+6. fechar como ganho ou perdido
+
+Regras:
+
+- o módulo é central em `servicos`; em `comercio` não faz parte da navegação principal
+- `DealStage` são independentes das `PipelineStage` dos contactos
+- `Company` pode ter vários deals e vários contactos ligados
+
+### 8.5 Tarefas
 
 O módulo de tarefas existe nos dois workspaces.
 
@@ -886,14 +1138,16 @@ Capacidades:
 - reatribuir
 - ligar a contacto
 - filtrar por estado e prioridade
+- modal de detalhe com notas em markdown
 
 Regras:
 
 - criação, conclusão, reatribuição e eliminação alimentam o activity log
 - tarefas podem surgir de automações
 - tarefas também aparecem no calendário
+- assignees podem editar as suas próprias tarefas independentemente da permissão global de edição
 
-### 8.5 Chat interno
+### 8.6 Chat interno
 
 O chat interno serve para colaboração operacional.
 
@@ -904,6 +1158,9 @@ Capacidades:
 - anexos
 - mentions
 - leitura/não lidas
+- presença em tempo real
+- notificações de tarefas no chat
+- carregamento paginado de mensagens
 
 Uso prático:
 
@@ -911,7 +1168,7 @@ Uso prático:
 - notificações operacionais
 - contexto de execução diária
 
-### 8.6 Calendário
+### 8.7 Calendário
 
 O calendário agrega:
 
@@ -923,7 +1180,7 @@ Regra importante:
 - a ligação à Google Calendar é individual por utilizador
 - não é uma integração partilhada pelo owner
 
-### 8.7 Formulários
+### 8.8 Formulários
 
 Os formulários públicos permitem:
 
@@ -938,8 +1195,10 @@ Capacidades:
 - marca visual do formulário
 - tracking básico
 - submissões
+- código de embed para landing pages externas
+- visualização em `/f/[id]`
 
-### 8.8 Automações
+### 8.9 Automações
 
 As automações ligam eventos a ações.
 
@@ -962,8 +1221,9 @@ Observabilidade:
 - logs por execução
 - sucesso/falha
 - métricas agregadas
+- alertas de automação (`AutomationAlert`)
 
-### 8.9 Finanças
+### 8.10 Finanças
 
 O módulo de finanças agrega a leitura financeira interna da empresa.
 
@@ -978,6 +1238,8 @@ Capacidades:
 - receita mensal baseada em recorrentes
 - rentabilidade por cliente
 - anexos de fornecedores/comprovativos
+- importação de extratos bancários em CSV e XLSX
+- gestão de categorias financeiras personalizadas (CRUD com cor e ícone)
 
 Regras de negócio importantes:
 
@@ -986,8 +1248,9 @@ Regras de negócio importantes:
 - `Lucro` continua a ser o resultado do mês selecionado
 - pesquisa de cliente usa `Contact`
 - rentabilidade por cliente depende da ligação `Transaction -> Contact`
+- categorias com `userId = null` são de sistema; com `userId` são personalizadas pela conta
 
-### 8.10 Faturação
+### 8.11 Faturação
 
 Este é um dos módulos mais críticos do sistema.
 
@@ -1014,7 +1277,7 @@ Regras de negócio importantes:
 - a moeda interna e a moeda de apresentação podem divergir
 - o PDF em `pdfkit` é a fonte de verdade do documento emitido
 
-### 8.11 Caixa
+### 8.12 Caixa
 
 O módulo `Caixa` é a visão operacional do ponto de venda.
 
@@ -1032,7 +1295,7 @@ Regras:
 - caixa é por estabelecimento
 - não deve ser confundido com finanças consolidada
 
-### 8.12 Vendas rápidas
+### 8.13 Vendas rápidas
 
 Fluxo orientado a POS.
 
@@ -1045,7 +1308,7 @@ Capacidades:
 - atualização de stock
 - geração de fatura
 
-### 8.13 Produtos e stock
+### 8.14 Produtos e stock
 
 O módulo de produtos suporta:
 
@@ -1062,7 +1325,58 @@ Regras:
 - o módulo é mais central em `comercio`
 - produtos também são usados em faturação clássica
 
-### 8.14 Onboarding
+### 8.15 Relatórios
+
+O módulo de relatórios é separado por workspace e é redirecionado automaticamente.
+
+#### Relatórios de `servicos`
+
+Foco em:
+
+- funil de vendas e conversão
+- desempenho de automações
+- evolução de receita
+
+Superfície: `/relatorios/servicos`
+
+#### Relatórios de `comercio`
+
+Foco em:
+
+- vendas e faturação comercial
+- produtos mais vendidos
+- desempenho de caixa
+
+Superfície: `/relatorios/comercio`
+
+Regra: `/relatorios` redireciona automaticamente para a rota do workspace do utilizador autenticado.
+
+### 8.16 Planos e billing
+
+O sistema suporta self-registration com trial e seleção de plano.
+
+Capacidades:
+
+- registo com questionário de recomendação de workspace
+- recomendação de plano baseada nas respostas
+- seleção de plano em 2 passos com preços mensais e anuais
+- trial de 14 dias para contas novas
+- página `/planos` com pricing cards e comparação de funcionalidades
+- trial status badge visível na aplicação
+- acesso ao upgrade via WhatsApp
+- plano `Expansão` para necessidades específicas
+
+Planos disponíveis: `essencial`, `starter`, `growth`, `pro`
+
+Regras:
+
+- `billingType = trial` — conta em período de prova
+- `trialEndsAt` — data de expiração do trial
+- `expiresAt` e `graceEndsAt` — expiração e graça do plano pago
+- `accountStatus` controla o acesso geral à conta
+- gating de funcionalidades continua a ser feito pelo backend via `requirePlanFeature`
+
+### 8.17 Onboarding
 
 O onboarding já está separado por workspace.
 
@@ -1071,6 +1385,8 @@ Características:
 - progresso por organização e workspace
 - pode ser dispensado
 - desaparece automaticamente quando completo
+- modal de introdução por módulo na primeira visita
+- seletor de modelo de startup durante o onboarding (aplica template via `StartupTemplateApplication`)
 
 #### Onboarding de `servicos`
 
@@ -1094,7 +1410,7 @@ Foca-se em:
 - primeira venda
 - convite de equipa
 
-### 8.15 Dica do Dia
+### 8.18 Dica do Dia
 
 A dica do dia é:
 
@@ -1105,7 +1421,7 @@ A dica do dia é:
 
 Hoje já não usa toast global como mecanismo principal.
 
-### 8.16 Activity / histórico
+### 8.19 Activity / histórico
 
 Existe histórico transversal com leitura por entidade e feed organizacional.
 
@@ -1119,9 +1435,10 @@ Eventos cobertos:
 Superfícies:
 
 - timeline no detalhe do contacto
+- timeline no detalhe da negociação
 - página `/activity`
 
-### 8.17 Administração de conta
+### 8.20 Administração de conta
 
 Capacidades:
 
@@ -1131,7 +1448,7 @@ Capacidades:
 - leitura de plano e uso
 - histórico de logins
 
-### 8.18 Superadmin
+### 8.21 Superadmin
 
 Capacidades:
 
@@ -1140,6 +1457,8 @@ Capacidades:
 - logins
 - impersonation
 - leitura operacional da plataforma
+- painel de campanhas de messaging (SMS via ZIETT)
+- envio de mensagens a segmentos de utilizadores
 
 ---
 
@@ -1156,16 +1475,28 @@ Fluxo atual:
 5. frontend carrega `currentUser`
 6. após login real, o sistema grava `LoginLog`
 
-### 9.2 Carregamento da aplicação autenticada
+### 9.2 Registo com trial
+
+1. utilizador acede a `/register`
+2. responde ao questionário de recomendação de workspace
+3. o sistema recomenda workspace e plano com base nas respostas
+4. utilizador seleciona plano (mensal ou anual)
+5. utilizador preenche dados e cria conta
+6. Supabase Auth cria utilizador e o backend cria `User` com `billingType = trial` e `trialEndsAt = now + 14 dias`
+7. onboarding é iniciado automaticamente
+8. `StartupTemplateApplication` pode ser criado durante o onboarding
+
+### 9.3 Carregamento da aplicação autenticada
 
 1. layout autenticado resolve utilizador atual
 2. frontend decide tema, sidebar e navegação com base em:
    - `workspaceMode`
    - permissões
    - papel do utilizador
+   - `accountStatus` e datas de trial/expiração
 3. módulos passam a carregar por página/feature
 
-### 9.3 Criação de contacto
+### 9.4 Criação de contacto
 
 1. frontend envia contacto
 2. backend valida
@@ -1173,21 +1504,31 @@ Fluxo atual:
 4. activity log regista `created`
 5. contacto fica disponível para tarefas, finanças e processos
 
-### 9.4 Mudança de etapa
+### 9.5 Mudança de etapa (Processos de Venda)
 
 1. utilizador move contacto no kanban
 2. backend persiste nova etapa
 3. activity log regista `stage_changed`
 4. analytics passam a refletir a nova distribuição
 
-### 9.5 Criação de tarefa
+### 9.6 Criação e progressão de negociação
+
+1. utilizador cria empresa (ou seleciona existente)
+2. cria deal associado com valor, fase e data de fecho esperada
+3. adiciona stakeholders (contactos do CRM) com papel
+4. move deal pelo Kanban de fases
+5. regista notas de acompanhamento
+6. fecha deal como ganho ou perdido
+7. deal fechado pode ser reaberto
+
+### 9.7 Criação de tarefa
 
 1. utilizador cria tarefa manualmente ou automação cria tarefa
 2. backend persiste `Task`
 3. task pode ficar associada a contacto e responsável
 4. activity log regista evento
 
-### 9.6 Emissão de fatura
+### 9.8 Emissão de fatura
 
 1. frontend monta documento
 2. backend valida dados fiscais
@@ -1198,7 +1539,7 @@ Fluxo atual:
 7. PDF é disponibilizado a partir do documento real
 8. activity log regista emissão
 
-### 9.7 Faturação recorrente
+### 9.9 Faturação recorrente
 
 1. utilizador cria template recorrente
 2. recorrente guarda moeda, frequência, série, cliente e linhas
@@ -1207,7 +1548,7 @@ Fluxo atual:
 5. recorrente atualiza contadores e próxima execução
 6. a recorrência alimenta `Receita Mensal`
 
-### 9.8 Venda rápida
+### 9.10 Venda rápida
 
 1. utilizador abre `Vendas Rápidas`
 2. sistema verifica sessão de caixa aberta
@@ -1217,13 +1558,21 @@ Fluxo atual:
 6. totais da sessão de caixa são atualizados
 7. operação alimenta faturação e reconciliação
 
-### 9.9 Uploads
+### 9.11 Uploads
 
-1. frontend envia ficheiro para rota local de upload
-2. a rota faz proxy autenticado para o backend
-3. backend usa Supabase Storage
-4. ficheiro fica guardado por pasta/conta
-5. a URL guardada passa a alimentar anexos, logos ou documentos
+1. frontend comprime a imagem automaticamente antes do envio (se aplicável)
+2. frontend envia ficheiro para rota local de upload
+3. a rota faz proxy autenticado para o backend
+4. backend usa Vercel Blob (storage atual)
+5. ficheiro fica guardado como blob privado
+6. a URL guardada passa a alimentar anexos, logos ou documentos
+
+### 9.12 Importação de extrato bancário
+
+1. utilizador acede ao módulo de finanças
+2. faz upload de ficheiro CSV ou XLSX
+3. o sistema processa as linhas do extrato
+4. transações são criadas ou reconciliadas automaticamente
 
 ---
 
@@ -1290,7 +1639,7 @@ Regra essencial:
 O histórico transversal existe para:
 
 - auditoria funcional
-- timelines por entidade
+- timelines por entidade (contacto, deal)
 - feed organizacional
 
 Importante:
@@ -1320,19 +1669,33 @@ Ambos já respeitam:
 - utilizador
 - contexto do produto
 
-### 10.7 Uploads
+### 10.7 Uploads e storage
 
 O caminho atual de upload usa:
 
+- compressão automática de imagens antes do envio
 - rota frontend de proxy
 - backend `/api/uploads`
-- Supabase Storage
+- Vercel Blob (store privado)
 
 Isto vale para:
 
-- anexos
+- anexos em notas e transações
+- galeria de ficheiros/fotos dos contactos
 - logos
 - ficheiros auxiliares do sistema
+
+### 10.8 Planos e trial
+
+O sistema verifica estado do plano a cada request relevante.
+
+Mecanismos:
+
+- `requirePlanFeature` no backend bloqueia acesso a módulos premium
+- frontend usa `plan-utils.ts` para adaptar a UI
+- `trial-status-badge` indica dias restantes de trial
+- `access-notice` apresenta limitações de plano ao utilizador
+- `usage-bar` mostra consumo de recursos vs limite do plano
 
 ---
 
@@ -1344,15 +1707,21 @@ Usado para:
 
 - autenticação
 - JWT
-- storage
 
-### 11.2 Google Calendar
+### 11.2 Vercel Blob
+
+Usado para:
+
+- storage de ficheiros, imagens e anexos (substituiu Supabase Storage)
+- acesso privado via proxy autenticado
+
+### 11.3 Google Calendar
 
 Usado para:
 
 - sincronização de calendário por utilizador
 
-### 11.3 WhatsApp / canais de comunicação
+### 11.4 WhatsApp / canais de comunicação
 
 O sistema já tem estrutura backend para:
 
@@ -1360,7 +1729,7 @@ O sistema já tem estrutura backend para:
 - envio
 - integração de mensagens
 
-### 11.4 AGT e contexto fiscal
+### 11.5 AGT e contexto fiscal
 
 A faturação foi desenhada para preservar:
 
@@ -1371,11 +1740,20 @@ A faturação foi desenhada para preservar:
 - estabelecimentos
 - estados de submissão/validação
 
-### 11.5 Email
+### 11.6 Email
 
 Existe infraestrutura utilitária para envio de email em:
 
 - `backend/src/lib/email.js`
+
+### 11.7 ZIETT (SMS)
+
+Integração de messaging para campanhas de SMS geridas pelo superadmin.
+
+- provider: `ZIETT`
+- canal: `SMS`
+- país: `AO` (Angola)
+- gestão via `MessagingCampaign` e painel de superadmin
 
 ---
 
@@ -1390,6 +1768,7 @@ O frontend pode adaptar a interface, mas a segurança real está no backend.
 - esconde rotas e elementos sem permissão
 - adapta navegação
 - muda a experiência conforme workspace
+- mostra estado de trial e limitações de plano
 
 ### 12.3 O que o backend faz
 
@@ -1397,6 +1776,7 @@ O frontend pode adaptar a interface, mas a segurança real está no backend.
 - valida papel do utilizador
 - valida plano
 - aplica escopo por conta
+- verifica `accountStatus` e datas de expiração
 
 ### 12.4 Resultado
 
@@ -1415,6 +1795,7 @@ Mesmo que a UI tente expor algo indevido:
 - Prisma como ORM oficial
 - middleware de auth obrigatório nas rotas protegidas
 - `effectiveUserId` como regra de scoping
+- migrations aplicadas automaticamente no deploy
 
 ### 13.2 Frontend
 
@@ -1424,6 +1805,7 @@ Mesmo que a UI tente expor algo indevido:
 - tipos centrais em `lib/types.ts`
 - UI modular por domínio
 - wrappers de loading/erro/empty state nas superfícies principais
+- compressão de imagens no lado do cliente antes do upload
 
 ### 13.3 Produto
 
@@ -1432,10 +1814,11 @@ Mesmo que a UI tente expor algo indevido:
 - manter consistência entre dashboard, detalhe e documento emitido
 - preferir linguagem visível de produto, mesmo que o nome técnico interno seja outro
 
-Exemplo:
+Exemplos:
 
-- internamente: `pipeline`
-- visível no produto: `Processos de Venda`
+- internamente: `pipeline` → visível no produto: `Processos de Venda`
+- internamente: `deals` → visível no produto: `Negociações`
+- internamente: `companies` → visível no produto: `Empresas`
 
 ### 13.4 Convenção de documentação
 
@@ -1465,7 +1848,16 @@ São entidades relacionadas, mas não idênticas.
 - `Contact` serve CRM, tarefas, rentabilidade e operação
 - `ClienteFaturacao` serve faturação formal
 
-### 14.3 Confundir workspace com produto separado
+### 14.3 Confundir `pipeline` com `negociações`
+
+São dois módulos distintos com conceitos diferentes:
+
+- `Pipeline / Processos de Venda` — funil de contactos/leads individuais
+- `Negociações` — ciclos B2B com empresas e múltiplos stakeholders
+
+Os modelos `PipelineStage` e `DealStage` são independentes e não se misturam.
+
+### 14.4 Confundir workspace com produto separado
 
 Os workspaces mudam a experiência, mas não são duas aplicações independentes.
 
@@ -1475,7 +1867,7 @@ O produto continua a ser um só sistema, com:
 - mesmo auth
 - mesmos módulos nucleares
 
-### 14.4 Alterações visuais em faturação
+### 14.5 Alterações visuais em faturação
 
 Devem preservar sempre:
 
@@ -1486,17 +1878,33 @@ Devem preservar sempre:
 - séries
 - regras fiscais
 
-### 14.5 Funcionalidades cross-cutting
+### 14.6 Funcionalidades cross-cutting
 
 Qualquer mudança em:
 
 - auth
 - permissions
-- uploads
+- uploads (Vercel Blob)
 - activity log
 - account scoping
+- planos e gating
 
 tem impacto transversal e deve ser tratada com cuidado.
+
+### 14.7 Trial e expiração
+
+O sistema tem múltiplos estados temporais de conta:
+
+- `trial` → `active` (pago) → `grace` → `suspended`
+
+Qualquer mudança na lógica de planos deve respeitar estes estados e não quebrar contas ativas.
+
+### 14.8 Vercel Blob privado
+
+Ficheiros no Vercel Blob são privados e requerem proxy autenticado.
+
+- nunca expor URLs diretas de Vercel Blob no frontend sem autenticação
+- o proxy backend é obrigatório para servir ficheiros privados
 
 ---
 
@@ -1507,6 +1915,7 @@ Documentos relacionados:
 - `README.md`
 - `IMPLEMENTACAO.md`
 - `estruturakukugest.md`
+- `DEPLOYMENT.md`
 
 Ficheiros nucleares do projeto:
 
@@ -1515,6 +1924,7 @@ Ficheiros nucleares do projeto:
 - `backend/prisma/schema.prisma`
 - `frontend/src/lib/api.ts`
 - `frontend/src/lib/types.ts`
+- `frontend/src/lib/plan-utils.ts`
 - `frontend/src/components/layout/layout-wrapper.tsx`
 - `frontend/src/components/layout/sidebar.tsx`
 - `frontend/src/app/page.tsx`
@@ -1525,16 +1935,17 @@ Ficheiros nucleares do projeto:
 
 O KukuGest atual já não é apenas um CRM simples. Ele combina:
 
-- CRM relacional
-- processos de venda
-- tarefas
-- automações
-- formulários
-- chat
+- CRM relacional com contactos, processos de venda e tarefas
+- CRM B2B com negociações empresariais, empresas e stakeholders
+- automações e formulários públicos
+- chat interno com presença
 - calendário
-- finanças
-- faturação
-- operação comercial com caixa e vendas rápidas
+- finanças com importação de extratos e categorias personalizadas
+- faturação completa com SAF-T e QR
+- operação comercial com caixa, vendas rápidas e stock
+- relatórios por workspace
+- planos e billing com self-registration e trial
+- painel superadmin com messaging campaigns
 
 Toda a estrutura do projeto gira em torno de alguns princípios centrais:
 
@@ -1543,6 +1954,7 @@ Toda a estrutura do projeto gira em torno de alguns princípios centrais:
 - experiência adaptada por `workspaceMode`
 - lógica fiscal preservada
 - módulos reutilizados entre CRM e comércio
+- gating de funcionalidades por plano
 
 Este ficheiro deve ser mantido sempre que houver alterações relevantes em:
 
@@ -1551,3 +1963,4 @@ Este ficheiro deve ser mantido sempre que houver alterações relevantes em:
 - entidades principais
 - organização dos módulos
 - regras de workspace
+- planos e billing

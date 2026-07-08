@@ -1,5 +1,6 @@
 const prisma = require('../lib/prisma');
 const { sendSms } = require('./sms.service');
+const ziettService = require('./ziett.service');
 const { SUPER_ADMIN_EMAILS } = require('../middleware/auth');
 
 /**
@@ -18,6 +19,23 @@ const PREVIEW_SAMPLE_SIZE = 50;
 const MAX_CAMPAIGN_RECIPIENTS = 500; // limite de segurança para evitar disparos acidentais
 const DEFAULT_WINDOW_DAYS = 7;
 
+const MESSAGE_STATUS_MAP = {
+  PENDING: 'queued',
+  PROCESSING: 'queued',
+  SENDING: 'queued',
+  SENT: 'sent',
+  DELIVERED: 'delivered',
+  FAILED: 'failed',
+  UNDELIVERED: 'failed',
+  EXPIRED: 'failed',
+  REJECTED: 'failed',
+  CANCELLED: 'failed',
+};
+
+const SUCCESS_STATUSES = new Set(['sent', 'delivered']);
+const FAILED_STATUSES = new Set(['failed']);
+const QUEUED_STATUSES = new Set(['queued']);
+
 class PlatformSmsError extends Error {
   constructor(message, { status = 400, code = 'PLATFORM_SMS_ERROR' } = {}) {
     super(message);
@@ -33,6 +51,94 @@ function formatError(error) {
   }
   console.error('[platform-sms] error:', error);
   return { status: 500, body: { error: error.message || 'Erro interno', code: 'INTERNAL' } };
+}
+
+function compactObject(value) {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) => item !== undefined)
+  );
+}
+
+function getPathValue(source, path) {
+  if (!source) return undefined;
+  return path.split('.').reduce((value, key) => {
+    if (value === undefined || value === null) return undefined;
+    return value[key];
+  }, source);
+}
+
+function pickFirstValue(source, paths) {
+  for (const path of paths) {
+    const value = getPathValue(source, path);
+    if (value !== undefined && value !== null && value !== '') {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function pickFirstString(source, paths) {
+  const value = pickFirstValue(source, paths);
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).trim();
+  return normalized || null;
+}
+
+function normalizeProviderStatus(rawStatus) {
+  if (!rawStatus) return null;
+  const normalized = String(rawStatus).trim().toUpperCase();
+  return MESSAGE_STATUS_MAP[normalized] || String(rawStatus).trim().toLowerCase();
+}
+
+function extractMessageProviderStatus(response) {
+  return pickFirstString(response, [
+    'status',
+    'provider_status',
+    'providerStatus',
+    'message.status',
+    'message.provider_status',
+    'message.providerStatus',
+    'data.status',
+    'data.provider_status',
+    'data.providerStatus',
+    'delivery.status',
+    'delivery_status',
+    'deliveryStatus',
+  ]);
+}
+
+function buildProviderErrorFields(response) {
+  return {
+    errorCode: pickFirstString(response, [
+      'error_code',
+      'errorCode',
+      'code',
+      'error.code',
+      'data.error_code',
+      'data.errorCode',
+      'data.code',
+    ]) || undefined,
+    errorMessage: pickFirstString(response, [
+      'error_message',
+      'errorMessage',
+      'message',
+      'detail',
+      'error.message',
+      'data.error_message',
+      'data.errorMessage',
+      'data.message',
+      'data.detail',
+    ]) || undefined,
+  };
+}
+
+function assertZiettEnabled() {
+  if (String(process.env.ZIETT_ENABLE || '').trim().toLowerCase() !== 'true') {
+    throw new PlatformSmsError('A integração Ziett está desativada neste ambiente.', {
+      status: 503,
+      code: 'PLATFORM_SMS_DISABLED',
+    });
+  }
 }
 
 const SEGMENTS = {
@@ -387,6 +493,124 @@ async function getStats() {
   };
 }
 
+async function syncMessage(user, messageId) {
+  assertZiettEnabled();
+
+  const message = await prisma.platformSmsMessage.findUnique({
+    where: { id: messageId },
+  });
+
+  if (!message) {
+    throw new PlatformSmsError('Mensagem não encontrada.', { status: 404, code: 'NOT_FOUND' });
+  }
+
+  if (!message.providerMessageId) {
+    throw new PlatformSmsError('A mensagem ainda não possui providerMessageId para sincronização.', {
+      status: 400,
+      code: 'MESSAGE_NOT_SYNCABLE',
+    });
+  }
+
+  const response = await ziettService.getMessageById(message.providerMessageId);
+  const providerStatus = extractMessageProviderStatus(response);
+  const internalStatus = normalizeProviderStatus(providerStatus) || message.status;
+  const providerErrorFields = buildProviderErrorFields(response);
+
+  const updated = await prisma.platformSmsMessage.update({
+    where: { id: message.id },
+    data: compactObject({
+      providerStatus,
+      status: internalStatus,
+      errorCode: providerErrorFields.errorCode || message.errorCode,
+      errorMessage: providerErrorFields.errorMessage || message.errorMessage,
+      rawResponseJson: response,
+      sentAt: SUCCESS_STATUSES.has(internalStatus) ? (message.sentAt || new Date()) : message.sentAt,
+    }),
+  });
+
+  if (updated.campaignId) {
+    await recalculateCampaignCounters(updated.campaignId);
+  }
+
+  return updated;
+}
+
+async function recalculateCampaignCounters(campaignId) {
+  const messages = await prisma.platformSmsMessage.findMany({
+    where: { campaignId },
+    select: { status: true },
+  });
+
+  const sentCount = messages.filter((message) => SUCCESS_STATUSES.has(message.status)).length;
+  const failedCount = messages.filter((message) => FAILED_STATUSES.has(message.status)).length;
+  const queuedCount = messages.filter((message) => QUEUED_STATUSES.has(message.status)).length;
+  const totalRecipients = messages.length;
+
+  let status = 'completed';
+  if (totalRecipients === 0) status = 'completed';
+  else if (queuedCount > 0) status = 'sending';
+  else if (sentCount === 0 && failedCount > 0) status = 'failed';
+
+  return prisma.platformSmsCampaign.update({
+    where: { id: campaignId },
+    data: {
+      sentCount,
+      failedCount,
+      status,
+      completedAt: queuedCount === 0 ? new Date() : null,
+    },
+    include: { _count: { select: { messages: true } } },
+  });
+}
+
+async function syncCampaign(user, campaignId) {
+  assertZiettEnabled();
+
+  const campaign = await prisma.platformSmsCampaign.findUnique({
+    where: { id: campaignId },
+  });
+
+  if (!campaign) {
+    throw new PlatformSmsError('Campanha não encontrada.', { status: 404, code: 'NOT_FOUND' });
+  }
+
+  const messages = await prisma.platformSmsMessage.findMany({
+    where: {
+      campaignId,
+      providerMessageId: { not: null },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  if (messages.length === 0) {
+    throw new PlatformSmsError('A campanha não possui mensagens sincronizáveis.', {
+      status: 400,
+      code: 'CAMPAIGN_NOT_SYNCABLE',
+    });
+  }
+
+  let synced = 0;
+  let failedSync = 0;
+
+  for (const message of messages) {
+    try {
+      await syncMessage(user, message.id);
+      synced += 1;
+    } catch (error) {
+      failedSync += 1;
+      console.warn(`[platform-sms] Falha ao sincronizar mensagem ${message.id}:`, error.message);
+    }
+  }
+
+  const updatedCampaign = await recalculateCampaignCounters(campaign.id);
+  return {
+    campaign: updatedCampaign,
+    synced,
+    failedSync,
+    totalSyncable: messages.length,
+  };
+}
+
 module.exports = {
   PlatformSmsError,
   formatError,
@@ -398,6 +622,8 @@ module.exports = {
   getCampaignDetail,
   listMessages,
   getStats,
+  syncMessage,
+  syncCampaign,
   // helpers reutilizados pelo motor de automações
   baseOwnerWhere,
   renderTemplate,

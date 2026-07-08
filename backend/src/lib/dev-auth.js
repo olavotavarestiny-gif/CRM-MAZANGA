@@ -63,7 +63,7 @@ const DEV_AUTH_PUBLIC_USER = {
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 function isDevAuthBypassEnabled() {
-  return process.env.NODE_ENV === 'development' && process.env.BYPASS_AUTH === 'true';
+  return (process.env.NODE_ENV || 'development') === 'development' && process.env.BYPASS_AUTH === 'true';
 }
 
 function hasValidDevAuthHeader(req) {

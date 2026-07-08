@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, BarChart3, Eye, History, Megaphone, Play, Send, Zap } from 'lucide-react';
+import { AlertTriangle, BarChart3, Eye, History, Megaphone, Play, RefreshCw, Save, Send, Zap } from 'lucide-react';
 import {
   getPlatformSmsStats,
+  getPlatformSmsCampaign,
+  listPlatformSmsAutomationLogs,
   listPlatformSmsAutomations,
   listPlatformSmsCampaigns,
   listPlatformSmsMessages,
@@ -12,7 +14,10 @@ import {
   previewPlatformSmsCampaign,
   runPlatformSmsAutomation,
   sendPlatformSmsCampaign,
+  syncPlatformSmsCampaign,
+  syncPlatformSmsMessage,
   updatePlatformSmsAutomation,
+  type PlatformAutomationRunResult,
   type PlatformAutomationRule,
   type PlatformSmsCampaign,
   type PlatformSmsMessage,
@@ -22,9 +27,16 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingButton } from '@/components/ui/loading-button';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -40,6 +52,50 @@ type Tab = 'campanhas' | 'automacoes' | 'historico' | 'estatisticas';
 
 const DAYS_SEGMENTS: PlatformSmsSegmentType[] = ['trial_ending', 'payment_due_soon'];
 const MAX_MESSAGE_LEN = 480;
+const HISTORY_PAGE_SIZE = 30;
+const CAMPAIGN_DETAIL_PAGE_SIZE = 20;
+
+type AutomationConditionField = {
+  key: 'cooldownDays' | 'days' | 'recentDays' | 'priorDays';
+  label: string;
+  defaultValue: number;
+  max: number;
+};
+
+const COOLDOWN_FIELD: AutomationConditionField = {
+  key: 'cooldownDays',
+  label: 'Intervalo sem repetir (dias)',
+  defaultValue: 7,
+  max: 365,
+};
+
+const AUTOMATION_CONDITION_FIELDS: Record<string, AutomationConditionField[]> = {
+  no_first_action: [
+    { key: 'days', label: 'Contas criadas nos últimos (dias)', defaultValue: 30, max: 365 },
+  ],
+  trial_ending: [
+    { key: 'days', label: 'Trial termina dentro de (dias)', defaultValue: 7, max: 90 },
+  ],
+  payment_due_soon: [
+    { key: 'days', label: 'Pagamento vence dentro de (dias)', defaultValue: 7, max: 90 },
+  ],
+  usage_drop: [
+    { key: 'recentDays', label: 'Sem login nos últimos (dias)', defaultValue: 7, max: 90 },
+    { key: 'priorDays', label: 'Com atividade nos últimos (dias)', defaultValue: 21, max: 365 },
+  ],
+};
+
+function getAutomationConditionFields(triggerType: string) {
+  return [COOLDOWN_FIELD, ...(AUTOMATION_CONDITION_FIELDS[triggerType] || [])];
+}
+
+function readPositiveCondition(
+  conditions: Record<string, unknown> | null | undefined,
+  field: AutomationConditionField
+) {
+  const value = Number(conditions?.[field.key]);
+  return Number.isFinite(value) && value > 0 ? value : field.defaultValue;
+}
 
 // Lista estática (espelha o backend) — usada como fallback para o seletor nunca
 // ficar vazio, mesmo que o endpoint /segments não esteja disponível.
@@ -73,6 +129,7 @@ function statusBadge(status: string) {
     sending: 'bg-blue-100 text-blue-700',
     queued: 'bg-slate-100 text-slate-600',
     draft: 'bg-slate-100 text-slate-600',
+    skipped: 'bg-amber-100 text-amber-700',
     failed: 'bg-red-100 text-red-700',
   };
   return map[status] || 'bg-slate-100 text-slate-600';
@@ -94,6 +151,9 @@ export function PlatformSmsSection() {
   // History search
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [historyPage, setHistoryPage] = useState(1);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [selectedCampaignPage, setSelectedCampaignPage] = useState(1);
 
   const segmentsQuery = useQuery({ queryKey: ['platform-sms-segments'], queryFn: listPlatformSmsSegments });
   const segments = segmentsQuery.data && segmentsQuery.data.length > 0 ? segmentsQuery.data : STATIC_SEGMENTS;
@@ -110,9 +170,18 @@ export function PlatformSmsSection() {
   });
 
   const messagesQuery = useQuery({
-    queryKey: ['platform-sms-messages', search],
-    queryFn: () => listPlatformSmsMessages({ pageSize: 30, search: search || undefined }),
+    queryKey: ['platform-sms-messages', search, historyPage],
+    queryFn: () => listPlatformSmsMessages({ page: historyPage, pageSize: HISTORY_PAGE_SIZE, search: search || undefined }),
     enabled: tab === 'historico',
+  });
+
+  const campaignDetailQuery = useQuery({
+    queryKey: ['platform-sms-campaign-detail', selectedCampaignId, selectedCampaignPage],
+    queryFn: () => getPlatformSmsCampaign(selectedCampaignId as string, {
+      page: selectedCampaignPage,
+      pageSize: CAMPAIGN_DETAIL_PAGE_SIZE,
+    }),
+    enabled: !!selectedCampaignId,
   });
 
   const statsQuery = useQuery({
@@ -153,8 +222,50 @@ export function PlatformSmsSection() {
     onError: (err: Error) => toast({ variant: 'error', title: 'Erro ao enviar', description: err.message }),
   });
 
+  const syncCampaignMutation = useMutation({
+    mutationFn: (campaignId: string) => syncPlatformSmsCampaign(campaignId),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ['platform-sms-campaigns'] });
+      qc.invalidateQueries({ queryKey: ['platform-sms-campaign-detail'] });
+      qc.invalidateQueries({ queryKey: ['platform-sms-messages'] });
+      qc.invalidateQueries({ queryKey: ['platform-sms-stats'] });
+      toast({
+        variant: result.failedSync > 0 ? 'info' : 'success',
+        title: 'Campanha sincronizada',
+        description: `${result.synced}/${result.totalSyncable} mensagem(ns) sincronizada(s).${result.failedSync ? ` ${result.failedSync} falharam.` : ''}`,
+      });
+    },
+    onError: (err: Error) => toast({ variant: 'error', title: 'Erro ao sincronizar campanha', description: err.message }),
+  });
+
+  const syncMessageMutation = useMutation({
+    mutationFn: (messageId: string) => syncPlatformSmsMessage(messageId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['platform-sms-campaigns'] });
+      qc.invalidateQueries({ queryKey: ['platform-sms-campaign-detail'] });
+      qc.invalidateQueries({ queryKey: ['platform-sms-messages'] });
+      qc.invalidateQueries({ queryKey: ['platform-sms-stats'] });
+      toast({ variant: 'success', title: 'Mensagem sincronizada' });
+    },
+    onError: (err: Error) => toast({ variant: 'error', title: 'Erro ao sincronizar mensagem', description: err.message }),
+  });
+
   const resetPreviewOnChange = (fn: () => void) => { fn(); setPreview(null); };
   const canSend = !!name.trim() && !!message.trim() && !!preview && preview.totalRecipients > 0;
+  const openCampaignDetail = (id: string) => {
+    setSelectedCampaignId(id);
+    setSelectedCampaignPage(1);
+  };
+  const handleSendCampaign = () => {
+    if (!canSend || sendMutation.isPending) return;
+    if (!isTest) {
+      const confirmed = window.confirm(
+        `Vai enviar uma campanha REAL para ${preview?.totalRecipients || 0} destinatário(s) do segmento "${segmentLabel(segmentType)}". Esta ação não usa a allowlist de teste. Pretende continuar?`
+      );
+      if (!confirmed) return;
+    }
+    sendMutation.mutate();
+  };
 
   return (
     <div className="space-y-6">
@@ -256,7 +367,7 @@ export function PlatformSmsSection() {
                   <Eye className="mr-2 h-4 w-4" /> Pré-visualizar destinatários
                 </LoadingButton>
                 <LoadingButton
-                  onClick={() => sendMutation.mutate()}
+                  onClick={handleSendCampaign}
                   disabled={!canSend || sendMutation.isPending}
                   loading={sendMutation.isPending}
                   loadingLabel="A enviar..."
@@ -327,6 +438,7 @@ export function PlatformSmsSection() {
                       <TableHead className="text-right">Enviados</TableHead>
                       <TableHead className="text-right">Falhados</TableHead>
                       <TableHead>Data</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -338,6 +450,11 @@ export function PlatformSmsSection() {
                         <TableCell className="text-right">{c.sentCount}/{c.totalRecipients}</TableCell>
                         <TableCell className="text-right">{c.failedCount}</TableCell>
                         <TableCell className="text-xs text-[#6b7e9a]">{formatDateTime(c.createdAt)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="outline" onClick={() => openCampaignDetail(c.id)}>
+                            <Eye className="mr-1 h-4 w-4" /> Detalhe
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -352,11 +469,18 @@ export function PlatformSmsSection() {
         <div className="space-y-4">
           <p className="text-sm text-[#6b7e9a]">
             Automações enviam SMS aos utilizadores conforme o gatilho. Estão <strong>desativadas por defeito</strong> —
-            ative só as que quiser. Para evitar duplicados, não reenviam ao mesmo utilizador dentro de 7 dias.
+            ative só as que quiser. Para evitar duplicados, respeitam o intervalo configurado em cada automação.
             O scheduler corre uma vez por dia; &laquo;Correr teste&raquo; envia apenas para a allowlist.
           </p>
           {automationsQuery.isLoading ? (
             <p className="py-8 text-center text-sm text-[#6b7e9a]">A carregar...</p>
+          ) : automationsQuery.isError ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
+              <p className="text-sm text-red-700">Não foi possível carregar as automações.</p>
+              <Button size="sm" variant="outline" onClick={() => automationsQuery.refetch()}>Tentar novamente</Button>
+            </div>
+          ) : (automationsQuery.data?.length ?? 0) === 0 ? (
+            <p className="py-8 text-center text-sm text-[#6b7e9a]">Ainda não há automações configuradas.</p>
           ) : (
             (automationsQuery.data || []).map((rule) => (
               <AutomationCard key={rule.id} rule={rule} />
@@ -372,7 +496,11 @@ export function PlatformSmsSection() {
           </CardHeader>
           <CardContent className="space-y-4">
             <form
-              onSubmit={(e) => { e.preventDefault(); setSearch(searchInput.trim()); }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                setHistoryPage(1);
+                setSearch(searchInput.trim());
+              }}
               className="flex gap-2"
             >
               <Input
@@ -397,6 +525,7 @@ export function PlatformSmsSection() {
                       <TableHead>Origem</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Erro</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -410,11 +539,32 @@ export function PlatformSmsSection() {
                         <TableCell className="max-w-[220px] truncate text-xs text-red-600" title={m.errorMessage || ''}>
                           {m.errorMessage || ''}
                         </TableCell>
+                        <TableCell className="text-right">
+                          <LoadingButton
+                            size="sm"
+                            variant="outline"
+                            loading={syncMessageMutation.isPending && syncMessageMutation.variables === m.id}
+                            loadingLabel="Sync"
+                            disabled={!m.providerMessageId}
+                            onClick={() => syncMessageMutation.mutate(m.id)}
+                          >
+                            <RefreshCw className="mr-1 h-4 w-4" /> Sync
+                          </LoadingButton>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
+            )}
+            {messagesQuery.data?.pagination && (
+              <SmsPagination
+                totalLabel={`${messagesQuery.data.pagination.total} mensagem(ns)`}
+                page={messagesQuery.data.pagination.page}
+                totalPages={messagesQuery.data.pagination.totalPages}
+                onPrevious={() => setHistoryPage((current) => Math.max(current - 1, 1))}
+                onNext={() => setHistoryPage((current) => current + 1)}
+              />
             )}
           </CardContent>
         </Card>
@@ -472,6 +622,152 @@ export function PlatformSmsSection() {
           </Card>
         </div>
       )}
+
+      <Dialog open={!!selectedCampaignId} onOpenChange={(open) => { if (!open) setSelectedCampaignId(null); }}>
+        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+          <DialogHeader className="pr-8">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <DialogTitle>Detalhe da campanha</DialogTitle>
+              {selectedCampaignId && (
+                <LoadingButton
+                  size="sm"
+                  variant="outline"
+                  loading={syncCampaignMutation.isPending && syncCampaignMutation.variables === selectedCampaignId}
+                  loadingLabel="A sincronizar..."
+                  onClick={() => syncCampaignMutation.mutate(selectedCampaignId)}
+                >
+                  <RefreshCw className="mr-1 h-4 w-4" /> Sincronizar campanha
+                </LoadingButton>
+              )}
+            </div>
+          </DialogHeader>
+
+          {campaignDetailQuery.isLoading ? (
+            <p className="py-8 text-center text-sm text-[#6b7e9a]">A carregar detalhe...</p>
+          ) : campaignDetailQuery.isError ? (
+            <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              Não foi possível carregar esta campanha.
+            </p>
+          ) : campaignDetailQuery.data ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <p className="text-xs uppercase text-[#6b7e9a]">Campanha</p>
+                  <p className="mt-1 font-semibold text-[#0A2540]">{campaignDetailQuery.data.campaign.name}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-[#6b7e9a]">Segmento</p>
+                  <p className="mt-1 text-[#0A2540]">{segmentLabel(campaignDetailQuery.data.campaign.segmentType)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-[#6b7e9a]">Estado</p>
+                  <Badge className={`mt-1 ${statusBadge(campaignDetailQuery.data.campaign.status)}`}>
+                    {campaignDetailQuery.data.campaign.status}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-[#6b7e9a]">Resultado</p>
+                  <p className="mt-1 text-[#0A2540]">
+                    {campaignDetailQuery.data.campaign.sentCount}/{campaignDetailQuery.data.campaign.totalRecipients} enviados · {campaignDetailQuery.data.campaign.failedCount} falhados
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <p className="text-xs uppercase text-[#6b7e9a]">Mensagem</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-[#0A2540]">{campaignDetailQuery.data.campaign.message}</p>
+              </div>
+
+              {(campaignDetailQuery.data.messages.length ?? 0) === 0 ? (
+                <p className="py-8 text-center text-sm text-[#6b7e9a]">Sem mensagens registadas para esta campanha.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Destinatário</TableHead>
+                        <TableHead>Telefone</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Provider</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Erro</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {campaignDetailQuery.data.messages.map((m) => (
+                        <TableRow key={m.id}>
+                          <TableCell className="font-medium">{m.recipientName || '—'}</TableCell>
+                          <TableCell className="font-mono text-xs">{m.phone}</TableCell>
+                          <TableCell><Badge className={statusBadge(m.status)}>{m.status}</Badge></TableCell>
+                          <TableCell className="text-xs text-[#6b7e9a]">{m.providerStatus || m.providerMessageId || '—'}</TableCell>
+                          <TableCell className="text-xs text-[#6b7e9a]">{formatDateTime(m.createdAt)}</TableCell>
+                          <TableCell className="max-w-[240px] truncate text-xs text-red-600" title={m.errorMessage || ''}>
+                            {m.errorMessage || ''}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <LoadingButton
+                              size="sm"
+                              variant="outline"
+                              loading={syncMessageMutation.isPending && syncMessageMutation.variables === m.id}
+                              loadingLabel="Sync"
+                              disabled={!m.providerMessageId}
+                              onClick={() => syncMessageMutation.mutate(m.id)}
+                            >
+                              <RefreshCw className="mr-1 h-4 w-4" /> Sync
+                            </LoadingButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              <SmsPagination
+                totalLabel={`${campaignDetailQuery.data.pagination.total} mensagem(ns) nesta campanha`}
+                page={campaignDetailQuery.data.pagination.page}
+                totalPages={campaignDetailQuery.data.pagination.totalPages}
+                onPrevious={() => setSelectedCampaignPage((current) => Math.max(current - 1, 1))}
+                onNext={() => setSelectedCampaignPage((current) => current + 1)}
+              />
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function SmsPagination({
+  totalLabel,
+  page,
+  totalPages,
+  onPrevious,
+  onNext,
+}: {
+  totalLabel: string;
+  page: number;
+  totalPages: number;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  const effectiveTotalPages = Math.max(totalPages, 1);
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-[#e5ebf3] pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-[#6b7e9a]">{totalLabel}</p>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" disabled={page <= 1} onClick={onPrevious}>
+          Anterior
+        </Button>
+        <span className="text-sm text-[#6b7e9a]">
+          Página {page} de {effectiveTotalPages}
+        </span>
+        <Button variant="outline" size="sm" disabled={page >= effectiveTotalPages} onClick={onNext}>
+          Próxima
+        </Button>
+      </div>
     </div>
   );
 }
@@ -480,26 +776,45 @@ function AutomationCard({ rule }: { rule: PlatformAutomationRule }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [message, setMessage] = useState(rule.messageTemplate);
+  const conditionFields = getAutomationConditionFields(rule.triggerType);
+  const [conditionValues, setConditionValues] = useState<Record<string, number>>(() =>
+    Object.fromEntries(
+      conditionFields.map((field) => [field.key, readPositiveCondition(rule.conditionsJson, field)])
+    )
+  );
+  const [previewResult, setPreviewResult] = useState<PlatformAutomationRunResult | null>(null);
+  const [showLogs, setShowLogs] = useState(false);
 
-  const invalidate = () => {
+  const logsQuery = useQuery({
+    queryKey: ['platform-sms-automation-logs', rule.id],
+    queryFn: () => listPlatformSmsAutomationLogs(rule.id, { pageSize: 10 }),
+    enabled: showLogs,
+  });
+
+  const invalidateExecution = () => {
     qc.invalidateQueries({ queryKey: ['platform-sms-automations'] });
+    qc.invalidateQueries({ queryKey: ['platform-sms-automation-logs', rule.id] });
     qc.invalidateQueries({ queryKey: ['platform-sms-messages'] });
     qc.invalidateQueries({ queryKey: ['platform-sms-stats'] });
   };
 
   const updateMutation = useMutation({
     mutationFn: (data: Parameters<typeof updatePlatformSmsAutomation>[1]) => updatePlatformSmsAutomation(rule.id, data),
-    onSuccess: () => { invalidate(); toast({ variant: 'success', title: 'Automação atualizada' }); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['platform-sms-automations'] });
+      toast({ variant: 'success', title: 'Automação atualizada' });
+    },
     onError: (err: Error) => toast({ variant: 'error', title: 'Erro', description: err.message }),
   });
 
   const runMutation = useMutation({
     mutationFn: (opts: { dryRun?: boolean; isTest?: boolean }) => runPlatformSmsAutomation(rule.id, opts),
     onSuccess: (res, opts) => {
-      invalidate();
       if (opts.dryRun) {
+        setPreviewResult(res);
         toast({ variant: 'info', title: 'Pré-visualização', description: `${res.eligible} utilizador(es) elegível(eis).` });
       } else {
+        invalidateExecution();
         toast({
           variant: res.failed > 0 && res.sent === 0 ? 'error' : 'success',
           title: 'Execução concluída',
@@ -511,10 +826,23 @@ function AutomationCard({ rule }: { rule: PlatformAutomationRule }) {
   });
 
   const messageChanged = message.trim() !== rule.messageTemplate;
+  const conditionsChanged = conditionFields.some(
+    (field) => conditionValues[field.key] !== readPositiveCondition(rule.conditionsJson, field)
+  );
+  const usageRangeInvalid = rule.triggerType === 'usage_drop'
+    && conditionValues.priorDays <= conditionValues.recentDays;
+
+  const saveConditions = () => {
+    const conditionsJson: Record<string, unknown> = { ...(rule.conditionsJson || {}) };
+    conditionFields.forEach((field) => {
+      conditionsJson[field.key] = conditionValues[field.key];
+    });
+    updateMutation.mutate({ conditionsJson });
+  };
 
   return (
     <Card className="border-slate-200 shadow-sm">
-      <CardContent className="space-y-3 p-4">
+      <CardContent className="space-y-4 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="font-medium text-[#0A2540]">{rule.name}</p>
@@ -524,34 +852,178 @@ function AutomationCard({ rule }: { rule: PlatformAutomationRule }) {
               <span>· {rule.sentCount ?? 0} enviado(s)</span>
             </div>
           </div>
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+          <div className="flex items-center gap-2 text-sm">
+            <Switch
+              aria-label={rule.isActive ? 'Desativar automação' : 'Ativar automação'}
               checked={rule.isActive}
               disabled={updateMutation.isPending}
-              onChange={(e) => updateMutation.mutate({ isActive: e.target.checked })}
+              onCheckedChange={(checked) => updateMutation.mutate({ isActive: checked === true })}
             />
             <span className={rule.isActive ? 'font-medium text-emerald-700' : 'text-[#6b7e9a]'}>
               {rule.isActive ? 'Ativa' : 'Inativa'}
             </span>
-          </label>
+          </div>
         </div>
 
-        <Textarea value={message} onChange={(e) => setMessage(e.target.value.slice(0, 480))} rows={2} />
+        <div className="space-y-2">
+          <Label htmlFor={`automation-message-${rule.id}`}>Mensagem</Label>
+          <Textarea
+            id={`automation-message-${rule.id}`}
+            value={message}
+            onChange={(e) => setMessage(e.target.value.slice(0, MAX_MESSAGE_LEN))}
+            rows={2}
+          />
+          <p className="text-right text-xs text-[#6b7e9a]">{message.length}/{MAX_MESSAGE_LEN}</p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {conditionFields.map((field) => (
+            <div key={field.key} className="space-y-2">
+              <Label htmlFor={`${rule.id}-${field.key}`}>{field.label}</Label>
+              <Input
+                id={`${rule.id}-${field.key}`}
+                type="number"
+                min={1}
+                max={field.max}
+                value={conditionValues[field.key]}
+                onChange={(event) => {
+                  const value = Math.min(field.max, Math.max(1, Number(event.target.value) || field.defaultValue));
+                  setConditionValues((current) => ({ ...current, [field.key]: value }));
+                }}
+              />
+            </div>
+          ))}
+        </div>
+
+        {usageRangeInvalid ? (
+          <p className="text-sm text-red-700">A janela com atividade deve ser maior do que o período sem login.</p>
+        ) : null}
 
         <div className="flex flex-wrap items-center gap-2">
-          {messageChanged && (
-            <Button size="sm" onClick={() => updateMutation.mutate({ messageTemplate: message.trim() })} disabled={updateMutation.isPending}>
-              Guardar mensagem
-            </Button>
-          )}
-          <Button size="sm" variant="outline" onClick={() => runMutation.mutate({ dryRun: true })} disabled={runMutation.isPending}>
+          {messageChanged ? (
+            <LoadingButton
+              size="sm"
+              loading={updateMutation.isPending}
+              loadingLabel="A guardar..."
+              onClick={() => updateMutation.mutate({ messageTemplate: message.trim() })}
+              disabled={!message.trim()}
+            >
+              <Save className="mr-1 h-4 w-4" /> Guardar mensagem
+            </LoadingButton>
+          ) : null}
+          {conditionsChanged ? (
+            <LoadingButton
+              size="sm"
+              variant="outline"
+              loading={updateMutation.isPending}
+              loadingLabel="A guardar..."
+              onClick={saveConditions}
+              disabled={usageRangeInvalid}
+            >
+              <Save className="mr-1 h-4 w-4" /> Guardar condições
+            </LoadingButton>
+          ) : null}
+          <LoadingButton
+            size="sm"
+            variant="outline"
+            loading={runMutation.isPending && runMutation.variables?.dryRun === true}
+            loadingLabel="A verificar..."
+            onClick={() => runMutation.mutate({ dryRun: true })}
+            disabled={runMutation.isPending}
+          >
             <Eye className="mr-1 h-4 w-4" /> Pré-ver elegíveis
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => runMutation.mutate({ dryRun: false, isTest: true })} disabled={runMutation.isPending}>
+          </LoadingButton>
+          <LoadingButton
+            size="sm"
+            variant="outline"
+            loading={runMutation.isPending && runMutation.variables?.dryRun === false}
+            loadingLabel="A executar..."
+            onClick={() => runMutation.mutate({ dryRun: false, isTest: true })}
+            disabled={runMutation.isPending}
+          >
             <Play className="mr-1 h-4 w-4" /> Correr teste
+          </LoadingButton>
+          <Button size="sm" variant="outline" onClick={() => setShowLogs((current) => !current)}>
+            <History className="mr-1 h-4 w-4" /> {showLogs ? 'Ocultar histórico' : 'Ver histórico'}
           </Button>
         </div>
+
+        {previewResult ? (
+          <div className="space-y-3 border-t border-slate-200 pt-4">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="font-semibold text-[#0A2540]">{previewResult.eligible} elegível(eis)</span>
+              {previewResult.sample && previewResult.eligible > previewResult.sample.length ? (
+                <span className="text-[#6b7e9a]">A mostrar os primeiros {previewResult.sample.length}.</span>
+              ) : null}
+            </div>
+            {previewResult.sample?.length ? (
+              <div className="max-h-56 overflow-auto rounded border border-slate-200">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Utilizador</TableHead>
+                      <TableHead>Telefone</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {previewResult.sample.map((recipient) => (
+                      <TableRow key={`${recipient.phone}-${recipient.name}`}>
+                        <TableCell className="font-medium">{recipient.name || '—'}</TableCell>
+                        <TableCell className="font-mono text-xs">{recipient.phone}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <p className="text-sm text-[#6b7e9a]">Nenhum utilizador elegível com telefone.</p>
+            )}
+          </div>
+        ) : null}
+
+        {showLogs ? (
+          <div className="space-y-3 border-t border-slate-200 pt-4">
+            <p className="font-medium text-[#0A2540]">Execuções recentes</p>
+            {logsQuery.isLoading ? (
+              <p className="py-4 text-sm text-[#6b7e9a]">A carregar histórico...</p>
+            ) : logsQuery.isError ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-red-200 bg-red-50 p-3">
+                <p className="text-sm text-red-700">Não foi possível carregar o histórico.</p>
+                <Button size="sm" variant="outline" onClick={() => logsQuery.refetch()}>Tentar novamente</Button>
+              </div>
+            ) : (logsQuery.data?.logs.length ?? 0) === 0 ? (
+              <p className="py-4 text-sm text-[#6b7e9a]">Esta automação ainda não tem execuções.</p>
+            ) : (
+              <div className="overflow-x-auto rounded border border-slate-200">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Utilizador</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Erro</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {logsQuery.data!.logs.map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell>
+                          <p className="font-medium">{log.targetUser?.name || `Utilizador #${log.targetUserId}`}</p>
+                          <p className="font-mono text-xs text-[#6b7e9a]">{log.targetUser?.phone || '—'}</p>
+                        </TableCell>
+                        <TableCell><Badge className={statusBadge(log.status)}>{log.status}</Badge></TableCell>
+                        <TableCell className="text-xs text-[#6b7e9a]">{formatDateTime(log.executedAt)}</TableCell>
+                        <TableCell className="max-w-[280px] truncate text-xs text-red-600" title={log.errorMessage || ''}>
+                          {log.errorMessage || ''}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

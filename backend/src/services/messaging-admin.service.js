@@ -9,6 +9,7 @@ const MAX_PAGE_SIZE = 100;
 const MAX_BATCH_RECIPIENTS = 1000;
 const DEFAULT_CHANNEL = 'SMS';
 const DEFAULT_COUNTRY = 'AO';
+const UUID_V7_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const CAMPAIGN_STATUS_MAP = {
   PENDING: 'pending',
@@ -162,6 +163,26 @@ function getDefaultChannel() {
   return String(process.env.ZIETT_DEFAULT_CHANNEL || DEFAULT_CHANNEL).toUpperCase();
 }
 
+function getRemitterId(bodyRemitterId) {
+  return toNullableString(bodyRemitterId) || toNullableString(process.env.ZIETT_DEFAULT_REMITTER_ID);
+}
+
+function validateRemitterId(value) {
+  const remitterId = validateRequiredString(value, 'remitterId', 'O remitter ID');
+
+  if (!UUID_V7_REGEX.test(remitterId)) {
+    throw new MessagingError('O remitter ID da Ziett deve ser um UUID v7 válido.', {
+      status: 400,
+      code: 'INVALID_REMITTER_ID',
+      fields: {
+        remitterId: 'Use o UUID v7 do remetente aprovado na Ziett, não o nome visível do remetente.',
+      },
+    });
+  }
+
+  return remitterId;
+}
+
 function assertMessagingEnabled() {
   if (String(process.env.ZIETT_ENABLE || '').toLowerCase() !== 'true') {
     throw new MessagingError('A integração Ziett está desativada neste ambiente.', {
@@ -239,8 +260,9 @@ function normalizeRecipientInput(rawRecipients) {
   return [];
 }
 
-async function classifyRecipients(rawRecipients, defaultCountry = DEFAULT_COUNTRY) {
-  const allowlist = getAllowedRecipientsSet(defaultCountry);
+async function classifyRecipients(rawRecipients, defaultCountry = DEFAULT_COUNTRY, options = {}) {
+  const enforceAllowlist = options.enforceAllowlist !== false;
+  const allowlist = enforceAllowlist ? getAllowedRecipientsSet(defaultCountry) : null;
   const normalizedRecipients = normalizeRecipientInput(rawRecipients);
   const accepted = [];
   const rejected = [];
@@ -305,7 +327,7 @@ async function classifyRecipients(rawRecipients, defaultCountry = DEFAULT_COUNTR
       return;
     }
 
-    if (!allowlist.has(recipient.phoneNormalized)) {
+    if (allowlist && !allowlist.has(recipient.phoneNormalized)) {
       rejected.push({
         ...recipient,
         status: 'not_allowed',
@@ -350,7 +372,7 @@ async function prepareBatchCampaignInput(body = {}) {
 
   const name = validateRequiredString(body.name, 'name', 'O nome da campanha');
   const content = validateRequiredString(body.content, 'content', 'O conteúdo da mensagem');
-  const remitterId = validateRequiredString(body.remitterId, 'remitterId', 'O remitter');
+  const remitterId = validateRemitterId(getRemitterId(body.remitterId));
   const countryAlpha2 = getDefaultCountry(body.countryAlpha2);
   const isTest = parseBoolean(body.isTest, true);
   const recipients = normalizeRecipientInput(body.recipients);
@@ -363,7 +385,9 @@ async function prepareBatchCampaignInput(body = {}) {
     });
   }
 
-  const classification = await classifyRecipients(recipients, countryAlpha2);
+  const classification = await classifyRecipients(recipients, countryAlpha2, {
+    enforceAllowlist: isTest,
+  });
 
   if (classification.accepted.length === 0) {
     throw new MessagingError('Nenhum destinatário válido ficou elegível para envio.', {
@@ -424,7 +448,7 @@ async function prepareSingleMessageInput(body = {}) {
   assertMessagingEnabled();
 
   const content = validateRequiredString(body.content, 'content', 'O conteúdo da mensagem');
-  const remitterId = validateRequiredString(body.remitterId, 'remitterId', 'O remitter');
+  const remitterId = validateRemitterId(getRemitterId(body.remitterId));
   const countryAlpha2 = getDefaultCountry(body.countryAlpha2);
   const phoneOriginal = validateRequiredString(body.phone, 'phone', 'O número');
   const phoneNormalized = normalizePhoneToE164(phoneOriginal, countryAlpha2);
@@ -438,8 +462,8 @@ async function prepareSingleMessageInput(body = {}) {
     });
   }
 
-  const allowlist = getAllowedRecipientsSet(countryAlpha2);
-  if (!allowlist.has(phoneNormalized)) {
+  const allowlist = isTest ? getAllowedRecipientsSet(countryAlpha2) : null;
+  if (allowlist && !allowlist.has(phoneNormalized)) {
     throw new MessagingError('O número não faz parte da allowlist de teste.', {
       status: 400,
       code: 'NOT_ALLOWED',
@@ -471,6 +495,7 @@ async function prepareSingleMessageInput(body = {}) {
     phoneNormalized,
     contactId: toNullableInt(body.contactId),
     isTest,
+    triggerSource: toNullableString(body.triggerSource) || 'SUPERADMIN_PANEL',
     saveContact: parsePlainObject(body.saveContact),
     ziettPayload: {
       remitter_id: remitterId,
@@ -1107,7 +1132,7 @@ async function sendSingleTestMessage(user, body) {
       channelType: getDefaultChannel(),
       remitterId: preparedInput.remitterId,
       status: 'pending',
-      triggerSource: 'SUPERADMIN_PANEL',
+      triggerSource: preparedInput.triggerSource,
       createdByUserId: user.id,
       createdByEmail: user.email,
       isTest: preparedInput.isTest,

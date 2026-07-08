@@ -29,6 +29,8 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
     trigger: 'new_contact',
     triggerValue: '',
     formId: '',
+    conditionFieldId: '',
+    conditionValue: '',
     action: 'update_stage',
     targetStage: '',
     taskTitle: '',
@@ -36,6 +38,7 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
     taskPriority: 'Media' as (typeof TASK_PRIORITIES)[number],
     taskDueDays: '0',
     taskAssignedToUserId: '',
+    tagValue: '',
   });
 
   const { data: contacts = [] } = useQuery({
@@ -70,6 +73,9 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
     }
   }, [formData.taskAssignedToUserId, orgUsers]);
 
+  const selectedForm = forms.find((form) => form.id === formData.formId);
+  const conditionField = selectedForm?.fields.find((field) => field.id === formData.conditionFieldId);
+
   const allTags = Array.from(
     new Set(contacts.flatMap((contact) => Array.isArray(contact.tags) ? contact.tags : []))
   ).sort();
@@ -91,6 +97,10 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
 
       if (formData.trigger === 'form_submission' && formData.formId) {
         payload.formId = formData.formId;
+        if (formData.conditionFieldId) {
+          payload.conditionFieldId = formData.conditionFieldId;
+          payload.conditionValue = formData.conditionValue;
+        }
       }
 
       if (formData.action === 'update_stage') {
@@ -107,6 +117,10 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
         }
       }
 
+      if (formData.action === 'add_tag') {
+        payload.tagValue = formData.tagValue;
+      }
+
       return createAutomation(payload);
     },
     onSuccess: () => {
@@ -114,6 +128,8 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
         trigger: 'new_contact',
         triggerValue: '',
         formId: '',
+        conditionFieldId: '',
+        conditionValue: '',
         action: 'update_stage',
         targetStage: stages[0]?.name || '',
         taskTitle: '',
@@ -121,6 +137,7 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
         taskPriority: 'Media',
         taskDueDays: '0',
         taskAssignedToUserId: orgUsers[0]?.id ? String(orgUsers[0].id) : '',
+        tagValue: '',
       });
       onSuccess?.();
     },
@@ -129,6 +146,10 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
   const getValidationMessage = () => {
     if (['contact_tag', 'contact_revenue', 'contact_sector', 'stage_changed', 'contact_inactivity'].includes(formData.trigger) && !formData.triggerValue) {
       return 'Preencha a condição do evento para continuar.';
+    }
+
+    if (formData.trigger === 'form_submission' && formData.conditionFieldId && !formData.conditionValue) {
+      return 'Selecione a resposta esperada para a condição do formulário.';
     }
 
     if (formData.action === 'update_stage' && !formData.targetStage) {
@@ -165,6 +186,17 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
       trigger: value,
       triggerValue: value === 'contact_inactivity' ? '7' : '',
       formId: value === 'form_submission' ? prev.formId : '',
+      conditionFieldId: value === 'form_submission' ? prev.conditionFieldId : '',
+      conditionValue: value === 'form_submission' ? prev.conditionValue : '',
+    }));
+  };
+
+  const handleFormIdChange = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      formId: value === '__all__' ? '' : value,
+      conditionFieldId: '',
+      conditionValue: '',
     }));
   };
 
@@ -257,10 +289,7 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
       {formData.trigger === 'form_submission' && (
         <div>
           <Label>Formulário</Label>
-          <Select
-            value={formData.formId || '__all__'}
-            onValueChange={(value) => setFormData((prev) => ({ ...prev, formId: value === '__all__' ? '' : value }))}
-          >
+          <Select value={formData.formId || '__all__'} onValueChange={handleFormIdChange}>
             <SelectTrigger>
               <SelectValue placeholder="Todos os formulários" />
             </SelectTrigger>
@@ -276,6 +305,59 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
         </div>
       )}
 
+      {formData.trigger === 'form_submission' && selectedForm && (
+        <div>
+          <Label>Condição: pergunta (opcional)</Label>
+          <Select
+            value={formData.conditionFieldId || '__none__'}
+            onValueChange={(value) =>
+              setFormData((prev) => ({
+                ...prev,
+                conditionFieldId: value === '__none__' ? '' : value,
+                conditionValue: '',
+              }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Sem condição" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Sem condição (qualquer resposta)</SelectItem>
+              {selectedForm.fields.map((field) => (
+                <SelectItem key={field.id} value={field.id}>
+                  {field.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {formData.trigger === 'form_submission' && conditionField && (
+        <div>
+          <Label>Resposta esperada *</Label>
+          {conditionField.type === 'multiple_choice' ? (
+            <Select
+              value={formData.conditionValue}
+              onValueChange={(value) => setFormData((prev) => ({ ...prev, conditionValue: value }))}
+            >
+              <SelectTrigger><SelectValue placeholder="Selecione uma opção" /></SelectTrigger>
+              <SelectContent>
+                {(conditionField.options || []).map((option) => (
+                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              placeholder="Valor exato da resposta"
+              value={formData.conditionValue}
+              onChange={(e) => setFormData((prev) => ({ ...prev, conditionValue: e.target.value }))}
+            />
+          )}
+        </div>
+      )}
+
       {formData.trigger === 'contact_tag' && (
         <div>
           <Label>Selecionar Tag *</Label>
@@ -286,9 +368,6 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
             list="tags-list"
             required
           />
-          <datalist id="tags-list">
-            {allTags.map((tag) => <option key={tag} value={tag} />)}
-          </datalist>
         </div>
       )}
 
@@ -360,9 +439,27 @@ export default function AutomationForm({ onSuccess }: { onSuccess?: () => void }
             <SelectItem value="update_stage">Mover para Etapa do Pipeline</SelectItem>
             <SelectItem value="create_task">Criar Tarefa</SelectItem>
             <SelectItem value="create_alert">Criar Alerta</SelectItem>
+            <SelectItem value="add_tag">Adicionar Tag ao Contacto</SelectItem>
           </SelectContent>
         </Select>
       </div>
+
+      {formData.action === 'add_tag' && (
+        <div>
+          <Label>Tag a adicionar *</Label>
+          <Input
+            placeholder="Digite ou selecione uma tag"
+            value={formData.tagValue}
+            onChange={(e) => setFormData((prev) => ({ ...prev, tagValue: e.target.value }))}
+            list="tags-list"
+            required
+          />
+        </div>
+      )}
+
+      <datalist id="tags-list">
+        {allTags.map((tag) => <option key={tag} value={tag} />)}
+      </datalist>
 
       {formData.action === 'update_stage' && (
         <div>

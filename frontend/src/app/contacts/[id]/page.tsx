@@ -377,11 +377,6 @@ function isImage(name: string, contentType?: string): boolean {
   return /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(name);
 }
 
-function isPdf(name: string, contentType?: string): boolean {
-  if (contentType === 'application/pdf') return true;
-  return /\.pdf$/i.test(name);
-}
-
 // ── Lightbox simples ────────────────────────────────────────────────────────────
 function Lightbox({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
   useEffect(() => {

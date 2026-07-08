@@ -679,7 +679,7 @@ export function SuperAdminMessagingSection() {
           <CardHeader>
             <CardTitle>Envio Batch</CardTitle>
             <CardDescription>
-              Cola a lista de números de teste, valida e cria a campanha local com tracking Ziett.
+              Cola a lista de números, valida e cria a campanha local com tracking Ziett.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -694,12 +694,12 @@ export function SuperAdminMessagingSection() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="campaign-remitter">Remitter ID</Label>
+                <Label htmlFor="campaign-remitter">Remitter ID Ziett</Label>
                 <Input
                   id="campaign-remitter"
                   value={batchForm.remitterId}
                   onChange={(event) => setBatchForm((current) => ({ ...current, remitterId: event.target.value }))}
-                  placeholder="uuid do remitter"
+                  placeholder="UUID v7 do remetente aprovado"
                 />
               </div>
             </div>
@@ -748,7 +748,7 @@ export function SuperAdminMessagingSection() {
                 onCheckedChange={(checked) => setBatchForm((current) => ({ ...current, isTest: checked === true }))}
               />
               <Label htmlFor="campaign-is-test" className="cursor-pointer text-sm text-[#0A2540]">
-                Marcar como campanha de teste interno
+                Campanha de teste interno, limitada à allowlist
               </Label>
             </div>
 
@@ -800,7 +800,7 @@ export function SuperAdminMessagingSection() {
                 id="single-remitter"
                 value={singleForm.remitterId}
                 onChange={(event) => setSingleForm((current) => ({ ...current, remitterId: event.target.value }))}
-                placeholder="uuid do remitter"
+                placeholder="UUID v7 do remetente aprovado"
               />
             </div>
             <div className="space-y-2">
@@ -821,7 +821,7 @@ export function SuperAdminMessagingSection() {
                 onCheckedChange={(checked) => setSingleForm((current) => ({ ...current, isTest: checked === true }))}
               />
               <Label htmlFor="single-is-test" className="cursor-pointer text-sm text-[#0A2540]">
-                Guardar como envio de teste
+                Envio de teste, limitado à allowlist
               </Label>
             </div>
 

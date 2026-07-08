@@ -52,6 +52,8 @@ const onboardingRouter = require('./routes/onboarding');
 const startupTemplatesRouter = require('./routes/startup-templates');
 const reportsRouter = require('./routes/reports');
 const serviceDashboardRouter = require('./routes/service-dashboard');
+const messagingRouter = require('./routes/messaging');
+const paymentsRouter = require('./routes/payments');
 const requireAuth = require('./middleware/auth');
 const { requireSuperAdmin } = require('./middleware/auth');
 const { requirePlanFeature } = require('./lib/plan-limits');
@@ -323,6 +325,9 @@ app.use('/api/webhook', webhookRouter);
 app.use('/api/forms', formsRouter);
 app.use('/api/setup', setupRouter);
 app.use('/api/public', publicLeadRouter);
+// Pagamentos: /charge é protegido internamente (requireAuth na rota),
+// /callback é público para receber o webhook do gateway E+ Kwanza.
+app.use('/api/payments', paymentsRouter);
 
 // Protected routes (require authentication)
 app.use('/api/contacts', requireAuth, checkSubscriptionAccess, contactsRouter);
@@ -360,6 +365,7 @@ app.use('/api/faturacao', requireAuth, checkSubscriptionAccess, requirePlanFeatu
 app.use('/api/produto-categorias', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), produtoCategoriasRouter);
 app.use('/api/comercial', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), comercialDashboardRouter);
 app.use('/api/chat', requireAuth, checkSubscriptionAccess, requirePlanFeature('conversas'), chatRouter);
+app.use('/api/messaging', requireAuth, checkSubscriptionAccess, requirePlanFeature('conversas'), messagingRouter);
 app.use('/api/quick-sales', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), quickSalesRouter);
 app.use('/api/caixa', requireAuth, checkSubscriptionAccess, requirePlanFeature('vendas'), caixaSessoesRouter);
 app.use('/api/activity', requireAuth, checkSubscriptionAccess, activityRouter);

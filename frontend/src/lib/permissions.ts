@@ -39,6 +39,7 @@ type CommerceRoute =
   | '/caixa'
   | '/vendas-rapidas'
   | '/contacts'
+  | '/messaging'
   | '/tasks'
   | '/produtos'
   | '/vendas'
@@ -64,6 +65,7 @@ const SERVICOS_ROUTE_TO_MODULE: Array<{ prefix: string; module: ModuleKey }> = [
   { prefix: '/faturacao', module: 'vendas' },
   { prefix: '/calendario', module: 'calendario' },
   { prefix: '/chat', module: 'chat' },
+  { prefix: '/messaging', module: 'chat' },
   { prefix: '/automations', module: 'automations' },
   { prefix: '/forms', module: 'forms' },
   { prefix: '/finances', module: 'finances' },
@@ -314,6 +316,7 @@ export function canAccessCommerceRoute(user: User, pathname: string): boolean {
   if (path.startsWith('/caixa')) return canCaixaView(user);
   if (path.startsWith('/vendas-rapidas')) return canAccessQuickSales(user);
   if (path.startsWith('/contacts')) return canView(user, 'contacts');
+  if (path.startsWith('/messaging')) return canView(user, 'chat');
   if (path.startsWith('/tasks')) return canView(user, 'tasks');
   if (path.startsWith('/produtos')) return canStockView(user);
   if (path.startsWith('/vendas')) return canAccessBilling(user);

@@ -260,6 +260,8 @@ export interface Automation {
   trigger: string; // "new_contact", "form_submission", "contact_tag", "contact_revenue", "contact_sector"
   triggerValue?: string; // tag name, revenue, or sector
   formId?: string | null;
+  conditionFieldId?: string | null; // form field whose answer must match conditionValue (form_submission trigger)
+  conditionValue?: string | null;
   action: string; // "send_email", "send_template", "send_text", "update_stage", "create_task"
   targetStage?: Stage; // for update_stage action
   templateName?: string;
@@ -270,10 +272,15 @@ export interface Automation {
   taskPriority?: 'Baixa' | 'Media' | 'Alta';
   taskDueDays?: number | null;
   taskAssignedToUserId?: number | null;
+  tagValue?: string;
   active: boolean;
   form?: {
     id: string;
     title: string;
+  } | null;
+  conditionField?: {
+    id: string;
+    label: string;
   } | null;
   executionSummary?: AutomationExecutionSummary;
 }

@@ -47,6 +47,7 @@ const ACTION_LABELS: Record<string, string> = {
   update_stage: 'Mover etapa',
   create_task: 'Criar tarefa',
   create_alert: 'Criar alerta',
+  add_tag: 'Adicionar tag',
 };
 
 const percentFormatter = new Intl.NumberFormat('pt-PT', {
@@ -92,6 +93,10 @@ function getAutomationActionDetail(automation: Automation) {
 
   if (automation.action === 'send_email') {
     return automation.emailSubject || 'Sem assunto';
+  }
+
+  if (automation.action === 'add_tag') {
+    return automation.tagValue ? `Adicionar tag "${automation.tagValue}"` : 'Adicionar tag';
   }
 
   return automation.templateName || ACTION_LABELS[automation.action] || automation.action;
@@ -348,6 +353,11 @@ export default function AutomationsPage() {
                         ? automation.form?.title || 'Todos os formulários'
                         : automation.triggerValue || 'Sem condição extra'}
                     </p>
+                    {automation.trigger === 'form_submission' && automation.conditionField ? (
+                      <p className="text-xs text-[#6b7e9a]">
+                        Se &quot;{automation.conditionField.label}&quot; = &quot;{automation.conditionValue}&quot;
+                      </p>
+                    ) : null}
                   </div>
                 ),
               },

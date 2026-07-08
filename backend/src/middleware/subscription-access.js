@@ -1,11 +1,11 @@
 const { getSubscriptionState, STATUS_SUSPENDED } = require('../lib/subscription-access');
 const { logRouteWarning } = require('../lib/request-log');
 
-const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-
 function isRenewalPath(path) {
   return (
     path.startsWith('/api/auth') ||
+    path.startsWith('/api/account') ||
+    path.startsWith('/api/payments') ||
     path.startsWith('/api/onboarding') ||
     path.startsWith('/api/startup-templates') ||
     path.startsWith('/api/superadmin') ||
@@ -28,8 +28,10 @@ async function checkSubscriptionAccess(req, res, next) {
     req.subscriptionAccess = state;
     res.setHeader('X-KukuGest-Account-Status', state.accountStatus);
 
-    if (state.accountStatus === STATUS_SUSPENDED && WRITE_METHODS.has(req.method)) {
-      logRouteWarning('[subscription-access] write denied', req, {
+    // Bloqueio total: conta suspensa não acede a nada (exceto a allowlist acima),
+    // incluindo leituras. O cliente só avança depois de pagar.
+    if (state.accountStatus === STATUS_SUSPENDED) {
+      logRouteWarning('[subscription-access] access denied (locked)', req, {
         status: 402,
         message: state.message || 'Acesso suspenso. Renove para continuar.',
         code: state.accountStatus,
@@ -38,6 +40,7 @@ async function checkSubscriptionAccess(req, res, next) {
         error: state.message || 'Acesso suspenso. Renove para continuar.',
         accountStatus: state.accountStatus,
         billingType: state.billingType,
+        locked: true,
         readOnly: true,
       });
     }

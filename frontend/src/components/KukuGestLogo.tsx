@@ -1,34 +1,43 @@
 import * as React from 'react';
-import Image from 'next/image';
 
+const COMMERCE_PRIMARY = '#F06A1A';
 const COMMERCE_DARK = '#B84D0E';
 const COMMERCE_BG = '#FDF2EA';
 const COMMERCE_BORDER = '#FAC775';
 
+const ORANGE = COMMERCE_PRIMARY;
+
+const LOGO_SRC = '/assets/kukugest-logo.png';
+const ICON_SRC = '/assets/kukugest-icon.png';
+
 interface KIconProps {
   size?: number;
+  /** Mantido por compatibilidade — o ícone oficial é uma imagem com cores fixas. */
   color?: string;
   accentColor?: string;
   bg?: string;
   borderColor?: string;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
-export function KukuGestIcon({
-  size = 48,
-}: KIconProps) {
+export function KukuGestIcon({ size = 48, className, style }: KIconProps) {
   return (
-    <Image
-      src="/kukugest-logo.png"
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={ICON_SRC}
       alt="KukuGest"
       width={size}
       height={size}
-      style={{ objectFit: 'contain' }}
+      className={className}
+      style={{ display: 'block', width: size, height: size, objectFit: 'contain', ...style }}
     />
   );
 }
 
 interface KukuGestLogoProps {
   height?: number;
+  /** Mantido por compatibilidade — o logótipo oficial não inclui tagline. */
   showTagline?: boolean;
   showBetaBadge?: boolean;
   className?: string;
@@ -45,10 +54,6 @@ function KukuGestLogo({
   const badgePaddingY = Math.max(3, Math.round(height * 0.08));
   const badgePaddingX = Math.max(7, Math.round(height * 0.16));
 
-  // Real image aspect ratio after trim: 3764x1906 ≈ 1.97
-  const aspectRatio = 3764 / 1906;
-  const width = Math.round(height * aspectRatio);
-
   return (
     <div
       className={className}
@@ -59,13 +64,11 @@ function KukuGestLogo({
         ...style,
       }}
     >
-      <Image
-        src="/kukugest-logo.png"
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={LOGO_SRC}
         alt="KukuGest"
-        width={width}
-        height={height}
-        style={{ objectFit: 'contain', display: 'block', flexShrink: 0 }}
-        priority
+        style={{ display: 'block', height, width: 'auto', flexShrink: 0 }}
       />
       {showBetaBadge && (
         <span
@@ -101,36 +104,40 @@ export function KukuGestLoginLogo({
   className?: string;
 }) {
   return (
-    <div className={className} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-      <Image
-        src="/favicon.png"
-        alt="KukuGest"
-        width={90}
-        height={90}
-        style={{ objectFit: 'contain' }}
-        priority
-      />
-      <span style={{
-        fontFamily: "'Montserrat', sans-serif",
-        fontWeight: 700,
-        fontSize: 22,
-        color: 'white',
-        letterSpacing: '0.04em',
-      }}>
-        KukuGest
-      </span>
-      {showTagline && (
-        <span style={{
-          fontFamily: "'Montserrat', sans-serif",
-          fontWeight: 600,
-          fontSize: 8,
-          color: 'rgba(255,255,255,0.42)',
-          letterSpacing: '0.24em',
-          textTransform: 'uppercase' as const,
-        }}>
-          GESTÃO INTELIGENTE
-        </span>
-      )}
+    <div className={className} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+      <KukuGestIcon size={72} style={{ borderRadius: 16 }} />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline' }}>
+          <span style={{
+            fontFamily: "'Montserrat', sans-serif",
+            fontWeight: 300,
+            fontSize: 26,
+            color: 'rgba(255,255,255,0.92)',
+            letterSpacing: '0.16em',
+          }}>KUKU</span>
+          <span style={{
+            fontFamily: "'Montserrat', sans-serif",
+            fontWeight: 900,
+            fontSize: 26,
+            color: 'white',
+            letterSpacing: '-0.01em',
+          }}>GEST</span>
+        </div>
+        <div style={{ width: 28, height: 2, background: ORANGE, borderRadius: 1, marginTop: 4 }} />
+        {showTagline && (
+          <span style={{
+            fontFamily: "'Montserrat', sans-serif",
+            fontWeight: 600,
+            fontSize: 8,
+            color: 'rgba(255,255,255,0.42)',
+            letterSpacing: '0.24em',
+            marginTop: 9,
+            textTransform: 'uppercase' as const,
+          }}>
+            GESTÃO INTELIGENTE
+          </span>
+        )}
+      </div>
     </div>
   );
 }

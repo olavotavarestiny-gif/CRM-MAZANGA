@@ -87,6 +87,7 @@ Este documento organiza as variáveis de ambiente do projeto por aplicação e p
 | `ZIETT_ENABLE` | não | liga/desliga a integração por ambiente |
 | `ZIETT_BASE_URL` | não | default `https://api.ziett.co` |
 | `ZIETT_API_KEY` | não | chave de acesso ao provider |
+| `ZIETT_DEFAULT_REMITTER_ID` | não | UUID v7 do remetente aprovado na Ziett |
 | `ZIETT_DEFAULT_CHANNEL` | não | ex: `SMS` |
 | `ZIETT_DEFAULT_COUNTRY` | não | ex: `AO` |
 | `ZIETT_TEST_ALLOWED_RECIPIENTS` | não | allowlist de teste |

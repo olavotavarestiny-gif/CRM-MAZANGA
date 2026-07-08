@@ -828,7 +828,11 @@ router.post('/:id/submit', cors({ origin: '*' }), async (req, res) => {
     automationContact.formTitle = form.title;
 
     if (automationContact) {
-      await automationRunner.run('form_submission', syncedContact || automationContact, { formId: req.params.id, userId: form.userId });
+      await automationRunner.run('form_submission', syncedContact || automationContact, {
+        formId: req.params.id,
+        userId: form.userId,
+        answers: answerSnapshots,
+      });
     }
 
     if (syncedContact) {

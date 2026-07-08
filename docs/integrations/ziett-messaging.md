@@ -27,6 +27,7 @@ Esta integração já tem base funcional no código, mas está em rollout contro
 - `ZIETT_ENABLE`
 - `ZIETT_BASE_URL`
 - `ZIETT_API_KEY`
+- `ZIETT_DEFAULT_REMITTER_ID`
 - `ZIETT_DEFAULT_CHANNEL`
 - `ZIETT_DEFAULT_COUNTRY`
 - `ZIETT_TEST_ALLOWED_RECIPIENTS`
@@ -36,6 +37,8 @@ Esta integração já tem base funcional no código, mas está em rollout contro
 - a integração pode ser desligada por ambiente com `ZIETT_ENABLE`
 - o serviço falha com erro explícito quando `ZIETT_API_KEY` não existe
 - o envio de testes depende de allowlist em `ZIETT_TEST_ALLOWED_RECIPIENTS`
+- campanhas marcadas como reais (`isTest=false`) não aplicam a allowlist de teste
+- o remitter deve ser o UUID v7 aprovado pela Ziett; se o frontend não enviar `remitterId`, o backend usa `ZIETT_DEFAULT_REMITTER_ID`
 - o canal e o país por defeito vêm do ambiente, não do frontend
 - os erros do provider são normalizados no backend antes de chegar à UI
 

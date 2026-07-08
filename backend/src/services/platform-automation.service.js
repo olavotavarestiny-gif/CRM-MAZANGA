@@ -266,7 +266,9 @@ async function listRules() {
   });
   const sentByRule = {};
   counts.forEach((c) => {
-    if (c.status === 'sent') sentByRule[c.automationRuleId] = (sentByRule[c.automationRuleId] || 0) + c._count._all;
+    if (['sent', 'delivered'].includes(c.status)) {
+      sentByRule[c.automationRuleId] = (sentByRule[c.automationRuleId] || 0) + c._count._all;
+    }
   });
   return rules.map((r) => ({ ...r, sentCount: sentByRule[r.id] || 0 }));
 }
@@ -326,7 +328,22 @@ async function listRuleLogs(id, query = {}) {
     orderBy: { executedAt: 'desc' },
     take,
   });
-  return { logs };
+
+  const targetUserIds = [...new Set(logs.map((log) => log.targetUserId))];
+  const users = targetUserIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: targetUserIds } },
+        select: { id: true, name: true, phone: true },
+      })
+    : [];
+  const usersById = new Map(users.map((user) => [user.id, user]));
+
+  return {
+    logs: logs.map((log) => ({
+      ...log,
+      targetUser: usersById.get(log.targetUserId) || null,
+    })),
+  };
 }
 
 module.exports = {

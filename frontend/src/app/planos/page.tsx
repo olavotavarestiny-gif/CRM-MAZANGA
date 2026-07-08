@@ -7,8 +7,8 @@ import type { PlanName } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import PricingCardsGrid from '@/components/billing/PricingCardsGrid';
 import PlanComparisonList from '@/components/billing/PlanComparisonList';
+import SubscriptionCheckout from '@/components/billing/subscription-checkout';
 import {
   buildWhatsAppPlanLink,
   getPlanComparisonItems,
@@ -69,19 +69,13 @@ export default function PlanosPage() {
 
       <div className="space-y-3">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-[#0A2540]">Compare os planos do seu workspace</h2>
+          <h2 className="text-xl font-bold tracking-tight text-[#0A2540]">Escolha e pague o seu plano</h2>
           <p className="mt-1 text-sm text-[#6b7e9a]">
-            O plano Crescimento fica em destaque como a evolução mais natural para a maioria das contas.
+            Pague com Multicaixa Express e a sua conta é ativada de imediato.
           </p>
         </div>
 
-        <PricingCardsGrid
-          workspaceMode={workspaceMode}
-          currentPlan={currentPlan}
-          name={currentUser?.name}
-          company={currentUser?.accountOwnerName || null}
-          source="crm"
-        />
+        <SubscriptionCheckout workspaceMode={workspaceMode} currentPlan={currentPlan} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -111,9 +105,9 @@ export default function PlanosPage() {
             </ul>
 
             <div className="rounded-2xl border border-[var(--workspace-primary-border)] bg-[var(--workspace-primary-soft)] px-4 py-4 text-sm text-[var(--workspace-primary)]">
-              <p className="font-semibold">Fluxo de upgrade desta fase</p>
+              <p className="font-semibold">Pagamento dentro da app</p>
               <p className="mt-1">
-                O upgrade continua manual nesta etapa, para manter a integração simples enquanto o billing real não é ligado ao CRM.
+                Escolha o plano acima e pague com Multicaixa Express ou referência. A conta é ativada automaticamente.
               </p>
             </div>
 

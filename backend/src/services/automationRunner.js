@@ -75,8 +75,24 @@ function matchesAutomation(trigger, automation, contact, context) {
     return matchesConditionalTrigger(trigger, automation, contact);
   }
 
-  if (trigger === 'form_submission' && automation.formId && automation.formId !== context.formId) {
-    return false;
+  if (trigger === 'form_submission') {
+    if (automation.formId && automation.formId !== context.formId) {
+      return false;
+    }
+
+    if (automation.conditionFieldId) {
+      const answers = Array.isArray(context.answers) ? context.answers : [];
+      const matchedAnswer = answers.find((answer) => answer.fieldId === automation.conditionFieldId);
+      if (!matchedAnswer) {
+        return false;
+      }
+
+      const actualValue = String(matchedAnswer.value || '').trim().toLowerCase();
+      const expectedValue = String(automation.conditionValue || '').trim().toLowerCase();
+      if (actualValue !== expectedValue) {
+        return false;
+      }
+    }
   }
 
   return true;
@@ -93,6 +109,7 @@ function buildTriggerData(trigger, triggerValue, context, contact) {
     triggerValue,
     formId: context.formId || null,
     formTitle: contact.formTitle || null,
+    answers: Array.isArray(context.answers) ? context.answers : null,
     oldStage: context.oldStage || null,
     newStage: context.newStage || null,
     inactivityDays: context.inactivityDays || null,
@@ -115,6 +132,7 @@ function buildActionData(automation, contact) {
     taskPriority: automation.taskPriority || null,
     taskDueDays: automation.taskDueDays ?? null,
     taskAssignedToUserId: automation.taskAssignedToUserId ?? null,
+    tagValue: automation.tagValue || null,
     contact: {
       id: contact.id || null,
       email: contact.email || null,
@@ -264,6 +282,32 @@ async function executeAutomationAction(automation, contact, context) {
     });
 
     console.log(`Automation executed: ${automation.trigger} -> create_alert`);
+    return;
+  }
+
+  if (automation.action === 'add_tag') {
+    const tagValue = (automation.tagValue || '').trim();
+    if (!tagValue || !contact.id) {
+      throw new Error('Tag ou contacto inválido para adicionar tag');
+    }
+
+    let currentTags = [];
+    try {
+      currentTags = contact.tags ? JSON.parse(contact.tags) : [];
+    } catch (error) {
+      currentTags = [];
+    }
+
+    if (!currentTags.includes(tagValue)) {
+      const nextTags = [...currentTags, tagValue];
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: { tags: JSON.stringify(nextTags) },
+      });
+      contact.tags = JSON.stringify(nextTags);
+    }
+
+    console.log(`Automation executed: ${automation.trigger} -> add_tag (${tagValue})`);
     return;
   }
 

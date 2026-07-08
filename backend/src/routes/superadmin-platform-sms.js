@@ -50,10 +50,28 @@ router.get('/campaigns/:id', async (req, res) => {
   }
 });
 
+// Sincronizar estados das mensagens de uma campanha interna
+router.post('/campaigns/:id/sync', async (req, res) => {
+  try {
+    return res.json(await platformSms.syncCampaign(req.user, req.params.id));
+  } catch (error) {
+    return handleRouteError(res, error);
+  }
+});
+
 // Histórico de SMS internos
 router.get('/messages', async (req, res) => {
   try {
     return res.json(await platformSms.listMessages(req.query));
+  } catch (error) {
+    return handleRouteError(res, error);
+  }
+});
+
+// Sincronizar uma mensagem interna pelo providerMessageId
+router.post('/messages/:id/sync', async (req, res) => {
+  try {
+    return res.json(await platformSms.syncMessage(req.user, req.params.id));
   } catch (error) {
     return handleRouteError(res, error);
   }
