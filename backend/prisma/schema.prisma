@@ -80,6 +80,9 @@ model User {
   deals                     Deal[]                 @relation("DealUser")
   dealStages                DealStage[]            @relation("DealStageUser")
   dealNotes                 DealNote[]             @relation("DealNoteAuthor")
+  subscriptionPayments      SubscriptionPayment[]  @relation("SubscriptionPaymentUser")
+  membershipsAsPerson       AccountMembership[]    @relation("MembershipPerson")
+  membershipsAsOwner        AccountMembership[]    @relation("MembershipAccountOwner")
 
   @@index([assignedEstabelecimentoId])
   @@index([accountStatus])
@@ -213,6 +216,27 @@ model PipelineStage {
   @@unique([userId, name])
 }
 
+// Acesso ADICIONAL de uma pessoa (login) a contas de outros donos.
+// A conta "casa" de cada pessoa continua em User.accountOwnerId; esta tabela
+// regista apenas os acessos extra (permite multi-conta / troca de conta).
+model AccountMembership {
+  id                        String   @id @default(cuid())
+  personId                  Int      // identidade de login a quem é dado acesso
+  accountOwnerId            Int      // conta (dono raiz) a que passa a ter acesso
+  role                      String   @default("user")
+  permissions               String?
+  assignedEstabelecimentoId String?
+  active                    Boolean  @default(true)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  person                    User     @relation("MembershipPerson", fields: [personId], references: [id], onDelete: Cascade)
+  accountOwner              User     @relation("MembershipAccountOwner", fields: [accountOwnerId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, accountOwnerId])
+  @@index([personId])
+  @@index([accountOwnerId])
+}
+
 model ContactFieldConfig {
   id       String  @id @default(cuid())
   userId   Int
@@ -282,12 +306,16 @@ model Automation {
   active               Boolean         @default(true)
   userId               Int?
   formId               String?
+  conditionFieldId     String?
+  conditionValue       String?
   taskAssignedToUserId Int?
   taskDueDays          Int?
   taskNotes            String?
   taskPriority         String?
   taskTitle            String?
+  tagValue             String?
   form                 Form?           @relation(fields: [formId], references: [id])
+  conditionField       FormField?      @relation(fields: [conditionFieldId], references: [id])
   user                 User?           @relation("AutomationUser", fields: [userId], references: [id])
   logs                 AutomationLog[]
   alerts               AutomationAlert[]
@@ -392,6 +420,7 @@ model FormField {
   options      String?
   contactField String?
   answers      FormAnswer[]
+  automations  Automation[]
   form         Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
 }
 
@@ -1225,4 +1254,28 @@ model DealStakeholder {
   @@unique([dealId, contactId])
   @@index([dealId])
   @@index([contactId])
+}
+
+model SubscriptionPayment {
+  id                    String    @id @default(cuid())
+  userId                Int
+  plan                  String
+  workspaceMode         String
+  cycle                 String
+  amount                Float
+  currency              String    @default("AOA")
+  method                String
+  merchantTransactionId String    @unique
+  providerTransactionId String?
+  reference             String?
+  status                String    @default("pending")
+  gatewayCode           String?
+  gatewayMessage        String?
+  raw                   String?
+  createdAt             DateTime  @default(now())
+  paidAt                DateTime?
+  user                  User      @relation("SubscriptionPaymentUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
 }

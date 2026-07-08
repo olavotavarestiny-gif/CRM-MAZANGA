@@ -307,7 +307,7 @@ router.get('/diagnostics', async (req, res) => {
   });
 });
 
-async function getCurrentUserPayload(userId, impersonatedBy = null) {
+async function getCurrentUserPayload(userId, { impersonatedBy = null, activeAccount = null } = {}) {
   let user;
   try {
     user = await prisma.user.findUnique({
@@ -336,15 +336,23 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
     return null;
   }
 
-  let effectivePermissions = parsePermissions(user.permissions);
+  // Conta activa: por omissão a conta "casa" (accountOwnerId da própria linha).
+  // Com multi-conta, activeAccount vem do req.user (a conta seleccionada) e o
+  // plano/permissões/subscrição são resolvidos contra ESSA conta.
+  const activeOwnerId = activeAccount ? activeAccount.ownerId : user.accountOwnerId || user.id;
+  const isOwnerActive = activeAccount ? activeAccount.isOwner : !user.accountOwnerId;
+  const activeMemberPerms = activeAccount ? activeAccount.permissionsJson : user.permissions;
+  const effectiveRole = activeAccount ? activeAccount.role || user.role : user.role;
+
+  let effectivePermissions = parsePermissions(activeMemberPerms);
   let effectivePlan = normalizePlan(user.plan);
   let effectiveWorkspaceMode = user.workspaceMode ?? 'servicos';
   let accountOwnerName = null;
   let subscriptionAccount = user;
 
-  if (user.accountOwnerId) {
+  if (!isOwnerActive) {
     const owner = await prisma.user.findUnique({
-      where: { id: user.accountOwnerId },
+      where: { id: activeOwnerId },
       select: {
         id: true,
         plan: true,
@@ -369,9 +377,14 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
   }
 
   const isSuperAdmin = Boolean(user.isSuperAdmin || isBootstrapSuperAdminEmail(user.email));
-  const userWithEffectiveRole = { ...user, isSuperAdmin };
+  const userWithEffectiveRole = {
+    ...user,
+    isSuperAdmin,
+    role: effectiveRole,
+    accountOwnerId: isOwnerActive ? null : activeOwnerId,
+  };
   const currentPlanCatalog = getSerializedPlanCatalog(effectivePlan, effectiveWorkspaceMode);
-  const subscription = await getSubscriptionState(user.accountOwnerId || user.id, subscriptionAccount);
+  const subscription = await getSubscriptionState(activeOwnerId, subscriptionAccount);
 
   return {
     ...userWithEffectiveRole,
@@ -387,6 +400,7 @@ async function getCurrentUserPayload(userId, impersonatedBy = null) {
     availablePlans: getSerializedPlanCatalog(undefined, effectiveWorkspaceMode),
     permissions: effectivePermissions,
     accountOwnerName,
+    activeAccountId: activeOwnerId,
     impersonatedBy,
     subscription,
     billingType: subscription?.billingType || user.billingType,
@@ -608,7 +622,15 @@ router.get('/me', requireAuth, async (req, res) => {
       return res.json(DEV_AUTH_PUBLIC_USER);
     }
 
-    const payload = await getCurrentUserPayload(req.user.id, req.user.impersonatedBy || null);
+    const payload = await getCurrentUserPayload(req.user.id, {
+      impersonatedBy: req.user.impersonatedBy || null,
+      activeAccount: {
+        ownerId: req.user.effectiveUserId,
+        isOwner: req.user.isAccountOwner,
+        permissionsJson: req.user.permissionsJson,
+        role: req.user.role,
+      },
+    });
     if (!payload) {
       return res.status(404).json({ error: 'Utilizador não encontrado' });
     }
@@ -696,7 +718,15 @@ router.patch('/me', requireAuth, async (req, res) => {
       throw error;
     }
 
-    const payload = await getCurrentUserPayload(req.user.id, req.user.impersonatedBy || null);
+    const payload = await getCurrentUserPayload(req.user.id, {
+      impersonatedBy: req.user.impersonatedBy || null,
+      activeAccount: {
+        ownerId: req.user.effectiveUserId,
+        isOwner: req.user.isAccountOwner,
+        permissionsJson: req.user.permissionsJson,
+        role: req.user.role,
+      },
+    });
     res.json(payload);
   } catch (error) {
     console.error('Error updating current user:', error);

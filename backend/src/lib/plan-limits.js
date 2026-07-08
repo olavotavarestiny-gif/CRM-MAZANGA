@@ -327,6 +327,14 @@ function setCachedPlanContext(effectiveUserId, context) {
   }
 }
 
+function invalidatePlanContextCache(effectiveUserId) {
+  if (effectiveUserId === undefined || effectiveUserId === null) {
+    planContextCache.clear();
+    return;
+  }
+  planContextCache.delete(effectiveUserId);
+}
+
 function getRequestPlanContext(req) {
   const context = req.user?.planContext;
   if (!context?.plan) return null;
@@ -385,9 +393,15 @@ async function getUsage(orgId, key) {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   switch (key) {
-    case 'users':
-      // +1 para incluir o dono da conta (não tem accountOwnerId, logo não é contado)
-      return (await prisma.user.count({ where: { accountOwnerId: orgId, active: true } })) + 1;
+    case 'users': {
+      // +1 para incluir o dono da conta (não tem accountOwnerId, logo não é contado).
+      // Inclui membros "casa" (User.accountOwnerId) + convidados (AccountMembership).
+      const [homeCount, guestCount] = await Promise.all([
+        prisma.user.count({ where: { accountOwnerId: orgId, active: true } }),
+        prisma.accountMembership.count({ where: { accountOwnerId: orgId, active: true } }),
+      ]);
+      return homeCount + guestCount + 1;
+    }
     case 'contacts':
       return prisma.contact.count({ where: { userId: orgId } });
     case 'tasks':
@@ -414,9 +428,14 @@ async function getUsage(orgId, key) {
       return prisma.produto.count({ where: { userId: orgId, active: true } });
     case 'customFields':
       return prisma.contactFieldDef.count({ where: { userId: orgId, active: true } });
-    case 'teamMembers':
-      // +1 para incluir o dono da conta
-      return (await prisma.user.count({ where: { accountOwnerId: orgId, active: true } })) + 1;
+    case 'teamMembers': {
+      // +1 para incluir o dono da conta. Inclui membros "casa" + convidados.
+      const [homeCount, guestCount] = await Promise.all([
+        prisma.user.count({ where: { accountOwnerId: orgId, active: true } }),
+        prisma.accountMembership.count({ where: { accountOwnerId: orgId, active: true } }),
+      ]);
+      return homeCount + guestCount + 1;
+    }
     default:
       return 0;
   }
@@ -561,6 +580,7 @@ module.exports = {
   normalizeWorkspaceMode,
   getPlan,
   getPlanContext,
+  invalidatePlanContextCache,
   getWorkspaceMode,
   getPlanCatalog,
   getSerializedPlanCatalog,

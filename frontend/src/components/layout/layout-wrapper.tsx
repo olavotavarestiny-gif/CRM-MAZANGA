@@ -11,6 +11,7 @@ import { Footer } from './footer';
 import ModuleOnboardingModal from '@/components/onboarding/module-onboarding-modal';
 import { routeToModuleKey, resolveModuleIntro, type ModuleIntroContent } from '@/lib/module-onboarding';
 import { BillingSuspendedModal } from '@/components/billing/access-notice';
+import SubscriptionPaywall from '@/components/billing/subscription-paywall';
 import TrialStatusBadge from '@/components/billing/trial-status-badge';
 import KukuGestLogo from '@/components/KukuGestLogo';
 import AppBootLoading from './app-boot-loading';
@@ -37,6 +38,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/faturacao':      'Faturação',
   '/calendario':     'Calendário',
   '/chat':           'Conversas',
+  '/messaging':      'SMS',
   '/automations':    'Automações',
   '/forms':          'Formulários',
   '/finances':       'Finanças',
@@ -55,6 +57,7 @@ const ROUTE_TO_PLAN_FEATURE = [
   { prefix: '/produtos', feature: 'vendas' },
   { prefix: '/calendario', feature: 'calendario' },
   { prefix: '/chat', feature: 'conversas' },
+  { prefix: '/messaging', feature: 'conversas' },
   { prefix: '/automations', feature: 'automacoes' },
   { prefix: '/forms', feature: 'formularios' },
   { prefix: '/finances', feature: 'financas' },
@@ -114,7 +117,14 @@ function LayoutInner({
   const [authLoadError, setAuthLoadError] = useState<AuthLoadError | null>(null);
   const [authRetryNonce, setAuthRetryNonce] = useState(0);
   const [routeTransitioning, setRouteTransitioning] = useState(false);
+  const [previewPaywall, setPreviewPaywall] = useState(false);
   const comercio = isComercio(currentUser?.workspaceMode);
+
+  // Pré-visualização do paywall: abrir qualquer página com ?preview=paywall
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setPreviewPaywall(new URLSearchParams(window.location.search).get('preview') === 'paywall');
+  }, [pathname]);
   const [showTopProgress, setShowTopProgress] = useState(false);
   const [backendWaking, setBackendWaking] = useState(false);
   const authChecked = useRef(false);
@@ -135,6 +145,7 @@ function LayoutInner({
     pathname === '/forgot-password' ||
     pathname === '/reset-password' ||
     pathname === '/change-password' ||
+    pathname === '/select-account' ||
     pathname === '/form' ||
     pathname === '/termos' ||
     pathname === '/privacidade' ||
@@ -476,6 +487,22 @@ function LayoutInner({
     );
   }
 
+  // Pré-visualização: ?preview=paywall mostra o ecrã de bloqueio em qualquer modo.
+  if (previewPaywall && currentUser) {
+    return <SubscriptionPaywall user={currentUser} />;
+  }
+
+  // Paywall total: conta suspensa só vê o ecrã de pagamento (exceto superadmin/impersonation/dev).
+  if (
+    currentUser &&
+    !devAuthBypassEnabled &&
+    !currentUser.isSuperAdmin &&
+    !currentUser.impersonatedBy &&
+    currentUser.subscription?.accountStatus === 'suspended'
+  ) {
+    return <SubscriptionPaywall user={currentUser} />;
+  }
+
   return (
     <div className={`flex h-screen bg-[#f5f7f9] ${comercio ? 'workspace-comercio' : 'workspace-servicos'}`}>
       <div className="pointer-events-none fixed inset-x-0 top-0 z-[80]">
@@ -563,7 +590,7 @@ function LayoutInner({
           </div>
         )}
 
-        {devAuthBypassEnabled && (
+        {devAuthBypassEnabled && process.env.NEXT_PUBLIC_HIDE_DEV_BANNER !== 'true' && (
           <div className="flex items-center justify-center bg-red-700 px-4 py-2 text-center text-sm font-black text-white shadow-sm">
             ⚠️ MODO DEV — Auth desactivado — Não é produção
           </div>

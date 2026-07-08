@@ -5,14 +5,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  BarChart3, Users, MessageSquare, Zap, Kanban,
+  BarChart3, Users, MessageSquare, Zap,
   CheckSquare, FileText, LogOut, X, DollarSign, CalendarDays,
   Package, Settings, HelpCircle, ShieldAlert, ShoppingBag, ShoppingCart,
-  ChevronDown, CreditCard, Clock3, Building2, Handshake,
+  ChevronDown, CreditCard, Clock3, Handshake, MessageSquareText,
 } from 'lucide-react';
 import { isComercio } from '@/lib/business-modes';
 import KukuGestLogo from '@/components/KukuGestLogo';
 import TrialStatusBadge from '@/components/billing/trial-status-badge';
+import AccountSwitcher from '@/components/layout/account-switcher';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
 import { getChatUnreadCount, getOnboarding, reopenOnboarding } from '@/lib/api';
@@ -105,6 +106,7 @@ export default function Sidebar({
     '/tasks':           'tasks',
     '/calendario':      'calendario',
     '/chat':            'chat',
+    '/messaging':       'chat',
     '/automations':     'automations',
     '/forms':           'forms',
     '/finances':        'finances',
@@ -133,6 +135,7 @@ export default function Sidebar({
     { href: '/tasks', label: 'Tarefas', icon: CheckSquare, module: 'tasks' as const },
     { href: '/vendas', label: 'Vendas', icon: ShoppingBag, module: 'vendas' as const },
     { href: '/chat', label: 'Conversas', icon: MessageSquare, module: 'chat' as const },
+    { href: '/messaging', label: 'SMS', icon: MessageSquareText, module: 'chat' as const },
     { href: '/calendario', label: 'Calendário', icon: CalendarDays, module: 'calendario' as const },
     { href: '/automations', label: 'Automações', icon: Zap, module: 'automations' as const },
     { href: '/forms', label: 'Formulários', icon: FileText, module: 'forms' as const },
@@ -144,6 +147,7 @@ export default function Sidebar({
     { href: '/caixa', label: 'Caixa', icon: CreditCard, module: 'vendas' as const },
     { href: '/vendas-rapidas', label: 'Venda Rápida', icon: ShoppingCart, module: 'vendas' as const },
     { href: '/contacts', label: 'Contactos', icon: Users, module: 'contacts' as const },
+    { href: '/messaging', label: 'SMS', icon: MessageSquareText, module: 'chat' as const },
     { href: '/tasks', label: 'Tarefas', icon: CheckSquare, module: 'tasks' as const },
     { href: '/produtos', label: 'Produtos', icon: Package, module: 'vendas' as const },
   ].filter(l => isVisible(l.href)) : [];
@@ -316,6 +320,7 @@ export default function Sidebar({
 
       {/* Footer */}
       <div className="px-3 py-4 border-t border-slate-100 space-y-0.5">
+        <AccountSwitcher />
         {currentUser?.plan && (
           <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/70">

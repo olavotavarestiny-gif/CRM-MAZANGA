@@ -1069,7 +1069,10 @@ function ConfiguracoesContent() {
                 </div>
                 <div>
                   <Label className="text-gray-600">Password Inicial</Label>
-                  <Input type="password" placeholder="Mínimo 6 caracteres" value={memberForm.password} onChange={e => setMemberForm(p => ({ ...p, password: e.target.value }))} required minLength={6} className="mt-1" />
+                  <Input type="password" placeholder="Mínimo 6 caracteres" value={memberForm.password} onChange={e => setMemberForm(p => ({ ...p, password: e.target.value }))} minLength={6} className="mt-1" />
+                  <p className="mt-1 text-xs text-gray-400">
+                    Deixe em branco se a pessoa já tem conta no sistema — será adicionada como convidada, usando o login dela.
+                  </p>
                 </div>
                 <div className="flex gap-3 pt-2">
                   <Button type="button" variant="outline" onClick={() => setShowAddMember(false)} className="flex-1">Cancelar</Button>
