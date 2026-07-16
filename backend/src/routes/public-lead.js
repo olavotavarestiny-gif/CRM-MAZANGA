@@ -16,11 +16,21 @@ router.post('/lead', async (req, res) => {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
 
-  const { name, email, phone, company, role, revenue, service_interest, source, main_challenge } = req.body;
+  const { name, email, phone, company, role, revenue, service_interest, source, main_challenge, tags: incomingTags } = req.body;
 
   if (!name?.trim() || !email?.trim() || !phone?.trim()) {
     return res.status(400).json({ success: false, error: 'Campos obrigatórios em falta: name, email, phone' });
   }
+
+  // Tags recebidas de origem externa (ex.: quiz da menopausa envia a fase como tag).
+  // Opcional e retrocompativel: se ausente, mantem-se o comportamento anterior.
+  const sanitizedTags = Array.isArray(incomingTags)
+    ? incomingTags
+        .filter((t) => typeof t === 'string')
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0 && t.length <= 60)
+        .slice(0, 10)
+    : [];
 
   if (!EMAIL_REGEX.test(email.trim())) {
     return res.status(400).json({ success: false, error: 'Email inválido' });
@@ -31,15 +41,23 @@ router.post('/lead', async (req, res) => {
   }
 
   try {
-    const ownerEmail = process.env.MAZANGA_LEAD_OWNER_EMAIL?.trim().toLowerCase();
+    // Encaminhamento por origem: leads do quiz da menopausa vao para a conta da
+    // Maria Simao (Menopausa Plena), nao para a conta partilhada do site
+    // mazangamarketing.com. Sem 'source' correspondente, mantem-se o comportamento
+    // anterior (MAZANGA_LEAD_OWNER_EMAIL) — nao afeta nenhum chamador existente.
+    const ORIGEM_PARA_OWNER_ENV = {
+      'Quiz Menopausa Plena': 'MENOPAUSA_LEAD_OWNER_EMAIL',
+    };
+    const ownerEnvVar = ORIGEM_PARA_OWNER_ENV[source?.trim()] || 'MAZANGA_LEAD_OWNER_EMAIL';
+    const ownerEmail = process.env[ownerEnvVar]?.trim().toLowerCase();
     if (!ownerEmail) {
-      console.error('[public-lead] MAZANGA_LEAD_OWNER_EMAIL não configurado');
+      console.error(`[public-lead] ${ownerEnvVar} não configurado`);
       return res.status(503).json({ success: false, error: 'Integração indisponível' });
     }
 
     const owner = await prisma.user.findUnique({ where: { email: ownerEmail }, select: { id: true } });
     if (!owner) {
-      console.error(`[public-lead] Owner não encontrado para MAZANGA_LEAD_OWNER_EMAIL=${ownerEmail}`);
+      console.error(`[public-lead] Owner não encontrado para ${ownerEnvVar}=${ownerEmail}`);
       return res.status(503).json({ success: false, error: 'Integração indisponível' });
     }
 
@@ -55,9 +73,22 @@ router.post('/lead', async (req, res) => {
 
     const existing = await prisma.contact.findUnique({
       where: { user_phone_unique: { userId, phone: normalizedPhone } },
-      select: { id: true },
+      select: { id: true, tags: true },
     });
     if (existing) {
+      // Faz merge (uniao) das tags existentes com as novas — nao perde as anteriores.
+      let mergedTags;
+      if (sanitizedTags.length > 0) {
+        let existingTags = [];
+        try {
+          existingTags = JSON.parse(existing.tags || '[]');
+          if (!Array.isArray(existingTags)) existingTags = [];
+        } catch (_) {
+          existingTags = [];
+        }
+        mergedTags = JSON.stringify([...new Set([...existingTags, ...sanitizedTags])]);
+      }
+
       const contact = await prisma.contact.update({
         where: { id: existing.id },
         data: {
@@ -67,6 +98,7 @@ router.post('/lead', async (req, res) => {
           revenue: revenue?.trim() || null,
           inPipeline: true,
           customFields,
+          ...(mergedTags ? { tags: mergedTags } : {}),
         },
       });
       return res.status(200).json({ success: true, contactId: contact.id, existing: true, updated: true });
@@ -90,7 +122,12 @@ router.post('/lead', async (req, res) => {
         revenue: revenue?.trim() || null,
         stage: 'Novo',
         inPipeline: true,
-        tags: JSON.stringify(['Mazanga Website', 'Lead']),
+        // Se vierem tags de origem externa usa-as (+ 'Lead'); senao mantem o default do site Mazanga.
+        tags: JSON.stringify(
+          sanitizedTags.length > 0
+            ? [...new Set(['Lead', ...sanitizedTags])]
+            : ['Mazanga Website', 'Lead'],
+        ),
         contactType: 'interessado',
         customFields,
       },
@@ -101,7 +138,7 @@ router.post('/lead', async (req, res) => {
         contactId: contact.id,
         userId,
         content: [
-          '📋 Lead recebido via mazangamarketing.com',
+          `📋 Lead recebido via ${source?.trim() || 'mazangamarketing.com'}`,
           '',
           role?.trim()             ? `• Cargo: ${role.trim()}`                         : null,
           revenue?.trim()          ? `• Facturamento: ${revenue.trim()}`               : null,
