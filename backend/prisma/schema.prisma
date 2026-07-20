@@ -79,6 +79,8 @@ model User {
   deals                     Deal[]                 @relation("DealUser")
   dealStages                DealStage[]            @relation("DealStageUser")
   dealNotes                 DealNote[]             @relation("DealNoteAuthor")
+  membershipsAsPerson       AccountMembership[]    @relation("MembershipPerson")
+  membershipsAsOwner        AccountMembership[]    @relation("MembershipAccountOwner")
 
   @@index([assignedEstabelecimentoId])
   @@index([accountStatus])
@@ -210,6 +212,25 @@ model PipelineStage {
   user      User     @relation("PipelineStageUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, name])
+}
+
+// Acessos adicionais de uma pessoa a contas de outros donos.
+model AccountMembership {
+  id                        String   @id @default(cuid())
+  personId                  Int
+  accountOwnerId            Int
+  role                      String   @default("user")
+  permissions               String?
+  assignedEstabelecimentoId String?
+  active                    Boolean  @default(true)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  person                    User     @relation("MembershipPerson", fields: [personId], references: [id], onDelete: Cascade)
+  accountOwner              User     @relation("MembershipAccountOwner", fields: [accountOwnerId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, accountOwnerId])
+  @@index([personId])
+  @@index([accountOwnerId])
 }
 
 model ContactFieldConfig {

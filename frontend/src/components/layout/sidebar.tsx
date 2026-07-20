@@ -13,6 +13,7 @@ import {
 import { isComercio } from '@/lib/business-modes';
 import KukuGestLogo from '@/components/KukuGestLogo';
 import TrialStatusBadge from '@/components/billing/trial-status-badge';
+import AccountSwitcher from '@/components/layout/account-switcher';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
 import { getChatUnreadCount, getOnboarding, reopenOnboarding } from '@/lib/api';
@@ -316,6 +317,7 @@ export default function Sidebar({
 
       {/* Footer */}
       <div className="px-3 py-4 border-t border-slate-100 space-y-0.5">
+        <AccountSwitcher />
         {currentUser?.plan && (
           <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/70">

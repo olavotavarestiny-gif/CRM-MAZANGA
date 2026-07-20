@@ -201,6 +201,25 @@ async function getSupabaseAccessToken(): Promise<string | null> {
   }
 }
 
+// Multi-conta: chave de localStorage com a conta activa seleccionada.
+export const ACTIVE_ACCOUNT_STORAGE_KEY = 'active_account_id';
+
+export function getActiveAccountId(): number | null {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+  const n = raw != null ? Number(raw) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+export function setActiveAccountId(accountOwnerId: number | null): void {
+  if (typeof window === 'undefined') return;
+  if (accountOwnerId == null) {
+    localStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+  } else {
+    localStorage.setItem(ACTIVE_ACCOUNT_STORAGE_KEY, String(accountOwnerId));
+  }
+}
+
 // Request interceptor: prefer impersonation token, fall back to Supabase session token
 api.interceptors.request.use(async (config) => {
   const devSampleAdapter = createDevSampleApiAdapter();
@@ -230,6 +249,13 @@ api.interceptors.request.use(async (config) => {
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
+  // Multi-conta: enviar a conta activa seleccionada (se houver).
+  if (typeof window !== 'undefined') {
+    const activeAccountId = localStorage.getItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+    if (activeAccountId) {
+      config.headers['X-Account-Id'] = activeAccountId;
+    }
+  }
   return config;
 });
 
@@ -255,10 +281,30 @@ api.interceptors.response.use(
       }
     }
 
-    if (error.response?.status === 401 && !isLoggingOut) {
+    // 401 (token inválido/expirado) ou 403 de conta desactivada → logout forçado.
+    // Só o código ACCOUNT_DEACTIVATED força logout; outros 403 (permissões,
+    // limites de plano) continuam a ser tratados como erros normais.
+    const errorCode = error.response?.data?.code;
+    const isDeactivated =
+      error.response?.status === 403 && errorCode === 'ACCOUNT_DEACTIVATED';
+    if ((error.response?.status === 401 || isDeactivated) && !isLoggingOut) {
       isLoggingOut = true;
       if (typeof window !== 'undefined') {
         window.location.href = '/auth/signout';
+      }
+    }
+
+    // Multi-conta: acesso à conta activa foi removido/expirou → limpar a selecção
+    // e ir ao seletor de conta, SEM terminar a sessão Supabase.
+    const isMembershipGone =
+      error.response?.status === 403 &&
+      (errorCode === 'MEMBERSHIP_DEACTIVATED' || errorCode === 'ACCOUNT_NOT_ACCESSIBLE');
+    if (isMembershipGone && !isLoggingOut) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+        if (!window.location.pathname.startsWith('/select-account')) {
+          window.location.href = '/select-account';
+        }
       }
     }
     // Extract the backend error message so .message is always human-readable
@@ -1088,6 +1134,7 @@ export interface User {
   assignedEstabelecimentoId?: string | null;
   assignedEstabelecimento?: { id: string; nome: string } | null;
   accountOwnerName?: string | null;
+  activeAccountId?: number | null;
   impersonatedBy?: number | null;
   mustChangePassword?: boolean;
   workspaceMode?: 'servicos' | 'comercio';
@@ -1116,6 +1163,26 @@ export interface SubscriptionAccess {
   message?: string | null;
 }
 
+// ── Multi-conta: contas acessíveis + selecção ────────────────────────────────
+export interface AccessibleAccount {
+  accountOwnerId: number;
+  accountName: string;
+  role: string;
+  isOwner: boolean;
+  isHome: boolean;
+}
+
+export async function getMyAccounts(): Promise<{ accounts: AccessibleAccount[]; activeAccountId: number }> {
+  const res = await api.get('/api/account/my-accounts');
+  return res.data;
+}
+
+export async function selectActiveAccount(
+  accountOwnerId: number
+): Promise<{ ok: boolean; account: AccessibleAccount }> {
+  const res = await api.post('/api/account/select-active-account', { accountOwnerId });
+  return res.data;
+}
 export interface LoginLog {
   id: number;
   userId: number;
@@ -1159,7 +1226,9 @@ export async function getTeamMembers() {
   return response.data;
 }
 
-export async function addTeamMember(data: { name: string; email: string; password: string }) {
+// password é opcional: só é necessária para uma pessoa NOVA. Se o email já
+// pertencer a alguém com conta, é adicionada como convidada (sem password).
+export async function addTeamMember(data: { name: string; email: string; password?: string }) {
   const response = await api.post<User>('/api/account/team', data);
   return response.data;
 }

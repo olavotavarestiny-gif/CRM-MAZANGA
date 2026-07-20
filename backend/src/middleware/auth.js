@@ -97,6 +97,37 @@ function pruneAuthUserCache() {
   }
 }
 
+// Invalida entradas de cache de uma conta (ex.: após pagamento/reativação),
+// para que o novo estado de subscrição seja lido de imediato.
+function invalidateAuthUserCacheByUserId(userId) {
+  if (userId === undefined || userId === null) return;
+  const target = Number(userId);
+  for (const [key, entry] of authUserCache.entries()) {
+    const cachedUser = entry?.user;
+    if (cachedUser && (Number(cachedUser.effectiveUserId) === target || Number(cachedUser.id) === target)) {
+      authUserCache.delete(key);
+    }
+  }
+}
+
+// Invalida apenas a entrada de cache do par (pessoa, conta activa), sem afectar
+// as outras contas dessa pessoa — usado ao remover um acesso multi-conta.
+function invalidateAuthUserCacheByMembership(personId, accountOwnerId) {
+  if (personId == null || accountOwnerId == null) return;
+  const person = Number(personId);
+  const account = Number(accountOwnerId);
+  for (const [key, entry] of authUserCache.entries()) {
+    const cachedUser = entry?.user;
+    if (
+      cachedUser &&
+      Number(cachedUser.id) === person &&
+      Number(cachedUser.effectiveUserId) === account
+    ) {
+      authUserCache.delete(key);
+    }
+  }
+}
+
 function cloneCachedRequestUser(user) {
   return {
     ...user,
@@ -175,19 +206,38 @@ function buildSubscriptionAccountSnapshot(account) {
   };
 }
 
-function buildRequestUser(user, { supabaseUid = null, impersonatedBy = null } = {}) {
-  const effectiveAccount = user.accountOwner || user;
+// activeAccount === null  → conta "casa" (comportamento legado, via accountOwnerId).
+// activeAccount presente com isOwner:false → conta de outro dono a que a pessoa
+// tem acesso via AccountMembership (multi-conta). Nesse caso o role/permissões/
+// plano/subscrição vêm da conta seleccionada, não da linha própria da pessoa.
+function buildRequestUser(user, { supabaseUid = null, impersonatedBy = null, activeAccount = null } = {}) {
+  let effectiveAccount, effectiveUserId, isAccountOwner, permissionsJson, role, accountOwnerId;
+  if (activeAccount && !activeAccount.isOwner) {
+    effectiveAccount = activeAccount.ownerRow;
+    effectiveUserId = activeAccount.ownerId;
+    isAccountOwner = false;
+    permissionsJson = activeAccount.permissionsJson || null;
+    role = activeAccount.role || 'user';
+    accountOwnerId = activeAccount.ownerId;
+  } else {
+    effectiveAccount = user.accountOwner || user;
+    effectiveUserId = user.accountOwnerId || user.id;
+    isAccountOwner = !user.accountOwnerId;
+    permissionsJson = user.permissions;
+    role = user.role;
+    accountOwnerId = user.accountOwnerId || null;
+  }
   const requestUser = {
     id: user.id,
     email: user.email,
     name: user.name,
-    role: user.role,
+    role,
     isSuperAdmin: user.isSuperAdmin || isBootstrapSuperAdminEmail(user.email),
-    permissionsJson: user.permissions,
-    accountOwnerId: user.accountOwnerId || null,
+    permissionsJson,
+    accountOwnerId,
     supabaseUid: user.supabaseUid || supabaseUid || null,
-    effectiveUserId: user.accountOwnerId || user.id,
-    isAccountOwner: !user.accountOwnerId,
+    effectiveUserId,
+    isAccountOwner,
     mustChangePassword: user.mustChangePassword,
     impersonatedBy,
     planContext: {
@@ -261,7 +311,14 @@ async function requireAuth(req, res, next) {
 
   const supabaseUid = decoded.sub;
   const jwtEmail = decoded.email;
-  const cacheKey = `supabase:${supabaseUid}`;
+  // Conta activa seleccionada pelo frontend (multi-conta). Sem header → conta "casa".
+  const requestedAccountIdRaw = req.headers['x-account-id'];
+  const requestedAccountId =
+    requestedAccountIdRaw != null && requestedAccountIdRaw !== ''
+      ? Number(requestedAccountIdRaw)
+      : null;
+  const hasRequestedAccount = Number.isFinite(requestedAccountId);
+  const cacheKey = `supabase:${supabaseUid}:${hasRequestedAccount ? requestedAccountId : 'home'}`;
 
   try {
     const requestUser = await getOrLoadAuthUser(cacheKey, async () => {
@@ -289,7 +346,53 @@ async function requireAuth(req, res, next) {
         error.statusCode = 403;
         throw error;
       }
-      return buildRequestUser(user, { supabaseUid });
+
+      const homeAccountId = user.accountOwnerId || user.id;
+
+      // Sem header, ou a pedir a própria conta "casa" → comportamento legado.
+      if (!hasRequestedAccount || requestedAccountId === homeAccountId) {
+        return buildRequestUser(user, { supabaseUid });
+      }
+
+      // Conta de outro dono: exige uma AccountMembership activa.
+      const membership = await prisma.accountMembership.findUnique({
+        where: {
+          personId_accountOwnerId: { personId: user.id, accountOwnerId: requestedAccountId },
+        },
+        select: { active: true, role: true, permissions: true, assignedEstabelecimentoId: true },
+      });
+      if (!membership || !membership.active) {
+        const error = new Error('Sem acesso a esta conta ou acesso removido.');
+        error.statusCode = 403;
+        error.code = 'MEMBERSHIP_DEACTIVATED';
+        throw error;
+      }
+
+      const ownerRow = await prisma.user.findUnique({
+        where: { id: requestedAccountId },
+        select: {
+          id: true, name: true, active: true, plan: true, workspaceMode: true,
+          billingType: true, trialEndsAt: true, expiresAt: true, graceEndsAt: true, accountStatus: true,
+        },
+      });
+      if (!ownerRow || !ownerRow.active) {
+        const error = new Error('A conta seleccionada já não está disponível.');
+        error.statusCode = 403;
+        error.code = 'MEMBERSHIP_DEACTIVATED';
+        throw error;
+      }
+
+      return buildRequestUser(user, {
+        supabaseUid,
+        activeAccount: {
+          ownerId: ownerRow.id,
+          ownerRow,
+          isOwner: false,
+          role: membership.role,
+          permissionsJson: membership.permissions,
+          assignedEstabelecimentoId: membership.assignedEstabelecimentoId,
+        },
+      });
     });
 
     if (!requestUser) {
@@ -345,3 +448,5 @@ module.exports.SUPER_ADMIN_EMAILS = SUPER_ADMIN_EMAILS;
 module.exports.isBootstrapSuperAdminEmail = isBootstrapSuperAdminEmail;
 module.exports.ACCESS_ROLES = ACCESS_ROLES;
 module.exports.verifySupabaseJwt = verifySupabaseJwt;
+module.exports.invalidateAuthUserCacheByUserId = invalidateAuthUserCacheByUserId;
+module.exports.invalidateAuthUserCacheByMembership = invalidateAuthUserCacheByMembership;

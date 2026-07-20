@@ -385,9 +385,13 @@ async function getUsage(orgId, key) {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   switch (key) {
-    case 'users':
-      // +1 para incluir o dono da conta (não tem accountOwnerId, logo não é contado)
-      return (await prisma.user.count({ where: { accountOwnerId: orgId, active: true } })) + 1;
+    case 'users': {
+      const [homeCount, guestCount] = await Promise.all([
+        prisma.user.count({ where: { accountOwnerId: orgId, active: true } }),
+        prisma.accountMembership.count({ where: { accountOwnerId: orgId, active: true } }),
+      ]);
+      return homeCount + guestCount + 1;
+    }
     case 'contacts':
       return prisma.contact.count({ where: { userId: orgId } });
     case 'tasks':
@@ -414,9 +418,13 @@ async function getUsage(orgId, key) {
       return prisma.produto.count({ where: { userId: orgId, active: true } });
     case 'customFields':
       return prisma.contactFieldDef.count({ where: { userId: orgId, active: true } });
-    case 'teamMembers':
-      // +1 para incluir o dono da conta
-      return (await prisma.user.count({ where: { accountOwnerId: orgId, active: true } })) + 1;
+    case 'teamMembers': {
+      const [homeCount, guestCount] = await Promise.all([
+        prisma.user.count({ where: { accountOwnerId: orgId, active: true } }),
+        prisma.accountMembership.count({ where: { accountOwnerId: orgId, active: true } }),
+      ]);
+      return homeCount + guestCount + 1;
+    }
     default:
       return 0;
   }

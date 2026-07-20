@@ -135,6 +135,7 @@ function LayoutInner({
     pathname === '/forgot-password' ||
     pathname === '/reset-password' ||
     pathname === '/change-password' ||
+    pathname === '/select-account' ||
     pathname === '/form' ||
     pathname === '/termos' ||
     pathname === '/privacidade' ||
