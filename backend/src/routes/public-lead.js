@@ -5,6 +5,7 @@ const { buildLimitErrorPayload, canCreateContact } = require('../lib/plan-limits
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[\d\s\+\-\(\)]{7,20}$/;
+const MENOPAUSA_SOURCE = 'Quiz Menopausa Plena';
 
 // POST /api/public/lead — recebe leads do site mazangamarketing.com
 router.post('/lead', async (req, res) => {
@@ -31,15 +32,19 @@ router.post('/lead', async (req, res) => {
   }
 
   try {
-    const ownerEmail = process.env.MAZANGA_LEAD_OWNER_EMAIL?.trim().toLowerCase();
+    const isMenopausaLead = source?.trim() === MENOPAUSA_SOURCE;
+    const ownerEnvName = isMenopausaLead
+      ? 'MENOPAUSA_LEAD_OWNER_EMAIL'
+      : 'MAZANGA_LEAD_OWNER_EMAIL';
+    const ownerEmail = process.env[ownerEnvName]?.trim().toLowerCase();
     if (!ownerEmail) {
-      console.error('[public-lead] MAZANGA_LEAD_OWNER_EMAIL não configurado');
+      console.error(`[public-lead] ${ownerEnvName} não configurado`);
       return res.status(503).json({ success: false, error: 'Integração indisponível' });
     }
 
     const owner = await prisma.user.findUnique({ where: { email: ownerEmail }, select: { id: true } });
     if (!owner) {
-      console.error(`[public-lead] Owner não encontrado para MAZANGA_LEAD_OWNER_EMAIL=${ownerEmail}`);
+      console.error(`[public-lead] Owner não encontrado para ${ownerEnvName}=${ownerEmail}`);
       return res.status(503).json({ success: false, error: 'Integração indisponível' });
     }
 
