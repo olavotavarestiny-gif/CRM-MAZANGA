@@ -22,6 +22,7 @@ import type {
   Contact,
   BulkUpdateContactsInput,
   BulkUpdateContactsResponse,
+  BulkDeleteContactsResponse,
   ContactsPageResponse,
   ContactGroup,
   ContactFieldConfig,
@@ -420,6 +421,11 @@ export async function bulkUpdateContacts(data: BulkUpdateContactsInput) {
   return response.data;
 }
 
+export async function bulkDeleteContacts(contactIds: number[]) {
+  const response = await api.post<BulkDeleteContactsResponse>('/api/contacts/bulk-delete', { contactIds });
+  return response.data;
+}
+
 export async function deleteContact(id: string) {
   await api.delete(`/api/contacts/${id}`);
 }
@@ -484,6 +490,7 @@ export async function getActivityFeed(params?: {
 }
 
 export interface ImportContactData {
+  name?: string;
   firstName?: string;
   lastName?: string;
   companyName?: string;

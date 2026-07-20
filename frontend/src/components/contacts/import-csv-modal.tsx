@@ -18,6 +18,7 @@ import { CheckCircle2, Upload } from 'lucide-react';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { useToast } from '@/components/ui/toast-provider';
+import Papa from 'papaparse';
 
 interface ImportCSVModalProps {
   open: boolean;
@@ -66,113 +67,56 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
     setErrorMsg(null);
   };
 
-  // Função para encontrar coluna por substring
-  const findHeaderIndex = (headers: string[], ...keywords: string[]): number => {
-    return headers.findIndex((h) =>
-      keywords.some((kw) => h.toLowerCase().includes(kw.toLowerCase()))
-    );
+  const normalizeHeader = (value: string) => value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
+  const isPhoneHeader = (value: string) => ['telefone', 'telemovel', 'numero', 'phone', 'number', 'mobile', 'celular', 'whatsapp']
+    .some((keyword) => normalizeHeader(value).includes(keyword));
+
+  const isNameHeader = (value: string) => ['nome', 'name', 'contacto', 'contato']
+    .some((keyword) => normalizeHeader(value).includes(keyword));
+
+  const looksLikePhone = (value: string) => {
+    const compact = value.trim().replace(/[\s().-]/g, '');
+    return /^\+?\d{7,15}$/.test(compact);
   };
 
   const parseCSV = async (file: File) => {
     try {
-      let text = await file.text();
-
-      // 1. Remover BOM se presente
-      text = text.replace(/^\uFEFF/, '');
-
-      // 2. Normalizar line endings (Windows \r\n → \n)
-      const normalizedText = text
-        .replace(/\r\n/g, '\n')
-        .replace(/\r/g, '\n');
-      const lines = normalizedText
-        .split('\n')
-        .filter((line) => line.trim());
-
-      if (lines.length < 2) {
-        setErrorMsg('CSV deve ter pelo menos uma linha de dados.');
+      const text = (await file.text()).replace(/^\uFEFF/, '');
+      const parsed = Papa.parse<string[]>(text, { skipEmptyLines: 'greedy' });
+      const rows = parsed.data.map((row) => row.map((cell) => String(cell ?? '').trim()));
+      if (!rows.length) {
+        setErrorMsg('O ficheiro está vazio.');
         return;
       }
 
-      // 3. Auto-detectar delimitador: contar ';' vs ','
-      const firstLine = lines[0];
-      const semicolonCount = (firstLine.match(/;/g) || []).length;
-      const commaCount = (firstLine.match(/,/g) || []).length;
-      const delimiter = semicolonCount > commaCount ? ';' : ',';
+      const header = rows[0];
+      const hasHeader = header.some((cell) => isPhoneHeader(cell) || isNameHeader(cell));
+      const phoneIdx = hasHeader ? header.findIndex(isPhoneHeader) : -1;
+      const nameIdx = hasHeader ? header.findIndex(isNameHeader) : -1;
+      const dataRows = hasHeader ? rows.slice(1) : rows;
 
-      // 4. Parse headers com delimitador detectado
-      const rawHeaders = firstLine
-        .split(delimiter)
-        .map((h) => h.trim().replace(/^"(.*)"$/, '$1'));
-
-      console.log('Delimiter:', delimiter, 'Headers:', rawHeaders);
-
-      // 5. Calcular índices UMA VEZ, fora do loop
-      const firstIdx = findHeaderIndex(
-        rawHeaders,
-        'First Name',
-        'first name',
-        'primeiro nome'
-      );
-      const lastIdx = findHeaderIndex(
-        rawHeaders,
-        'Last Name',
-        'last name',
-        'sobrenome'
-      );
-      const companyIdx = findHeaderIndex(
-        rawHeaders,
-        'Company Name',
-        'company',
-        'empresa'
-      );
-      const phoneIdx = findHeaderIndex(rawHeaders, 'Phone', 'telefone');
-      const emailIdx = findHeaderIndex(rawHeaders, 'Email', 'e-mail');
-      const revenueIdx = findHeaderIndex(
-        rawHeaders,
-        'Faturamento',
-        'faturação',
-        'revenue'
-      );
-      const sectorIdx = findHeaderIndex(rawHeaders, 'Setor', 'sector');
-
-      const data: ImportContactData[] = [];
-
-      // 6. Parse rows
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-
-        // Split por delimitador detectado
-        const values = line
-          .split(delimiter)
-          .map((v) => v.trim().replace(/^"(.*)"$/, '$1').trim());
-
-        const phone =
-          phoneIdx >= 0 ? values[phoneIdx]?.trim() : undefined;
-
-        // Apenas processar se tiver telefone
-        if (phone) {
-          const contact: ImportContactData = {
-            firstName:
-              firstIdx >= 0 ? values[firstIdx]?.trim() || '' : '',
-            lastName:
-              lastIdx >= 0 ? values[lastIdx]?.trim() || '' : '',
-            companyName:
-              companyIdx >= 0 ? values[companyIdx]?.trim() || '' : '',
-            phone,
-            email: emailIdx >= 0 ? values[emailIdx]?.trim() || '' : '',
-            revenue:
-              revenueIdx >= 0 ? values[revenueIdx]?.trim() || '' : '',
-            sector:
-              sectorIdx >= 0 ? values[sectorIdx]?.trim() || '' : '',
-          };
-
-          data.push(contact);
+      const data: ImportContactData[] = dataRows.flatMap((values) => {
+        let resolvedPhoneIdx = phoneIdx;
+        if (resolvedPhoneIdx < 0) {
+          resolvedPhoneIdx = values.findIndex(looksLikePhone);
         }
-      }
+        const phone = values[resolvedPhoneIdx]?.trim();
+        if (!phone || !looksLikePhone(phone)) return [];
+
+        const fallbackNameIdx = values.length > 1
+          ? values.findIndex((value, index) => index !== resolvedPhoneIdx && value.trim())
+          : -1;
+        const resolvedName = (nameIdx >= 0 ? values[nameIdx] : values[fallbackNameIdx])?.trim() || '';
+        return [{ name: resolvedName, phone }];
+      });
 
       if (data.length === 0) {
-        setErrorMsg('Nenhum contacto válido encontrado no CSV.');
+        setErrorMsg('Nenhum número válido encontrado. Usa números com 7 a 15 dígitos.');
         return;
       }
 
@@ -189,8 +133,8 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    if (!selectedFile.name.endsWith('.csv')) {
-      setErrorMsg('Por favor, selecione um ficheiro CSV.');
+    if (!/\.(csv|txt)$/i.test(selectedFile.name)) {
+      setErrorMsg('Seleciona um ficheiro CSV ou TXT.');
       return;
     }
 
@@ -209,7 +153,7 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
         <DialogHeader>
           <DialogTitle>Importar Contactos</DialogTitle>
           <DialogDescription>
-            Faça upload de um ficheiro CSV com os seus contactos
+            Carrega uma lista simples com número, ou nome e número
           </DialogDescription>
         </DialogHeader>
 
@@ -230,10 +174,10 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
                 <span className="text-blue-600 hover:text-blue-500 hover:underline font-medium">
                   Clique para selecionar
                 </span>
-                <span className="text-slate-500 ml-1">ou arraste um ficheiro CSV</span>
+                  <span className="text-slate-500 ml-1">ou arraste um ficheiro CSV/TXT</span>
                 <Input
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.txt,text/csv,text/plain"
                   onChange={handleFileSelect}
                   className="hidden"
                 />
@@ -241,15 +185,11 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
             </div>
 
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-              <p className="text-sm font-medium mb-2 text-[#0A2540]">Colunas esperadas:</p>
-              <div className="grid grid-cols-2 gap-2 text-sm text-slate-600">
-                <span>• First Name (Primeiro Nome)</span>
-                <span>• Last Name (Apelido)</span>
-                <span>• Company Name (Empresa)</span>
-                <span>• Phone (Telefone)</span>
-                <span>• Email</span>
-                <span>• Faturamento Anual</span>
-                <span>• Setor</span>
+              <p className="text-sm font-medium mb-2 text-[#0A2540]">Formato simples:</p>
+              <div className="space-y-1 text-sm text-slate-600">
+                <p>• Apenas números, um por linha; ou</p>
+                <p>• Duas colunas: <strong>Nome</strong> e <strong>Número</strong>.</p>
+                <p className="text-xs text-slate-500">Aceita vírgula ou ponto e vírgula, com ou sem cabeçalho.</p>
               </div>
             </div>
 
@@ -285,23 +225,15 @@ export default function ImportCSVModal({ open, onOpenChange }: ImportCSVModalPro
                   <tr>
                     <th className="text-left p-2 text-[#0A2540] font-semibold">Nome</th>
                     <th className="text-left p-2 text-[#0A2540] font-semibold">Telefone</th>
-                    <th className="text-left p-2 text-[#0A2540] font-semibold">Empresa</th>
-                    <th className="text-left p-2 text-[#0A2540] font-semibold">Setor</th>
-                    <th className="text-left p-2 text-[#0A2540] font-semibold">Faturação</th>
                   </tr>
                 </thead>
                 <tbody>
                   {preview.slice(0, 5).map((contact, idx) => (
                     <tr key={idx} className="border-t border-slate-200 hover:bg-slate-50">
                       <td className="p-2 text-[#0A2540]">
-                        {contact.firstName} {contact.lastName}
+                        {contact.name || 'Sem nome'}
                       </td>
                       <td className="p-2 text-[#0A2540]">{contact.phone}</td>
-                      <td className="p-2 text-slate-500">{contact.companyName}</td>
-                      <td className="p-2 text-slate-500">{contact.sector}</td>
-                      <td className="p-2 text-slate-500 text-xs">
-                        {contact.revenue}
-                      </td>
                     </tr>
                   ))}
                 </tbody>

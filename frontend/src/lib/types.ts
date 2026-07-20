@@ -172,6 +172,11 @@ export interface BulkUpdateContactsResponse {
   matchedCount: number;
   updatedCount: number;
 }
+
+export interface BulkDeleteContactsResponse {
+  requestedCount: number;
+  deletedCount: number;
+}
 export interface ContactsPageResponse {
   data: Contact[];
   pagination: {
