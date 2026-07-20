@@ -4,7 +4,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getContactsPage,
+  getContacts,
   bulkUpdateContacts,
+  bulkDeleteContacts,
   updateContact,
   deleteContact,
   getCurrentUser,
@@ -41,7 +43,7 @@ import ImportCSVModal from '@/components/contacts/import-csv-modal';
 import ContactFieldsManager from '@/components/contacts/contact-fields-manager';
 import ContactGroupsManager from '@/components/contacts/contact-groups-manager';
 import Link from 'next/link';
-import { Trash2, MessageCircle, Upload, Settings2, Phone, FolderTree, ListChecks, X } from 'lucide-react';
+import { Trash2, MessageCircle, Upload, Download, Settings2, Phone, FolderTree, ListChecks, X } from 'lucide-react';
 import { useToast } from '@/components/ui/toast-provider';
 import type { Contact } from '@/lib/types';
 
@@ -75,6 +77,7 @@ export default function ContactsPage() {
   const [isFieldsOpen, setIsFieldsOpen] = useState(false);
   const [isGroupsOpen, setIsGroupsOpen] = useState(false);
   const [isBulkActionsOpen, setIsBulkActionsOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [selectedContactIds, setSelectedContactIds] = useState<number[]>([]);
   const [contactTypeTab, setContactTypeTab] = useState<'interessado' | 'cliente'>('interessado');
   const [page, setPage] = useState(1);
@@ -245,6 +248,62 @@ export default function ContactsPage() {
     },
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: bulkDeleteContacts,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      setSelectedContactIds([]);
+      toast({
+        variant: 'success',
+        title: 'Contactos eliminados',
+        description: `${result.deletedCount} contacto(s) eliminado(s) com sucesso.`,
+      });
+    },
+    onError: (error: Error) => toast({
+      variant: 'error',
+      title: 'Falha ao eliminar contactos',
+      description: error.message || 'Tenta novamente.',
+    }),
+  });
+
+  const handleBulkDelete = () => {
+    if (!selectedContactIds.length) return;
+    if (!window.confirm(`Eliminar definitivamente ${selectedContactIds.length} contacto(s)? Esta ação não pode ser anulada.`)) return;
+    bulkDeleteMutation.mutate(selectedContactIds);
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const exportedContacts = await getContacts({
+        search: debouncedSearch || undefined,
+        stage: canShowPipelineUi && stageFilter !== 'ALL' ? stageFilter : undefined,
+        revenue: revenueFilter === 'ALL' ? undefined : revenueFilter,
+        groupId: groupFilter === ALL_GROUPS_VALUE ? undefined : groupFilter,
+        contactType: effectiveContactType,
+      });
+      const escapeCsv = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+      const rows = [
+        ['Nome', 'Número'],
+        ...exportedContacts.map((contact) => [contact.name, contact.phone]),
+      ];
+      const csv = `\uFEFF${rows.map((row) => row.map(escapeCsv).join(';')).join('\r\n')}`;
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `contactos-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      toast({ variant: 'success', title: 'Exportação concluída', description: `${exportedContacts.length} contacto(s) exportado(s).` });
+    } catch (error) {
+      toast({ variant: 'error', title: 'Falha na exportação', description: getApiErrorMessage(error, 'Não foi possível exportar os contactos.') });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const contactTypeMutation = useMutation({
     mutationFn: ({ contactId, contactType }: { contactId: number; contactType: 'interessado' | 'cliente' }) =>
       updateContact(String(contactId), { contactType } as any),
@@ -325,7 +384,16 @@ export default function ContactsPage() {
             className="w-full sm:w-auto"
           >
             <Upload className="w-4 h-4 mr-2" />
-            Import CSV
+            Importar
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={isExporting}
+            className="w-full sm:w-auto"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            {isExporting ? 'A exportar...' : 'Exportar'}
           </Button>
           <Button data-tour="contacts-new" className="w-full sm:w-auto" onClick={() => setIsFormOpen(true)}>
             Novo Contacto
@@ -453,6 +521,18 @@ export default function ContactsPage() {
                 <ListChecks className="mr-1.5 h-4 w-4" />
                 Ações em massa
               </Button>
+              {currentUser && !currentUser.accountOwnerId ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleteMutation.isPending}
+                >
+                  <Trash2 className="mr-1.5 h-4 w-4" />
+                  {bulkDeleteMutation.isPending ? 'A eliminar...' : 'Eliminar selecionados'}
+                </Button>
+              ) : null}
               <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedContactIds([])}>
                 <X className="mr-1.5 h-4 w-4" />
                 Limpar seleção

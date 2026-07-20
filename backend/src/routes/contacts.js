@@ -941,6 +941,47 @@ router.post('/bulk-update', requirePermission('contacts', 'edit'), async (req, r
   }
 });
 
+// POST delete multiple contacts - MUST be before /:id routes
+router.post('/bulk-delete', requireDeletePermission, async (req, res) => {
+  try {
+    if (!req.user.isAccountOwner) {
+      return res.status(403).json({ error: 'Apenas o dono da conta pode eliminar contactos.' });
+    }
+
+    const rawContactIds = Array.isArray(req.body?.contactIds) ? req.body.contactIds : [];
+    const contactIds = [...new Set(rawContactIds
+      .map((value) => Number.parseInt(String(value), 10))
+      .filter((value) => Number.isInteger(value) && value > 0))];
+
+    if (!contactIds.length) {
+      return res.status(400).json({ error: 'Selecione pelo menos um contacto.' });
+    }
+
+    const userId = req.user.effectiveUserId;
+    const contacts = await prisma.contact.findMany({
+      where: { userId, id: { in: contactIds } },
+      select: { id: true, name: true },
+    });
+
+    const result = await prisma.contact.deleteMany({
+      where: { userId, id: { in: contacts.map((contact) => contact.id) } },
+    });
+
+    await Promise.all(contacts.map((contact) => logContactActivity(req, {
+      entity_type: 'contact',
+      entity_id: contact.id,
+      entity_label: contact.name,
+      action: 'deleted',
+      metadata: { source: 'bulk_delete' },
+    })));
+
+    return res.json({ requestedCount: contactIds.length, deletedCount: result.count });
+  } catch (error) {
+    console.error('Error bulk-deleting contacts:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // POST import contacts (bulk) - MUST be before /:id routes
 router.post('/import', requirePermission('contacts', 'edit'), async (req, res) => {
   try {
@@ -956,10 +997,11 @@ router.post('/import', requirePermission('contacts', 'edit'), async (req, res) =
 
     // Prepare contacts for insertion
     const preparedContacts = contacts
-      .filter((c) => c.phone) // Required field
+      .map((c) => ({ ...c, phone: normalizePhone(String(c?.phone || '')) }))
+      .filter((c) => c.phone && isValidPhone(c.phone))
       .map((c) => ({
         userId,
-        name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.phone,
+        name: String(c.name || `${c.firstName || ''} ${c.lastName || ''}`).trim() || c.phone,
         email: c.email || '',
         phone: c.phone,
         company: c.companyName || '',
