@@ -1,0 +1,508 @@
+{
+  "version": "1.1.0-local",
+  "updatedAt": "2026-08-25",
+  "title": "Guia KukuGest Food",
+  "description": "Mapa operacional para configurar o restaurante, preparar a equipa e executar cada fluxo do workspace Food.",
+  "roles": [
+    { "id": "manager", "label": "Gestor", "description": "Configura a operação, equipa, menu, stock, compras e fechos." },
+    { "id": "cashier", "label": "Caixa", "description": "Abre turno e Caixa, cria pedidos, recebe pagamentos e trata alterações." },
+    { "id": "kitchen", "label": "Cozinha", "description": "Reconhece tickets, prepara itens e comunica indisponibilidades." },
+    { "id": "delivery_manager", "label": "Delivery", "description": "Atribui entregas, acompanha incidentes e reconcilia cobranças." },
+    { "id": "courier", "label": "Entregador", "description": "Executa recolha, deslocação, contacto e prova de entrega." },
+    { "id": "crm_marketing", "label": "CRM & Marketing", "description": "Gere clientes, consentimentos, segmentos e retenção." }
+  ],
+  "flow": [
+    "Configurar restaurante",
+    "Criar locais e equipa",
+    "Montar menu e stock",
+    "Abrir turno e Caixa",
+    "Criar e preparar pedido",
+    "Entregar ou levantar",
+    "Reconciliar e analisar"
+  ],
+  "topics": [
+    {
+      "id": "workspace",
+      "section": "Começar",
+      "title": "Mapa do workspace",
+      "summary": "Entenda os seis ambientes e escolha quem deve utilizar cada um.",
+      "route": "/food",
+      "roles": ["manager", "cashier", "kitchen", "delivery_manager", "courier", "crm_marketing"],
+      "outcome": "Cada pessoa sabe onde começa e quais ambientes pertencem à sua função.",
+      "steps": [
+        { "title": "Ambientes", "description": "Use Ambientes como ponto de entrada para Gestão, Caixa, Cozinha, Delivery, Entregador e CRM & Marketing." },
+        { "title": "Acesso por função", "description": "No ambiente online cada colaborador vê apenas as áreas autorizadas. O Gestor possui a visão global da organização." },
+        { "title": "Teste local", "description": "No modo local o Gestor pode abrir todos os ambientes. Ao entrar em Entregador, a aplicação usa automaticamente o entregador fictício activo." },
+        { "title": "Unidade", "description": "Operações como Caixa, stock, cozinha e Delivery devem ocorrer dentro de uma unidade Food." }
+      ],
+      "tips": ["Use Voltar ao Gestor na barra amarela para terminar uma pré-visualização local."],
+      "warnings": ["A sede fiscal é opcional para operar e só é necessária quando houver emissão fiscal real."]
+    },
+    {
+      "id": "identity-operation",
+      "section": "Configuração",
+      "title": "Identidade do restaurante",
+      "summary": "Configure nome, logótipo, cores e contactos apresentados no workspace Food.",
+      "route": "/food/configuracoes?section=identity",
+      "roles": ["manager"],
+      "outcome": "O workspace apresenta a marca e os contactos correctos em todos os ambientes.",
+      "steps": [
+        { "title": "Identidade", "description": "Defina nome do restaurante, logótipo e cores. O logótipo adapta-se automaticamente aos espaços disponíveis." },
+        { "title": "Contactos", "description": "Registe telefone, email e morada operacional apresentados à equipa." },
+        { "title": "Cores", "description": "Escolha uma cor principal legível e use a pré-visualização antes de guardar." },
+        { "title": "Guardar", "description": "Confirme as alterações no topo da página e reveja o logótipo no menu lateral." }
+      ],
+      "tips": ["Use um ficheiro de logótipo com margem interna e fundo transparente ou branco."],
+      "warnings": ["Não use contactos pessoais quando o workspace passar para produção."]
+    },
+    {
+      "id": "operation-settings",
+      "section": "Configuração",
+      "title": "Regras da operação",
+      "summary": "Defina moeda, fuso horário, tempos de preparação e alertas da cozinha.",
+      "route": "/food/configuracoes?section=operation",
+      "roles": ["manager"],
+      "outcome": "Caixa e Cozinha utilizam tempos, alertas e contexto local coerentes.",
+      "steps": [
+        { "title": "Moeda e fuso", "description": "Confirme AOA e Africa/Luanda antes de iniciar pedidos e turnos." },
+        { "title": "Tempo padrão", "description": "Defina o tempo usado quando um produto não possui preparação própria." },
+        { "title": "Limites KDS", "description": "Configure os minutos verde, amarelo e vermelho em ordem crescente." },
+        { "title": "Som", "description": "Active o som, ajuste volume e repetição e teste no dispositivo real da cozinha." },
+        { "title": "Escalação", "description": "Defina quando um ticket não reconhecido deve gerar aviso e escalação." }
+      ],
+      "tips": ["Teste os alertas durante o horário sem clientes antes do primeiro turno."],
+      "warnings": ["Alterações nos limites afectam a leitura de atraso da equipa inteira."]
+    },
+    {
+      "id": "order-settings",
+      "section": "Configuração",
+      "title": "Tipos de pedido e pagamentos",
+      "summary": "Escolha como o restaurante atende e quais métodos o Caixa pode receber.",
+      "route": "/food/configuracoes?section=orders",
+      "roles": ["manager", "cashier"],
+      "outcome": "O Caixa apresenta apenas tipos de atendimento e pagamentos realmente aceites.",
+      "steps": [
+        { "title": "Tipos de pedido", "description": "Active Delivery, levantamento e consumo no local conforme a operação." },
+        { "title": "Métodos", "description": "Escolha dinheiro, Multicaixa, TPA, transferência ou outros métodos autorizados." },
+        { "title": "Teste no Caixa", "description": "Abra um pedido sintético e confirme que as opções esperadas aparecem." },
+        { "title": "Revisão", "description": "Desactive opções temporariamente indisponíveis para reduzir erros no atendimento." }
+      ],
+      "tips": ["Comece com poucas opções e acrescente regras depois do primeiro fluxo completo."],
+      "warnings": ["Desactivar um método não altera pagamentos já registados."]
+    },
+    {
+      "id": "locations",
+      "section": "Configuração",
+      "title": "Locais e unidade principal",
+      "summary": "Separe a operação por restaurante, filial, balcão ou cozinha.",
+      "route": "/food/configuracoes?section=locations",
+      "roles": ["manager"],
+      "outcome": "Existe pelo menos uma unidade activa e definida como principal.",
+      "steps": [
+        { "title": "Adicionar local", "description": "Informe nome e morada operacional. Telefone e email são opcionais." },
+        { "title": "Principal", "description": "Defina a unidade usada como predefinição nos ecrãs operacionais." },
+        { "title": "Vínculo fiscal", "description": "Ligue a um Estabelecimento apenas quando desejar preparar emissão fiscal. Pode ficar vazio." },
+        { "title": "Estado", "description": "Desactive unidades que deixaram de operar sem apagar o histórico." }
+      ],
+      "tips": ["Durante o primeiro piloto use uma única unidade para reduzir variações."],
+      "warnings": ["Não desactive uma unidade com turnos, Caixas, pedidos ou entregas em curso."]
+    },
+    {
+      "id": "team",
+      "section": "Configuração",
+      "title": "Equipa, funções e códigos",
+      "summary": "Adicione colaboradores e controle função, unidade, código pessoal e horário.",
+      "route": "/food/configuracoes?section=team",
+      "roles": ["manager"],
+      "outcome": "Cada posto possui um colaborador activo, função adequada e código configurado.",
+      "steps": [
+        { "title": "Novo colaborador", "description": "Crie a identidade com nome, email e password inicial." },
+        { "title": "Atribuir função", "description": "Escolha Caixa, Cozinha, Delivery, Entregador, CRM ou Gestor e limite à unidade quando necessário." },
+        { "title": "Função principal", "description": "Use para definir o ambiente inicial quando a pessoa acumula funções." },
+        { "title": "Código pessoal", "description": "Configure um código de 4 a 6 dígitos. Ele confirma turnos, Caixa e acções sensíveis." },
+        { "title": "Horários", "description": "Em Gestão > Equipa, planeie entrada e saída e acompanhe turnos activos." },
+        { "title": "Testar como", "description": "No modo local use o ícone de olho para abrir a aplicação com a função do colaborador." }
+      ],
+      "tips": ["Uma pessoa pode acumular funções, mas deve ter apenas uma função principal."],
+      "warnings": ["Nunca partilhe códigos pessoais nem registe códigos em documentos de formação."]
+    },
+    {
+      "id": "menu-products",
+      "section": "Preparação",
+      "title": "Produtos do menu",
+      "summary": "Crie os itens vendidos no Food, separados do catálogo fiscal e comercial.",
+      "route": "/food/produtos?tab=products",
+      "roles": ["manager"],
+      "outcome": "O Caixa encontra produtos disponíveis, com preço, imagem e preparação correctos.",
+      "steps": [
+        { "title": "Produtos", "description": "Defina nome, código interno, preço, custo, preparação, imagem, unidade e disponibilidade." },
+        { "title": "Categoria", "description": "Associe o produto a uma categoria activa para facilitar a pesquisa no Caixa." },
+        { "title": "Extras", "description": "Ligue apenas os grupos de complementos aplicáveis a este produto." },
+        { "title": "Disponibilidade", "description": "Use disponível para pausas temporárias e activo para controlar o catálogo permanente." },
+        { "title": "Arquivo", "description": "Arquive produtos ou extras antigos sem alterar os snapshots dos pedidos anteriores." }
+      ],
+      "tips": ["Crie um produto simples e teste no Caixa antes de carregar o menu completo."],
+      "warnings": ["Produtos indisponíveis não podem ser adicionados a novos pedidos."]
+    },
+    {
+      "id": "menu-categories",
+      "section": "Preparação",
+      "title": "Categorias do menu",
+      "summary": "Organize o menu em grupos curtos e fáceis de reconhecer durante o atendimento.",
+      "route": "/food/produtos?tab=categories",
+      "roles": ["manager"],
+      "outcome": "Produtos ficam agrupados numa ordem clara para o Caixa e para a gestão.",
+      "steps": [
+        { "title": "Criar", "description": "Informe um nome curto, cor e ícone coerentes com o conteúdo." },
+        { "title": "Ordenar", "description": "Coloque primeiro as categorias mais usadas no atendimento." },
+        { "title": "Editar", "description": "Actualize nome e aparência sem recriar os produtos associados." },
+        { "title": "Arquivar", "description": "Arquive categorias antigas apenas depois de mover ou rever os respectivos produtos." }
+      ],
+      "tips": ["Evite categorias duplicadas ou com apenas um item quando não melhoram a escolha."],
+      "warnings": ["Uma categoria inactiva deixa de organizar novos atendimentos."]
+    },
+    {
+      "id": "menu-extras",
+      "section": "Preparação",
+      "title": "Extras e complementos",
+      "summary": "Configure escolhas obrigatórias ou opcionais com limites e alterações de preço.",
+      "route": "/food/produtos?tab=extras",
+      "roles": ["manager", "cashier"],
+      "outcome": "O Caixa consegue personalizar um produto sem aceitar combinações inválidas.",
+      "steps": [
+        { "title": "Grupo", "description": "Crie um grupo como Molhos, Tamanho ou Adicionais e defina se é obrigatório." },
+        { "title": "Limites", "description": "Configure mínimo e máximo de escolhas permitidas no grupo." },
+        { "title": "Opções", "description": "Adicione cada extra com nome, diferença de preço e estado." },
+        { "title": "Associação", "description": "Ligue o grupo apenas aos produtos em que deve aparecer." },
+        { "title": "Editar ou arquivar", "description": "Edite opções futuras ou arquive-as sem alterar pedidos anteriores." }
+      ],
+      "tips": ["Teste selecção mínima, máxima e preço total num pedido sintético."],
+      "warnings": ["Não arquive uma opção durante a montagem de um pedido em curso."]
+    },
+    {
+      "id": "management-overview",
+      "section": "Gestão",
+      "title": "Painel de Gestão",
+      "summary": "Leia o estado do dia, identifique prioridades e abra a área que precisa de intervenção.",
+      "route": "/food/gestao",
+      "roles": ["manager"],
+      "outcome": "O Gestor distingue indicadores informativos de situações que exigem acção imediata.",
+      "steps": [
+        { "title": "Estado do dia", "description": "Consulte pedidos, receita recebida, ticket médio e pagamentos confirmados." },
+        { "title": "Prioridades", "description": "Resolva primeiro stock baixo e sessões de Caixa ainda abertas." },
+        { "title": "Áreas de gestão", "description": "Entre em Menu, Stock, Fichas, Compras, Equipa ou Relatórios conforme a tarefa." },
+        { "title": "Reposição", "description": "Revise sugestões antes de criar compras ou ajustar inventário." },
+        { "title": "Matérias-primas", "description": "Registe ingrediente ou ajuste saldo sempre com um motivo auditável." }
+      ],
+      "tips": ["Use o painel para decidir onde actuar; use os relatórios para analisar períodos."],
+      "warnings": ["Receita recebida não inclui valores ainda pendentes ou em custódia do entregador."]
+    },
+    {
+      "id": "stock",
+      "section": "Preparação",
+      "title": "Ingredientes e stock",
+      "summary": "Ligue ingredientes aos produtos para calcular consumo e reposição.",
+      "route": "/food/gestao/stock",
+      "roles": ["manager"],
+      "outcome": "Cada produto piloto possui ficha técnica e o consumo baixa stock uma única vez.",
+      "steps": [
+        { "title": "Ingredientes", "description": "Registe unidade interna, stock actual, mínimo, ideal e custo médio." },
+        { "title": "Fichas técnicas", "description": "Em Gestão > Fichas, associe a quantidade de cada ingrediente consumida pelo produto." },
+        { "title": "Alertas", "description": "Itens no mínimo geram reposição recomendada; stock zero é crítico quando o mínimo está configurado." },
+        { "title": "Movimentos", "description": "Confira consumo, recepção, ajuste e desperdício sem apagar movimentos anteriores." }
+      ],
+      "tips": ["Use a mesma unidade de medida em stock e ficha técnica."],
+      "warnings": ["Stock mínimo zero desactiva o alerta desse ingrediente."]
+    },
+    {
+      "id": "recipes",
+      "section": "Gestão",
+      "title": "Fichas técnicas",
+      "summary": "Associe ingredientes, quantidades e desperdício a cada produto vendido.",
+      "route": "/food/gestao/fichas",
+      "roles": ["manager"],
+      "outcome": "Cada produto possui custo estimado e baixa de stock coerente com a preparação.",
+      "steps": [
+        { "title": "Escolher produto", "description": "Seleccione um produto activo e confirme preço e unidade Food." },
+        { "title": "Adicionar ingredientes", "description": "Escolha matérias-primas compatíveis com a unidade do produto." },
+        { "title": "Quantidade", "description": "Informe o consumo por unidade vendida usando a unidade interna do ingrediente." },
+        { "title": "Desperdício", "description": "Registe a percentagem média apenas quando houver medição operacional." },
+        { "title": "Guardar e testar", "description": "Guarde a ficha e envie um pedido sintético à cozinha para validar uma única baixa." }
+      ],
+      "tips": ["Compare custo estimado e preço antes de alterar a margem do menu."],
+      "warnings": ["Quantidade incorrecta acumula diferenças de stock em todos os pedidos seguintes."]
+    },
+    {
+      "id": "purchases",
+      "section": "Preparação",
+      "title": "Fornecedores e compras",
+      "summary": "Planeie reposição, confirme pedidos e actualize stock apenas na recepção.",
+      "route": "/food/gestao/compras",
+      "roles": ["manager"],
+      "outcome": "Compras pendentes, quantidades recebidas e divergências ficam rastreáveis.",
+      "steps": [
+        { "title": "Fornecedor", "description": "Cadastre contactos e condições por produto ou ingrediente." },
+        { "title": "Sugestão", "description": "Revise a quantidade recomendada considerando stock disponível e compras pendentes." },
+        { "title": "Confirmação", "description": "O rascunho WhatsApp pode ser editado; abrir a conversa não confirma o envio." },
+        { "title": "Recepção", "description": "Registe recepção parcial ou total. Só esta confirmação actualiza o stock." }
+      ],
+      "tips": ["Confirme preço e unidade de compra antes de enviar ao fornecedor."],
+      "warnings": ["Não marque como recebido antes da conferência física."]
+    },
+    {
+      "id": "new-order",
+      "section": "Operação",
+      "title": "Montar novo pedido",
+      "summary": "Escolha atendimento, cliente, produtos e extras antes de confirmar o total.",
+      "route": "/food/novo-pedido",
+      "roles": ["cashier", "manager"],
+      "outcome": "O pedido é criado uma única vez com itens, complementos e dados de entrega correctos.",
+      "steps": [
+        { "title": "Tipo", "description": "Escolha Delivery, levantamento ou consumo no local antes de montar o carrinho." },
+        { "title": "Cliente", "description": "Pesquise por telefone ou crie o cliente quando o tipo de pedido exigir identificação." },
+        { "title": "Produtos", "description": "Adicione quantidades e abra o produto para seleccionar extras e observações." },
+        { "title": "Validar extras", "description": "Respeite grupos obrigatórios, mínimo e máximo antes de continuar." },
+        { "title": "Rever", "description": "Confirme itens, subtotal, desconto autorizado, taxa e total." },
+        { "title": "Criar", "description": "Confirme uma vez; a aplicação usa idempotência para evitar pedidos duplicados." }
+      ],
+      "tips": ["Use observações apenas para instruções que a cozinha precisa de executar."],
+      "warnings": ["Confirme telefone e morada antes de criar um pedido Delivery."]
+    },
+    {
+      "id": "orders-active",
+      "section": "Operação",
+      "title": "Pedidos em curso",
+      "summary": "Acompanhe pedidos activos por tempo, cozinha, prontidão e entrega.",
+      "route": "/food/pedidos?tab=active",
+      "roles": ["cashier", "manager", "delivery_manager"],
+      "outcome": "Cada pedido avança pelo ambiente responsável sem alterações de estado incoerentes.",
+      "steps": [
+        { "title": "Pesquisar", "description": "Localize por número, cliente ou telefone sem alterar os filtros operacionais." },
+        { "title": "Prioridade", "description": "Atenda primeiro cartões atrasados ou com problema sinalizado." },
+        { "title": "Detalhes", "description": "Abra o pedido para consultar itens, cliente, pagamentos e histórico." },
+        { "title": "Acção", "description": "Execute apenas comandos pertencentes ao Caixa; Cozinha e Delivery actualizam as suas projecções." },
+        { "title": "Sincronização", "description": "A lista actualiza em tempo real e usa recuperação periódica quando necessário." }
+      ],
+      "tips": ["Use os filtros Cozinha, Prontos e Em entrega durante períodos de maior movimento."],
+      "warnings": ["Não repita uma acção enquanto o comando anterior ainda estiver a processar."]
+    },
+    {
+      "id": "orders-history",
+      "section": "Operação",
+      "title": "Histórico de pedidos",
+      "summary": "Consulte pedidos concluídos ou cancelados e a sequência auditável de eventos.",
+      "route": "/food/pedidos?tab=history",
+      "roles": ["cashier", "manager", "delivery_manager", "crm_marketing"],
+      "outcome": "O utilizador encontra a causa e o percurso de um pedido sem alterar o histórico.",
+      "steps": [
+        { "title": "Estado", "description": "Alterne entre concluídos e cancelados conforme a investigação." },
+        { "title": "Pesquisa", "description": "Use número, nome ou telefone para localizar o registo." },
+        { "title": "Detalhes", "description": "Confira snapshots dos itens, totais, pagamentos e entrega." },
+        { "title": "Timeline", "description": "Leia actor, origem e hora de cada transição." },
+        { "title": "Correcção", "description": "Corrija a origem operacional; nunca reescreva eventos anteriores." }
+      ],
+      "tips": ["Use Relatórios quando precisar comparar vários pedidos ou um período inteiro."],
+      "warnings": ["Dados históricos não devem ser apagados para corrigir uma operação."]
+    },
+    {
+      "id": "cashier",
+      "section": "Operação",
+      "title": "Turno, Caixa e pedido",
+      "summary": "Execute o atendimento completo desde a abertura até ao pagamento.",
+      "route": "/food/caixa",
+      "roles": ["cashier", "manager"],
+      "outcome": "O pedido é criado, enviado à cozinha, pago e concluído sem duplicações.",
+      "steps": [
+        { "title": "Abrir Caixa", "description": "Escolha a unidade, informe o fundo inicial e confirme o código pessoal. O turno é iniciado automaticamente." },
+        { "title": "Novo pedido", "description": "Identifique o cliente quando aplicável, escolha o tipo, produtos, quantidades, extras e observações." },
+        { "title": "Enviar à cozinha", "description": "Confirme o pedido para criar o ticket de produção." },
+        { "title": "Receber", "description": "Registe valor, método e referência. A emissão fiscal permanece uma acção separada e opcional." },
+        { "title": "Fechar", "description": "Abra o diálogo de fecho, conte o valor final e justifique diferenças. Ao confirmar, o Caixa e o turno são encerrados." }
+      ],
+      "tips": ["Use Pedidos para acompanhar estados e histórico fora da lista rápida do Caixa."],
+      "warnings": ["Não termine o turno enquanto existir Caixa aberto."]
+    },
+    {
+      "id": "kitchen",
+      "section": "Operação",
+      "title": "KukuGest Cozinha",
+      "summary": "Produza em três colunas com alertas, temporizadores e estados por item.",
+      "route": "/food/cozinha",
+      "roles": ["kitchen", "manager"],
+      "outcome": "A cozinha reconhece, prepara e conclui o pedido, ou comunica um problema ao Caixa.",
+      "steps": [
+        { "title": "Som e ecrã", "description": "Active o som por interação e use ecrã inteiro para mostrar apenas o painel de produção no dispositivo da cozinha." },
+        { "title": "Reconhecer", "description": "Confirme que o novo ticket foi visto; o temporizador de atraso continua activo." },
+        { "title": "Preparar", "description": "Mova o ticket para preparação e conclua os itens individualmente." },
+        { "title": "Indisponível", "description": "Registe ingrediente ou produto em falta para o Caixa confirmar a alternativa com o cliente." },
+        { "title": "Pronto", "description": "Conclua o ticket. Pedidos Delivery seguem então para despacho." }
+      ],
+      "tips": ["Mantenha o KDS aberto num ecrã dedicado e confirme o áudio no início do turno."],
+      "warnings": ["A Cozinha não deve ver preços, pagamentos, telefone ou morada do cliente."]
+    },
+    {
+      "id": "delivery",
+      "section": "Operação",
+      "title": "Despacho Delivery",
+      "summary": "Atribua entregadores e controle ocorrências, devoluções e dinheiro em trânsito.",
+      "route": "/food/delivery",
+      "roles": ["delivery_manager", "manager"],
+      "outcome": "Cada entrega possui responsável, estados coerentes e cobrança reconciliada.",
+      "steps": [
+        { "title": "Fila", "description": "O pedido aparece para despacho somente depois de a cozinha o marcar como pronto." },
+        { "title": "Atribuir", "description": "Escolha um entregador activo, em turno e disponível para a unidade." },
+        { "title": "Acompanhar", "description": "Observe recolha, saída, chegada, entrega e problemas em tempo real." },
+        { "title": "Incidente", "description": "Registe motivo, reatribua quando possível ou confirme devolução." },
+        { "title": "Cobrança", "description": "Valores recebidos permanecem com o entregador até entrega ao Caixa e reconciliação." }
+      ],
+      "tips": ["Use PIN como prova padrão no piloto local quando o pedido já estiver pago."],
+      "warnings": ["Fotografia só deve ser usada com autorização e armazenamento privado configurado."]
+    },
+    {
+      "id": "courier",
+      "section": "Operação",
+      "title": "Aplicação do Entregador",
+      "summary": "Execute apenas as tarefas atribuídas, com contacto e prova controlados.",
+      "route": "/food/entregador",
+      "roles": ["courier"],
+      "outcome": "O entregador conclui a tarefa e entrega eventual cobrança ao Caixa.",
+      "steps": [
+        { "title": "Perfil e turno", "description": "Confirme telefone, transporte, matrícula, unidade e código pessoal antes de ficar disponível." },
+        { "title": "Recolha", "description": "Aceite a tarefa, vá ao restaurante e confirme que recebeu o pedido." },
+        { "title": "Entrega", "description": "Saia para entrega, use navegação externa e marque chegada ao destino." },
+        { "title": "Contacto", "description": "Ligar e WhatsApp são auditados e ficam disponíveis apenas durante a tarefa activa." },
+        { "title": "Prova", "description": "Confirme PIN para pedido pago ou fotografia autorizada quando permitido." },
+        { "title": "Dinheiro", "description": "Confirme o método recebido e entregue o valor ao Caixa para reconciliação." }
+      ],
+      "tips": ["No modo local, abrir Entregador a partir do Gestor selecciona automaticamente Manuel Entregador."],
+      "warnings": ["O entregador não pode alterar preço, total ou valor esperado do pedido."]
+    },
+    {
+      "id": "crm-customers",
+      "section": "Clientes",
+      "title": "Clientes Food",
+      "summary": "Construa histórico do cliente sem duplicar a identidade do CRM principal.",
+      "route": "/food/crm?tab=customers",
+      "roles": ["crm_marketing", "manager"],
+      "outcome": "Clientes, preferências, consentimentos e actividade Food ficam pesquisáveis e auditáveis.",
+      "steps": [
+        { "title": "Cliente", "description": "Pesquise ou crie por nome e telefone normalizado; registe moradas e preferências." },
+        { "title": "Perfil", "description": "Consulte pedidos, valor gasto, produtos preferidos, ocorrências e timeline." },
+        { "title": "Consentimento", "description": "Registe canal permitido e respeite opt-out antes de qualquer campanha." },
+        { "title": "Segmentos", "description": "Use recorrência, valor, zona, risco ou aniversário para organizar acções." },
+        { "title": "Importação", "description": "Pré-visualize CSV, corrija erros e trate duplicados antes de confirmar." }
+      ],
+      "tips": ["Use dados sintéticos durante o piloto local."],
+      "warnings": ["Não envie campanhas reais nem carregue contactos de produção no ambiente local."]
+    },
+    {
+      "id": "crm-birthdays",
+      "section": "Clientes",
+      "title": "Aniversários",
+      "summary": "Identifique aniversariantes apenas quando a data e o consentimento forem válidos.",
+      "route": "/food/crm?tab=birthdays",
+      "roles": ["crm_marketing", "manager"],
+      "outcome": "A equipa prepara contacto relevante sem utilizar dados incompletos ou não autorizados.",
+      "steps": [
+        { "title": "Período", "description": "Consulte aniversários próximos e confirme a data no perfil do cliente." },
+        { "title": "Consentimento", "description": "Verifique o canal autorizado antes de preparar qualquer mensagem." },
+        { "title": "Contexto", "description": "Consulte preferências e histórico Food para evitar ofertas inadequadas." },
+        { "title": "Acção", "description": "Prepare a comunicação ou associe um cupão válido quando o envio estiver activo." }
+      ],
+      "tips": ["Mantenha mensagens curtas e ligadas à relação real do cliente com o restaurante."],
+      "warnings": ["Data de aniversário não substitui consentimento de marketing."]
+    },
+    {
+      "id": "crm-coupons",
+      "section": "Clientes",
+      "title": "Cupões",
+      "summary": "Crie incentivos controlados com código, tipo de desconto e valor mínimo.",
+      "route": "/food/crm?tab=coupons",
+      "roles": ["crm_marketing", "manager"],
+      "outcome": "O cupão possui regras claras, utilização rastreável e impacto financeiro previsível.",
+      "steps": [
+        { "title": "Código", "description": "Use um código curto, único e fácil de comunicar." },
+        { "title": "Desconto", "description": "Escolha percentagem ou valor fixo e confirme o limite operacional." },
+        { "title": "Pedido mínimo", "description": "Defina o valor mínimo quando necessário para proteger a margem." },
+        { "title": "Guardar", "description": "Crie o cupão e teste a regra antes de o associar a uma campanha." },
+        { "title": "Acompanhar", "description": "Consulte utilizações e receita atribuída sem alterar resgates anteriores." }
+      ],
+      "tips": ["Calcule o custo da oferta com base na ficha técnica e não apenas no preço de venda."],
+      "warnings": ["Não publique cupões enquanto o fluxo de resgate não estiver validado no Caixa."]
+    },
+    {
+      "id": "crm-campaigns",
+      "section": "Clientes",
+      "title": "Campanhas",
+      "summary": "Prepare campanhas segmentadas e auditáveis sem enviar para contactos sem consentimento.",
+      "route": "/food/crm?tab=campaigns",
+      "roles": ["crm_marketing", "manager"],
+      "outcome": "A campanha permanece em rascunho até canal, público, consentimento e conteúdo estarem validados.",
+      "steps": [
+        { "title": "Objectivo", "description": "Defina nome e resultado esperado antes de escrever a mensagem." },
+        { "title": "Canal", "description": "Escolha SMS ou WhatsApp conforme consentimento e integração disponível." },
+        { "title": "Mensagem", "description": "Escreva conteúdo claro, identifique o restaurante e respeite opt-out." },
+        { "title": "Cupão", "description": "Associe um incentivo apenas quando as regras estiverem testadas." },
+        { "title": "Rascunho", "description": "Guarde para revisão; envio real depende da integração tenant-aware." }
+      ],
+      "tips": ["Faça primeiro uma revisão interna com dados sintéticos."],
+      "warnings": ["O ambiente local não deve enviar campanhas ou utilizar contactos reais."]
+    },
+    {
+      "id": "workforce",
+      "section": "Gestão",
+      "title": "Equipa, horários e Caixas",
+      "summary": "Acompanhe turnos, planeamento, produtividade e diferenças de Caixa por colaborador.",
+      "route": "/food/gestao/equipa",
+      "roles": ["manager"],
+      "outcome": "Horários, turnos e diferenças financeiras possuem responsável e tratamento registado.",
+      "steps": [
+        { "title": "Período e unidade", "description": "Filtre o painel antes de comparar colaboradores ou sessões de Caixa." },
+        { "title": "Horários", "description": "Planeie entrada e saída e remova apenas horários que ainda não ocorreram." },
+        { "title": "Turnos", "description": "Identifique colaboradores actualmente em turno e duração acumulada." },
+        { "title": "Produtividade", "description": "Leia horas, pedidos e vendas como indicadores, não como metas automáticas." },
+        { "title": "Diferenças de Caixa", "description": "Analise valor esperado, contado e motivo antes de aprovar ou rejeitar." },
+        { "title": "Colaboradores", "description": "Use Gerir colaboradores para alterar função, unidade ou código pessoal." }
+      ],
+      "tips": ["Registe uma nota clara em qualquer decisão sobre diferença de Caixa."],
+      "warnings": ["Não compare produtividade sem considerar função, duração do turno e volume da unidade."]
+    },
+    {
+      "id": "reports",
+      "section": "Gestão",
+      "title": "Relatórios e fecho mensal",
+      "summary": "Reconcile pedidos, pagamentos, stock, Caixa e Delivery antes do snapshot.",
+      "route": "/food/gestao/relatorios",
+      "roles": ["manager", "crm_marketing"],
+      "outcome": "O período fecha sem pendências e mantém original e revisões imutáveis.",
+      "steps": [
+        { "title": "Período e unidade", "description": "Escolha mês e unidade para comparar pedidos, recebimentos, stock e operação." },
+        { "title": "Pendências", "description": "Resolva Caixas, turnos, pagamentos, cobranças, compras e diferenças indicadas." },
+        { "title": "Pré-validação", "description": "O estado deve ficar pronto para fechar; avisos precisam de revisão, bloqueios impedem o comando." },
+        { "title": "Fechar", "description": "Crie o snapshot mensal imutável com confirmação do Gestor." },
+        { "title": "Reabrir", "description": "Informe motivo, corrija a origem e feche novamente para criar uma nova revisão." },
+        { "title": "Exportar", "description": "Descarregue PDF ou CSV do original ou da revisão seleccionada." }
+      ],
+      "tips": ["Abra cada pendência pela origem em vez de corrigir valores directamente no relatório."],
+      "warnings": ["CRM & Marketing pode consultar relatórios, mas apenas o Gestor fecha ou reabre meses."]
+    },
+    {
+      "id": "local-testing",
+      "section": "Teste",
+      "title": "Roteiro de teste local",
+      "summary": "Valide cada função com dados sintéticos antes de qualquer publicação.",
+      "route": "/food/gestao/equipa",
+      "roles": ["manager"],
+      "outcome": "O fluxo Caixa → Cozinha → Delivery termina sem inconsistências e com evidência segura.",
+      "steps": [
+        { "title": "Preparar", "description": "Confirme serviços locais, unidade, equipa, códigos, categoria, produtos e baseline sem operações antigas." },
+        { "title": "Alternar função", "description": "Use Testar como na Equipa ou abra Entregador no menu. Regresse sempre por Voltar ao Gestor." },
+        { "title": "Executar", "description": "Crie pedido sintético, envie à cozinha, conclua, atribua entrega, confirme prova e reconcilie." },
+        { "title": "Registar", "description": "Anote cenário, hora, pedido, resultado e erro sem guardar dados pessoais, códigos ou PIN." },
+        { "title": "Limpar", "description": "Encerre turnos, Caixas e operações de teste conforme o roteiro de aceitação." }
+      ],
+      "tips": ["Execute primeiro um pedido completo; depois faça as repetições do piloto."],
+      "warnings": ["O modo local não autoriza publicação, emissão fiscal, campanhas ou uso de dados reais."]
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import { put, del, list } from '@vercel/blob';
 import { sanitizeFilename } from './file-utils';
 
-export type UploadFolder = 'avatars' | 'attachments' | 'invoices';
+export type UploadFolder = 'avatars' | 'attachments' | 'invoices' | 'food' | 'food-proof';
 
 export interface UploadResult {
   url: string;

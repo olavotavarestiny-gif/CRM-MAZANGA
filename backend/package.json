@@ -9,9 +9,15 @@
     "postinstall": "prisma generate",
     "prestart": "prisma generate",
     "start": "node src/index.js",
+    "test": "node --test src/lib/*.test.js src/integration/*.test.js",
+    "test:unit": "node --test src/lib/*.test.js",
+    "test:integration": "node --test src/integration/*.test.js",
+    "test:rls": "node --test src/integration/management-rls.test.js",
     "db:push": "prisma db push",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
+    "db:seed:management": "node scripts/seed-management-demo.js",
+    "db:check:food": "DATABASE_URL=postgresql://kukugest:kukugest_local@127.0.0.1:5433/kukugest_dev?schema=public node scripts/check-food-local.js",
     "db:studio": "prisma studio",
     "db:backfill-contact-nif": "node scripts/backfill-contact-nif.js"
   },
@@ -36,7 +42,8 @@
     "nodemailer": "^8.0.2",
     "pdfkit": "^0.18.0",
     "qrcode": "^1.5.4",
-    "xmlbuilder2": "^4.0.3"
+    "xmlbuilder2": "^4.0.3",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.2",

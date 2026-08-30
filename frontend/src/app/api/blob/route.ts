@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { getSupabaseEnv } from '@/lib/supabase/env';
+import { DEV_AUTH_HEADER, DEV_AUTH_TOKEN, isServerDevAuthBypassEnabled } from '@/lib/dev-auth';
 
 const PRIVATE_BLOB_HOSTNAME = '.private.blob.vercel-storage.com';
 
@@ -11,7 +14,30 @@ function isBlobUrl(url: string): boolean {
   }
 }
 
+function isDeliveryProofUrl(url: string): boolean {
+  try {
+    return new URL(url).pathname.split('/').includes('food-proof');
+  } catch {
+    return false;
+  }
+}
+
+async function hasAuthenticatedSession(request: NextRequest): Promise<boolean> {
+  if (isServerDevAuthBypassEnabled() || request.headers.get(DEV_AUTH_HEADER) === DEV_AUTH_TOKEN) return true;
+  if (!getSupabaseEnv()) return false;
+  try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    return Boolean(user);
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  if (!await hasAuthenticatedSession(request)) {
+    return new NextResponse('Sessão inválida', { status: 401 });
+  }
   const rawUrl = request.nextUrl.searchParams.get('url');
   if (!rawUrl) {
     return new NextResponse('Parâmetro url em falta', { status: 400 });
@@ -19,6 +45,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   if (!isBlobUrl(rawUrl)) {
     return new NextResponse('URL inválido', { status: 400 });
+  }
+  if (isDeliveryProofUrl(rawUrl)) {
+    return new NextResponse('Use a rota protegida da entrega para consultar este ficheiro', { status: 403 });
   }
 
   const token = process.env.BLOB_READ_WRITE_TOKEN;

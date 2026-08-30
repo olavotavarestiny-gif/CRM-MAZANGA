@@ -2,6 +2,7 @@
 node_modules/
 .DS_Store
 .claude/
+.local-dev/
 .env
 .env.local
 .env.*

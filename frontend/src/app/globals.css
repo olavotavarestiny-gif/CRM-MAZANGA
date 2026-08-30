@@ -51,6 +51,44 @@
   --workspace-on-primary: #ffffff;
 }
 
+.workspace-food {
+  --workspace-primary: #0f766e;
+  --workspace-primary-hover: #0d5f59;
+  --workspace-primary-soft: #ecfdf5;
+  --workspace-primary-border: #a7f3d0;
+  --workspace-on-primary: #ffffff;
+}
+
+.workspace-gestao-kpi {
+  --workspace-primary: #2563eb;
+  --workspace-primary-hover: #1d4ed8;
+  --workspace-primary-soft: #eff6ff;
+  --workspace-primary-border: #bfdbfe;
+  --workspace-on-primary: #ffffff;
+}
+
+.dark {
+  --background: 222 47% 7%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 9%;
+  --popover-foreground: 210 40% 98%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --border: 217 33% 18%;
+  --input: 217 33% 18%;
+}
+
+@media print {
+  aside, header, [data-no-print] { display: none !important; }
+  main { overflow: visible !important; }
+  body { background: white !important; color: black !important; }
+  .print-card { break-inside: avoid; border: 1px solid #d1d5db !important; box-shadow: none !important; }
+}
+
 * {
   border-color: hsl(var(--border));
 }

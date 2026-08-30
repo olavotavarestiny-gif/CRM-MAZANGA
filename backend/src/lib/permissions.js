@@ -36,6 +36,19 @@
  *   },
  *   taskAssignment: {
  *     assign_admin_owner: true | false,
+ *   },
+ *   food: {
+ *     overview: true | false,
+ *     settings: true | false,
+ *     products_view: true | false,
+ *     products_edit: true | false,
+ *     orders_create: true | false,
+ *     orders_view_all: true | false,
+ *     kitchen: true | false,
+ *     delivery: true | false,
+ *     reports: true | false,
+ *     discounts: true | false,
+ *     cancel_orders: true | false,
  *   }
  * }
  *
@@ -65,6 +78,19 @@ const BOOLEAN_SCOPE_RULES = {
   },
   taskAssignment: {
     assign_admin_owner: 'allow_only_true',
+  },
+  food: {
+    overview: 'allow_unless_false',
+    settings: 'allow_only_true',
+    products_view: 'allow_unless_false',
+    products_edit: 'allow_only_true',
+    orders_create: 'allow_only_true',
+    orders_view_all: 'allow_only_true',
+    kitchen: 'allow_only_true',
+    delivery: 'allow_only_true',
+    reports: 'allow_only_true',
+    discounts: 'allow_only_true',
+    cancel_orders: 'allow_only_true',
   },
 };
 
@@ -198,6 +224,10 @@ function canTaskAssignment(permissionsJson, key) {
   return canScopedBooleanPermission(permissionsJson, 'taskAssignment', key);
 }
 
+function canFood(permissionsJson, key) {
+  return canScopedBooleanPermission(permissionsJson, 'food', key);
+}
+
 function hasFullAccess(req) {
   return hasOrgAdminAccess(req.user);
 }
@@ -270,6 +300,22 @@ function requireStockPermission(key) {
   };
 }
 
+function requireFoodPermission(key) {
+  return (req, res, next) => {
+    if (hasFullAccess(req)) return next();
+    if (!canFood(req.user.permissionsJson, key)) {
+      logRouteWarning('[permissions] food denied', req, {
+        status: 403,
+        message: 'Sem permissão para esta acção',
+        module: 'food',
+        action: key,
+      });
+      return res.status(403).json({ error: 'Sem permissão para esta acção' });
+    }
+    next();
+  };
+}
+
 /**
  * Express middleware: only account owners and superadmin can delete.
  * Regular team members cannot delete anything.
@@ -292,9 +338,11 @@ module.exports = {
   canCaixa,
   canStock,
   canTaskAssignment,
+  canFood,
   requirePermission,
   requireComercialPermission,
   requireCaixaPermission,
   requireStockPermission,
+  requireFoodPermission,
   requireDeletePermission,
 };

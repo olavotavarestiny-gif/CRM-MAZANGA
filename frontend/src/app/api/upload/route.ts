@@ -9,6 +9,8 @@ const MAX_SIZES: Record<UploadFolder, number> = {
   avatars: 2 * 1024 * 1024,       // 2 MB
   attachments: 10 * 1024 * 1024,  // 10 MB (documentos + fotos de alta resolução)
   invoices: 5 * 1024 * 1024,      // 5 MB
+  food: 4 * 1024 * 1024,           // 4 MB (logótipos e fotos do menu)
+  'food-proof': 4 * 1024 * 1024,   // 4 MB (comprovativos privados de entrega)
 };
 
 const ALLOWED_TYPES: Record<UploadFolder, readonly string[]> = {
@@ -22,15 +24,19 @@ const ALLOWED_TYPES: Record<UploadFolder, readonly string[]> = {
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   ],
   invoices: ['application/pdf'],
+  food: ['image/jpeg', 'image/png', 'image/webp'],
+  'food-proof': ['image/jpeg', 'image/png', 'image/webp'],
 };
 
 const ALLOWED_EXTENSIONS: Record<UploadFolder, readonly string[]> = {
   avatars: ['jpg', 'jpeg', 'png', 'webp'],
   attachments: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'pdf', 'doc', 'docx', 'xls', 'xlsx'],
   invoices: ['pdf'],
+  food: ['jpg', 'jpeg', 'png', 'webp'],
+  'food-proof': ['jpg', 'jpeg', 'png', 'webp'],
 };
 
-const VALID_FOLDERS: UploadFolder[] = ['avatars', 'attachments', 'invoices'];
+const VALID_FOLDERS: UploadFolder[] = ['avatars', 'attachments', 'invoices', 'food', 'food-proof'];
 
 // Simple in-memory rate limiter: max 10 uploads per minute per IP
 const uploadCounts = new Map<string, { count: number; resetAt: number }>();

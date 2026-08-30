@@ -99,6 +99,10 @@ router.get('/orgs', async (req, res) => {
           select: { id: true, name: true, email: true, active: true },
           orderBy: { name: 'asc' },
         },
+        organizationModules: {
+          select: { id: true, module: true, enabled: true, planTier: true },
+          orderBy: { module: 'asc' },
+        },
         _count: { select: { accountMembers: { where: { active: true } } } },
         loginLogs: { take: 1, orderBy: { createdAt: 'desc' }, select: { createdAt: true } },
       },
@@ -136,8 +140,8 @@ router.patch('/orgs/:id', async (req, res) => {
       data.permissions = permissions ? JSON.stringify(permissions) : null;
     }
     if (workspaceMode !== undefined) {
-      if (!['servicos', 'comercio'].includes(workspaceMode)) {
-        return res.status(400).json({ error: 'Workspace inválido. Use servicos ou comercio.' });
+      if (!['servicos', 'comercio', 'gestao_kpi', 'food'].includes(workspaceMode)) {
+        return res.status(400).json({ error: 'Workspace inválido. Use servicos, comercio, gestao_kpi ou food.' });
       }
       data.workspaceMode = workspaceMode;
     }
@@ -163,6 +167,20 @@ router.patch('/orgs/:id', async (req, res) => {
       },
     });
 
+    if (workspaceMode !== undefined) {
+      await prisma.organizationModule.upsert({
+        where: { organizationId_module: { organizationId: userId, module: workspaceMode } },
+        update: { enabled: true, planTier: updated.plan },
+        create: {
+          organizationId: userId,
+          module: workspaceMode,
+          enabled: true,
+          planTier: updated.plan,
+          createdByUserId: req.user.id,
+        },
+      });
+    }
+
     res.json({
       ...updated,
       plan: normalizePlan(updated.plan),
@@ -170,6 +188,79 @@ router.patch('/orgs/:id', async (req, res) => {
     });
   } catch (error) {
     if (error.code === 'P2025') return res.status(404).json({ error: 'Conta não encontrada' });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/orgs/:id/modules', async (req, res) => {
+  try {
+    const organizationId = Number(req.params.id);
+    if (!Number.isInteger(organizationId)) return res.status(400).json({ error: 'Organização inválida.' });
+    const modules = await prisma.organizationModule.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: 'asc' },
+    });
+    res.json(modules);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.put('/orgs/:id/modules/:module', async (req, res) => {
+  try {
+    const organizationId = Number(req.params.id);
+    const module = String(req.params.module || '').trim().toLowerCase();
+    const enabled = req.body?.enabled !== false;
+    if (!Number.isInteger(organizationId)) return res.status(400).json({ error: 'Organização inválida.' });
+    if (!['servicos', 'comercio', 'gestao_kpi', 'food'].includes(module)) {
+      return res.status(400).json({ error: 'Módulo inválido.' });
+    }
+    const organization = await prisma.user.findFirst({
+      where: getClientAccountOwnerWhere({ id: organizationId }),
+      select: { id: true, plan: true },
+    });
+    if (!organization) return res.status(404).json({ error: 'Organização não encontrada.' });
+
+    const result = await prisma.$transaction(async (tx) => {
+      const organizationModule = await tx.organizationModule.upsert({
+        where: { organizationId_module: { organizationId, module } },
+        update: { enabled, planTier: req.body?.planTier || organization.plan },
+        create: {
+          organizationId,
+          module,
+          enabled,
+          planTier: req.body?.planTier || organization.plan,
+          createdByUserId: req.user.id,
+        },
+      });
+      if (module === 'food') {
+        await tx.foodSettings.upsert({
+          where: { userId: organizationId },
+          update: { isEnabled: enabled },
+          create: { userId: organizationId, isEnabled: enabled, createdByUserId: req.user.id },
+        });
+        await tx.foodStaffRoleAssignment.upsert({
+          where: {
+            id: (await tx.foodStaffRoleAssignment.findFirst({
+              where: { organizationId, personId: organizationId, role: 'manager', branchId: null },
+              select: { id: true },
+            }))?.id || '__new__',
+          },
+          update: { active: enabled, isPrimary: true },
+          create: {
+            organizationId,
+            personId: organizationId,
+            role: 'manager',
+            isPrimary: true,
+            active: enabled,
+            createdByUserId: req.user.id,
+          },
+        });
+      }
+      return organizationModule;
+    });
+    res.json(result);
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
@@ -283,8 +374,8 @@ router.post('/users', async (req, res) => {
     if (plan !== undefined && !isSupportedPlan(plan)) {
       return res.status(400).json({ error: 'Plano inválido. Use inicial, crescimento ou estabilidade.' });
     }
-    if (workspaceMode !== undefined && !['servicos', 'comercio'].includes(workspaceMode)) {
-      return res.status(400).json({ error: 'Workspace inválido. Use servicos ou comercio.' });
+    if (workspaceMode !== undefined && !['servicos', 'comercio', 'gestao_kpi', 'food'].includes(workspaceMode)) {
+      return res.status(400).json({ error: 'Workspace inválido. Use servicos, comercio, gestao_kpi ou food.' });
     }
 
     const existing = await prisma.user.findFirst({
@@ -298,18 +389,44 @@ router.post('/users', async (req, res) => {
     });
     if (authError) return res.status(400).json({ error: authError.message });
 
-    const user = await prisma.user.create({
-      data: {
-        name, email: normalizedEmail,
-        supabaseUid: authData.user.id,
-        role: 'user',
-        active: true,
-        mustChangePassword: true,
-        plan: plan ? normalizePlan(plan) : DEFAULT_PLAN,
-        workspaceMode: workspaceMode || 'servicos',
-        permissions: permissions ? JSON.stringify(permissions) : null,
-        ...buildAccessFields({ billingType, durationDays, accountStatus }),
-      },
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          name, email: normalizedEmail,
+          supabaseUid: authData.user.id,
+          role: 'user',
+          active: true,
+          mustChangePassword: true,
+          plan: plan ? normalizePlan(plan) : DEFAULT_PLAN,
+          workspaceMode: workspaceMode || 'servicos',
+          permissions: permissions ? JSON.stringify(permissions) : null,
+          ...buildAccessFields({ billingType, durationDays, accountStatus }),
+        },
+      });
+      await tx.organizationModule.create({
+        data: {
+          organizationId: created.id,
+          module: created.workspaceMode,
+          enabled: true,
+          planTier: created.plan,
+          createdByUserId: req.user.id,
+        },
+      });
+      if (created.workspaceMode === 'food') {
+        await tx.foodSettings.create({
+          data: { userId: created.id, isEnabled: true, createdByUserId: req.user.id },
+        });
+        await tx.foodStaffRoleAssignment.create({
+          data: {
+            organizationId: created.id,
+            personId: created.id,
+            role: 'manager',
+            isPrimary: true,
+            createdByUserId: req.user.id,
+          },
+        });
+      }
+      return created;
     });
 
     res.status(201).json({
@@ -439,9 +556,40 @@ router.get('/dashboard', async (req, res) => {
     const activeOrgs = orgs.filter(o => o.active).length;
     const newOrgsThisMonth = orgs.filter(o => new Date(o.createdAt) >= startOfMonth).length;
     const totalContacts = orgs.reduce((s, o) => s + o._count.contacts, 0);
+    const totalUsers = orgs.reduce((sum, org) => sum + 1 + org.accountMembers.length, 0);
+
+    const accessSummary = await prisma.user.groupBy({
+      by: ['billingType'],
+      where: getClientAccountOwnerWhere({ active: true }),
+      _count: { _all: true },
+    });
+    const accessByType = Object.fromEntries(
+      accessSummary.map((entry) => [entry.billingType || 'trial', entry._count._all])
+    );
+
+    const [
+      totalFoodOrders,
+      foodOrdersThisMonth,
+      completedFoodOrders,
+      completedFoodItems,
+      confirmedFoodPayments,
+    ] = await Promise.all([
+      prisma.foodOrder.count(),
+      prisma.foodOrder.count({ where: { createdAt: { gte: startOfMonth } } }),
+      prisma.foodOrder.count({ where: { orderState: 'completed' } }),
+      prisma.foodOrderItem.aggregate({
+        where: { completedAt: { not: null } },
+        _sum: { quantity: true },
+      }),
+      prisma.foodPayment.aggregate({
+        where: { status: 'confirmed' },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+    ]);
 
     const planDistribution = { essencial: 0, profissional: 0, enterprise: 0 };
-    const workspaceMixCount = { servicos: 0, comercio: 0 };
+    const workspaceMixCount = { servicos: 0, comercio: 0, gestao_kpi: 0, food: 0 };
     for (const o of orgs) {
       const p = normalizePlan(o.plan);
       if (p in planDistribution) planDistribution[p]++;
@@ -477,11 +625,27 @@ router.get('/dashboard', async (req, res) => {
       totalOrgs,
       activeOrgs,
       newOrgsThisMonth,
+      totalUsers,
       totalContacts,
+      access: {
+        trial: accessByType.trial || 0,
+        paid: accessByType.paid || 0,
+      },
+      food: {
+        totalOrders: totalFoodOrders,
+        ordersThisMonth: foodOrdersThisMonth,
+        completedOrders: completedFoodOrders,
+        completedItems: completedFoodItems._sum.quantity || 0,
+        confirmedPayments: confirmedFoodPayments._count._all,
+        restaurantGmv: confirmedFoodPayments._sum.amount || 0,
+      },
+      platformRevenue: null,
       totalStorageMb: Math.round(totalStorageBytes / (1024 * 1024) * 100) / 100,
       workspaceMix: {
         servicos: totalOrgs > 0 ? Math.round((workspaceMixCount.servicos / totalOrgs) * 100) : 0,
         comercio: totalOrgs > 0 ? Math.round((workspaceMixCount.comercio / totalOrgs) * 100) : 0,
+        gestao_kpi: totalOrgs > 0 ? Math.round((workspaceMixCount.gestao_kpi / totalOrgs) * 100) : 0,
+        food: totalOrgs > 0 ? Math.round((workspaceMixCount.food / totalOrgs) * 100) : 0,
       },
       planDistribution,
       mostActiveOrg,

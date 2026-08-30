@@ -8,79 +8,105 @@ datasource db {
 }
 
 model User {
-  id                        Int                    @id @default(autoincrement())
-  name                      String
-  email                     String                 @unique
-  passwordHash              String                 @default("SUPABASE_AUTH")
-  resetToken                String?
-  resetExpiry               DateTime?
-  createdAt                 DateTime               @default(now())
-  active                    Boolean                @default(true)
-  role                      String                 @default("user")
-  mustChangePassword        Boolean                @default(false)
-  accountOwnerId            Int?
-  supabaseUid               String?                @unique
-  plan                      String                 @default("essencial")
-  isSuperAdmin              Boolean                @default(false)
-  permissions               String?
-  jobTitle                  String?
-  workspaceMode             String                 @default("servicos")
-  assignedEstabelecimentoId String?
-  billingType               String                 @default("trial")
-  trialEndsAt               DateTime?
-  expiresAt                 DateTime?
-  graceEndsAt               DateTime?
-  accountStatus             String                 @default("active")
-  lastSeenAt                DateTime?
-  automations               Automation[]           @relation("AutomationUser")
-  caixaSessoesFechadas      CaixaSessao[]          @relation("CaixaSessaoClosedBy")
-  caixaSessoesAbertas       CaixaSessao[]          @relation("CaixaSessaoOpenedBy")
-  caixaSessoes              CaixaSessao[]          @relation("CaixaSessaoUser")
-  calendarSync              CalendarSync?
-  chatChannelMemberships    ChatChannelMember[]    @relation("ChatMemberUser")
-  chatMessagesSent          ChatMessage[]          @relation("ChatSenderUser")
-  clientesFaturacao         ClienteFaturacao[]     @relation("ClienteFaturacaoUser")
-  configuracaoFaturacao     ConfiguracaoFaturacao? @relation("ConfigFaturacaoUser")
-  contacts                  Contact[]              @relation("ContactUser")
-  contactFieldConfigs       ContactFieldConfig[]   @relation("ContactFieldConfigUser")
-  contactFieldDefs          ContactFieldDef[]      @relation("ContactFieldDefUser")
-  contactGroups             ContactGroup[]         @relation("ContactGroupUser")
-  contactNotes              ContactNote[]          @relation("NoteAuthor")
-  calendarEvents            CalendarEvent[]        @relation("CalendarEventUser")
-  assignedCalendarEvents    CalendarEvent[]        @relation("CalendarEventAssignee")
-  estabelecimentos          Estabelecimento[]      @relation("EstabelecimentoUser")
-  facturas                  Factura[]              @relation("FacturaUser")
-  facturaRecorrentes        FacturaRecorrente[]    @relation("FacturaRecorrenteUser")
-  forms                     Form[]                 @relation("FormUser")
-  googleCalendarEvents      GoogleCalendarEvent[]
-  googleCalendarToken       GoogleCalendarToken?
-  loginLogs                 LoginLog[]
-  pipelineStages            PipelineStage[]        @relation("PipelineStageUser")
-  produtos                  Produto[]              @relation("ProdutoUser")
-  produtoCategorias         ProdutoCategoria[]     @relation("ProdutoCategoriaUser")
-  saftPeriodos              SaftPeriodo[]          @relation("SaftPeriodoUser")
-  series                    Serie[]                @relation("SerieUser")
-  stockMovementsCreated     StockMovement[]        @relation("StockMovementCreatedBy")
-  stockMovements            StockMovement[]        @relation("StockMovementUser")
-  assignedTasks             Task[]                 @relation("TaskAssignee")
-  tasks                     Task[]                 @relation("TaskUser")
-  transactions              Transaction[]          @relation("TransactionUser")
-  accountOwner              User?                  @relation("AccountMembers", fields: [accountOwnerId], references: [id])
-  accountMembers            User[]                 @relation("AccountMembers")
-  assignedEstabelecimento   Estabelecimento?       @relation("AssignedEstabelecimento", fields: [assignedEstabelecimentoId], references: [id])
-  automationLogs            AutomationLog[]
-  automationAlerts          AutomationAlert[]
-  dailyTipDeliveries        DailyTipDelivery[]
-  startupTemplateApplied    StartupTemplateApplication? @relation("StartupTemplateOrganization")
-  startupTemplatesAppliedBy StartupTemplateApplication[] @relation("StartupTemplateAppliedBy")
-  serviceDashboardSettings  ServiceDashboardSettings?
-  financialCategories       FinancialCategory[]
-  companies                 Company[]              @relation("CompanyUser")
-  deals                     Deal[]                 @relation("DealUser")
-  dealStages                DealStage[]            @relation("DealStageUser")
-  dealNotes                 DealNote[]             @relation("DealNoteAuthor")
-  membershipsAsPerson       AccountMembership[]    @relation("MembershipPerson")
-  membershipsAsOwner        AccountMembership[]    @relation("MembershipAccountOwner")
+  id                             Int                             @id @default(autoincrement())
+  name                           String
+  email                          String                          @unique
+  passwordHash                   String                          @default("SUPABASE_AUTH")
+  resetToken                     String?
+  resetExpiry                    DateTime?
+  createdAt                      DateTime                        @default(now())
+  active                         Boolean                         @default(true)
+  role                           String                          @default("user")
+  mustChangePassword             Boolean                         @default(false)
+  accountOwnerId                 Int?
+  supabaseUid                    String?                         @unique
+  plan                           String                          @default("essencial")
+  isSuperAdmin                   Boolean                         @default(false)
+  permissions                    String?
+  jobTitle                       String?
+  workspaceMode                  String                          @default("servicos")
+  assignedEstabelecimentoId      String?
+  billingType                    String                          @default("trial")
+  trialEndsAt                    DateTime?
+  expiresAt                      DateTime?
+  graceEndsAt                    DateTime?
+  accountStatus                  String                          @default("active")
+  lastSeenAt                     DateTime?
+  automations                    Automation[]                    @relation("AutomationUser")
+  caixaSessoesFechadas           CaixaSessao[]                   @relation("CaixaSessaoClosedBy")
+  caixaSessoesAbertas            CaixaSessao[]                   @relation("CaixaSessaoOpenedBy")
+  caixaSessoes                   CaixaSessao[]                   @relation("CaixaSessaoUser")
+  calendarSync                   CalendarSync?
+  chatChannelMemberships         ChatChannelMember[]             @relation("ChatMemberUser")
+  chatMessagesSent               ChatMessage[]                   @relation("ChatSenderUser")
+  clientesFaturacao              ClienteFaturacao[]              @relation("ClienteFaturacaoUser")
+  configuracaoFaturacao          ConfiguracaoFaturacao?          @relation("ConfigFaturacaoUser")
+  contacts                       Contact[]                       @relation("ContactUser")
+  contactFieldConfigs            ContactFieldConfig[]            @relation("ContactFieldConfigUser")
+  contactFieldDefs               ContactFieldDef[]               @relation("ContactFieldDefUser")
+  contactGroups                  ContactGroup[]                  @relation("ContactGroupUser")
+  contactNotes                   ContactNote[]                   @relation("NoteAuthor")
+  calendarEvents                 CalendarEvent[]                 @relation("CalendarEventUser")
+  assignedCalendarEvents         CalendarEvent[]                 @relation("CalendarEventAssignee")
+  estabelecimentos               Estabelecimento[]               @relation("EstabelecimentoUser")
+  facturas                       Factura[]                       @relation("FacturaUser")
+  facturaRecorrentes             FacturaRecorrente[]             @relation("FacturaRecorrenteUser")
+  forms                          Form[]                          @relation("FormUser")
+  googleCalendarEvents           GoogleCalendarEvent[]
+  googleCalendarToken            GoogleCalendarToken?
+  loginLogs                      LoginLog[]
+  pipelineStages                 PipelineStage[]                 @relation("PipelineStageUser")
+  produtos                       Produto[]                       @relation("ProdutoUser")
+  produtoCategorias              ProdutoCategoria[]              @relation("ProdutoCategoriaUser")
+  saftPeriodos                   SaftPeriodo[]                   @relation("SaftPeriodoUser")
+  series                         Serie[]                         @relation("SerieUser")
+  stockMovementsCreated          StockMovement[]                 @relation("StockMovementCreatedBy")
+  stockMovements                 StockMovement[]                 @relation("StockMovementUser")
+  assignedTasks                  Task[]                          @relation("TaskAssignee")
+  tasks                          Task[]                          @relation("TaskUser")
+  transactions                   Transaction[]                   @relation("TransactionUser")
+  accountOwner                   User?                           @relation("AccountMembers", fields: [accountOwnerId], references: [id])
+  accountMembers                 User[]                          @relation("AccountMembers")
+  assignedEstabelecimento        Estabelecimento?                @relation("AssignedEstabelecimento", fields: [assignedEstabelecimentoId], references: [id])
+  automationLogs                 AutomationLog[]
+  automationAlerts               AutomationAlert[]
+  dailyTipDeliveries             DailyTipDelivery[]
+  startupTemplateApplied         StartupTemplateApplication?     @relation("StartupTemplateOrganization")
+  startupTemplatesAppliedBy      StartupTemplateApplication[]    @relation("StartupTemplateAppliedBy")
+  serviceDashboardSettings       ServiceDashboardSettings?
+  financialCategories            FinancialCategory[]
+  companies                      Company[]                       @relation("CompanyUser")
+  deals                          Deal[]                          @relation("DealUser")
+  dealStages                     DealStage[]                     @relation("DealStageUser")
+  dealNotes                      DealNote[]                      @relation("DealNoteAuthor")
+  membershipsAsPerson            AccountMembership[]             @relation("MembershipPerson")
+  membershipsAsOwner             AccountMembership[]             @relation("MembershipAccountOwner")
+  managementOrganization         ManagementOrganization?         @relation("ManagementOrganizationOwner")
+  managementProfile              ManagementProfile?
+  foodSettings                   FoodSettings?                   @relation("FoodSettingsUser")
+  foodBranches                   FoodBranch[]                    @relation("FoodBranchUser")
+  foodCategories                 FoodCategory[]                  @relation("FoodCategoryUser")
+  foodProducts                   FoodProduct[]                   @relation("FoodProductUser")
+  foodModifierGroups             FoodModifierGroup[]             @relation("FoodModifierGroupUser")
+  foodModifierOptions            FoodModifierOption[]            @relation("FoodModifierOptionUser")
+  foodProductModifierGroups      FoodProductModifierGroup[]      @relation("FoodProductModifierGroupUser")
+  foodOrders                     FoodOrder[]                     @relation("FoodOrderUser")
+  organizationModules            OrganizationModule[]            @relation("OrganizationModuleOrganization")
+  foodStaffOrganizations         FoodStaffRoleAssignment[]       @relation("FoodStaffOrganization")
+  foodStaffRoles                 FoodStaffRoleAssignment[]       @relation("FoodStaffPerson")
+  foodCredentialOrganizations    FoodStaffCredential[]           @relation("FoodStaffCredentialOrganization")
+  foodCredentials                FoodStaffCredential[]           @relation("FoodStaffCredentialPerson")
+  foodShiftOrganizations         FoodShift[]                     @relation("FoodShiftOrganization")
+  foodShifts                     FoodShift[]                     @relation("FoodShiftPerson")
+  foodScheduleOrganizations      FoodWorkSchedule[]              @relation("FoodWorkScheduleOrganization")
+  foodSchedules                  FoodWorkSchedule[]              @relation("FoodWorkSchedulePerson")
+  foodCustomerProfiles           FoodCustomerProfile[]           @relation("FoodCustomerProfileOrganization")
+  foodCustomerOccurrences        FoodCustomerOccurrence[]        @relation("FoodCustomerOccurrenceOrganization")
+  foodStockAlertOrganizations    FoodStockAlert[]                @relation("FoodStockAlertOrganization")
+  foodPurchaseEventOrganizations FoodPurchaseEvent[]             @relation("FoodPurchaseEventOrganization")
+  foodBirthdaySettings           FoodBirthdayAutomationSettings? @relation("FoodBirthdaySettingsOrganization")
+  foodAuditOrganizations         FoodAuditEvent[]                @relation("FoodAuditOrganization")
+  foodAuditActions               FoodAuditEvent[]                @relation("FoodAuditActor")
 
   @@index([assignedEstabelecimentoId])
   @@index([accountStatus])
@@ -110,43 +136,46 @@ model LoginLog {
 }
 
 model Contact {
-  id              Int              @id @default(autoincrement())
-  name            String
-  email           String
-  phone           String
-  company         String
-  revenue         String?
-  sector          String?
-  location        String?
-  birthDate       DateTime?
-  lastActivityAt  DateTime?
-  stage           String           @default("Novo")
-  inPipeline      Boolean          @default(false)
-  tags            String           @default("[]")
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  userId          Int?
-  customFields    String           @default("{}")
-  contactType     String           @default("interessado")
-  documents       String           @default("[]")
-  status          String           @default("ativo")
-  clienteType     String           @default("particular")
-  nif             String?
-  dealValueKz     Float?
-  contactGroupId  String?
-  companyId       String?
-  company_rel     Company?         @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  contactGroup    ContactGroup?    @relation(fields: [contactGroupId], references: [id], onDelete: SetNull)
-  user            User?            @relation("ContactUser", fields: [userId], references: [id], onDelete: SetNull)
-  notes           ContactNote[]
-  formSubmissions FormSubmission[]
-  calendarEvents  CalendarEvent[]
-  messages        Message[]
-  tasks           Task[]
+  id               Int                      @id @default(autoincrement())
+  name             String
+  email            String
+  phone            String
+  company          String
+  revenue          String?
+  sector           String?
+  location         String?
+  birthDate        DateTime?
+  lastActivityAt   DateTime?
+  stage            String                   @default("Novo")
+  inPipeline       Boolean                  @default(false)
+  tags             String                   @default("[]")
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  userId           Int?
+  customFields     String                   @default("{}")
+  contactType      String                   @default("interessado")
+  documents        String                   @default("[]")
+  status           String                   @default("ativo")
+  clienteType      String                   @default("particular")
+  nif              String?
+  dealValueKz      Float?
+  contactGroupId   String?
+  companyId        String?
+  company_rel      Company?                 @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contactGroup     ContactGroup?            @relation(fields: [contactGroupId], references: [id], onDelete: SetNull)
+  user             User?                    @relation("ContactUser", fields: [userId], references: [id], onDelete: SetNull)
+  notes            ContactNote[]
+  formSubmissions  FormSubmission[]
+  calendarEvents   CalendarEvent[]
+  messages         Message[]
+  tasks            Task[]
   dealStakeholders DealStakeholder[]
-  transactions    Transaction[]
-  automationLogs  AutomationLog[]
+  transactions     Transaction[]
+  automationLogs   AutomationLog[]
   automationAlerts AutomationAlert[]
+  foodProfiles     FoodCustomerProfile[]
+  foodOrders       FoodOrder[]
+  foodOccurrences  FoodCustomerOccurrence[]
 
   @@unique([userId, phone], name: "user_phone_unique")
   @@index([companyId])
@@ -159,6 +188,23 @@ model Contact {
   @@index([userId, updatedAt])
   @@index([userId, status, birthDate])
   @@index([userId, birthDate])
+}
+
+model OrganizationModule {
+  id              String   @id @default(cuid())
+  organizationId  Int
+  module          String
+  enabled         Boolean  @default(true)
+  planTier        String?
+  settings        Json     @default("{}")
+  createdByUserId Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  organization    User     @relation("OrganizationModuleOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, module])
+  @@index([organizationId, enabled])
+  @@map("organization_modules")
 }
 
 model ContactGroup {
@@ -291,7 +337,7 @@ model Task {
 }
 
 model Automation {
-  id                   String          @id @default(cuid())
+  id                   String            @id @default(cuid())
   trigger              String
   triggerValue         String?
   action               String
@@ -299,7 +345,7 @@ model Automation {
   templateName         String?
   emailSubject         String?
   emailBody            String?
-  active               Boolean         @default(true)
+  active               Boolean           @default(true)
   userId               Int?
   formId               String?
   taskAssignedToUserId Int?
@@ -307,8 +353,8 @@ model Automation {
   taskNotes            String?
   taskPriority         String?
   taskTitle            String?
-  form                 Form?           @relation(fields: [formId], references: [id])
-  user                 User?           @relation("AutomationUser", fields: [userId], references: [id])
+  form                 Form?             @relation(fields: [formId], references: [id])
+  user                 User?             @relation("AutomationUser", fields: [userId], references: [id])
   logs                 AutomationLog[]
   alerts               AutomationAlert[]
 }
@@ -489,7 +535,7 @@ model FinancialCategory {
   active        Boolean @default(true)
   sortOrder     Int     @default(0)
 
-  user          User?   @relation(fields: [userId], references: [id])
+  user User? @relation(fields: [userId], references: [id])
 
   @@unique([userId, type, category])
 }
@@ -594,6 +640,1246 @@ model Estabelecimento {
   facturaRecorrentes FacturaRecorrente[]
   series             Serie[]             @relation("EstabelecimentoSeries")
   assignedUsers      User[]              @relation("AssignedEstabelecimento")
+  foodBranches       FoodBranch[]        @relation("FoodBranchEstabelecimento")
+}
+
+model FoodSettings {
+  id                             String   @id @default(cuid())
+  userId                         Int      @unique
+  isEnabled                      Boolean  @default(false)
+  restaurantName                 String?
+  logoUrl                        String?
+  primaryColor                   String   @default("#0f766e")
+  secondaryColor                 String?
+  restaurantPhone                String?
+  restaurantEmail                String?
+  restaurantAddress              String?
+  currency                       String   @default("AOA")
+  timezone                       String   @default("Africa/Luanda")
+  defaultPreparationMinutes      Int      @default(20)
+  kdsGreenMinutes                Int      @default(15)
+  kdsYellowMinutes               Int      @default(25)
+  kdsRedMinutes                  Int      @default(35)
+  orderTypes                     String   @default("[\"delivery\",\"pickup\",\"dine_in\"]")
+  paymentMethods                 String   @default("[\"CASH\",\"MULTICAIXA\",\"TPA\",\"TRANSFER\"]")
+  kitchenSoundEnabled            Boolean  @default(true)
+  kitchenSoundVolume             Float    @default(0.7)
+  kitchenSoundRepeatSeconds      Int      @default(20)
+  kdsUnacceptedWarningSeconds    Int      @default(60)
+  kdsUnacceptedEscalationSeconds Int      @default(120)
+  kdsReadyReminderMinutes        Int      @default(5)
+  createdByUserId                Int?
+  createdAt                      DateTime @default(now())
+  updatedAt                      DateTime @updatedAt
+  user                           User     @relation("FoodSettingsUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("food_settings")
+}
+
+model FoodBranch {
+  id                  String                    @id @default(cuid())
+  userId              Int
+  estabelecimentoId   String?
+  name                String
+  phone               String?
+  email               String?
+  address             String?
+  neighborhood        String?
+  isMain              Boolean                   @default(false)
+  active              Boolean                   @default(true)
+  createdByUserId     Int?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  user                User                      @relation("FoodBranchUser", fields: [userId], references: [id], onDelete: Cascade)
+  estabelecimento     Estabelecimento?          @relation("FoodBranchEstabelecimento", fields: [estabelecimentoId], references: [id], onDelete: SetNull)
+  products            FoodProduct[]
+  staffAssignments    FoodStaffRoleAssignment[]
+  customerProfiles    FoodCustomerProfile[]
+  kitchenTickets      FoodKitchenTicket[]
+  deliveries          FoodDelivery[]
+  payments            FoodPayment[]
+  cashSessions        FoodCashSession[]
+  shifts              FoodShift[]
+  workSchedules       FoodWorkSchedule[]
+  fiscalDocuments     FoodFiscalDocument[]
+  ingredients         FoodIngredient[]
+  suppliers           FoodSupplier[]
+  purchases           FoodPurchase[]
+  purchaseEvents      FoodPurchaseEvent[]
+  stockMovements      FoodStockMovement[]
+  stockAlerts         FoodStockAlert[]
+  orders              FoodOrder[]
+  auditEvents         FoodAuditEvent[]
+  customerOccurrences FoodCustomerOccurrence[]
+  monthlyCloses       FoodMonthlyClose[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([estabelecimentoId])
+  @@index([userId, active])
+  @@map("food_branches")
+}
+
+model FoodAuditEvent {
+  id             String      @id @default(cuid())
+  organizationId Int
+  branchId       String?
+  actorUserId    Int?
+  actorRole      String?
+  action         String
+  entityType     String
+  entityId       String
+  origin         String      @default("api")
+  device         String?
+  reason         String?
+  idempotencyKey String?
+  ipAddress      String?
+  userAgent      String?
+  payload        Json        @default("{}")
+  occurredAt     DateTime    @default(now())
+  organization   User        @relation("FoodAuditOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  branch         FoodBranch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  actor          User?       @relation("FoodAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, occurredAt])
+  @@index([organizationId, action, occurredAt])
+  @@index([organizationId, entityType, entityId, occurredAt])
+  @@index([branchId, occurredAt])
+  @@map("food_audit_events")
+}
+
+model FoodCategory {
+  id              String        @id @default(cuid())
+  userId          Int
+  name            String
+  color           String?       @default("#6b7e9a")
+  icon            String?
+  sortOrder       Int           @default(0)
+  active          Boolean       @default(true)
+  archivedAt      DateTime?
+  createdByUserId Int?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  user            User          @relation("FoodCategoryUser", fields: [userId], references: [id], onDelete: Cascade)
+  products        FoodProduct[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([userId, active])
+  @@index([userId, sortOrder])
+  @@map("food_categories")
+}
+
+model FoodProduct {
+  id                 String                     @id @default(cuid())
+  userId             Int
+  branchId           String?
+  categoryId         String?
+  internalCode       String
+  name               String
+  description        String?
+  imageUrl           String?
+  price              Float                      @default(0)
+  cost               Float?
+  preparationMinutes Int                        @default(15)
+  available          Boolean                    @default(true)
+  active             Boolean                    @default(true)
+  archivedAt         DateTime?
+  sortOrder          Int                        @default(0)
+  createdByUserId    Int?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  user               User                       @relation("FoodProductUser", fields: [userId], references: [id], onDelete: Cascade)
+  branch             FoodBranch?                @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  category           FoodCategory?              @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  modifierGroups     FoodProductModifierGroup[]
+  recipeItems        FoodRecipeItem[]
+
+  @@unique([userId, internalCode])
+  @@index([userId])
+  @@index([branchId])
+  @@index([categoryId])
+  @@index([userId, active])
+  @@index([userId, available])
+  @@index([userId, sortOrder])
+  @@map("food_products")
+}
+
+model FoodModifierGroup {
+  id              String                     @id @default(cuid())
+  userId          Int
+  name            String
+  required        Boolean                    @default(false)
+  minSelection    Int                        @default(0)
+  maxSelection    Int?
+  sortOrder       Int                        @default(0)
+  active          Boolean                    @default(true)
+  createdByUserId Int?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  user            User                       @relation("FoodModifierGroupUser", fields: [userId], references: [id], onDelete: Cascade)
+  options         FoodModifierOption[]
+  products        FoodProductModifierGroup[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([userId, active])
+  @@index([userId, sortOrder])
+  @@map("food_modifier_groups")
+}
+
+model FoodModifierOption {
+  id              String            @id @default(cuid())
+  userId          Int
+  groupId         String
+  name            String
+  priceDelta      Float             @default(0)
+  sortOrder       Int               @default(0)
+  active          Boolean           @default(true)
+  createdByUserId Int?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  user            User              @relation("FoodModifierOptionUser", fields: [userId], references: [id], onDelete: Cascade)
+  group           FoodModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, name])
+  @@index([userId])
+  @@index([groupId])
+  @@index([userId, active])
+  @@index([groupId, sortOrder])
+  @@map("food_modifier_options")
+}
+
+model FoodProductModifierGroup {
+  id        String            @id @default(cuid())
+  userId    Int
+  productId String
+  groupId   String
+  sortOrder Int               @default(0)
+  createdAt DateTime          @default(now())
+  user      User              @relation("FoodProductModifierGroupUser", fields: [userId], references: [id], onDelete: Cascade)
+  product   FoodProduct       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  group     FoodModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, groupId])
+  @@index([userId])
+  @@index([productId])
+  @@index([groupId])
+  @@map("food_product_modifier_groups")
+}
+
+model FoodOrder {
+  id                          String                   @id @default(cuid())
+  userId                      Int
+  branchId                    String?
+  contactId                   Int?
+  orderNumber                 Int
+  status                      String                   @default("draft")
+  orderState                  String                   @default("draft")
+  kitchenState                String                   @default("not_required")
+  deliveryState               String                   @default("not_required")
+  paymentState                String                   @default("unpaid")
+  version                     Int                      @default(1)
+  idempotencyKey              String?
+  orderType                   String                   @default("delivery")
+  source                      String                   @default("counter")
+  customerName                String?
+  customerPhone               String?
+  customerEmail               String?
+  deliveryAddress             String?
+  deliveryNeighborhood        String?
+  deliveryReference           String?
+  tableName                   String?
+  paymentMethod               String?
+  paymentStatus               String                   @default("pending")
+  subtotal                    Float                    @default(0)
+  discountAmount              Float                    @default(0)
+  deliveryFee                 Float                    @default(0)
+  taxAmount                   Float                    @default(0)
+  total                       Float                    @default(0)
+  estimatedPreparationMinutes Int                      @default(20)
+  notes                       String?
+  cancelReason                String?
+  confirmedAt                 DateTime?
+  sentToKitchenAt             DateTime?
+  readyAt                     DateTime?
+  completedAt                 DateTime?
+  cancelledAt                 DateTime?
+  createdByUserId             Int?
+  updatedByUserId             Int?
+  createdAt                   DateTime                 @default(now())
+  updatedAt                   DateTime                 @updatedAt
+  user                        User                     @relation("FoodOrderUser", fields: [userId], references: [id], onDelete: Cascade)
+  branch                      FoodBranch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  contact                     Contact?                 @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  items                       FoodOrderItem[]
+  statusHistory               FoodOrderStatusHistory[]
+  events                      FoodOrderEvent[]
+  kitchenTicket               FoodKitchenTicket?
+  delivery                    FoodDelivery?
+  deliveryCollection          FoodDeliveryCollection?
+  payments                    FoodPayment[]
+  fiscalDocuments             FoodFiscalDocument[]
+
+  @@unique([userId, orderNumber])
+  @@unique([userId, idempotencyKey])
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, orderType])
+  @@index([userId, createdAt])
+  @@index([userId, branchId, createdAt])
+  @@index([userId, contactId])
+  @@index([branchId])
+  @@map("food_orders")
+}
+
+model FoodOrderItem {
+  id                 String                  @id @default(cuid())
+  userId             Int
+  orderId            String
+  productId          String?
+  productName        String
+  productCode        String?
+  productImageUrl    String?
+  categoryName       String?
+  unitPrice          Float                   @default(0)
+  quantity           Int                     @default(1)
+  subtotal           Float                   @default(0)
+  notes              String?
+  offered            Boolean                 @default(false)
+  preparationMinutes Int                     @default(0)
+  sortOrder          Int                     @default(0)
+  kitchenState       String                  @default("pending")
+  kitchenIssue       String?
+  completedAt        DateTime?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  order              FoodOrder               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  modifiers          FoodOrderItemModifier[]
+  kitchenTicketItem  FoodKitchenTicketItem?
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([productId])
+  @@map("food_order_items")
+}
+
+model FoodOrderItemModifier {
+  id               String        @id @default(cuid())
+  userId           Int
+  orderItemId      String
+  modifierGroupId  String?
+  modifierOptionId String?
+  groupName        String
+  optionName       String
+  priceDelta       Float         @default(0)
+  quantity         Int           @default(1)
+  total            Float         @default(0)
+  sortOrder        Int           @default(0)
+  createdAt        DateTime      @default(now())
+  item             FoodOrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([orderItemId])
+  @@index([modifierGroupId])
+  @@index([modifierOptionId])
+  @@map("food_order_item_modifiers")
+}
+
+model FoodOrderStatusHistory {
+  id              String    @id @default(cuid())
+  userId          Int
+  orderId         String
+  previousStatus  String?
+  newStatus       String
+  note            String?
+  metadata        String    @default("{}")
+  createdByUserId Int?
+  createdAt       DateTime  @default(now())
+  order           FoodOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([userId, createdAt])
+  @@map("food_order_status_history")
+}
+
+model FoodStaffRoleAssignment {
+  id              String      @id @default(cuid())
+  organizationId  Int
+  personId        Int
+  branchId        String?
+  role            String
+  isPrimary       Boolean     @default(false)
+  active          Boolean     @default(true)
+  createdByUserId Int?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  organization    User        @relation("FoodStaffOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  person          User        @relation("FoodStaffPerson", fields: [personId], references: [id], onDelete: Cascade)
+  branch          FoodBranch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, personId, active])
+  @@index([organizationId, role, active])
+  @@index([branchId, active])
+  @@map("food_staff_role_assignments")
+}
+
+model FoodStaffCredential {
+  id              String    @id @default(cuid())
+  organizationId  Int
+  personId        Int
+  pinHash         String
+  failedAttempts  Int       @default(0)
+  lockedUntil     DateTime?
+  lastVerifiedAt  DateTime?
+  active          Boolean   @default(true)
+  createdByUserId Int?
+  updatedByUserId Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  organization    User      @relation("FoodStaffCredentialOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  person          User      @relation("FoodStaffCredentialPerson", fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, personId])
+  @@index([organizationId, active])
+  @@map("food_staff_credentials")
+}
+
+model FoodShift {
+  id              String            @id @default(cuid())
+  organizationId  Int
+  branchId        String
+  personId        Int
+  status          String            @default("open")
+  startDeviceId   String?
+  endDeviceId     String?
+  notes           String?
+  startedAt       DateTime          @default(now())
+  endedAt         DateTime?
+  createdByUserId Int?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  organization    User              @relation("FoodShiftOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  person          User              @relation("FoodShiftPerson", fields: [personId], references: [id], onDelete: Cascade)
+  branch          FoodBranch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  cashSessions    FoodCashSession[]
+
+  @@index([organizationId, status, startedAt])
+  @@index([branchId, status, startedAt])
+  @@index([personId, status, startedAt])
+  @@map("food_shifts")
+}
+
+model FoodWorkSchedule {
+  id              String     @id @default(cuid())
+  organizationId  Int
+  branchId        String
+  personId        Int
+  workDate        DateTime
+  startTime       String
+  endTime         String
+  notes           String?
+  active          Boolean    @default(true)
+  createdByUserId Int?
+  updatedByUserId Int?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  organization    User       @relation("FoodWorkScheduleOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  person          User       @relation("FoodWorkSchedulePerson", fields: [personId], references: [id], onDelete: Cascade)
+  branch          FoodBranch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, personId, workDate])
+  @@index([organizationId, workDate, active])
+  @@index([branchId, workDate, active])
+  @@map("food_work_schedules")
+}
+
+model FoodCustomerProfile {
+  id                   String                @id @default(cuid())
+  organizationId       Int
+  contactId            Int
+  preferredBranchId    String?
+  marketingConsent     Boolean               @default(false)
+  transactionalConsent Boolean               @default(true)
+  preferences          Json                  @default("{}")
+  notes                String?
+  totalOrders          Int                   @default(0)
+  totalSpent           Float                 @default(0)
+  lastOrderAt          DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  organization         User                  @relation("FoodCustomerProfileOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  contact              Contact               @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  preferredBranch      FoodBranch?           @relation(fields: [preferredBranchId], references: [id], onDelete: SetNull)
+  addresses            FoodCustomerAddress[]
+
+  @@unique([organizationId, contactId])
+  @@index([organizationId, lastOrderAt])
+  @@index([preferredBranchId])
+  @@map("food_customer_profiles")
+}
+
+model FoodCustomerAddress {
+  id             String              @id @default(cuid())
+  organizationId Int
+  profileId      String
+  label          String              @default("Principal")
+  address        String
+  neighborhood   String?
+  reference      String?
+  latitude       Float?
+  longitude      Float?
+  isPrimary      Boolean             @default(false)
+  active         Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  profile        FoodCustomerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, active])
+  @@index([profileId])
+  @@map("food_customer_addresses")
+}
+
+model FoodCustomerOccurrence {
+  id               String      @id @default(cuid())
+  organizationId   Int
+  contactId        Int
+  branchId         String?
+  type             String
+  severity         String      @default("medium")
+  title            String
+  description      String?
+  status           String      @default("open")
+  payload          Json        @default("{}")
+  occurredAt       DateTime    @default(now())
+  resolvedAt       DateTime?
+  resolutionNote   String?
+  createdByUserId  Int?
+  resolvedByUserId Int?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  organization     User        @relation("FoodCustomerOccurrenceOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  contact          Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  branch           FoodBranch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, contactId, occurredAt])
+  @@index([organizationId, status, severity, occurredAt])
+  @@index([branchId, occurredAt])
+  @@map("food_customer_occurrences")
+}
+
+model FoodOrderEvent {
+  id             String    @id @default(cuid())
+  userId         Int
+  branchId       String?
+  orderId        String
+  version        Int
+  eventType      String
+  actorUserId    Int?
+  actorRole      String?
+  origin         String    @default("api")
+  payload        Json      @default("{}")
+  idempotencyKey String?
+  occurredAt     DateTime  @default(now())
+  order          FoodOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, version])
+  @@unique([userId, idempotencyKey])
+  @@index([userId, occurredAt, id])
+  @@index([userId, branchId, occurredAt, id])
+  @@map("food_order_events")
+}
+
+model FoodKitchenTicket {
+  id                   String                  @id @default(cuid())
+  userId               Int
+  branchId             String?
+  orderId              String                  @unique
+  state                String                  @default("queued")
+  version              Int                     @default(1)
+  acceptedAt           DateTime?
+  acknowledgedAt       DateTime?
+  acknowledgedByUserId Int?
+  startedAt            DateTime?
+  readyAt              DateTime?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  order                FoodOrder               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  branch               FoodBranch?             @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  items                FoodKitchenTicketItem[]
+
+  @@index([userId, state, createdAt])
+  @@index([branchId, state, createdAt])
+  @@map("food_kitchen_tickets")
+}
+
+model FoodKitchenTicketItem {
+  id                    String            @id @default(cuid())
+  userId                Int
+  ticketId              String
+  orderItemId           String            @unique
+  state                 String            @default("pending")
+  issueType             String?
+  issueNote             String?
+  issueResolution       String?
+  issueResolvedAt       DateTime?
+  issueResolvedByUserId Int?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  ticket                FoodKitchenTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  orderItem             FoodOrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@index([userId, state])
+  @@index([ticketId, state])
+  @@map("food_kitchen_ticket_items")
+}
+
+model FoodPrivateMedia {
+  id               String         @id @default(cuid())
+  organizationId   Int
+  uploadedByUserId Int?
+  kind             String
+  storageUrl       String
+  mimeType         String
+  sizeBytes        Int?
+  checksum         String?
+  active           Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  deliveries       FoodDelivery[]
+
+  @@index([organizationId, kind, active])
+  @@map("food_private_media")
+}
+
+model FoodDelivery {
+  id            String                  @id @default(cuid())
+  userId        Int
+  branchId      String?
+  orderId       String                  @unique
+  courierUserId Int?
+  state         String                  @default("awaiting_dispatch")
+  pinHash       String?
+  proofType     String?
+  proofMediaId  String?                 @unique
+  failureReason String?
+  returnReason  String?
+  attemptCount  Int                     @default(0)
+  assignedAt    DateTime?
+  pickedUpAt    DateTime?
+  arrivedAt     DateTime?
+  deliveredAt   DateTime?
+  returnedAt    DateTime?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  order         FoodOrder               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  branch        FoodBranch?             @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  proofMedia    FoodPrivateMedia?       @relation(fields: [proofMediaId], references: [id], onDelete: SetNull)
+  collection    FoodDeliveryCollection?
+
+  @@index([userId, state, createdAt])
+  @@index([branchId, state, createdAt])
+  @@index([courierUserId, state, createdAt])
+  @@map("food_deliveries")
+}
+
+model FoodCourierProfile {
+  id              String                   @id @default(cuid())
+  organizationId  Int
+  personId        Int
+  phone           String?
+  address         String?
+  transportType   String?
+  vehiclePlate    String?
+  baseStatus      String                   @default("off_shift")
+  lastLatitude    Float?
+  lastLongitude   Float?
+  lastLocationAt  DateTime?
+  active          Boolean                  @default(true)
+  createdByUserId Int?
+  updatedByUserId Int?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  statusEvents    FoodCourierStatusEvent[]
+
+  @@unique([organizationId, personId])
+  @@index([organizationId, baseStatus, active])
+  @@map("food_courier_profiles")
+}
+
+model FoodCourierStatusEvent {
+  id             String             @id @default(cuid())
+  organizationId Int
+  profileId      String
+  personId       Int
+  branchId       String?
+  previousStatus String?
+  newStatus      String
+  reason         String?
+  latitude       Float?
+  longitude      Float?
+  actorUserId    Int?
+  createdAt      DateTime           @default(now())
+  profile        FoodCourierProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, personId, createdAt])
+  @@index([profileId, createdAt])
+  @@map("food_courier_status_events")
+}
+
+model FoodPayment {
+  id                   String                  @id @default(cuid())
+  userId               Int
+  branchId             String?
+  orderId              String
+  cashSessionId        String?
+  deliveryCollectionId String?                 @unique
+  source               String                  @default("cashier")
+  courierUserId        Int?
+  amount               Float
+  method               String
+  status               String                  @default("confirmed")
+  transactionReference String?
+  idempotencyKey       String?
+  paidAt               DateTime?
+  createdByUserId      Int?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  order                FoodOrder               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  cashSession          FoodCashSession?        @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
+  branch               FoodBranch?             @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  deliveryCollection   FoodDeliveryCollection? @relation(fields: [deliveryCollectionId], references: [id], onDelete: SetNull)
+  fiscalDocuments      FoodFiscalDocument[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, orderId])
+  @@index([cashSessionId])
+  @@index([branchId, paidAt])
+  @@map("food_payments")
+}
+
+model FoodDeliveryCollection {
+  id                      String                        @id @default(cuid())
+  organizationId          Int
+  branchId                String?
+  deliveryId              String                        @unique
+  orderId                 String                        @unique
+  courierUserId           Int
+  state                   String                        @default("pending_collection")
+  expectedAmount          Float
+  expectedMethod          String?
+  actualAmount            Float?
+  actualMethod            String?
+  discrepancyAmount       Float?
+  exceptionReason         String?
+  version                 Int                           @default(1)
+  receivedByCourierUserId Int?
+  handedOverByUserId      Int?
+  reconciledByUserId      Int?
+  receivedAt              DateTime?
+  handedOverAt            DateTime?
+  reconciledAt            DateTime?
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  delivery                FoodDelivery                  @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  order                   FoodOrder                     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payment                 FoodPayment?
+  events                  FoodDeliveryCollectionEvent[]
+
+  @@index([organizationId, state, createdAt])
+  @@index([branchId, state, createdAt])
+  @@index([courierUserId, state, createdAt])
+  @@map("food_delivery_collections")
+}
+
+model FoodDeliveryCollectionEvent {
+  id             String                 @id @default(cuid())
+  organizationId Int
+  collectionId   String
+  version        Int
+  eventType      String
+  actorUserId    Int?
+  actorRole      String?
+  payload        Json                   @default("{}")
+  idempotencyKey String?
+  createdAt      DateTime               @default(now())
+  collection     FoodDeliveryCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, version])
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, createdAt])
+  @@index([collectionId, createdAt])
+  @@map("food_delivery_collection_events")
+}
+
+model FoodMonthlyClose {
+  id                 String                  @id @default(cuid())
+  organizationId     Int
+  branchId           String?
+  scopeKey           String
+  month              DateTime
+  status             String                  @default("closed")
+  version            Int                     @default(1)
+  snapshot           Json
+  validationSnapshot Json
+  closedByUserId     Int
+  idempotencyKey     String
+  closedAt           DateTime                @default(now())
+  reopenedByUserId   Int?
+  reopenedAt         DateTime?
+  reopenReason       String?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  branch             FoodBranch?             @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  events             FoodMonthlyCloseEvent[]
+  revisions          FoodMonthlyCloseRevision[]
+
+  @@unique([organizationId, month, scopeKey])
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, status, month])
+  @@index([branchId, month])
+  @@map("food_monthly_closes")
+}
+
+model FoodMonthlyCloseRevision {
+  id                 String           @id @default(cuid())
+  organizationId     Int
+  monthlyCloseId     String
+  revisionNumber     Int
+  aggregateVersion   Int
+  snapshot           Json
+  validationSnapshot Json
+  reason             String
+  closedByUserId     Int
+  idempotencyKey     String
+  closedAt           DateTime         @default(now())
+  createdAt          DateTime         @default(now())
+  monthlyClose       FoodMonthlyClose @relation(fields: [monthlyCloseId], references: [id], onDelete: Cascade)
+
+  @@unique([monthlyCloseId, revisionNumber])
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, closedAt])
+  @@index([monthlyCloseId, closedAt])
+  @@map("food_monthly_close_revisions")
+}
+
+model FoodMonthlyCloseEvent {
+  id             String           @id @default(cuid())
+  organizationId Int
+  monthlyCloseId String
+  version        Int
+  eventType      String
+  actorUserId    Int
+  payload        Json             @default("{}")
+  idempotencyKey String
+  createdAt      DateTime         @default(now())
+  monthlyClose   FoodMonthlyClose @relation(fields: [monthlyCloseId], references: [id], onDelete: Cascade)
+
+  @@unique([monthlyCloseId, version])
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, createdAt])
+  @@map("food_monthly_close_events")
+}
+
+model FoodCashSession {
+  id                    String        @id @default(cuid())
+  organizationId        Int
+  branchId              String
+  shiftId               String?
+  openedByUserId        Int
+  closedByUserId        Int?
+  status                String        @default("open")
+  openingBalance        Float         @default(0)
+  expectedClosingAmount Float         @default(0)
+  closingCountedAmount  Float?
+  differenceAmount      Float?
+  totalSalesAmount      Float         @default(0)
+  salesCount            Int           @default(0)
+  totalsByMethod        Json          @default("{}")
+  notes                 String?
+  openedDeviceId        String?
+  closedDeviceId        String?
+  approvalStatus        String        @default("not_required")
+  approvedByUserId      Int?
+  approvedAt            DateTime?
+  approvalNote          String?
+  openedAt              DateTime      @default(now())
+  closedAt              DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  branch                FoodBranch    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  shift                 FoodShift?    @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  payments              FoodPayment[]
+
+  @@index([organizationId, status, openedAt])
+  @@index([branchId, status, openedAt])
+  @@index([shiftId, status])
+  @@index([organizationId, approvalStatus, closedAt])
+  @@index([openedByUserId, status])
+  @@map("food_cash_sessions")
+}
+
+model FoodFiscalDocument {
+  id             String       @id @default(cuid())
+  userId         Int
+  branchId       String?
+  orderId        String
+  paymentId      String?
+  facturaId      String?
+  documentType   String       @default("FR")
+  status         String       @default("pending")
+  idempotencyKey String
+  attemptCount   Int          @default(0)
+  errorCode      String?
+  errorMessage   String?
+  requestedAt    DateTime     @default(now())
+  issuedAt       DateTime?
+  updatedAt      DateTime     @updatedAt
+  order          FoodOrder    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payment        FoodPayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  branch         FoodBranch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, orderId])
+  @@index([branchId, status])
+  @@map("food_fiscal_documents")
+}
+
+model FoodIngredient {
+  id                  String                @id @default(cuid())
+  organizationId      Int
+  branchId            String?
+  internalCode        String
+  name                String
+  unit                String                @default("unit")
+  currentStock        Float                 @default(0)
+  minimumStock        Float                 @default(0)
+  idealStock          Float                 @default(0)
+  purchaseUnit        String                @default("unit")
+  purchaseConversion  Float                 @default(1)
+  preferredSupplierId String?
+  averageCost         Float                 @default(0)
+  active              Boolean               @default(true)
+  createdByUserId     Int?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  branch              FoodBranch?           @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  preferredSupplier   FoodSupplier?         @relation("FoodIngredientPreferredSupplier", fields: [preferredSupplierId], references: [id], onDelete: SetNull)
+  recipeItems         FoodRecipeItem[]
+  purchaseItems       FoodPurchaseItem[]
+  supplierProducts    FoodSupplierProduct[]
+  stockMovements      FoodStockMovement[]
+  stockAlert          FoodStockAlert?
+
+  @@unique([organizationId, internalCode])
+  @@index([organizationId, active])
+  @@index([branchId, active])
+  @@index([preferredSupplierId])
+  @@map("food_ingredients")
+}
+
+model FoodRecipeItem {
+  id             String         @id @default(cuid())
+  organizationId Int
+  productId      String
+  ingredientId   String
+  quantity       Float
+  unit           String
+  wastePercent   Float          @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  product        FoodProduct    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  ingredient     FoodIngredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, ingredientId])
+  @@index([organizationId])
+  @@index([ingredientId])
+  @@map("food_recipe_items")
+}
+
+model FoodSupplier {
+  id                   String                @id @default(cuid())
+  organizationId       Int
+  branchId             String?
+  name                 String
+  nif                  String?
+  phone                String?
+  email                String?
+  address              String?
+  active               Boolean               @default(true)
+  createdByUserId      Int?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  branch               FoodBranch?           @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  purchases            FoodPurchase[]
+  preferredIngredients FoodIngredient[]      @relation("FoodIngredientPreferredSupplier")
+  products             FoodSupplierProduct[]
+
+  @@index([organizationId, active])
+  @@index([branchId, active])
+  @@map("food_suppliers")
+}
+
+model FoodPurchase {
+  id                 String              @id @default(cuid())
+  organizationId     Int
+  branchId           String
+  supplierId         String?
+  status             String              @default("draft")
+  version            Int                 @default(1)
+  reference          String?
+  total              Float               @default(0)
+  purchasedAt        DateTime?
+  receivedAt         DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  createdByUserId    Int?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  branch             FoodBranch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier           FoodSupplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  items              FoodPurchaseItem[]
+  stockMovements     FoodStockMovement[]
+  events             FoodPurchaseEvent[]
+
+  @@index([organizationId, status, createdAt])
+  @@index([branchId, status])
+  @@map("food_purchases")
+}
+
+model FoodSupplierProduct {
+  id              String         @id @default(cuid())
+  organizationId  Int
+  supplierId      String
+  ingredientId    String
+  purchaseUnit    String
+  packageQuantity Float
+  packagePrice    Float
+  minimumPackages Int            @default(1)
+  leadTimeDays    Int            @default(0)
+  qualityRating   Float?
+  paymentTerms    String?
+  active          Boolean        @default(true)
+  createdByUserId Int?
+  updatedByUserId Int?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  supplier        FoodSupplier   @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  ingredient      FoodIngredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, ingredientId])
+  @@index([organizationId, ingredientId, active])
+  @@index([organizationId, supplierId, active])
+  @@map("food_supplier_products")
+}
+
+model FoodPurchaseItem {
+  id               String         @id @default(cuid())
+  organizationId   Int
+  purchaseId       String
+  ingredientId     String
+  quantity         Float
+  receivedQuantity Float          @default(0)
+  unitCost         Float
+  total            Float
+  createdAt        DateTime       @default(now())
+  purchase         FoodPurchase   @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  ingredient       FoodIngredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([purchaseId])
+  @@index([ingredientId])
+  @@map("food_purchase_items")
+}
+
+model FoodPurchaseEvent {
+  id             String       @id @default(cuid())
+  organizationId Int
+  branchId       String
+  purchaseId     String
+  type           String
+  statusFrom     String?
+  statusTo       String?
+  version        Int
+  actorUserId    Int?
+  idempotencyKey String
+  payload        Json         @default("{}")
+  createdAt      DateTime     @default(now())
+  organization   User         @relation("FoodPurchaseEventOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  purchase       FoodPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  branch         FoodBranch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@unique([purchaseId, idempotencyKey])
+  @@index([organizationId, createdAt])
+  @@index([branchId, createdAt])
+  @@index([purchaseId, version])
+  @@map("food_purchase_events")
+}
+
+model FoodStockMovement {
+  id              String         @id @default(cuid())
+  organizationId  Int
+  branchId        String?
+  ingredientId    String
+  purchaseId      String?
+  type            String
+  quantity        Float
+  previousStock   Float
+  newStock        Float
+  unitCost        Float?
+  reason          String?
+  referenceType   String?
+  referenceId     String?
+  createdByUserId Int?
+  createdAt       DateTime       @default(now())
+  branch          FoodBranch?    @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  ingredient      FoodIngredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  purchase        FoodPurchase?  @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([branchId, createdAt])
+  @@index([ingredientId, createdAt])
+  @@map("food_stock_movements")
+}
+
+model FoodStockAlert {
+  id                  String         @id @default(cuid())
+  organizationId      Int
+  branchId            String?
+  ingredientId        String         @unique
+  status              String         @default("open")
+  severity            String         @default("warning")
+  recommendedQuantity Float          @default(0)
+  openedAt            DateTime       @default(now())
+  resolvedAt          DateTime?
+  lastEvaluatedAt     DateTime       @default(now())
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  organization        User           @relation("FoodStockAlertOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  branch              FoodBranch?    @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  ingredient          FoodIngredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, severity])
+  @@index([branchId, status])
+  @@map("food_stock_alerts")
+}
+
+model FoodCoupon {
+  id               String                           @id @default(cuid())
+  organizationId   Int
+  code             String
+  name             String
+  discountType     String                           @default("fixed")
+  discountValue    Float
+  minimumOrder     Float                            @default(0)
+  maximumDiscount  Float?
+  startsAt         DateTime?
+  endsAt           DateTime?
+  usageLimit       Int?
+  perCustomerLimit Int                              @default(1)
+  active           Boolean                          @default(true)
+  createdByUserId  Int?
+  createdAt        DateTime                         @default(now())
+  updatedAt        DateTime                         @updatedAt
+  redemptions      FoodCouponRedemption[]
+  campaigns        FoodMarketingCampaign[]
+  birthdaySettings FoodBirthdayAutomationSettings[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, active, startsAt, endsAt])
+  @@map("food_coupons")
+}
+
+model FoodCouponRedemption {
+  id             String     @id @default(cuid())
+  organizationId Int
+  couponId       String
+  orderId        String
+  contactId      Int?
+  discountAmount Float
+  redeemedAt     DateTime   @default(now())
+  coupon         FoodCoupon @relation(fields: [couponId], references: [id], onDelete: Restrict)
+
+  @@unique([couponId, orderId])
+  @@index([organizationId, contactId, redeemedAt])
+  @@index([orderId])
+  @@map("food_coupon_redemptions")
+}
+
+model FoodCustomerSegment {
+  id               String                           @id @default(cuid())
+  organizationId   Int
+  name             String
+  description      String?
+  filters          Json                             @default("{}")
+  active           Boolean                          @default(true)
+  createdByUserId  Int?
+  createdAt        DateTime                         @default(now())
+  updatedAt        DateTime                         @updatedAt
+  campaigns        FoodMarketingCampaign[]
+  birthdaySettings FoodBirthdayAutomationSettings[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, active])
+  @@map("food_customer_segments")
+}
+
+model FoodBirthdayAutomationSettings {
+  id              String               @id @default(cuid())
+  organizationId  Int                  @unique
+  enabled         Boolean              @default(false)
+  daysBefore      Int                  @default(0)
+  sendTime        String               @default("09:00")
+  channel         String               @default("WHATSAPP")
+  template        String               @default("Feliz aniversário, {{nome}}!")
+  benefitType     String               @default("none")
+  couponId        String?
+  validityDays    Int                  @default(7)
+  minimumOrder    Float                @default(0)
+  segmentId       String?
+  createdByUserId Int?
+  updatedByUserId Int?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  organization    User                 @relation("FoodBirthdaySettingsOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  coupon          FoodCoupon?          @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  segment         FoodCustomerSegment? @relation(fields: [segmentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, enabled])
+  @@index([couponId])
+  @@index([segmentId])
+  @@map("food_birthday_automation_settings")
+}
+
+model FoodMarketingCampaign {
+  id                  String               @id @default(cuid())
+  organizationId      Int
+  segmentId           String?
+  couponId            String?
+  messagingCampaignId String?
+  name                String
+  channel             String               @default("SMS")
+  content             String
+  status              String               @default("draft")
+  scheduledAt         DateTime?
+  sentAt              DateTime?
+  recipientsCount     Int                  @default(0)
+  deliveredCount      Int                  @default(0)
+  conversionsCount    Int                  @default(0)
+  attributedRevenue   Float                @default(0)
+  createdByUserId     Int?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  segment             FoodCustomerSegment? @relation(fields: [segmentId], references: [id], onDelete: SetNull)
+  coupon              FoodCoupon?          @relation(fields: [couponId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, createdAt])
+  @@index([segmentId])
+  @@index([couponId])
+  @@map("food_marketing_campaigns")
 }
 
 model Serie {
@@ -912,15 +2198,15 @@ model OnboardingProgress {
 }
 
 model StartupTemplateApplication {
-  id              String    @id @default(cuid())
-  organizationId  Int       @unique
+  id              String   @id @default(cuid())
+  organizationId  Int      @unique
   templateKey     String
   workspaceMode   String
-  appliedAt       DateTime  @default(now())
+  appliedAt       DateTime @default(now())
   appliedByUserId Int?
   metadata        Json?
-  organization    User      @relation("StartupTemplateOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
-  appliedByUser   User?     @relation("StartupTemplateAppliedBy", fields: [appliedByUserId], references: [id], onDelete: SetNull)
+  organization    User     @relation("StartupTemplateOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  appliedByUser   User?    @relation("StartupTemplateAppliedBy", fields: [appliedByUserId], references: [id], onDelete: SetNull)
 
   @@index([templateKey])
   @@index([workspaceMode])
@@ -1063,7 +2349,7 @@ model MessagingOptOut {
 }
 
 model Company {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    Int
   name      String
   nif       String?
@@ -1071,8 +2357,8 @@ model Company {
   website   String?
   location  String?
   sizeTier  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   user      User      @relation("CompanyUser", fields: [userId], references: [id], onDelete: Cascade)
   deals     Deal[]
   contacts  Contact[]
@@ -1151,4 +2437,305 @@ model DealStakeholder {
   @@unique([dealId, contactId])
   @@index([dealId])
   @@index([contactId])
+}
+
+model ManagementOrganization {
+  id               String                           @id @default(uuid()) @db.Uuid
+  accountOwnerId   Int                              @unique @map("account_owner_id")
+  name             String
+  createdAt        DateTime                         @default(now()) @map("created_at")
+  updatedAt        DateTime                         @updatedAt @map("updated_at")
+  accountOwner     User                             @relation("ManagementOrganizationOwner", fields: [accountOwnerId], references: [id], onDelete: Cascade)
+  profiles         ManagementProfile[]
+  clients          ManagementClient[]
+  campaigns        ManagementCampaign[]
+  opportunities    ManagementOpportunity[]
+  stageSettings    ManagementPipelineStageSetting[]
+  operationalTasks ManagementOperationalTask[]
+  transactions     ManagementFinancialTransaction[]
+  goals            ManagementGoal[]
+  activityLogs     ManagementActivityLog[]
+
+  @@map("management_organizations")
+}
+
+model ManagementProfile {
+  id                 String                              @id @default(uuid()) @db.Uuid
+  organizationId     String                              @map("organization_id") @db.Uuid
+  userId             Int                                 @unique @map("user_id")
+  authUserId         String?                             @unique @map("auth_user_id") @db.Uuid
+  fullName           String                              @map("full_name")
+  role               String
+  active             Boolean                             @default(true)
+  createdAt          DateTime                            @default(now()) @map("created_at")
+  updatedAt          DateTime                            @updatedAt @map("updated_at")
+  createdBy          String?                             @map("created_by") @db.Uuid
+  organization       ManagementOrganization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user               User                                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commercialClients  ManagementClient[]                  @relation("ClientCommercialResponsible")
+  operationalClients ManagementClient[]                  @relation("ClientOperationalResponsible")
+  campaigns          ManagementCampaign[]
+  opportunities      ManagementOpportunity[]
+  stageHistory       ManagementOpportunityStageHistory[]
+  operationalTasks   ManagementOperationalTask[]
+  goals              ManagementGoal[]
+  activityLogs       ManagementActivityLog[]
+
+  @@index([organizationId, role, active])
+  @@map("profiles")
+}
+
+model ManagementClient {
+  id                       String                           @id @default(uuid()) @db.Uuid
+  organizationId           String                           @map("organization_id") @db.Uuid
+  companyName              String                           @map("company_name")
+  contactName              String                           @map("contact_name")
+  phone                    String?
+  email                    String?
+  contractedService        String?                          @map("contracted_service")
+  monthlyValue             Decimal?                         @map("monthly_value") @db.Decimal(18, 2)
+  totalContractValue       Decimal?                         @map("total_contract_value") @db.Decimal(18, 2)
+  startDate                DateTime?                        @map("start_date") @db.Date
+  expectedEndDate          DateTime?                        @map("expected_end_date") @db.Date
+  contractDurationMonths   Int?                             @map("contract_duration_months")
+  commercialResponsibleId  String?                          @map("commercial_responsible_id") @db.Uuid
+  operationalResponsibleId String?                          @map("operational_responsible_id") @db.Uuid
+  status                   String                           @default("lead")
+  source                   String?
+  notes                    String?
+  cancellationDate         DateTime?                        @map("cancellation_date") @db.Date
+  cancellationReason       String?                          @map("cancellation_reason")
+  archivedAt               DateTime?                        @map("archived_at")
+  createdAt                DateTime                         @default(now()) @map("created_at")
+  updatedAt                DateTime                         @updatedAt @map("updated_at")
+  createdBy                String?                          @map("created_by") @db.Uuid
+  organization             ManagementOrganization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  commercialResponsible    ManagementProfile?               @relation("ClientCommercialResponsible", fields: [commercialResponsibleId], references: [id], onDelete: SetNull)
+  operationalResponsible   ManagementProfile?               @relation("ClientOperationalResponsible", fields: [operationalResponsibleId], references: [id], onDelete: SetNull)
+  opportunities            ManagementOpportunity[]
+  operationalTasks         ManagementOperationalTask[]
+  transactions             ManagementFinancialTransaction[]
+
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, commercialResponsibleId])
+  @@index([organizationId, operationalResponsibleId])
+  @@index([organizationId, companyName])
+  @@map("clients")
+}
+
+model ManagementCampaign {
+  id                String                  @id @default(uuid()) @db.Uuid
+  organizationId    String                  @map("organization_id") @db.Uuid
+  name              String
+  channel           String
+  objective         String
+  startDate         DateTime                @map("start_date") @db.Date
+  endDate           DateTime?               @map("end_date") @db.Date
+  status            String                  @default("planeada")
+  responsibleUserId String?                 @map("responsible_user_id") @db.Uuid
+  investment        Decimal                 @default(0) @db.Decimal(18, 2)
+  impressions       Int                     @default(0)
+  reach             Int                     @default(0)
+  clicks            Int                     @default(0)
+  leads             Int                     @default(0)
+  qualifiedLeads    Int                     @default(0) @map("qualified_leads")
+  meetingsGenerated Int                     @default(0) @map("meetings_generated")
+  clientsWon        Int                     @default(0) @map("clients_won")
+  attributedRevenue Decimal                 @default(0) @map("attributed_revenue") @db.Decimal(18, 2)
+  notes             String?
+  createdAt         DateTime                @default(now()) @map("created_at")
+  updatedAt         DateTime                @updatedAt @map("updated_at")
+  createdBy         String?                 @map("created_by") @db.Uuid
+  organization      ManagementOrganization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  responsible       ManagementProfile?      @relation(fields: [responsibleUserId], references: [id], onDelete: SetNull)
+  opportunities     ManagementOpportunity[]
+
+  @@index([organizationId, status, startDate])
+  @@index([organizationId, channel, startDate])
+  @@index([organizationId, responsibleUserId])
+  @@map("campaigns")
+}
+
+model ManagementOpportunity {
+  id                  String                              @id @default(uuid()) @db.Uuid
+  organizationId      String                              @map("organization_id") @db.Uuid
+  clientId            String?                             @map("client_id") @db.Uuid
+  campaignId          String?                             @map("campaign_id") @db.Uuid
+  companyName         String                              @map("company_name")
+  contactName         String                              @map("contact_name")
+  phone               String?
+  email               String?
+  leadSource          String?                             @map("lead_source")
+  responsibleUserId   String?                             @map("responsible_user_id") @db.Uuid
+  entryDate           DateTime                            @map("entry_date") @db.Date
+  firstContactDate    DateTime?                           @map("first_contact_date")
+  lastInteractionDate DateTime?                           @map("last_interaction_date")
+  nextInteractionDate DateTime?                           @map("next_interaction_date")
+  stage               String                              @default("lead_recebido")
+  estimatedValue      Decimal                             @default(0) @map("estimated_value") @db.Decimal(18, 2)
+  closeProbability    Decimal                             @default(10) @map("close_probability") @db.Decimal(7, 2)
+  meetingDate         DateTime?                           @map("meeting_date")
+  proposalDate        DateTime?                           @map("proposal_date")
+  expectedCloseDate   DateTime?                           @map("expected_close_date") @db.Date
+  actualCloseDate     DateTime?                           @map("actual_close_date") @db.Date
+  result              String?
+  lossReason          String?                             @map("loss_reason")
+  notes               String?
+  stageChangedAt      DateTime                            @default(now()) @map("stage_changed_at")
+  createdAt           DateTime                            @default(now()) @map("created_at")
+  updatedAt           DateTime                            @updatedAt @map("updated_at")
+  createdBy           String?                             @map("created_by") @db.Uuid
+  organization        ManagementOrganization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client              ManagementClient?                   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  campaign            ManagementCampaign?                 @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  responsible         ManagementProfile?                  @relation(fields: [responsibleUserId], references: [id], onDelete: SetNull)
+  stageHistory        ManagementOpportunityStageHistory[]
+
+  @@index([organizationId, stage, entryDate])
+  @@index([organizationId, responsibleUserId])
+  @@index([organizationId, clientId])
+  @@index([organizationId, campaignId])
+  @@map("opportunities")
+}
+
+model ManagementOpportunityStageHistory {
+  id             String                @id @default(uuid()) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
+  opportunityId  String                @map("opportunity_id") @db.Uuid
+  userId         String                @map("user_id") @db.Uuid
+  previousStage  String?               @map("previous_stage")
+  newStage       String                @map("new_stage")
+  notes          String?
+  changedAt      DateTime              @default(now()) @map("changed_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  opportunity    ManagementOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  user           ManagementProfile     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, opportunityId, changedAt])
+  @@map("opportunity_stage_history")
+}
+
+model ManagementPipelineStageSetting {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @map("organization_id") @db.Uuid
+  stage          String
+  label          String
+  probability    Decimal                @db.Decimal(7, 2)
+  order          Int
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+  createdBy      String?                @map("created_by") @db.Uuid
+  organization   ManagementOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, stage])
+  @@index([organizationId, order])
+  @@map("pipeline_stage_settings")
+}
+
+model ManagementOperationalTask {
+  id                String                 @id @default(uuid()) @db.Uuid
+  organizationId    String                 @map("organization_id") @db.Uuid
+  clientId          String?                @map("client_id") @db.Uuid
+  project           String?
+  workType          String                 @map("work_type")
+  title             String
+  description       String?
+  responsibleUserId String?                @map("responsible_user_id") @db.Uuid
+  requestDate       DateTime               @map("request_date") @db.Date
+  startDate         DateTime?              @map("start_date") @db.Date
+  deadline          DateTime               @map("deadline")
+  completionDate    DateTime?              @map("completion_date")
+  priority          String                 @default("normal")
+  status            String                 @default("pendente")
+  estimatedHours    Decimal?               @map("estimated_hours") @db.Decimal(10, 2)
+  actualHours       Decimal?               @map("actual_hours") @db.Decimal(10, 2)
+  revisionCount     Int                    @default(0) @map("revision_count")
+  deliveredOnTime   Boolean?               @map("delivered_on_time")
+  clientApproved    Boolean                @default(false) @map("client_approved")
+  delayReason       String?                @map("delay_reason")
+  notes             String?
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  createdBy         String?                @map("created_by") @db.Uuid
+  organization      ManagementOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client            ManagementClient?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  responsible       ManagementProfile?     @relation(fields: [responsibleUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, deadline])
+  @@index([organizationId, responsibleUserId, deadline])
+  @@index([organizationId, clientId])
+  @@map("operational_tasks")
+}
+
+model ManagementFinancialTransaction {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @map("organization_id") @db.Uuid
+  clientId       String?                @map("client_id") @db.Uuid
+  date           DateTime               @db.Date
+  type           String
+  category       String
+  subcategory    String?
+  project        String?
+  description    String
+  expectedValue  Decimal                @default(0) @map("expected_value") @db.Decimal(18, 2)
+  actualValue    Decimal?               @map("actual_value") @db.Decimal(18, 2)
+  dueDate        DateTime?              @map("due_date") @db.Date
+  paymentDate    DateTime?              @map("payment_date") @db.Date
+  status         String                 @default("previsto")
+  paymentMethod  String?                @map("payment_method")
+  receiptUrl     String?                @map("receipt_url")
+  notes          String?
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+  createdBy      String?                @map("created_by") @db.Uuid
+  organization   ManagementOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client         ManagementClient?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, type, status, date])
+  @@index([organizationId, clientId, date])
+  @@index([organizationId, category, date])
+  @@map("financial_transactions")
+}
+
+model ManagementGoal {
+  id                String                 @id @default(uuid()) @db.Uuid
+  organizationId    String                 @map("organization_id") @db.Uuid
+  month             Int
+  year              Int
+  area              String
+  kpi               String
+  targetValue       Decimal                @map("target_value") @db.Decimal(18, 2)
+  actualValue       Decimal?               @map("actual_value") @db.Decimal(18, 2)
+  unit              String
+  responsibleUserId String?                @map("responsible_user_id") @db.Uuid
+  notes             String?
+  calculatedAt      DateTime?              @map("calculated_at")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  createdBy         String?                @map("created_by") @db.Uuid
+  organization      ManagementOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  responsible       ManagementProfile?     @relation(fields: [responsibleUserId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, month, year, area, kpi, responsibleUserId])
+  @@index([organizationId, year, month])
+  @@index([organizationId, responsibleUserId])
+  @@map("goals")
+}
+
+model ManagementActivityLog {
+  id              String                 @id @default(uuid()) @db.Uuid
+  organizationId  String                 @map("organization_id") @db.Uuid
+  userId          String?                @map("user_id") @db.Uuid
+  actionType      String                 @map("action_type")
+  module          String
+  relatedRecordId String?                @map("related_record_id") @db.Uuid
+  description     String
+  metadata        Json?
+  createdAt       DateTime               @default(now()) @map("created_at")
+  organization    ManagementOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user            ManagementProfile?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, module, relatedRecordId])
+  @@map("activity_logs")
 }

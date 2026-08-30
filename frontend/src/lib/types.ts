@@ -814,6 +814,1142 @@ export interface Estabelecimento {
   } | null;
 }
 
+export interface FoodSettings {
+  id: string | null;
+  userId: number | null;
+  organizationId?: number | null;
+  isEnabled: boolean;
+  restaurantName?: string | null;
+  logoUrl?: string | null;
+  primaryColor: string;
+  secondaryColor?: string | null;
+  restaurantPhone?: string | null;
+  restaurantEmail?: string | null;
+  restaurantAddress?: string | null;
+  currency: string;
+  timezone: string;
+  defaultPreparationMinutes: number;
+  kdsGreenMinutes: number;
+  kdsYellowMinutes: number;
+  kdsRedMinutes: number;
+  orderTypes: string[];
+  paymentMethods: string[];
+  kitchenSoundEnabled: boolean;
+  kitchenSoundVolume: number;
+  kitchenSoundRepeatSeconds: number;
+  kdsUnacceptedWarningSeconds: number;
+  kdsUnacceptedEscalationSeconds: number;
+  kdsReadyReminderMinutes: number;
+  createdByUserId?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface FoodBranch {
+  id: string;
+  userId: number;
+  organizationId?: number;
+  estabelecimentoId?: string | null;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  neighborhood?: string | null;
+  isMain: boolean;
+  active: boolean;
+  createdByUserId?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  estabelecimento?: Pick<Estabelecimento, 'id' | 'nome' | 'nif'> | null;
+}
+
+export interface FoodCategory {
+  id: string;
+  userId: number;
+  organizationId?: number;
+  name: string;
+  color?: string | null;
+  icon?: string | null;
+  sortOrder: number;
+  active: boolean;
+  archivedAt?: string | null;
+  createdByUserId?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { products: number };
+}
+
+export interface FoodModifierOption {
+  id: string;
+  userId: number;
+  organizationId?: number;
+  groupId: string;
+  name: string;
+  priceDelta: number;
+  sortOrder: number;
+  active: boolean;
+  createdByUserId?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FoodModifierGroup {
+  id: string;
+  userId: number;
+  organizationId?: number;
+  name: string;
+  required: boolean;
+  minSelection: number;
+  maxSelection?: number | null;
+  sortOrder: number;
+  active: boolean;
+  createdByUserId?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  options?: FoodModifierOption[];
+}
+
+export interface FoodProduct {
+  id: string;
+  userId: number;
+  organizationId?: number;
+  branchId?: string | null;
+  categoryId?: string | null;
+  internalCode: string;
+  name: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  price: number;
+  cost?: number | null;
+  preparationMinutes: number;
+  available: boolean;
+  active: boolean;
+  archivedAt?: string | null;
+  sortOrder: number;
+  createdByUserId?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  branch?: Pick<FoodBranch, 'id' | 'name'> | null;
+  category?: Pick<FoodCategory, 'id' | 'name' | 'color' | 'icon'> | null;
+  modifierGroups?: Array<{
+    id: string;
+    groupId: string;
+    sortOrder: number;
+    group: FoodModifierGroup;
+  }>;
+  recipeItems?: FoodRecipeItem[];
+}
+
+export type FoodOrderStatus =
+  | 'draft'
+  | 'pending_confirmation'
+  | 'confirmed'
+  | 'sent_to_kitchen'
+  | 'kitchen_accepted'
+  | 'preparing'
+  | 'ready'
+  | 'awaiting_handoff'
+  | 'out_for_delivery'
+  | 'delivered'
+  | 'completed'
+  | 'cancelled';
+
+export type FoodOrderType = 'delivery' | 'pickup' | 'dine_in';
+export type FoodPaymentStatus = 'pending' | 'paid' | 'partial' | 'refunded';
+export type FoodOrderState = 'draft' | 'active' | 'completed' | 'cancelled';
+export type FoodKitchenState = 'not_required' | 'queued' | 'accepted' | 'preparing' | 'ready';
+export type FoodDeliveryState =
+  | 'not_required' | 'pending' | 'awaiting_dispatch' | 'assigned'
+  | 'approaching_pickup' | 'picked_up' | 'out_for_delivery' | 'arrived'
+  | 'delivered' | 'failed' | 'returned';
+export type FoodPaymentState = 'unpaid' | 'partial' | 'paid' | 'refunded';
+
+export interface FoodCustomerSearchResult {
+  id: number;
+  name: string;
+  phone: string;
+  email?: string | null;
+  location?: string | null;
+  company?: string | null;
+  totalOrders?: number;
+  totalSpent?: number;
+  lastOrder?: Pick<FoodOrder, 'id' | 'orderNumber' | 'displayNumber' | 'total' | 'createdAt' | 'status' | 'statusLabel'> | null;
+}
+
+export interface FoodOrderItemModifier {
+  id: string;
+  userId: number;
+  orderItemId: string;
+  modifierGroupId?: string | null;
+  modifierOptionId?: string | null;
+  groupName: string;
+  optionName: string;
+  priceDelta: number;
+  quantity: number;
+  total: number;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface FoodOrderItem {
+  id: string;
+  userId: number;
+  orderId: string;
+  productId?: string | null;
+  productName: string;
+  productCode?: string | null;
+  productImageUrl?: string | null;
+  categoryName?: string | null;
+  unitPrice: number;
+  quantity: number;
+  subtotal: number;
+  notes?: string | null;
+  offered: boolean;
+  preparationMinutes: number;
+  sortOrder: number;
+  kitchenState?: 'pending' | 'preparing' | 'completed' | 'unavailable';
+  kitchenIssue?: string | null;
+  completedAt?: string | null;
+  kitchenTicketItem?: FoodKitchenTicketItem | null;
+  createdAt: string;
+  modifiers?: FoodOrderItemModifier[];
+}
+
+export interface FoodOrderStatusHistory {
+  id: string;
+  userId: number;
+  orderId: string;
+  previousStatus?: FoodOrderStatus | null;
+  previousStatusLabel?: string | null;
+  newStatus: FoodOrderStatus;
+  newStatusLabel?: string;
+  note?: string | null;
+  metadata?: Record<string, unknown>;
+  createdByUserId?: number | null;
+  createdAt: string;
+}
+
+export interface FoodOrder {
+  id: string;
+  userId: number;
+  organizationId?: number;
+  branchId?: string | null;
+  contactId?: number | null;
+  orderNumber: number;
+  displayNumber: string;
+  status: FoodOrderStatus;
+  statusLabel: string;
+  orderState: FoodOrderState;
+  kitchenState: FoodKitchenState;
+  deliveryState: FoodDeliveryState;
+  paymentState: FoodPaymentState;
+  version: number;
+  orderType: FoodOrderType;
+  orderTypeLabel: string;
+  source: string;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
+  deliveryAddress?: string | null;
+  deliveryNeighborhood?: string | null;
+  deliveryReference?: string | null;
+  tableName?: string | null;
+  paymentMethod?: string | null;
+  paymentStatus: FoodPaymentStatus;
+  paymentStatusLabel: string;
+  subtotal: number;
+  discountAmount: number;
+  deliveryFee: number;
+  taxAmount: number;
+  total: number;
+  estimatedPreparationMinutes: number;
+  notes?: string | null;
+  cancelReason?: string | null;
+  confirmedAt?: string | null;
+  sentToKitchenAt?: string | null;
+  readyAt?: string | null;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
+  createdByUserId?: number | null;
+  createdByName?: string | null;
+  updatedByUserId?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  items?: FoodOrderItem[];
+  statusHistory?: FoodOrderStatusHistory[];
+  events?: FoodOrderEvent[];
+  kitchenTicket?: FoodKitchenTicket | null;
+  delivery?: FoodDelivery | null;
+  payments?: FoodPayment[];
+  fiscalDocuments?: FoodFiscalDocument[];
+}
+
+export interface FoodOrderEvent {
+  id: string;
+  userId: number;
+  branchId?: string | null;
+  orderId: string;
+  version: number;
+  eventType: string;
+  actorUserId?: number | null;
+  actorRole?: string | null;
+  origin: string;
+  payload: Record<string, unknown>;
+  occurredAt: string;
+}
+
+export interface FoodAuditEvent {
+  id: string;
+  organizationId: number;
+  branchId?: string | null;
+  actorUserId?: number | null;
+  actorRole?: string | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  origin: string;
+  device?: string | null;
+  reason?: string | null;
+  idempotencyKey?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  payload: Record<string, unknown>;
+  occurredAt: string;
+  branch?: Pick<FoodBranch, 'id' | 'name'> | null;
+  actor?: { id: number; name: string; email: string } | null;
+}
+
+export interface FoodKitchenTicketItem {
+  id: string;
+  ticketId: string;
+  orderItemId: string;
+  state: 'pending' | 'preparing' | 'completed' | 'unavailable';
+  issueType?: string | null;
+  issueNote?: string | null;
+  issueResolution?: string | null;
+  issueResolvedAt?: string | null;
+  issueResolvedByUserId?: number | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  orderItem?: FoodOrderItem;
+}
+
+export interface FoodKitchenTicket {
+  id: string;
+  userId: number;
+  branchId?: string | null;
+  orderId: string;
+  state: 'queued' | 'accepted' | 'preparing' | 'ready' | 'collected' | 'cancelled';
+  version: number;
+  acceptedAt?: string | null;
+  acknowledgedAt?: string | null;
+  acknowledgedByUserId?: number | null;
+  startedAt?: string | null;
+  readyAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items?: FoodKitchenTicketItem[];
+  order?: FoodOrder;
+  branch?: Pick<FoodBranch, 'id' | 'name'> | null;
+  alert?: FoodKitchenAlert;
+}
+
+export type FoodKitchenAlertLevel = 'new' | 'change' | 'unaccepted_warning' | 'cashier_escalation' | 'on_time' | 'acknowledged' | 'near_limit' | 'late' | 'critical' | 'ready_waiting';
+
+export interface FoodKitchenAlert {
+  level: FoodKitchenAlertLevel;
+  label: string;
+  elapsedSeconds: number;
+  readySeconds?: number;
+  audible: boolean;
+  requiresAcknowledgement: boolean;
+}
+
+export interface FoodDelivery {
+  id: string;
+  userId: number;
+  branchId?: string | null;
+  orderId: string;
+  courierUserId?: number | null;
+  state: FoodDeliveryState;
+  proofType?: 'pin' | 'photo' | null;
+  proofMediaId?: string | null;
+  failureReason?: string | null;
+  returnReason?: string | null;
+  attemptCount: number;
+  assignedAt?: string | null;
+  pickedUpAt?: string | null;
+  arrivedAt?: string | null;
+  deliveredAt?: string | null;
+  returnedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  order?: FoodOrder;
+  branch?: Pick<FoodBranch, 'id' | 'name'> | null;
+  proofMedia?: { id: string; kind: string; mimeType: string; createdAt: string } | null;
+  contactAvailable?: boolean;
+  customerDataRedacted?: boolean;
+  collection?: FoodDeliveryCollection | null;
+}
+
+export type FoodDeliveryCollectionState =
+  | 'pending_collection' | 'with_courier' | 'handed_to_cashier' | 'reconciled'
+  | 'not_received' | 'discrepancy' | 'returned';
+
+export interface FoodDeliveryCollection {
+  id: string;
+  organizationId: number;
+  branchId?: string | null;
+  deliveryId: string;
+  orderId: string;
+  courierUserId: number;
+  state: FoodDeliveryCollectionState;
+  expectedAmount: number;
+  expectedMethod?: string | null;
+  actualAmount?: number | null;
+  actualMethod?: string | null;
+  discrepancyAmount?: number | null;
+  exceptionReason?: string | null;
+  version: number;
+  receivedAt?: string | null;
+  handedOverAt?: string | null;
+  reconciledAt?: string | null;
+  payment?: FoodPayment | null;
+  events?: Array<{ id: string; eventType: string; version: number; payload: Record<string, unknown>; createdAt: string }>;
+}
+
+export type FoodCourierOperationalStatus = 'available' | 'unavailable' | 'off_shift' | 'assigned' | 'heading_pickup' | 'at_restaurant' | 'delivering' | 'no_gps' | 'problem';
+
+export interface FoodCourierProfile {
+  id: string;
+  organizationId: number;
+  personId: number;
+  phone?: string | null;
+  address?: string | null;
+  transportType?: 'motorcycle' | 'bicycle' | 'car' | 'on_foot' | 'other' | null;
+  vehiclePlate?: string | null;
+  baseStatus: 'available' | 'unavailable' | 'no_gps' | 'off_shift';
+  lastLatitude?: number | null;
+  lastLongitude?: number | null;
+  lastLocationAt?: string | null;
+  active: boolean;
+  statusEvents?: Array<{ id: string; previousStatus?: string | null; newStatus: string; reason?: string | null; createdAt: string }>;
+}
+
+export interface FoodCourierSnapshot {
+  profile?: FoodCourierProfile | null;
+  shift?: FoodShift | null;
+  activeDelivery?: { id: string; state: FoodDeliveryState; branchId?: string | null; orderId: string } | null;
+  operationalStatus: FoodCourierOperationalStatus;
+  metrics: { deliveredCount: number };
+}
+
+export interface FoodCourierAssignment {
+  id: string;
+  personId: number;
+  branchId?: string | null;
+  person: { id: number; name: string; email: string; active: boolean };
+  courierProfile?: FoodCourierProfile | null;
+  currentShift?: FoodShift | null;
+  activeDelivery?: FoodCourierSnapshot['activeDelivery'];
+  operationalStatus: FoodCourierOperationalStatus;
+  assignmentEligible: boolean;
+  legacyProfile: boolean;
+  metrics: FoodCourierSnapshot['metrics'];
+}
+
+export interface FoodPayment {
+  id: string;
+  userId: number;
+  branchId?: string | null;
+  orderId: string;
+  cashSessionId?: string | null;
+  deliveryCollectionId?: string | null;
+  source?: 'cashier' | 'delivery_collection' | string;
+  courierUserId?: number | null;
+  amount: number;
+  method: string;
+  status: string;
+  transactionReference?: string | null;
+  paidAt?: string | null;
+  createdAt: string;
+}
+
+export interface FoodCashSession {
+  id: string;
+  organizationId: number;
+  branchId: string;
+  shiftId?: string | null;
+  openedByUserId: number;
+  closedByUserId?: number | null;
+  status: 'open' | 'closed';
+  openingBalance: number;
+  expectedClosingAmount: number;
+  closingCountedAmount?: number | null;
+  differenceAmount?: number | null;
+  totalSalesAmount: number;
+  salesCount: number;
+  totalsByMethod: Record<string, number>;
+  notes?: string | null;
+  openedDeviceId?: string | null;
+  closedDeviceId?: string | null;
+  approvalStatus: 'not_required' | 'pending' | 'approved' | 'rejected';
+  approvedByUserId?: number | null;
+  approvedAt?: string | null;
+  approvalNote?: string | null;
+  openedAt: string;
+  closedAt?: string | null;
+  branch?: Pick<FoodBranch, 'id' | 'name'>;
+  shift?: FoodShift | null;
+}
+
+export interface FoodShift {
+  id: string;
+  organizationId: number;
+  branchId: string;
+  personId: number;
+  status: 'open' | 'closed';
+  startDeviceId?: string | null;
+  endDeviceId?: string | null;
+  notes?: string | null;
+  startedAt: string;
+  endedAt?: string | null;
+  branch?: Pick<FoodBranch, 'id' | 'name'>;
+  person?: { id: number; name: string; email: string };
+}
+
+export interface FoodWorkforceStatus {
+  credentialConfigured: boolean;
+  credentialLockedUntil?: string | null;
+  shift?: FoodShift | null;
+}
+
+export interface FoodWorkSchedule {
+  id: string;
+  organizationId: number;
+  branchId: string;
+  personId: number;
+  workDate: string;
+  startTime: string;
+  endTime: string;
+  notes?: string | null;
+  active: boolean;
+  branch?: Pick<FoodBranch, 'id' | 'name'>;
+  person?: { id: number; name: string; email: string };
+}
+
+export interface FoodWorkforcePerformance {
+  person: { id: number; name: string; email: string; active: boolean };
+  roles: string[];
+  shiftOpen?: FoodShift | null;
+  hours: number;
+  orders: number;
+  orderValue: number;
+  cashSales: number;
+  cashDifference: number;
+  pendingApprovals: number;
+}
+
+export interface FoodWorkforceDashboard {
+  from: string;
+  days: number;
+  summary: { peopleWorking: number; openCashSessions: number; pendingApprovals: number; hours: number; orders: number };
+  activeShifts: FoodShift[];
+  performance: FoodWorkforcePerformance[];
+  cashSessions: FoodCashSession[];
+  schedules: FoodWorkSchedule[];
+}
+
+export interface FoodFiscalDocument {
+  id: string;
+  orderId: string;
+  paymentId?: string | null;
+  facturaId?: string | null;
+  documentType: string;
+  status: 'pending' | 'issued' | 'failed';
+  attemptCount: number;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  requestedAt: string;
+  issuedAt?: string | null;
+  factura?: { id: string; documentNo: string; grossTotal: number };
+}
+
+export interface FoodContext {
+  entitled: boolean;
+  enabled: boolean;
+  roles: string[];
+  primaryRole?: string | null;
+  branchIds: string[] | null;
+  branches: Array<Pick<FoodBranch, 'id' | 'name' | 'isMain'> & Partial<Pick<FoodBranch, 'address' | 'neighborhood'>>>;
+  permissions: string[];
+  roleLabels: Record<string, string>;
+}
+
+export interface FoodIngredient {
+  id: string;
+  organizationId: number;
+  branchId?: string | null;
+  internalCode: string;
+  name: string;
+  unit: string;
+  currentStock: number;
+  minimumStock: number;
+  idealStock: number;
+  purchaseUnit: string;
+  purchaseConversion: number;
+  preferredSupplierId?: string | null;
+  averageCost: number;
+  active: boolean;
+  lowStock?: boolean;
+  branch?: Pick<FoodBranch, 'id' | 'name'> | null;
+  preferredSupplier?: Pick<FoodSupplier, 'id' | 'name' | 'phone'> | null;
+  _count?: { recipeItems: number };
+}
+
+export interface FoodStockAlert {
+  id: string;
+  organizationId: number;
+  branchId?: string | null;
+  ingredientId: string;
+  status: 'open' | 'resolved';
+  severity: 'warning' | 'critical';
+  recommendedQuantity: number;
+  openedAt: string;
+  resolvedAt?: string | null;
+  lastEvaluatedAt: string;
+}
+
+export interface FoodStockReplenishmentItem {
+  ingredient: FoodIngredient;
+  currentStock: number;
+  minimumStock: number;
+  idealStock: number;
+  pendingQuantity: number;
+  recommendedQuantity: number;
+  recommendedPackages: number;
+  needsAlert: boolean;
+  severity: 'warning' | 'critical';
+  alert?: FoodStockAlert | null;
+  lastUnitCost?: number | null;
+  lastPurchaseId?: string | null;
+}
+
+export interface FoodStockReplenishmentResponse {
+  summary: { alerts: number; critical: number; recommendedItems: number };
+  items: FoodStockReplenishmentItem[];
+}
+
+export interface FoodStockMovement {
+  id: string;
+  organizationId: number;
+  branchId?: string | null;
+  ingredientId: string;
+  purchaseId?: string | null;
+  type: string;
+  quantity: number;
+  previousStock: number;
+  newStock: number;
+  unitCost?: number | null;
+  reason?: string | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  createdAt: string;
+  branch?: Pick<FoodBranch, 'id' | 'name'> | null;
+  ingredient: Pick<FoodIngredient, 'id' | 'name' | 'unit' | 'internalCode'>;
+  purchase?: Pick<FoodPurchase, 'id' | 'reference' | 'status'> | null;
+}
+
+export interface FoodStockReport {
+  branch?: Pick<FoodBranch, 'id' | 'name'> | null;
+  from: string;
+  days: number;
+  inventory: { ingredients: number; value: number; alerts: number };
+  movements: { count: number; entries: number; exits: number };
+  purchases: {
+    byStatus: Array<{ status: string; _count: { _all: number }; _sum: { total: number | null } }>;
+    openCount: number;
+    openValue: number;
+    receivedCount: number;
+    receivedValue: number;
+  };
+}
+
+export interface FoodSupplierWhatsAppDraft {
+  supplier: Pick<FoodSupplier, 'id' | 'name' | 'phone'>;
+  phone: string;
+  message: string;
+  url: string;
+}
+
+export interface FoodRecipeItem {
+  id: string;
+  organizationId: number;
+  productId: string;
+  ingredientId: string;
+  quantity: number;
+  unit: string;
+  wastePercent: number;
+  ingredient?: FoodIngredient;
+}
+
+export interface FoodSupplier {
+  id: string;
+  organizationId: number;
+  branchId?: string | null;
+  name: string;
+  nif?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  active: boolean;
+  branch?: Pick<FoodBranch, 'id' | 'name'> | null;
+  createdAt: string;
+}
+
+export interface FoodSupplierProduct {
+  id: string;
+  organizationId: number;
+  supplierId: string;
+  ingredientId: string;
+  purchaseUnit: string;
+  packageQuantity: number;
+  packagePrice: number;
+  minimumPackages: number;
+  leadTimeDays: number;
+  qualityRating?: number | null;
+  paymentTerms?: string | null;
+  active: boolean;
+  normalizedUnitCost: number;
+  supplier: FoodSupplier;
+  ingredient: FoodIngredient;
+}
+
+export interface FoodPurchaseSuggestionGroup {
+  supplier: FoodSupplier;
+  branch: Pick<FoodBranch, 'id' | 'name'>;
+  items: Array<{
+    ingredient: FoodIngredient;
+    offer: FoodSupplierProduct;
+    packages: number;
+    quantity: number;
+    unitCost: number;
+    total: number;
+  }>;
+  total: number;
+}
+
+export interface FoodPurchaseSuggestionsResponse {
+  branch: Pick<FoodBranch, 'id' | 'name'>;
+  groups: FoodPurchaseSuggestionGroup[];
+  unpriced: Array<{ ingredient: FoodIngredient; recommendedQuantity: number }>;
+}
+
+export interface FoodPurchaseItem {
+  id: string;
+  ingredientId: string;
+  quantity: number;
+  receivedQuantity: number;
+  unitCost: number;
+  total: number;
+  ingredient?: FoodIngredient;
+}
+
+export interface FoodPurchase {
+  id: string;
+  organizationId: number;
+  branchId: string;
+  supplierId?: string | null;
+  status: 'draft' | 'awaiting_confirmation' | 'confirmed' | 'in_delivery' | 'partial' | 'received' | 'cancelled' | 'ordered';
+  version: number;
+  reference?: string | null;
+  total: number;
+  purchasedAt?: string | null;
+  receivedAt?: string | null;
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
+  createdAt: string;
+  branch?: FoodBranch;
+  supplier?: FoodSupplier | null;
+  items?: FoodPurchaseItem[];
+  events?: FoodPurchaseEvent[];
+}
+
+export interface FoodPurchaseEvent {
+  id: string;
+  purchaseId: string;
+  type: string;
+  statusFrom?: string | null;
+  statusTo?: string | null;
+  version: number;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface FoodManagementOverview {
+  from: string;
+  orders: { total: number; cancelled: number; byState: Array<{ orderState: string; _count: { _all: number }; _sum: { total: number | null } }> };
+  revenue: number;
+  paymentsCount: number;
+  averageTicket: number;
+  deliveries: Array<{ state: string; _count: { _all: number } }>;
+  lowStock: number;
+  openSessions: number;
+}
+
+export interface FoodOperationalReportSummary {
+  orders: number;
+  cancelledOrders: number;
+  cancellationRate: number;
+  orderValue: number;
+  received: number;
+  reconciled: number;
+  heldByCouriers: number;
+  outstanding: number;
+  averageTicket: number;
+  discounts: number;
+  delivered: number;
+  failedDeliveries: number;
+  deliverySuccessRate: number;
+  purchasesReceived: number;
+  cashDifference: number;
+}
+
+export interface FoodOperationalReport {
+  period: { from: string; to: string; days: number; previousFrom: string; previousTo: string; branchId?: string | null };
+  summary: FoodOperationalReportSummary;
+  previous: FoodOperationalReportSummary;
+  comparison: Partial<Record<keyof FoodOperationalReportSummary, number | null>>;
+  daily: Array<{ date: string; orders: number; orderValue: number; received: number; reconciled: number }>;
+  byMethod: Array<{ method: string; received: number; reconciled: number; count: number }>;
+  byBranch: Array<{ branchId: string; branchName: string } & FoodOperationalReportSummary>;
+  stock: { inventoryValue: number; lowStock: number; movementCount: number; movementValue: number };
+  pending: {
+    collections: Array<{
+      id: string; orderId: string; orderNumber: number; customerName?: string | null;
+      branchId?: string | null; branchName: string; courierUserId: number;
+      state: FoodDeliveryCollectionState; expectedAmount: number; actualAmount?: number | null;
+      discrepancyAmount?: number | null; exceptionReason?: string | null;
+      deliveryState: FoodDeliveryState; updatedAt: string;
+    }>;
+    openCashSessions: number;
+    cashDifferences: Array<{
+      id: string; branchId: string; differenceAmount?: number | null; approvalStatus: string;
+      openedAt: string; closedAt?: string | null; totalSalesAmount: number;
+    }>;
+  };
+}
+
+export interface FoodMonthCloseCheck {
+  key: string;
+  label: string;
+  status: 'ok' | 'warning' | 'blocked';
+  count: number;
+  amount: number;
+  actionHref?: string | null;
+  records: Array<Record<string, unknown>>;
+}
+
+export interface FoodMonthCloseReadiness {
+  period: { month: string; start: string; end: string; branchId?: string | null };
+  ready: boolean;
+  totals: { blockedChecks: number; blockingRecords: number; warningChecks: number; warningRecords: number };
+  checks: FoodMonthCloseCheck[];
+}
+
+export interface FoodMonthlyClose {
+  id: string;
+  organizationId: number;
+  branchId?: string | null;
+  scopeKey: string;
+  month: string;
+  status: 'closed' | 'reopened';
+  version: number;
+  snapshot: FoodOperationalReport;
+  validationSnapshot: FoodMonthCloseReadiness;
+  closedByUserId: number;
+  idempotencyKey: string;
+  closedAt: string;
+  reopenedByUserId?: number | null;
+  reopenedAt?: string | null;
+  reopenReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  branch?: Pick<FoodBranch, 'id' | 'name'> | null;
+  events?: Array<{ id: string; version: number; eventType: string; actorUserId: number; payload: Record<string, unknown>; createdAt: string }>;
+  revisions: FoodMonthlyCloseRevision[];
+}
+
+export interface FoodMonthlyCloseRevision {
+  id: string;
+  organizationId: number;
+  monthlyCloseId: string;
+  revisionNumber: number;
+  aggregateVersion: number;
+  snapshot: FoodOperationalReport;
+  validationSnapshot: FoodMonthCloseReadiness;
+  reason: string;
+  closedByUserId: number;
+  idempotencyKey: string;
+  closedAt: string;
+  createdAt: string;
+}
+
+export interface FoodMarketingOverview {
+  customers: number;
+  consented: number;
+  segments: Array<{ id: string; name: string; description?: string | null; filters: Record<string, unknown> }>;
+  coupons: Array<{ id: string; code: string; name: string; discountType: string; discountValue: number; active: boolean; _count?: { redemptions: number } }>;
+  campaigns: Array<{ id: string; name: string; channel: string; content: string; status: string; recipientsCount: number; deliveredCount: number; conversionsCount: number; attributedRevenue: number; createdAt: string }>;
+}
+
+export interface FoodCustomerAddress {
+  id: string;
+  organizationId: number;
+  profileId: string;
+  label: string;
+  address: string;
+  neighborhood?: string | null;
+  reference?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  isPrimary: boolean;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FoodCustomerProfile {
+  id: string;
+  organizationId: number;
+  contactId: number;
+  preferredBranchId?: string | null;
+  marketingConsent: boolean;
+  transactionalConsent: boolean;
+  preferences: FoodCustomerPreferences & Record<string, unknown>;
+  notes?: string | null;
+  totalOrders: number;
+  totalSpent: number;
+  lastOrderAt?: string | null;
+  preferredBranch?: Pick<FoodBranch, 'id' | 'name'> | null;
+  addresses?: FoodCustomerAddress[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FoodCustomerPreferences {
+  allergies?: string[];
+  dietaryRestrictions?: string[];
+  preferredChannel?: 'WHATSAPP' | 'SMS' | 'EMAIL' | 'NONE';
+  preferredOrderType?: 'delivery' | 'pickup' | 'dine_in';
+  favoriteNotes?: string | null;
+}
+
+export interface FoodV1Customer {
+  id: number;
+  name: string;
+  phone: string;
+  email?: string | null;
+  company?: string | null;
+  location?: string | null;
+  birthDate?: string | null;
+  tags?: string;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  foodProfile?: FoodCustomerProfile | null;
+  insights?: {
+    favoriteProducts: Array<{ productId?: string | null; name: string; quantity: number }>;
+  };
+}
+
+export type FoodCustomerOccurrenceType = 'complaint' | 'compliment' | 'preference' | 'incident' | 'follow_up' | 'other';
+export type FoodCustomerOccurrenceSeverity = 'low' | 'medium' | 'high';
+
+export interface FoodCustomerOccurrence {
+  id: string;
+  organizationId: number;
+  contactId: number;
+  branchId?: string | null;
+  type: FoodCustomerOccurrenceType;
+  severity: FoodCustomerOccurrenceSeverity;
+  title: string;
+  description?: string | null;
+  status: 'open' | 'resolved';
+  occurredAt: string;
+  resolvedAt?: string | null;
+  resolutionNote?: string | null;
+  branch?: Pick<FoodBranch, 'id' | 'name'> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type FoodCustomerTimelineType = 'all' | 'order' | 'coupon' | 'occurrence' | 'audit';
+
+export interface FoodCustomerTimelineEvent {
+  id: string;
+  entityId?: string;
+  type: Exclude<FoodCustomerTimelineType, 'all'>;
+  occurredAt: string;
+  title: string;
+  description?: string | null;
+  status: string;
+  severity?: FoodCustomerOccurrenceSeverity;
+  occurrenceType?: FoodCustomerOccurrenceType;
+  resolutionNote?: string | null;
+  resolvedAt?: string | null;
+  branch?: Pick<FoodBranch, 'id' | 'name'> | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface FoodCustomerDuplicatePair {
+  id: string;
+  reasons: Array<'phone' | 'email' | 'name_context'>;
+  customers: [FoodV1Customer, FoodV1Customer];
+}
+
+export interface FoodCustomerMergeResult {
+  customer: FoodV1Customer;
+  sourceContactId: number;
+  reasons: FoodCustomerDuplicatePair['reasons'];
+  moved: Record<string, number>;
+}
+
+export type FoodCustomerImportRowInput = {
+  name?: string;
+  phone?: string;
+  email?: string;
+  company?: string;
+  location?: string;
+  birthDate?: string;
+  tags?: string;
+  notes?: string;
+  marketingConsent?: string | boolean;
+};
+
+export type FoodCustomerImportRow = {
+  rowNumber: number;
+  status: 'valid' | 'invalid' | 'duplicate_file' | 'existing' | 'existing_inactive';
+  data: {
+    name: string;
+    phone: string;
+    email: string;
+    company: string;
+    location?: string | null;
+    birthDate?: string | null;
+    tags: string[];
+    notes?: string | null;
+    marketingConsent: boolean;
+  };
+  errors: string[];
+  existingCustomer?: Pick<FoodV1Customer, 'id' | 'name' | 'phone' | 'email' | 'status'> | null;
+};
+
+export interface FoodCustomerImportPreview {
+  rows: FoodCustomerImportRow[];
+  summary: {
+    total: number;
+    valid: number;
+    invalid: number;
+    duplicate_file: number;
+    existing: number;
+    existing_inactive: number;
+  };
+  maxRows: number;
+}
+
+export interface FoodCustomerImportResult {
+  importId: string;
+  total: number;
+  imported: number;
+  updated: number;
+  skipped: number;
+  invalid: number;
+  errors: FoodCustomerImportRow[];
+}
+
+export interface FoodBirthdayCustomer {
+  id: number;
+  name: string;
+  phone: string;
+  email?: string | null;
+  birthDate: string;
+  nextBirthday: string;
+  daysUntil: number;
+  ageTurning: number;
+  preferredChannel: 'WHATSAPP' | 'SMS' | 'EMAIL' | 'NONE';
+  marketingConsent: boolean;
+  eligible: boolean;
+  totalOrders: number;
+  totalSpent: number;
+}
+
+export interface FoodBirthdaySettings {
+  id?: string;
+  organizationId?: number;
+  enabled: boolean;
+  daysBefore: number;
+  sendTime: string;
+  channel: 'WHATSAPP' | 'SMS' | 'EMAIL';
+  template: string;
+  benefitType: 'none' | 'coupon';
+  couponId?: string | null;
+  validityDays: number;
+  minimumOrder: number;
+  segmentId?: string | null;
+  coupon?: FoodMarketingOverview['coupons'][number] | null;
+  segment?: FoodMarketingOverview['segments'][number] | null;
+}
+
+export interface FoodOrderStatusOption {
+  value: FoodOrderStatus;
+  label: string;
+}
+
+export interface FoodOrderCreateItemInput {
+  productId: string;
+  quantity: number;
+  modifierOptionIds?: string[];
+  notes?: string | null;
+  offered?: boolean;
+}
+
+export interface FoodOrderCreateInput {
+  branchId?: string | null;
+  contactId?: number | null;
+  createCustomer?: boolean;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
+  orderType: FoodOrderType;
+  source?: string | null;
+  deliveryAddress?: string | null;
+  deliveryNeighborhood?: string | null;
+  deliveryReference?: string | null;
+  tableName?: string | null;
+  paymentMethod?: string | null;
+  paymentStatus?: FoodPaymentStatus;
+  discountAmount?: number;
+  deliveryFee?: number;
+  taxAmount?: number;
+  notes?: string | null;
+  sendToKitchen?: boolean;
+  status?: FoodOrderStatus;
+  items: FoodOrderCreateItemInput[];
+}
+
+export interface FoodOverview {
+  settings: FoodSettings;
+  counts: {
+    branches: number;
+    categories: number;
+    products: number;
+    modifierGroups: number;
+    activeOrders?: number;
+    todaysOrders?: number;
+  };
+}
+
 export interface ClienteFaturacao {
   id: string;
   customerTaxID: string;

@@ -1,7 +1,7 @@
 if (process.env.NODE_ENV !== 'production') {
   const path = require('path');
   const dotenv = require('dotenv');
-  dotenv.config();
+  dotenv.config({ path: path.resolve(__dirname, '../.env') });
   dotenv.config({ path: path.resolve(__dirname, '../../frontend/.env.local') });
 }
 
@@ -52,10 +52,13 @@ const onboardingRouter = require('./routes/onboarding');
 const startupTemplatesRouter = require('./routes/startup-templates');
 const reportsRouter = require('./routes/reports');
 const serviceDashboardRouter = require('./routes/service-dashboard');
+const managementRouter = require('./routes/management');
+const foodV1Router = require('./routes/food-v1');
 const requireAuth = require('./middleware/auth');
 const { requireSuperAdmin } = require('./middleware/auth');
 const { requirePlanFeature } = require('./lib/plan-limits');
 const { checkSubscriptionAccess } = require('./middleware/subscription-access');
+const { requireManagementWorkspace } = require('./lib/management-context');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -342,6 +345,8 @@ app.use('/api/superadmin', requireAuth, requireSuperAdmin, superadminRouter);
 // Account owner or admin routes
 app.use('/api/finances', requireAuth, checkSubscriptionAccess, requirePlanFeature('financas'), financesRouter);
 app.use('/api/account', requireAuth, checkSubscriptionAccess, accountRouter);
+app.use('/api/management', requireAuth, checkSubscriptionAccess, requireManagementWorkspace, managementRouter);
+app.use('/api/food/v1', requireAuth, checkSubscriptionAccess, foodV1Router);
 app.use('/api/pipeline-stages', requireAuth, checkSubscriptionAccess, pipelineStagesRouter);
 app.use('/api/deal-stages', requireAuth, checkSubscriptionAccess, requirePlanFeature('processos'), dealStagesRouter);
 app.use('/api/companies', requireAuth, checkSubscriptionAccess, requirePlanFeature('processos'), companiesRouter);
@@ -374,6 +379,7 @@ try {
   const cron = require('node-cron');
   const { processRecorrentes } = require('./lib/faturacao/scheduler');
   const { processFollowUpAutomations } = require('./services/followup-automation-scheduler');
+  const { markManagementOverdueTasks } = require('./services/management-overdue-scheduler');
   cron.schedule('5 0 * * *', () => {
     console.log('[Scheduler] A processar faturas recorrentes...');
     processRecorrentes().catch(err => console.error('[Scheduler] Erro:', err.message));
@@ -393,6 +399,13 @@ try {
       .catch((err) => console.error('[Scheduler] Erro nas automações de follow-up:', err.message));
   });
   console.log('[Scheduler] Cron de automações de follow-up iniciado (06:15 UTC diário)');
+
+  cron.schedule('*/15 * * * *', () => {
+    markManagementOverdueTasks()
+      .then((updated) => updated > 0 && console.log(`[Scheduler] ${updated} trabalho(s) Gestão e KPI marcado(s) como atrasado(s).`))
+      .catch((err) => console.error('[Scheduler] Erro ao atualizar trabalhos Gestão e KPI:', err.message));
+  });
+  console.log('[Scheduler] Cron de prazos Gestão e KPI iniciado (a cada 15 minutos)');
 } catch (err) {
   console.warn('[Scheduler] node-cron não disponível:', err.message);
 }

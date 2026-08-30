@@ -5,21 +5,25 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  BarChart3, Users, MessageSquare, Zap, Kanban,
+  BarChart3, Users, MessageSquare, Zap,
   CheckSquare, FileText, LogOut, X, DollarSign, CalendarDays,
   Package, Settings, HelpCircle, ShieldAlert, ShoppingBag, ShoppingCart,
-  ChevronDown, CreditCard, Clock3, Building2, Handshake,
+  ChevronDown, CreditCard, Clock3, Handshake, Utensils, ChefHat,
+  LayoutDashboard, Bike, Truck, Megaphone, ArrowLeftRight, CircleHelp,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import { isComercio } from '@/lib/business-modes';
-import KukuGestLogo from '@/components/KukuGestLogo';
+import { isComercio, isFood } from '@/lib/business-modes';
+import KukuGestLogo, { KukuGestIcon } from '@/components/KukuGestLogo';
 import TrialStatusBadge from '@/components/billing/trial-status-badge';
 import AccountSwitcher from '@/components/layout/account-switcher';
+import { RestaurantMark, getFoodBrand, getFoodBrandStyle } from '@/components/food/food-ui';
 import { cn } from '@/lib/utils';
 import type { User } from '@/lib/api';
-import { getChatUnreadCount, getOnboarding, reopenOnboarding } from '@/lib/api';
-import { canAccessCommerceRoute, canView, canViewReports } from '@/lib/permissions';
-import type { ModuleKey } from '@/lib/permissions';
+import { getChatUnreadCount, getFoodSettings, getFoodTeam, getOnboarding, reopenOnboarding } from '@/lib/api';
+import { canAccessCommerceRoute, canView, canViewReports, hasFoodPermission, hasFoodRole } from '@/lib/permissions';
+import type { FoodRole, ModuleKey } from '@/lib/permissions';
 import { buildWhatsAppSupportLink, getPlanBadgeClasses, getPricingTierLabel } from '@/lib/plan-utils';
+import { isClientDevAuthBypassEnabled, setDevAuthPersonId } from '@/lib/dev-auth';
 
 const TOUR_ATTR: Record<string, string> = {
   '/':            'sidebar-painel',
@@ -32,10 +36,14 @@ export default function Sidebar({
   open = false,
   onClose = () => {},
   currentUser = null,
+  collapsed = false,
+  onToggleCollapsed = () => {},
 }: {
   open?: boolean;
   onClose?: () => void;
   currentUser?: User | null;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 }) {
   const pathname = usePathname();
   const queryClient = useQueryClient();
@@ -89,13 +97,37 @@ export default function Sidebar({
 
   const navItemClass = (active: boolean) => cn(
     'flex items-center gap-3 px-3 py-2 transition-all text-sm font-medium rounded-xl',
+    collapsed && 'justify-center px-2',
     active
       ? 'bg-[var(--workspace-primary-soft)] text-[var(--workspace-primary)] font-semibold'
       : 'text-[#6b7e9a] hover:bg-[var(--workspace-primary-soft)] hover:text-[var(--workspace-primary)]'
   );
 
-  const comercio = isComercio(currentUser?.workspaceMode);
+  const food = pathname === '/food' || pathname.startsWith('/food/');
+  const foodNavItemClass = (active: boolean) => cn(
+    'flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+    collapsed && 'justify-center px-2',
+    active
+      ? 'bg-[var(--workspace-primary-soft)] font-semibold text-[var(--workspace-primary)]'
+      : 'font-medium text-slate-500 hover:bg-white hover:text-slate-800'
+  );
+  const comercio = !food && isComercio(currentUser?.workspaceMode);
+  const hasFoodWorkspace = currentUser?.availableWorkspaces?.includes('food') === true || isFood(currentUser?.workspaceMode);
   const reportsHref = comercio ? '/relatorios/comercio' : '/relatorios/servicos';
+  const { data: foodSettings } = useQuery({
+    queryKey: ['food-settings'],
+    queryFn: getFoodSettings,
+    enabled: food,
+    retry: 2,
+  });
+  const foodBrand = getFoodBrand(foodSettings);
+  const localFoodPreview = food && isClientDevAuthBypassEnabled() && currentUser?.foodAccess?.roles.includes('manager') === true;
+  const { data: foodTeam } = useQuery({
+    queryKey: ['food-team'],
+    queryFn: getFoodTeam,
+    enabled: localFoodPreview,
+  });
+  const previewCourier = foodTeam?.assignments.find((assignment) => assignment.active && assignment.role === 'courier' && assignment.person.active);
 
   // Map href to module key for permission checks
   const hrefToModule: Record<string, ModuleKey | null> = {
@@ -158,6 +190,31 @@ export default function Sidebar({
     { href: '/configuracoes', label: 'Configurações', icon: Settings },
   ].filter(l => isVisible(l.href)) : [];
 
+  const allFoodLinks: Array<{ href: string; label: string; icon: React.ElementType; permission: string; group: 'start' | 'operation' | 'growth' | 'configuration'; role?: FoodRole }> = [
+    { href: '/food', label: 'Ambientes', icon: Utensils, permission: 'context.view', group: 'start' },
+    { href: '/food/gestao', label: 'Gestão', icon: LayoutDashboard, permission: 'overview.view', group: 'operation' },
+    { href: '/food/caixa', label: 'Caixa', icon: ShoppingCart, permission: 'orders.create', group: 'operation' },
+    { href: '/food/cozinha', label: 'KukuGest Cozinha', icon: ChefHat, permission: 'kitchen.view', group: 'operation' },
+    { href: '/food/delivery', label: 'Delivery', icon: Truck, permission: 'delivery.view', group: 'operation' },
+    { href: '/food/entregador', label: 'Entregador', icon: Bike, permission: 'delivery.view_own', group: 'operation', role: 'courier' },
+    { href: '/food/crm', label: 'CRM & Marketing', icon: Megaphone, permission: 'crm.view', group: 'growth' },
+    { href: '/food/gestao/relatorios', label: 'Relatórios', icon: BarChart3, permission: 'reports.view', group: 'growth' },
+    { href: '/food/produtos', label: 'Menu', icon: Package, permission: 'catalog.view', group: 'configuration' },
+    { href: '/food/configuracoes', label: 'Configurações', icon: Settings, permission: 'settings.edit', group: 'configuration' },
+    { href: '/food/ajuda', label: 'Ajuda', icon: CircleHelp, permission: 'context.view', group: 'configuration' },
+  ];
+  const foodLinks = food ? allFoodLinks.filter((link) => (
+    !!currentUser
+    && hasFoodPermission(currentUser, link.permission)
+    && (!link.role || hasFoodRole(currentUser, link.role) || (localFoodPreview && link.role === 'courier' && Boolean(previewCourier)))
+  )) : [];
+  const foodGroups = [
+    { id: 'start', label: '', links: foodLinks.filter((link) => link.group === 'start') },
+    { id: 'operation', label: 'Operação', links: foodLinks.filter((link) => link.group === 'operation') },
+    { id: 'growth', label: 'Crescimento', links: foodLinks.filter((link) => link.group === 'growth') },
+    { id: 'configuration', label: 'Configuração', links: foodLinks.filter((link) => link.group === 'configuration') },
+  ].filter((group) => group.links.length > 0);
+
   const allGestaoLinks = [
     { href: '/finances', label: 'Finanças', icon: DollarSign },
     { href: reportsHref, label: 'Relatórios', icon: BarChart3 },
@@ -174,21 +231,81 @@ export default function Sidebar({
   return (
     <div
       data-tour="sidebar"
-      className={`w-64 min-h-screen flex flex-col fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:static border-r border-slate-100 bg-white ${
+      className={cn(`min-h-screen flex flex-col fixed inset-y-0 left-0 z-50 transform transition-[width,transform] duration-300 md:relative border-r ${food ? 'border-slate-200 bg-slate-50 md:bg-slate-50/60' : 'border-slate-100 bg-white'} ${
         open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-      }`}
+      }`, collapsed ? 'w-20' : 'w-64')}
+      style={food ? getFoodBrandStyle(foodSettings) : undefined}
     >
       {/* Logo */}
-      <div className="px-4 py-4 flex items-center justify-between flex-shrink-0 border-b border-slate-100">
-        <KukuGestLogo height={44} className="max-w-[calc(100%-2rem)]" />
+      <div className={cn('flex flex-shrink-0 items-center justify-between border-b border-slate-100 px-4 py-4', food && 'bg-white py-4 md:bg-white/70', collapsed && 'flex-col gap-2 px-2 py-3')}>
+        {food ? (
+          <div className="flex min-w-0 items-center gap-3">
+            <RestaurantMark settings={foodSettings} size="md" />
+            <div className={cn('min-w-0', collapsed && 'hidden')}>
+              <p className="truncate text-sm font-black text-slate-950">{foodBrand.name}</p>
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className={cn('h-2 w-2 rounded-full', foodSettings?.isEnabled ? 'bg-emerald-500' : 'bg-amber-400')} />
+                <span className="text-xs font-medium text-slate-500">{foodSettings?.isEnabled ? 'Activo' : 'Inactivo'}</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          collapsed ? <KukuGestIcon size={38} /> : <KukuGestLogo height={44} className="max-w-[calc(100%-2rem)]" />
+        )}
         <button onClick={onClose} className="md:hidden p-1 hover:bg-slate-100 rounded transition-colors">
           <X className="w-4 h-4 text-[#6b7e9a]" />
         </button>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
-        {comercio ? (
+      <nav className={cn('flex-1 space-y-0.5 overflow-y-auto px-3 py-4', collapsed && 'px-2 [&_p]:hidden [&_span]:hidden')}>
+        {food ? (
+          <>
+            <div data-food-tour="food-nav" className="space-y-5">
+              {foodGroups.map((group) => (
+                <div key={group.id}>
+                  {group.label ? <p className="mb-1 px-3 text-[10px] font-bold uppercase tracking-normal text-slate-400">{group.label}</p> : null}
+                  <div className="space-y-0.5">
+                    {group.links.map(({ href, label, icon: Icon, role }) => (
+                      <Link
+                        key={href}
+                        href={href}
+                        title={collapsed ? label : undefined}
+                        className={foodNavItemClass(href === '/food' ? pathname === '/food' : isActive(href))}
+                        onClick={(event) => {
+                          if (role === 'courier' && localFoodPreview && previewCourier) {
+                            event.preventDefault();
+                            setDevAuthPersonId(previewCourier.personId);
+                            window.location.href = href;
+                            return;
+                          }
+                          onClose();
+                        }}
+                      >
+                        <Icon className="h-4 w-4 flex-shrink-0" />
+                        <span className="flex-1">{label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {adminLinks.length > 0 && (
+              <div className="pt-3 mt-2 border-t border-slate-100">
+                <p className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/60">
+                  Admin
+                </p>
+                {adminLinks.map(({ href, label, icon: Icon }) => (
+                  <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose} title={collapsed ? label : undefined}>
+                    <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+                    <span>{label}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </>
+        ) : comercio ? (
           <>
             {/* COMERCIO: Grupo "Uso diário" */}
             <div>
@@ -199,6 +316,7 @@ export default function Sidebar({
                 <Link
                   key={href}
                   href={href}
+                  title={collapsed ? label : undefined}
                   data-tour={TOUR_ATTR[href]}
                   className={navItemClass(isActive(href))}
                   onClick={onClose}
@@ -233,6 +351,7 @@ export default function Sidebar({
                   <Link
                     key={href}
                     href={href}
+                    title={collapsed ? label : undefined}
                     className={navItemClass(isActive(href))}
                     onClick={onClose}
                   >
@@ -255,7 +374,7 @@ export default function Sidebar({
                   Admin
                 </p>
                 {adminLinks.map(({ href, label, icon: Icon }) => (
-                  <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose}>
+                  <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose} title={collapsed ? label : undefined}>
                     <Icon className="w-[18px] h-[18px] flex-shrink-0" />
                     <span>{label}</span>
                   </Link>
@@ -270,6 +389,7 @@ export default function Sidebar({
               <Link
                 key={href}
                 href={href}
+                title={collapsed ? label : undefined}
                 data-tour={TOUR_ATTR[href]}
                 className={navItemClass(isActive(href))}
                 onClick={onClose}
@@ -290,7 +410,7 @@ export default function Sidebar({
                   Gestão
                 </p>
                 {gestaoLinks.map(({ href, label, icon: Icon }) => (
-                  <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose}>
+                  <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose} title={collapsed ? label : undefined}>
                     <Icon className="w-[18px] h-[18px] flex-shrink-0" />
                     <span>{label}</span>
                   </Link>
@@ -304,7 +424,7 @@ export default function Sidebar({
                   Admin
                 </p>
                 {adminLinks.map(({ href, label, icon: Icon }) => (
-                  <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose}>
+                  <Link key={href} href={href} className={navItemClass(isActive(href))} onClick={onClose} title={collapsed ? label : undefined}>
                     <Icon className="w-[18px] h-[18px] flex-shrink-0" />
                     <span>{label}</span>
                   </Link>
@@ -316,9 +436,20 @@ export default function Sidebar({
       </nav>
 
       {/* Footer */}
-      <div className="px-3 py-4 border-t border-slate-100 space-y-0.5">
-        <AccountSwitcher />
-        {currentUser?.plan && (
+      <footer className={cn('space-y-0.5 border-t border-slate-100 px-3 py-4', collapsed && 'px-2 [&_p]:hidden [&_span]:hidden')}>
+        {hasFoodWorkspace && (
+          <Link
+            href={food ? (currentUser?.defaultWorkspace === 'gestao_kpi' ? '/gestao' : '/') : '/food'}
+            className={navItemClass(false)}
+            onClick={onClose}
+            title={collapsed ? (food ? 'Voltar ao CRM' : 'Abrir KukuGest Food') : undefined}
+          >
+            <ArrowLeftRight className="w-[18px] h-[18px] flex-shrink-0" />
+            <span>{food ? 'Voltar ao CRM' : 'Abrir KukuGest Food'}</span>
+          </Link>
+        )}
+        {!collapsed ? <AccountSwitcher /> : null}
+        {currentUser?.plan && !food && !collapsed && (
           <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-[#6b7e9a]/70">
               Plano atual
@@ -329,7 +460,7 @@ export default function Sidebar({
             <TrialStatusBadge subscription={currentUser.subscription} className="mt-2" />
           </div>
         )}
-        {showOnboardingBadge && (
+        {showOnboardingBadge && !food && !collapsed && (
           <Link
             href="/"
             onClick={onClose}
@@ -351,23 +482,24 @@ export default function Sidebar({
             </span>
           </Link>
         )}
-        {!comercio && (
-          <Link href="/configuracoes" className={navItemClass(isActive('/configuracoes'))} onClick={onClose}>
+        {!comercio && !food && (
+          <Link href="/configuracoes" className={navItemClass(isActive('/configuracoes'))} onClick={onClose} title={collapsed ? 'Configurações' : undefined}>
             <Settings className="w-[18px] h-[18px] flex-shrink-0" />
             <span>Configurações</span>
           </Link>
         )}
-        <a
+        {!food ? <a
           href={helpHref}
           target="_blank"
           rel="noopener noreferrer"
           onClick={onClose}
           className={navItemClass(false)}
+          title={collapsed ? 'Ajuda' : undefined}
         >
           <HelpCircle className="w-[18px] h-[18px] flex-shrink-0" />
           <span>Ajuda</span>
-        </a>
-        {isOnboardingEligible && (
+        </a> : null}
+        {isOnboardingEligible && !food && !collapsed && (
           <Link
             href="/"
             onClick={() => {
@@ -382,12 +514,27 @@ export default function Sidebar({
         )}
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 text-[#6b7e9a] hover:text-[#b31b25] hover:bg-[#b31b25]/5 transition-all text-left text-sm font-medium rounded-xl"
+          className={cn('flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-[#6b7e9a] transition-all hover:bg-[#b31b25]/5 hover:text-[#b31b25]', collapsed && 'justify-center px-2')}
+          title={collapsed ? 'Sair' : undefined}
         >
           <LogOut className="w-[18px] h-[18px] flex-shrink-0" />
           <span>Sair</span>
         </button>
-      </div>
+        {food ? (
+          <p className="px-3 pt-4 text-[11px] font-semibold text-slate-400">
+            Powered by <span className="text-slate-500">KukuGest</span>
+          </p>
+        ) : null}
+      </footer>
+      <button
+        type="button"
+        onClick={onToggleCollapsed}
+        className="absolute -right-2 top-1/2 z-10 hidden h-8 w-4 -translate-y-1/2 items-center justify-center rounded-r border border-l-0 border-slate-200 bg-white/80 text-slate-300 opacity-70 transition hover:bg-white hover:text-slate-700 hover:opacity-100 md:flex"
+        title={collapsed ? 'Expandir menu' : 'Minimizar menu'}
+        aria-label={collapsed ? 'Expandir menu' : 'Minimizar menu'}
+      >
+        {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+      </button>
     </div>
   );
 }

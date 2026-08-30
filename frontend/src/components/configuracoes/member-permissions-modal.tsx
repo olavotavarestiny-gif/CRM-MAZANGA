@@ -22,6 +22,7 @@ type CommercialPermissionKey = 'dashboard_basic' | 'dashboard_analysis';
 type CaixaPermissionKey = 'view' | 'open' | 'close' | 'audit';
 type StockPermissionKey = 'view' | 'edit';
 type TaskAssignmentPermissionKey = 'assign_admin_owner';
+type FoodPermissionKey = keyof NonNullable<UserPermissions['food']>;
 
 const SERVICOS_SIMPLE_MODULES: { key: keyof Omit<UserPermissions, 'finances'>; label: string }[] = [
   { key: 'contacts', label: 'Contactos' },
@@ -36,6 +37,20 @@ const SERVICOS_SIMPLE_MODULES: { key: keyof Omit<UserPermissions, 'finances'>; l
 const COMERCIO_SIMPLE_MODULES: { key: keyof Omit<UserPermissions, 'finances'>; label: string }[] = [
   { key: 'contacts', label: 'Contactos' },
   { key: 'vendas', label: 'Venda Rápida' },
+];
+
+const FOOD_PERMISSION_ITEMS: { key: FoodPermissionKey; label: string }[] = [
+  { key: 'overview', label: 'Ver visão geral' },
+  { key: 'settings', label: 'Gerir configurações' },
+  { key: 'products_view', label: 'Ver produtos' },
+  { key: 'products_edit', label: 'Editar produtos' },
+  { key: 'orders_create', label: 'Criar pedidos' },
+  { key: 'orders_view_all', label: 'Ver todos os pedidos' },
+  { key: 'kitchen', label: 'Operar cozinha' },
+  { key: 'delivery', label: 'Operar delivery' },
+  { key: 'reports', label: 'Ver relatórios' },
+  { key: 'discounts', label: 'Autorizar descontos' },
+  { key: 'cancel_orders', label: 'Cancelar pedidos' },
 ];
 
 const LEVEL_LABELS: Record<SimpleLevel, string> = {
@@ -75,6 +90,19 @@ function initPerms(user: User): UserPermissions {
     perms.taskAssignment = {
       assign_admin_owner: true,
     };
+    perms.food = {
+      overview: true,
+      settings: true,
+      products_view: true,
+      products_edit: true,
+      orders_create: true,
+      orders_view_all: true,
+      kitchen: true,
+      delivery: true,
+      reports: true,
+      discounts: true,
+      cancel_orders: true,
+    };
     return perms;
   }
 
@@ -98,6 +126,19 @@ function initPerms(user: User): UserPermissions {
     },
     taskAssignment: {
       assign_admin_owner: user.permissions.taskAssignment?.assign_admin_owner === true,
+    },
+    food: {
+      overview: user.permissions.food?.overview !== false,
+      settings: user.permissions.food?.settings === true,
+      products_view: user.permissions.food?.products_view !== false,
+      products_edit: user.permissions.food?.products_edit === true,
+      orders_create: user.permissions.food?.orders_create === true,
+      orders_view_all: user.permissions.food?.orders_view_all === true,
+      kitchen: user.permissions.food?.kitchen === true,
+      delivery: user.permissions.food?.delivery === true,
+      reports: user.permissions.food?.reports === true,
+      discounts: user.permissions.food?.discounts === true,
+      cancel_orders: user.permissions.food?.cancel_orders === true,
     },
   };
 }
@@ -141,7 +182,8 @@ export default function MemberPermissionsModal({
 }: Props) {
   const [perms, setPerms] = useState<UserPermissions>(initPerms(member));
   const isComercioWorkspace = workspaceMode === 'comercio';
-  const visibleSimpleModules = isComercioWorkspace ? COMERCIO_SIMPLE_MODULES : SERVICOS_SIMPLE_MODULES;
+  const isFoodWorkspace = workspaceMode === 'food';
+  const visibleSimpleModules = isFoodWorkspace ? [] : isComercioWorkspace ? COMERCIO_SIMPLE_MODULES : SERVICOS_SIMPLE_MODULES;
   const [assignedEstabelecimentoId, setAssignedEstabelecimentoId] = useState(member.assignedEstabelecimentoId ?? 'unassigned');
 
   const {
@@ -228,6 +270,16 @@ export default function MemberPermissionsModal({
     }));
   };
 
+  const setFood = (key: FoodPermissionKey, value: boolean) => {
+    setPerms((prev) => ({
+      ...prev,
+      food: {
+        ...prev.food,
+        [key]: value,
+      },
+    }));
+  };
+
   const canManageTaskAssignment = (perms.tasks ?? 'none') === 'edit';
 
   const mutation = useMutation({
@@ -257,6 +309,7 @@ export default function MemberPermissionsModal({
   const comercial: NonNullable<UserPermissions['comercial']> = perms.comercial ?? {};
   const caixa: NonNullable<UserPermissions['caixa']> = perms.caixa ?? {};
   const stock: NonNullable<UserPermissions['stock']> = perms.stock ?? {};
+  const foodPerms: NonNullable<UserPermissions['food']> = perms.food ?? {};
   const financeTransactionsLevel: SimpleLevel = finances.transactions ?? 'none';
 
   return (
@@ -270,6 +323,12 @@ export default function MemberPermissionsModal({
           {isComercioWorkspace ? (
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
               Estás a editar as permissões do workspace de comércio. Esta vista segue as abas reais desse modo.
+            </div>
+          ) : null}
+
+          {isFoodWorkspace ? (
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+              Estás a editar permissões do KukuGest Food. A fundação usa Visão geral, Produtos e Configurações; as restantes permissões ficam preparadas para pedidos, cozinha e delivery.
             </div>
           ) : null}
 
@@ -308,6 +367,26 @@ export default function MemberPermissionsModal({
             </div>
           ) : null}
 
+          {isFoodWorkspace ? (
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#6b7e9a]">KukuGest Food</p>
+              <div className="space-y-3 rounded-xl border border-[#dde3ec] bg-[#f8fafc] p-3">
+                {FOOD_PERMISSION_ITEMS.map(({ key, label }) => (
+                  <label key={key} className="flex cursor-pointer select-none items-center justify-between gap-3">
+                    <span className="text-sm text-[#0A2540]">{label}</span>
+                    <input
+                      type="checkbox"
+                      checked={!!foodPerms[key]}
+                      onChange={(event) => setFood(key, event.target.checked)}
+                      className="h-4 w-4 accent-[#0A2540]"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {!isFoodWorkspace ? (
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">
               {isComercioWorkspace ? 'Operação diária' : 'Módulos'}
@@ -348,6 +427,7 @@ export default function MemberPermissionsModal({
               ) : null}
             </div>
           </div>
+          ) : null}
 
           {visibleSimpleModules.some((module) => module.key === 'tasks') ? (
             <div>
@@ -375,7 +455,7 @@ export default function MemberPermissionsModal({
             </div>
           ) : null}
 
-          {!isComercioWorkspace ? (
+          {!isComercioWorkspace && !isFoodWorkspace ? (
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">Finanças</p>
               <div className="space-y-3 p-3 bg-[#f8fafc] rounded-xl border border-[#dde3ec]">
@@ -410,6 +490,7 @@ export default function MemberPermissionsModal({
             </div>
           ) : null}
 
+          {!isFoodWorkspace ? (
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">
               {isComercioWorkspace ? 'Painel Comercial' : 'Permissões Comerciais'}
@@ -431,7 +512,9 @@ export default function MemberPermissionsModal({
               ))}
             </div>
           </div>
+          ) : null}
 
+          {!isFoodWorkspace ? (
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">
               Caixa
@@ -455,7 +538,9 @@ export default function MemberPermissionsModal({
               ))}
             </div>
           </div>
+          ) : null}
 
+          {!isFoodWorkspace ? (
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-[#6b7e9a] mb-3">
               {isComercioWorkspace ? 'Produtos e Stock' : 'Stock'}
@@ -481,6 +566,7 @@ export default function MemberPermissionsModal({
               </label>
             </div>
           </div>
+          ) : null}
 
           {isComercioWorkspace ? (
             <div>

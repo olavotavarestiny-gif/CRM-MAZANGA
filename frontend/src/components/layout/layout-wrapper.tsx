@@ -3,25 +3,27 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, Suspense } from 'react';
 import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { dismissWelcomeOnboarding, getCurrentUser, getOnboarding, getModuleIntrosSeen, markModuleIntroSeen, updateChatPresence, BACKEND_WAKING_EVENT, BACKEND_READY_EVENT } from '@/lib/api';
+import { dismissWelcomeOnboarding, getCurrentUser, getFoodSettings, getOnboarding, getModuleIntrosSeen, markModuleIntroSeen, updateChatPresence, BACKEND_WAKING_EVENT, BACKEND_READY_EVENT } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import Sidebar from './sidebar';
+import ManagementSidebar from '@/components/management/management-sidebar';
 import { Footer } from './footer';
 import ModuleOnboardingModal from '@/components/onboarding/module-onboarding-modal';
 import { routeToModuleKey, resolveModuleIntro, type ModuleIntroContent } from '@/lib/module-onboarding';
 import { BillingSuspendedModal } from '@/components/billing/access-notice';
 import TrialStatusBadge from '@/components/billing/trial-status-badge';
 import KukuGestLogo from '@/components/KukuGestLogo';
+import { RestaurantMark, getFoodBrand } from '@/components/food/food-ui';
 import AppBootLoading from './app-boot-loading';
 import ServerConnectionError from './server-connection-error';
 import { ReactNode } from 'react';
 import { Menu, Eye, Info, LogOut, RefreshCw, X } from 'lucide-react';
 import type { User } from '@/lib/api';
 import { canAccessWorkspaceRoute, getWorkspaceFallbackRoute, hasFeature } from '@/lib/permissions';
-import { isComercio } from '@/lib/business-modes';
+import { isComercio, isGestaoKpi } from '@/lib/business-modes';
 import { getBlockedFeatureCopy } from '@/lib/plan-utils';
-import { DEV_AUTH_USER, isDevAuthSessionActive, writeDevAuthSession } from '@/lib/dev-auth';
+import { DEV_AUTH_USER, isDevAuthSessionActive, setDevAuthPersonId, writeDevAuthSession } from '@/lib/dev-auth';
 import { getAccessRoleLabel } from '@/lib/roles';
 
 const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
@@ -41,6 +43,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/forms':          'Formulários',
   '/finances':       'Finanças',
   '/produtos':       'Produtos',
+  '/food':           'KukuGest Food',
 };
 
 const ROUTE_TO_PLAN_FEATURE = [
@@ -58,6 +61,7 @@ const ROUTE_TO_PLAN_FEATURE = [
   { prefix: '/automations', feature: 'automacoes' },
   { prefix: '/forms', feature: 'formularios' },
   { prefix: '/finances', feature: 'financas' },
+  { prefix: '/food', feature: 'food' },
 ] as const;
 
 function resolveRouteLabel(pathname: string) {
@@ -108,13 +112,17 @@ function LayoutInner({
   const fetchingCount = useIsFetching();
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [moduleIntro, setModuleIntro] = useState<{ key: string; content: ModuleIntroContent } | null>(null);
   const [accessNotice, setAccessNotice] = useState<AccessNotice | null>(null);
   const [authLoadError, setAuthLoadError] = useState<AuthLoadError | null>(null);
   const [authRetryNonce, setAuthRetryNonce] = useState(0);
   const [routeTransitioning, setRouteTransitioning] = useState(false);
-  const comercio = isComercio(currentUser?.workspaceMode);
+  const food = pathname === '/food' || pathname.startsWith('/food/');
+  const gestaoKpi = !food && (pathname === '/gestao' || pathname.startsWith('/gestao/') || isGestaoKpi(currentUser?.workspaceMode));
+  const comercio = !food && !gestaoKpi && isComercio(currentUser?.workspaceMode);
+  const activeWorkspaceMode = food ? 'food' : gestaoKpi ? 'gestao_kpi' : comercio ? 'comercio' : 'servicos';
   const [showTopProgress, setShowTopProgress] = useState(false);
   const [backendWaking, setBackendWaking] = useState(false);
   const authChecked = useRef(false);
@@ -128,6 +136,18 @@ function LayoutInner({
     if (!devAuthBypassEnabled) return;
     writeDevAuthSession(DEV_AUTH_USER);
   }, [devAuthBypassEnabled]);
+
+  useEffect(() => {
+    setSidebarCollapsed(window.localStorage.getItem('kukugest:sidebar-collapsed') === '1');
+  }, []);
+
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((value) => {
+      const next = !value;
+      window.localStorage.setItem('kukugest:sidebar-collapsed', next ? '1' : '0');
+      return next;
+    });
+  };
 
   const isPublicPage =
     pathname === '/login' ||
@@ -144,7 +164,7 @@ function LayoutInner({
     pathname.startsWith('/preview');
 
   const onboardingQuery = useQuery({
-    queryKey: ['onboarding', currentUser?.workspaceMode],
+    queryKey: ['onboarding', activeWorkspaceMode],
     queryFn: getOnboarding,
     staleTime: 60_000,
     enabled: !!currentUser && !isPublicPage && !devAuthBypassEnabled,
@@ -153,7 +173,7 @@ function LayoutInner({
   const dismissWelcomeMutation = useMutation({
     mutationFn: dismissWelcomeOnboarding,
     onSuccess: () => {
-      queryClient.setQueryData(['onboarding', currentUser?.workspaceMode], (old: unknown) => (
+      queryClient.setQueryData(['onboarding', activeWorkspaceMode], (old: unknown) => (
         old && typeof old === 'object'
           ? {
               ...old,
@@ -194,6 +214,13 @@ function LayoutInner({
     enabled: !!currentUser && !isPublicPage && !devAuthBypassEnabled,
   });
 
+  const foodSettingsQuery = useQuery({
+    queryKey: ['food-settings'],
+    queryFn: getFoodSettings,
+    enabled: food && !!currentUser && !isPublicPage,
+    retry: 2,
+  });
+
   const markModuleSeenMutation = useMutation({
     mutationFn: markModuleIntroSeen,
     onSuccess: (seen) => {
@@ -208,7 +235,7 @@ function LayoutInner({
     if (!seen) return; // ainda a carregar a lista
     const moduleKey = routeToModuleKey(pathname);
     if (!moduleKey || seen.includes(moduleKey)) return;
-    const content = resolveModuleIntro(moduleKey, currentUser.workspaceMode);
+    const content = resolveModuleIntro(moduleKey, activeWorkspaceMode);
     if (!content) return;
     setModuleIntro({ key: moduleKey, content });
   }, [pathname, currentUser, isPublicPage, devAuthBypassEnabled, moduleIntrosQuery.data, moduleIntro]);
@@ -373,6 +400,17 @@ function LayoutInner({
     }
 
     const enforceAccess = (user: User) => {
+      // A rota raiz e o alias /dashboard são pontos de entrada, não tentativas de
+      // acesso a outro workspace. Encaminhar contas Food sem mostrar um falso 403.
+      if (user.workspaceMode === 'food' && (pathname === '/' || pathname.startsWith('/dashboard'))) {
+        setAccessNotice(null);
+        try {
+          sessionStorage.removeItem(ACCESS_NOTICE_STORAGE_KEY);
+        } catch {}
+        router.replace('/food');
+        return;
+      }
+
       // Only platform superadmins can access /superadmin
       if (pathname.startsWith('/superadmin') && !user.isSuperAdmin) {
         router.push('/');
@@ -384,10 +422,10 @@ function LayoutInner({
         return;
       }
 
-      if (!canAccessWorkspaceRoute(user, pathname, user.workspaceMode)) {
-        const fallback = getWorkspaceFallbackRoute(user, user.workspaceMode);
+      if (!canAccessWorkspaceRoute(user, pathname, activeWorkspaceMode)) {
+        const fallback = getWorkspaceFallbackRoute(user, activeWorkspaceMode);
         const planFeature = resolveRoutePlanFeature(pathname);
-        const blockedByPlan = planFeature ? !hasFeature(user, planFeature) : false;
+        const blockedByPlan = planFeature && planFeature !== 'food' ? !hasFeature(user, planFeature) : false;
         const blockedCopy = blockedByPlan
           ? getBlockedFeatureCopy({ featureName: pathname.startsWith('/relatorios') ? 'advancedReports' : planFeature, pathname })
           : null;
@@ -447,6 +485,17 @@ function LayoutInner({
     checkAuth();
   }, [pathname, authRetryNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!authLoadError || isPublicPage) return;
+    const timer = window.setTimeout(() => {
+      authChecked.current = false;
+      setIsLoading(true);
+      setAuthLoadError(null);
+      setAuthRetryNonce((value) => value + 1);
+    }, 5_000);
+    return () => window.clearTimeout(timer);
+  }, [authLoadError, isPublicPage]);
+
 
   if (isLoading && !isPublicPage) {
     return <AppBootLoading />;
@@ -477,8 +526,10 @@ function LayoutInner({
     );
   }
 
+  const ActiveSidebar = gestaoKpi ? ManagementSidebar : Sidebar;
+
   return (
-    <div className={`flex h-screen bg-[#f5f7f9] ${comercio ? 'workspace-comercio' : 'workspace-servicos'}`}>
+    <div className={`flex h-screen ${gestaoKpi ? 'workspace-gestao-kpi bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50' : `bg-[#f5f7f9] ${food ? 'workspace-food' : comercio ? 'workspace-comercio' : 'workspace-servicos'}`}`}>
       <div className="pointer-events-none fixed inset-x-0 top-0 z-[80]">
         <div
           className={`h-1 origin-left transition-all duration-300 ease-out ${
@@ -497,10 +548,12 @@ function LayoutInner({
       )}
       {/* Sidebar Desktop */}
       <div className="hidden md:flex">
-        <Sidebar
+        <ActiveSidebar
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           currentUser={currentUser}
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={toggleSidebarCollapsed}
         />
       </div>
 
@@ -512,23 +565,25 @@ function LayoutInner({
             onClick={() => setSidebarOpen(false)}
           />
         )}
-        <Sidebar
+        <ActiveSidebar
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           currentUser={currentUser}
+          collapsed={false}
+          onToggleCollapsed={toggleSidebarCollapsed}
         />
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col h-screen">
+      <div className="flex-1 flex min-w-0 flex-col h-screen">
         {/* Top Bar Desktop */}
-        <div className="hidden md:flex items-center justify-between h-16 px-8 bg-white border-b border-slate-100 sticky top-0 z-40 flex-shrink-0">
+        <div className={`hidden md:flex items-center justify-between h-16 px-8 border-b sticky top-0 z-40 flex-shrink-0 ${gestaoKpi ? 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950' : 'bg-white border-slate-100'}`}>
           <div />
           <UserWidget user={currentUser} />
         </div>
 
         {/* Top Bar Mobile */}
-        <div className="md:hidden flex items-center justify-between gap-3 h-16 px-4 border-b border-slate-100 bg-white">
+        <div className={`md:hidden flex items-center justify-between gap-3 h-16 px-4 border-b ${gestaoKpi ? 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950' : 'border-slate-100 bg-white'}`}>
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -538,7 +593,16 @@ function LayoutInner({
               <span className="text-sm font-medium text-[#2c2f31]">Menu</span>
             </button>
             <div className="min-w-0 overflow-hidden">
-              <KukuGestLogo height={24} showBetaBadge className="max-w-full" />
+              {food ? (
+                <div className="flex min-w-0 items-center gap-2">
+                  <RestaurantMark settings={foodSettingsQuery.data} size="sm" />
+                  <span className="truncate text-sm font-black text-slate-950">
+                    {getFoodBrand(foodSettingsQuery.data).name}
+                  </span>
+                </div>
+              ) : (
+                <KukuGestLogo height={24} showBetaBadge className="max-w-full" />
+              )}
             </div>
           </div>
           <UserWidget user={currentUser} compact />
@@ -565,13 +629,32 @@ function LayoutInner({
         )}
 
         {devAuthBypassEnabled && (
-          <div className="flex items-center justify-center bg-red-700 px-4 py-2 text-center text-sm font-black text-white shadow-sm">
-            ⚠️ MODO DEV — Auth desactivado — Não é produção
+          <div className={food
+            ? 'flex items-center justify-center gap-3 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-center text-xs font-semibold text-amber-800'
+            : 'flex items-center justify-center bg-red-700 px-4 py-2 text-center text-sm font-black text-white shadow-sm'}
+          >
+            <span>{food
+              ? currentUser?.accountOwnerId
+                ? `A testar como ${currentUser.name}`
+                : 'Modo dev activo'
+              : '⚠️ MODO DEV — Auth desactivado — Não é produção'}</span>
+            {food && currentUser?.accountOwnerId ? (
+              <button
+                type="button"
+                className="rounded-md border border-amber-300 bg-white px-2 py-1 font-bold text-amber-900 hover:bg-amber-100"
+                onClick={() => {
+                  setDevAuthPersonId(null);
+                  window.location.href = '/food';
+                }}
+              >
+                Voltar ao Gestor
+              </button>
+            ) : null}
           </div>
         )}
 
         {/* Main Scrollable Area */}
-        <main className="flex-1 overflow-y-auto bg-[#f5f7f9]">
+        <main className="flex-1 min-w-0 overflow-y-auto bg-[#f5f7f9]">
           {accessNotice && (
             <div className="px-4 pt-4 md:px-6">
               <div className="flex items-start justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">

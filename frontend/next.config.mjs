@@ -53,6 +53,9 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  // O servidor local usa .next-dev (definido no script `dev`) para que um
+  // `next build` executado durante os testes não substitua os seus artefactos.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   async redirects() {
     return [
       {

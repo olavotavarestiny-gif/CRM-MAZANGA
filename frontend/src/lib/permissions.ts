@@ -10,7 +10,11 @@ export type ModuleKey =
   | 'automations'
   | 'forms'
   | 'finances'
-  | 'vendas';
+  | 'vendas'
+  | 'food';
+
+export type FoodPermissionKey = keyof NonNullable<UserPermissions['food']>;
+export type FoodRole = NonNullable<User['foodAccess']>['roles'][number];
 
 const MODULE_TO_FEATURE: Record<ModuleKey, PlanFeatureName> = {
   contacts: 'clientes',
@@ -22,6 +26,7 @@ const MODULE_TO_FEATURE: Record<ModuleKey, PlanFeatureName> = {
   forms: 'formularios',
   finances: 'financas',
   vendas: 'vendas',
+  food: 'food',
 };
 
 function parsePermissions(permissions?: UserPermissions | null): UserPermissions | null {
@@ -45,6 +50,19 @@ type CommerceRoute =
   | '/faturacao'
   | '/finances'
   | '/configuracoes';
+type FoodRoute =
+  | '/food'
+  | '/food/gestao'
+  | '/food/caixa'
+  | '/food/novo-pedido'
+  | '/food/pedidos'
+  | '/food/cozinha'
+  | '/food/delivery'
+  | '/food/entregador'
+  | '/food/crm'
+  | '/food/ajuda'
+  | '/food/produtos'
+  | '/food/configuracoes';
 
 const GLOBAL_PRIVATE_ROUTE_PREFIXES = [
   '/admin',
@@ -82,6 +100,21 @@ const COMERCIO_FALLBACK_ROUTES: CommerceRoute[] = [
   '/configuracoes',
 ];
 
+const FOOD_FALLBACK_ROUTES: FoodRoute[] = [
+  '/food',
+  '/food/gestao',
+  '/food/caixa',
+  '/food/cozinha',
+  '/food/delivery',
+  '/food/entregador',
+  '/food/crm',
+  '/food/ajuda',
+  '/food/novo-pedido',
+  '/food/pedidos',
+  '/food/produtos',
+  '/food/configuracoes',
+];
+
 const PLAN_ORDER: Array<User['plan']> = ['essencial', 'profissional', 'enterprise'];
 
 function normalizePath(pathname: string): string {
@@ -91,6 +124,10 @@ function normalizePath(pathname: string): string {
 
 function isCommerceWorkspace(user?: Pick<User, 'workspaceMode'> | null) {
   return user?.workspaceMode === 'comercio';
+}
+
+function isFoodWorkspace(user?: Pick<User, 'workspaceMode' | 'availableWorkspaces'> | null) {
+  return user?.workspaceMode === 'food' || user?.availableWorkspaces?.includes('food') === true;
 }
 
 function isPlanAtLeast(user: Pick<User, 'plan'> | null | undefined, targetPlan: User['plan']) {
@@ -112,6 +149,7 @@ export function hasFeature(
 
 /** Returns true if user can view the given module */
 export function canView(user: User, module: ModuleKey): boolean {
+  if (module === 'food') return canFood(user, 'overview');
   if (!hasFeature(user, MODULE_TO_FEATURE[module])) return false;
   // SuperAdmin and platform admin see everything
   if (hasFullAccess(user)) return true;
@@ -138,6 +176,7 @@ export function canView(user: User, module: ModuleKey): boolean {
 
 /** Returns true if user can create/edit records in the given module */
 export function canEdit(user: User, module: ModuleKey): boolean {
+  if (module === 'food') return canFood(user, 'settings') || canFood(user, 'products_edit');
   if (!hasFeature(user, MODULE_TO_FEATURE[module])) return false;
   if (hasFullAccess(user)) return true;
   if (!user.permissions) return true;
@@ -307,6 +346,62 @@ export function canViewReports(user: User): boolean {
   return finances.view_reports === true;
 }
 
+export function canFood(user: User, key: FoodPermissionKey): boolean {
+  if (!isFoodWorkspace(user) || user.foodAccess?.entitled === false) return false;
+  const granularByLegacyKey: Record<FoodPermissionKey, string> = {
+    overview: 'overview.view',
+    settings: 'settings.edit',
+    products_view: 'catalog.view',
+    products_edit: 'catalog.edit',
+    orders_create: 'orders.create',
+    orders_view_all: 'orders.view',
+    kitchen: 'kitchen.manage',
+    delivery: 'delivery.manage',
+    reports: 'reports.view',
+    discounts: 'orders.discount',
+    cancel_orders: 'orders.cancel',
+  };
+  if (user.foodAccess) {
+    return user.foodAccess.permissions.includes('*') || user.foodAccess.permissions.includes(granularByLegacyKey[key]);
+  }
+  if (hasFullAccess(user)) return true;
+  const perms = parsePermissions(user.permissions);
+  if (perms === null) return true;
+  const value = perms?.food?.[key];
+  if (key === 'overview' || key === 'products_view') return value !== false;
+  return value === true;
+}
+
+export function hasFoodPermission(user: User, permission: string): boolean {
+  if (!isFoodWorkspace(user) || user.foodAccess?.entitled === false) return false;
+  if (hasFullAccess(user) && !user.foodAccess) return true;
+  if (user.foodAccess) {
+    return user.foodAccess.permissions.includes('*') || user.foodAccess.permissions.includes(permission);
+  }
+  const fallbackByPermission: Record<string, FoodPermissionKey> = {
+    'overview.view': 'overview',
+    'settings.edit': 'settings',
+    'team.view': 'settings',
+    'team.edit': 'settings',
+    'catalog.view': 'products_view',
+    'catalog.edit': 'products_edit',
+    'orders.create': 'orders_create',
+    'orders.view': 'orders_view_all',
+    'kitchen.view': 'kitchen',
+    'kitchen.manage': 'kitchen',
+    'delivery.view': 'delivery',
+    'delivery.dispatch': 'delivery',
+    'delivery.view_own': 'delivery',
+    'reports.view': 'reports',
+  };
+  const fallback = fallbackByPermission[permission];
+  return fallback ? canFood(user, fallback) : false;
+}
+
+export function hasFoodRole(user: User, role: FoodRole): boolean {
+  return user.foodAccess?.roles.includes(role) === true;
+}
+
 export function canAccessCommerceRoute(user: User, pathname: string): boolean {
   const path = normalizePath(pathname);
 
@@ -327,6 +422,28 @@ export function canAccessCommerceRoute(user: User, pathname: string): boolean {
   return false;
 }
 
+export function canAccessFoodRoute(user: User, pathname: string): boolean {
+  const path = normalizePath(pathname);
+
+  if (!isFoodWorkspace(user)) return false;
+  if (path === '/food') return hasFoodPermission(user, 'context.view') || canFood(user, 'overview');
+  if (path.startsWith('/food/ajuda')) return hasFoodPermission(user, 'context.view');
+  if (path.startsWith('/food/gestao')) return hasFoodPermission(user, 'overview.view');
+  if (path.startsWith('/food/caixa')) return hasFoodPermission(user, 'orders.create');
+  if (path.startsWith('/food/novo-pedido')) return canFood(user, 'orders_create');
+  if (path.startsWith('/food/pedidos')) return canFood(user, 'orders_view_all') || canFood(user, 'orders_create') || canFood(user, 'kitchen') || canFood(user, 'delivery');
+  if (path.startsWith('/food/cozinha')) return canFood(user, 'kitchen');
+  if (path.startsWith('/food/delivery')) return hasFoodPermission(user, 'delivery.view') || hasFoodPermission(user, 'delivery.dispatch');
+  if (path.startsWith('/food/entregador')) {
+    return hasFoodRole(user, 'courier') && hasFoodPermission(user, 'delivery.view_own');
+  }
+  if (path.startsWith('/food/crm')) return hasFoodPermission(user, 'crm.view');
+  if (path.startsWith('/food/produtos')) return canFood(user, 'products_view');
+  if (path.startsWith('/food/configuracoes')) return canFood(user, 'settings');
+
+  return false;
+}
+
 export function canAccessWorkspaceRoute(
   user: User,
   pathname: string,
@@ -336,6 +453,26 @@ export function canAccessWorkspaceRoute(
 
   if (GLOBAL_PRIVATE_ROUTE_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix + '/'))) {
     return true;
+  }
+
+  if (path === '/food' || path.startsWith('/food/')) {
+    return canAccessFoodRoute(user, path);
+  }
+
+  if (workspaceMode === 'gestao_kpi') {
+    if (path === '/') return true;
+    if (!path.startsWith('/gestao')) return false;
+    const role = !user.accountOwnerId || user.role === 'admin' ? 'admin' : user.role;
+    if (role === 'admin') return true;
+    if (path === '/gestao' || path.startsWith('/gestao/configuracoes')) return true;
+    if (role === 'marketing') return path.startsWith('/gestao/marketing');
+    if (role === 'commercial') return path.startsWith('/gestao/clientes') || path.startsWith('/gestao/comercial');
+    if (role === 'designer' || role === 'editor') return path.startsWith('/gestao/operacional');
+    return false;
+  }
+
+  if (workspaceMode === 'food') {
+    return canAccessFoodRoute(user, path);
   }
 
   if (path === '/relatorios' || path.startsWith('/relatorios/')) {
@@ -363,6 +500,10 @@ export function canAccessWorkspaceRoute(
 }
 
 export function getWorkspaceFallbackRoute(user: User, workspaceMode?: WorkspaceMode | null): string {
+  if (workspaceMode === 'gestao_kpi') return '/gestao';
+  if (workspaceMode === 'food') {
+    return FOOD_FALLBACK_ROUTES.find((route) => canAccessFoodRoute(user, route)) ?? '/food';
+  }
   if (workspaceMode === 'comercio') {
     return COMERCIO_FALLBACK_ROUTES.find((route) => canAccessCommerceRoute(user, route)) ?? '/';
   }
@@ -377,6 +518,7 @@ export function getWorkspaceFallbackRoute(user: User, workspaceMode?: WorkspaceM
     forms: '/forms',
     finances: '/finances',
     vendas: '/vendas',
+    food: '/food',
   };
 
   return getVisibleModules(user).map((module) => moduleToPath[module]).find(Boolean) ?? '/';
@@ -386,7 +528,7 @@ export function getWorkspaceFallbackRoute(user: User, workspaceMode?: WorkspaceM
 export function getVisibleModules(user: User): ModuleKey[] {
   const all: ModuleKey[] = [
     'contacts', 'pipeline', 'tasks', 'chat', 'calendario',
-    'automations', 'forms', 'finances', 'vendas',
+    'automations', 'forms', 'finances', 'vendas', 'food',
   ];
   if (hasFullAccess(user)) return all;
   return all.filter((m) => canView(user, m));

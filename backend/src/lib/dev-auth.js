@@ -2,9 +2,18 @@ const { AsyncLocalStorage } = require('async_hooks');
 const { ACCESS_ROLES } = require('./roles');
 
 const DEV_AUTH_HEADER = 'x-kukugest-dev-auth';
+const DEV_AUTH_PERSON_HEADER = 'x-kukugest-dev-person-id';
 const DEV_AUTH_TOKEN = 'kukugest-dev-auth-bypass-v1';
 const DEV_AUTH_INTERNAL_USER_ID = -1001;
 const devAuthRequestContext = new AsyncLocalStorage();
+const DEV_AUTH_WORKSPACE_MODE = process.env.DEV_AUTH_WORKSPACE_MODE === 'gestao_kpi'
+  ? 'gestao_kpi'
+  : process.env.DEV_AUTH_WORKSPACE_MODE === 'food'
+    ? 'food'
+  : process.env.DEV_AUTH_WORKSPACE_MODE === 'comercio'
+    ? 'comercio'
+    : 'servicos';
+const DEV_AUTH_REAL_USER_EMAIL = String(process.env.DEV_AUTH_REAL_USER_EMAIL || '').trim().toLowerCase();
 
 const DEV_AUTH_PUBLIC_USER = {
   id: 'dev-user-local-001',
@@ -20,7 +29,28 @@ const DEV_AUTH_PUBLIC_USER = {
   isSuperAdmin: false,
   permissions: null,
   mustChangePassword: false,
-  workspaceMode: 'servicos',
+  workspaceMode: DEV_AUTH_WORKSPACE_MODE,
+  defaultWorkspace: DEV_AUTH_WORKSPACE_MODE,
+  availableWorkspaces: DEV_AUTH_WORKSPACE_MODE === 'food'
+    ? ['servicos', 'food']
+    : [DEV_AUTH_WORKSPACE_MODE, 'food'],
+  foodAccess: {
+    entitled: true,
+    enabled: true,
+    roles: ['manager'],
+    primaryRole: 'manager',
+    branchIds: null,
+    branches: [],
+    permissions: ['*'],
+    roleLabels: {
+      manager: 'Gestor',
+      cashier: 'Caixa',
+      kitchen: 'Cozinha',
+      delivery_manager: 'Gestor de Delivery',
+      courier: 'Entregador',
+      crm_marketing: 'CRM & Marketing',
+    },
+  },
   plan: 'enterprise',
   planDetails: {
     label: 'Enterprise',
@@ -43,6 +73,7 @@ const DEV_AUTH_PUBLIC_USER = {
     automacoes: true,
     formularios: true,
     financas: true,
+    food: true,
   },
   availablePlans: {},
   billingType: 'trial',
@@ -63,7 +94,7 @@ const DEV_AUTH_PUBLIC_USER = {
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 function isDevAuthBypassEnabled() {
-  return process.env.NODE_ENV === 'development' && process.env.BYPASS_AUTH === 'true';
+  return (process.env.NODE_ENV || 'development') === 'development' && process.env.BYPASS_AUTH === 'true';
 }
 
 function hasValidDevAuthHeader(req) {
@@ -103,8 +134,11 @@ function isDevAuthRequestContext() {
 
 module.exports = {
   DEV_AUTH_HEADER,
+  DEV_AUTH_PERSON_HEADER,
   DEV_AUTH_TOKEN,
   DEV_AUTH_PUBLIC_USER,
+  DEV_AUTH_REAL_USER_EMAIL,
+  DEV_AUTH_WORKSPACE_MODE,
   isDevAuthBypassEnabled,
   hasValidDevAuthHeader,
   buildDevAuthRequestUser,

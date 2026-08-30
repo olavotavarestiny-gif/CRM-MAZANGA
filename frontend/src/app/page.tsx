@@ -10,7 +10,8 @@ import {
   getServicesDashboardBase,
   updateTask,
 } from '@/lib/api';
-import { isComercio } from '@/lib/business-modes';
+import { isComercio, isGestaoKpi } from '@/lib/business-modes';
+import ManagementDashboard from '@/components/management/management-dashboard';
 import type { Factura, ServicesDashboardBase, Task } from '@/lib/types';
 import PainelComercialPage from '@/components/comercial/painel-comercial';
 import OnboardingChecklist from '@/components/onboarding/onboarding-checklist';
@@ -759,6 +760,10 @@ export default function Dashboard() {
 
   if (isComercio(currentUser.workspaceMode)) {
     return <PainelComercialPage currentUser={currentUser} />;
+  }
+
+  if (isGestaoKpi(currentUser.workspaceMode)) {
+    return <ManagementDashboard />;
   }
 
   return <DashboardCrm currentUser={currentUser} />;

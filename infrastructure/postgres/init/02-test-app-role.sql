@@ -1,0 +1,27 @@
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'kukugest_app') THEN
+    CREATE ROLE kukugest_app
+      LOGIN
+      PASSWORD 'kukugest_app_local'
+      NOSUPERUSER
+      NOCREATEDB
+      NOCREATEROLE
+      NOINHERIT;
+  END IF;
+END
+$$;
+
+ALTER ROLE kukugest_app PASSWORD 'kukugest_app_local';
+GRANT CONNECT ON DATABASE kukugest_test TO kukugest_app;
+GRANT USAGE ON SCHEMA public TO kukugest_app;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO kukugest_app;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO kukugest_app;
+GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO kukugest_app;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE kukugest IN SCHEMA public
+  GRANT ALL PRIVILEGES ON TABLES TO kukugest_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE kukugest IN SCHEMA public
+  GRANT ALL PRIVILEGES ON SEQUENCES TO kukugest_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE kukugest IN SCHEMA public
+  GRANT ALL PRIVILEGES ON FUNCTIONS TO kukugest_app;

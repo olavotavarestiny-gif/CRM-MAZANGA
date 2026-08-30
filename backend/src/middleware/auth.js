@@ -3,6 +3,10 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 const { ACCESS_ROLES, getAccessRole, hasSuperAdminAccess } = require('../lib/roles');
 const {
+  DEV_AUTH_PUBLIC_USER,
+  DEV_AUTH_REAL_USER_EMAIL,
+  DEV_AUTH_PERSON_HEADER,
+  DEV_AUTH_WORKSPACE_MODE,
   buildDevAuthRequestUser,
   hasValidDevAuthHeader,
   isDevAuthBypassEnabled,
@@ -250,8 +254,121 @@ function buildRequestUser(user, { supabaseUid = null, impersonatedBy = null, act
   return requestUser;
 }
 
+async function ensureDevAuthFoodUser() {
+  const data = {
+    name: DEV_AUTH_PUBLIC_USER.name,
+    role: ACCESS_ROLES.ORG_ADMIN,
+    active: true,
+    accountOwnerId: null,
+    workspaceMode: 'food',
+    plan: 'enterprise',
+    billingType: 'trial',
+    trialEndsAt: null,
+    expiresAt: null,
+    graceEndsAt: null,
+    accountStatus: 'active',
+    permissions: null,
+  };
+
+  return prisma.$transaction(async (tx) => {
+    const user = await tx.user.upsert({
+      where: { email: DEV_AUTH_PUBLIC_USER.email },
+      update: data,
+      create: {
+        ...data,
+        email: DEV_AUTH_PUBLIC_USER.email,
+      },
+      select: USER_SELECT,
+    });
+    await tx.organizationModule.upsert({
+      where: { organizationId_module: { organizationId: user.id, module: 'food' } },
+      update: { enabled: true, planTier: 'enterprise' },
+      create: { organizationId: user.id, module: 'food', enabled: true, planTier: 'enterprise', createdByUserId: user.id },
+    });
+    await tx.foodSettings.upsert({
+      where: { userId: user.id },
+      update: { isEnabled: true },
+      create: { userId: user.id, isEnabled: true, restaurantName: 'Restaurante local', createdByUserId: user.id },
+    });
+    const existingRole = await tx.foodStaffRoleAssignment.findFirst({
+      where: { organizationId: user.id, personId: user.id, branchId: null, role: 'manager' },
+    });
+    if (existingRole) {
+      await tx.foodStaffRoleAssignment.update({ where: { id: existingRole.id }, data: { active: true, isPrimary: true } });
+    } else {
+      await tx.foodStaffRoleAssignment.create({
+        data: { organizationId: user.id, personId: user.id, role: 'manager', isPrimary: true, createdByUserId: user.id },
+      });
+    }
+    return user;
+  });
+}
+
+async function resolveDevAuthRealUser() {
+  const explicitEmail = DEV_AUTH_REAL_USER_EMAIL;
+  if (explicitEmail) {
+    return prisma.user.findUnique({
+      where: { email: explicitEmail },
+      select: USER_SELECT,
+    });
+  }
+
+  if (DEV_AUTH_WORKSPACE_MODE === 'gestao_kpi') {
+    const owner = await prisma.user.findFirst({
+      where: { workspaceMode: 'gestao_kpi', active: true, accountOwnerId: null },
+      select: USER_SELECT,
+      orderBy: { id: 'asc' },
+    });
+    if (owner) return owner;
+
+    return prisma.user.findFirst({
+      where: { workspaceMode: 'gestao_kpi', active: true },
+      select: USER_SELECT,
+      orderBy: { id: 'asc' },
+    });
+  }
+
+  if (DEV_AUTH_WORKSPACE_MODE === 'food') {
+    return ensureDevAuthFoodUser();
+  }
+
+  return null;
+}
+
 async function requireAuth(req, res, next) {
   if (isDevAuthBypassEnabled() && hasValidDevAuthHeader(req)) {
+    let realUser = null;
+    try {
+      realUser = await resolveDevAuthRealUser();
+    } catch (error) {
+      console.error('[auth] dev auth DB error:', error.message);
+      return res.status(503).json({
+        error: 'Base de dados indisponível. Tente novamente dentro de instantes.',
+        code: 'DATABASE_UNAVAILABLE',
+      });
+    }
+    if (realUser) {
+      const requestedPersonId = Number(req.headers[DEV_AUTH_PERSON_HEADER]);
+      if (Number.isInteger(requestedPersonId) && requestedPersonId !== realUser.id) {
+        const requestedPerson = await prisma.user.findUnique({ where: { id: requestedPersonId }, select: USER_SELECT });
+        const directMember = requestedPerson?.active && requestedPerson.accountOwnerId === realUser.id;
+        const invitedMember = requestedPerson?.active && await prisma.accountMembership.findFirst({
+          where: { accountOwnerId: realUser.id, personId: requestedPersonId, active: true },
+          select: { id: true },
+        });
+        if (!directMember && !invitedMember) {
+          return res.status(403).json({
+            error: 'A persona de teste não pertence à organização local.',
+            code: 'DEV_AUTH_PERSON_NOT_ALLOWED',
+          });
+        }
+        realUser = requestedPerson;
+      }
+      req.user = buildRequestUser(realUser, { supabaseUid: realUser.supabaseUid || null });
+      req.user.isDevAuthLocalUser = true;
+      return next();
+    }
+
     req.user = buildDevAuthRequestUser();
 
     if (isDevAuthWrite(req) && !String(req.originalUrl || '').startsWith('/api/auth/log-login')) {

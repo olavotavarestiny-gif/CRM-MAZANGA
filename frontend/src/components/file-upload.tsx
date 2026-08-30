@@ -10,12 +10,16 @@ const DEFAULT_ACCEPT: Record<UploadFolder, string> = {
   avatars: 'image/jpeg,image/png,image/webp',
   attachments: 'image/*,application/pdf,application/vnd.openxmlformats-officedocument.*',
   invoices: 'application/pdf',
+  food: 'image/jpeg,image/png,image/webp',
+  'food-proof': 'image/jpeg,image/png,image/webp',
 };
 
 const MAX_SIZES: Record<UploadFolder, number> = {
   avatars: 2 * 1024 * 1024,
   attachments: 2 * 1024 * 1024,
   invoices: 5 * 1024 * 1024,
+  food: 4 * 1024 * 1024,
+  'food-proof': 4 * 1024 * 1024,
 };
 
 export interface FileUploadProps {

@@ -45,6 +45,7 @@ export const PLAN_FEATURE_LABELS: Record<PlanFeatureName, string> = {
   automacoes: 'Automações',
   formularios: 'Formulários',
   financas: 'Finanças',
+  food: 'KukuGest Food',
 };
 
 const PLAN_TO_TIER: Record<PlanName, PricingTierKey> = {
@@ -77,7 +78,7 @@ function normalizePlanInput(plan?: PlanName | string | null): PlanName | null {
   return null;
 }
 
-const WORKSPACE_PRICING_CATALOG: Record<WorkspaceMode, PricingTier[]> = {
+const WORKSPACE_PRICING_CATALOG: Record<Exclude<WorkspaceMode, 'gestao_kpi'>, PricingTier[]> = {
   servicos: [
     {
       key: 'starter',
@@ -188,9 +189,59 @@ const WORKSPACE_PRICING_CATALOG: Record<WorkspaceMode, PricingTier[]> = {
       emphasize: true,
     },
   ],
+  food: [
+    {
+      key: 'starter',
+      internalPlan: 'essencial',
+      name: 'Inicial',
+      price: '14.999 Kz',
+      description: 'Para restaurantes pequenos a organizar pedidos e catálogo',
+      features: [
+        '1 utilizador',
+        'Até 300 clientes',
+        'Catálogo Food',
+        'Configuração do restaurante',
+        'Visão geral operacional',
+      ],
+      buttonText: 'Começar',
+    },
+    {
+      key: 'growth',
+      internalPlan: 'profissional',
+      name: 'Crescimento',
+      price: '29.999 Kz',
+      description: 'Para equipas com atendimento, caixa e cozinha',
+      features: [
+        'Até 5 utilizadores',
+        'Até 3.000 clientes',
+        'Tudo do Inicial',
+        'Preparado para cozinha e delivery',
+        'Finanças',
+      ],
+      buttonText: 'Escolher Crescimento',
+      badge: 'Mais escolhido',
+      highlight: true,
+    },
+    {
+      key: 'pro',
+      internalPlan: 'enterprise',
+      name: 'Estabilidade',
+      price: '54.999 Kz',
+      description: 'Para restaurantes com equipa maior e operação estruturada',
+      features: [
+        'Até 15 utilizadores',
+        'Clientes ilimitados',
+        'Tudo do Crescimento',
+        'Multi-unidade preparado',
+        'Relatórios avançados',
+      ],
+      buttonText: 'Escolher Estabilidade',
+      emphasize: true,
+    },
+  ],
 };
 
-const WORKSPACE_PLAN_COMPARISON: Record<WorkspaceMode, PlanComparisonItem[]> = {
+const WORKSPACE_PLAN_COMPARISON: Record<Exclude<WorkspaceMode, 'gestao_kpi'>, PlanComparisonItem[]> = {
   servicos: [
     { feature: 'Relatórios básicos', availabilityLabel: 'Crescimento e Estabilidade', tone: 'growth' },
     { feature: 'Relatórios avançados', availabilityLabel: 'Estabilidade', tone: 'pro' },
@@ -207,10 +258,17 @@ const WORKSPACE_PLAN_COMPARISON: Record<WorkspaceMode, PlanComparisonItem[]> = {
     { feature: 'Gestão de equipa', availabilityLabel: 'Crescimento e Estabilidade', tone: 'growth' },
     { feature: 'Mensagens em massa', availabilityLabel: 'Estabilidade (Em breve)', tone: 'soon' },
   ],
+  food: [
+    { feature: 'Catálogo Food', availabilityLabel: 'Todos os planos', tone: 'growth' },
+    { feature: 'Caixa e faturação', availabilityLabel: 'Crescimento e Estabilidade', tone: 'growth' },
+    { feature: 'Multi-unidade', availabilityLabel: 'Estabilidade', tone: 'pro' },
+    { feature: 'Relatórios avançados', availabilityLabel: 'Estabilidade', tone: 'pro' },
+    { feature: 'Delivery avançado', availabilityLabel: 'Estabilidade (Em breve)', tone: 'soon' },
+  ],
 };
 
 const WORKSPACE_UPGRADE_SUMMARY: Record<
-  WorkspaceMode,
+  Exclude<WorkspaceMode, 'gestao_kpi'>,
   Record<PricingTierKey, { title: string; description: string; bullets: string[] }>
 > = {
   servicos: {
@@ -247,6 +305,23 @@ const WORKSPACE_UPGRADE_SUMMARY: Record<
       bullets: ['Clientes ilimitados', 'Multi-estabelecimento', 'Gestão de equipa', 'Relatórios avançados'],
     },
   },
+  food: {
+    starter: {
+      title: 'Próximo passo recomendado: Crescimento',
+      description: 'Desbloqueia a estrutura necessária para atendimento, caixa e equipa.',
+      bullets: ['Até 5 utilizadores', 'Finanças', 'Preparado para cozinha', 'Preparado para delivery'],
+    },
+    growth: {
+      title: 'Próximo passo: Estabilidade',
+      description: 'Prepara restaurantes com mais volume para relatórios, equipa maior e multi-unidade.',
+      bullets: ['Até 15 utilizadores', 'Clientes ilimitados', 'Multi-unidade preparado', 'Relatórios avançados'],
+    },
+    pro: {
+      title: 'Está no plano mais completo',
+      description: 'O plano Estabilidade cobre a operação Food mais avançada disponível nesta fase.',
+      bullets: ['Clientes ilimitados', 'Multi-unidade preparado', 'Permissões avançadas', 'Relatórios avançados'],
+    },
+  },
 };
 
 export function getPlanBillingOptions(plan: PlanName): string[] {
@@ -256,11 +331,13 @@ export function getPlanBillingOptions(plan: PlanName): string[] {
 }
 
 export function getWorkspaceLabel(mode?: WorkspaceMode | string | null) {
+  if (mode === 'gestao_kpi') return 'Gestão e KPI';
+  if (mode === 'food') return 'Food';
   return mode === 'comercio' ? 'Comércio' : 'Serviços';
 }
 
 export function getPricingCatalog(mode: WorkspaceMode = 'servicos') {
-  return WORKSPACE_PRICING_CATALOG[mode];
+  return WORKSPACE_PRICING_CATALOG[mode === 'gestao_kpi' ? 'servicos' : mode];
 }
 
 export function mapPlanNameToPricingTier(plan?: PlanName | string | null): PricingTierKey {
@@ -347,7 +424,8 @@ export function getPricingButtonText(
 }
 
 export function getPlanComparisonItems(workspaceMode: WorkspaceMode = 'servicos') {
-  return WORKSPACE_PLAN_COMPARISON[workspaceMode];
+  const pricingMode = workspaceMode === 'gestao_kpi' ? 'servicos' : workspaceMode;
+  return WORKSPACE_PLAN_COMPARISON[pricingMode];
 }
 
 export function getUpgradeSummary(
@@ -355,7 +433,8 @@ export function getUpgradeSummary(
   plan?: PlanName | null
 ) {
   const tier = mapPlanNameToPricingTier(plan);
-  return WORKSPACE_UPGRADE_SUMMARY[workspaceMode][tier];
+  const pricingMode = workspaceMode === 'gestao_kpi' ? 'servicos' : workspaceMode;
+  return WORKSPACE_UPGRADE_SUMMARY[pricingMode][tier];
 }
 
 export function buildWhatsAppPlanLink({
@@ -588,7 +667,7 @@ export interface RegisterPlan {
 }
 
 // Preços diferem por workspace (serviços vs comércio)
-export const REGISTER_PRICING: Record<'servicos' | 'comercio', RegisterPlan[]> = {
+export const REGISTER_PRICING: Record<'servicos' | 'comercio' | 'food', RegisterPlan[]> = {
   servicos: [
     {
       key: 'essencial', name: 'Inicial', description: 'Para começar e validar o negócio.',
@@ -629,6 +708,26 @@ export const REGISTER_PRICING: Record<'servicos' | 'comercio', RegisterPlan[]> =
       badge: null,
     },
   ],
+  food: [
+    {
+      key: 'essencial', name: 'Inicial', description: 'Para restaurantes pequenos começarem com catálogo e configuração.',
+      monthlyPrice: 14999, annualMonthlyPrice: 9583, annualTotalPrice: 115000,
+      features: ['1 utilizador', 'Catálogo Food', 'Configuração do restaurante', 'Clientes', 'Visão geral'],
+      badge: null,
+    },
+    {
+      key: 'profissional', name: 'Crescimento', description: 'Para equipas com atendimento, caixa e cozinha.',
+      monthlyPrice: 29999, annualMonthlyPrice: 18750, annualTotalPrice: 225000,
+      features: ['Até 5 utilizadores', 'Tudo do Inicial', 'Preparado para pedidos', 'Preparado para cozinha', 'Finanças'],
+      badge: 'Mais escolhido',
+    },
+    {
+      key: 'enterprise', name: 'Estabilidade', description: 'Para restaurantes com operação estruturada.',
+      monthlyPrice: 54999, annualMonthlyPrice: 34583, annualTotalPrice: 415000,
+      features: ['Até 15 utilizadores', 'Clientes ilimitados', 'Multi-unidade preparado', 'Relatórios avançados'],
+      badge: null,
+    },
+  ],
 };
 
 // Card de contacto (não é plano self-serve) — igual nos dois workspaces
@@ -640,7 +739,7 @@ export const EXPANSAO_CARD = {
 };
 
 // Desconto anual real por workspace (calculado do plano Crescimento)
-export function annualDiscountPct(mode: 'servicos' | 'comercio'): number {
+export function annualDiscountPct(mode: 'servicos' | 'comercio' | 'food'): number {
   const plan = REGISTER_PRICING[mode][1];
   return Math.round((1 - plan.annualTotalPrice / (plan.monthlyPrice * 12)) * 100);
 }
@@ -653,7 +752,7 @@ export function buildExpansaoLink(): string {
 
 // ── Questionário de recomendação (workspace + plano) no registo ──────────────
 
-export type WorkspaceRec = 'servicos' | 'comercio';
+export type WorkspaceRec = 'servicos' | 'comercio' | 'food';
 export type PlanRec = RegisterPlanKey; // 'essencial' | 'profissional' | 'enterprise'
 
 export interface RegisterQuestionOption {
@@ -676,6 +775,7 @@ export const REGISTER_QUESTIONS: RegisterQuestion[] = [
     options: [
       { label: 'Serviços', hint: 'Consultoria, agência, clínica, assistência…', workspace: 'servicos' },
       { label: 'Produtos físicos', hint: 'Loja, balcão, comércio', workspace: 'comercio' },
+      { label: 'Restaurante ou delivery', hint: 'Restaurante, bar, cozinha, pastelaria…', workspace: 'food' },
     ],
   },
   {
@@ -716,5 +816,6 @@ export function recommendFromAnswers(answers: RegisterAnswers): { workspace: Wor
 }
 
 export function workspaceLabel(workspace: WorkspaceRec): string {
+  if (workspace === 'food') return 'Food';
   return workspace === 'comercio' ? 'Comércio' : 'Serviços';
 }

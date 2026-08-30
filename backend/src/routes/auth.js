@@ -11,6 +11,7 @@ const { getSubscriptionState } = require('../lib/subscription-access');
 const { DEV_AUTH_PUBLIC_USER } = require('../lib/dev-auth');
 const { getAccessRole } = require('../lib/roles');
 const { logRouteError } = require('../lib/request-log');
+const { getOrganizationModules, resolveFoodAccess, serializeFoodAccess } = require('../lib/food-access');
 
 const DIAGNOSTIC_TIMEOUT_MS = 3500;
 
@@ -385,12 +386,26 @@ async function getCurrentUserPayload(userId, { impersonatedBy = null, activeAcco
   };
   const currentPlanCatalog = getSerializedPlanCatalog(effectivePlan, effectiveWorkspaceMode);
   const subscription = await getSubscriptionState(activeOwnerId, subscriptionAccount);
+  const requestUserForFood = {
+    ...userWithEffectiveRole,
+    effectiveUserId: activeOwnerId,
+    isAccountOwner: isOwnerActive,
+    permissionsJson: effectivePermissions,
+    planContext: { workspaceMode: effectiveWorkspaceMode, plan: effectivePlan },
+  };
+  const [availableWorkspaces, foodAccess] = await Promise.all([
+    getOrganizationModules(prisma, activeOwnerId, effectiveWorkspaceMode),
+    resolveFoodAccess(prisma, requestUserForFood),
+  ]);
 
   return {
     ...userWithEffectiveRole,
     accessRole: getAccessRole(userWithEffectiveRole),
     plan: effectivePlan,
     workspaceMode: effectiveWorkspaceMode,
+    defaultWorkspace: effectiveWorkspaceMode,
+    availableWorkspaces,
+    foodAccess: serializeFoodAccess(foodAccess),
     planDetails: {
       label: currentPlanCatalog.label,
       description: currentPlanCatalog.description,
@@ -446,7 +461,7 @@ router.post('/register', async (req, res) => {
     if (!password || typeof password !== 'string' || password.length < 6) {
       return res.status(400).json({ error: 'Password deve ter pelo menos 6 caracteres.' });
     }
-    if (workspaceMode && !['servicos', 'comercio'].includes(workspaceMode)) {
+    if (workspaceMode && !['servicos', 'comercio', 'food'].includes(workspaceMode)) {
       return res.status(400).json({ error: 'Workspace inválido.' });
     }
     const resolvedPlan = plan && isSupportedPlan(plan) ? normalizePlan(plan) : DEFAULT_PLAN;
@@ -510,8 +525,33 @@ router.post('/register', async (req, res) => {
 
     // Create DB record — rollback Supabase user if this fails
     try {
-      await prisma.user.create({
-        data: { ...dbData, supabaseUid },
+      await prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({
+          data: { ...dbData, supabaseUid },
+        });
+        await tx.organizationModule.create({
+          data: {
+            organizationId: created.id,
+            module: created.workspaceMode,
+            enabled: true,
+            planTier: created.plan,
+            createdByUserId: created.id,
+          },
+        });
+        if (created.workspaceMode === 'food') {
+          await tx.foodSettings.create({
+            data: { userId: created.id, isEnabled: true, createdByUserId: created.id },
+          });
+          await tx.foodStaffRoleAssignment.create({
+            data: {
+              organizationId: created.id,
+              personId: created.id,
+              role: 'manager',
+              isPrimary: true,
+              createdByUserId: created.id,
+            },
+          });
+        }
       });
     } catch (dbError) {
       console.error('[auth.register] DB create failed, rolling back Supabase user:', dbError.message);

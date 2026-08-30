@@ -213,7 +213,7 @@ export default function RegisterPage() {
                     </p>
                   )}
                   <div className="flex items-center rounded-xl border border-white/20 bg-white/[0.06] p-1">
-                    {(['servicos', 'comercio'] as WorkspaceRec[]).map((w) => (
+                    {(['servicos', 'comercio', 'food'] as WorkspaceRec[]).map((w) => (
                       <button
                         key={w}
                         type="button"

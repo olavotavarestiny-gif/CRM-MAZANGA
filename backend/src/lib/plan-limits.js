@@ -12,6 +12,8 @@ const planContextCache = new Map();
 const planContextLoaders = new Map();
 
 function normalizeWorkspaceMode(workspaceMode) {
+  if (workspaceMode === 'gestao_kpi') return 'gestao_kpi';
+  if (workspaceMode === 'food') return 'food';
   return workspaceMode === 'comercio' ? 'comercio' : DEFAULT_WORKSPACE_MODE;
 }
 
@@ -37,6 +39,7 @@ const PLAN_CATALOG = {
         automacoes: false,
         formularios: false,
         financas: false,
+        food: false,
       },
       operationalLimits: {
         channels: 20,
@@ -75,6 +78,7 @@ const PLAN_CATALOG = {
         automacoes: true,
         formularios: true,
         financas: true,
+        food: false,
       },
       operationalLimits: {
         channels: 50,
@@ -113,6 +117,7 @@ const PLAN_CATALOG = {
         automacoes: true,
         formularios: true,
         financas: true,
+        food: false,
       },
       operationalLimits: {
         channels: Infinity,
@@ -153,6 +158,7 @@ const PLAN_CATALOG = {
         automacoes: false,
         formularios: false,
         financas: false,
+        food: false,
       },
       operationalLimits: {
         channels: 20,
@@ -191,6 +197,7 @@ const PLAN_CATALOG = {
         automacoes: false,
         formularios: false,
         financas: true,
+        food: false,
       },
       operationalLimits: {
         channels: 50,
@@ -229,6 +236,7 @@ const PLAN_CATALOG = {
         automacoes: false,
         formularios: false,
         financas: true,
+        food: false,
       },
       operationalLimits: {
         channels: Infinity,
@@ -240,6 +248,128 @@ const PLAN_CATALOG = {
         activeDeals: 0,
         invoicesPerMonth: Infinity,
         products: Infinity,
+        activeForms: 0,
+        formSubmissionsPerMonth: 0,
+        storageGb: Infinity,
+        maxFileSizeMb: Infinity,
+        teamMembers: 15,
+      },
+    },
+  },
+  food: {
+    essencial: {
+      label: 'Inicial',
+      description: 'Para restaurantes pequenos a digitalizar atendimento, cozinha e catálogo.',
+      limits: {
+        users: 1,
+        contacts: 300,
+        tasks: Infinity,
+        automations: 0,
+      },
+      features: {
+        painel: true,
+        clientes: true,
+        processos: false,
+        tarefas: false,
+        vendas: true,
+        conversas: false,
+        calendario: false,
+        automacoes: false,
+        formularios: false,
+        financas: false,
+        food: true,
+      },
+      operationalLimits: {
+        channels: Infinity,
+        messagesPerDay: Infinity,
+        attachmentsPerDay: Infinity,
+        mentionsPerMessage: Infinity,
+        csvImportRows: Infinity,
+        customFields: Infinity,
+        activeDeals: 0,
+        invoicesPerMonth: 500,
+        products: 80,
+        foodProducts: 80,
+        activeForms: 0,
+        formSubmissionsPerMonth: 0,
+        storageGb: 5,
+        maxFileSizeMb: Infinity,
+        teamMembers: 1,
+      },
+    },
+    profissional: {
+      label: 'Crescimento',
+      description: 'Para operações Food com equipa, caixa e catálogo mais completo.',
+      limits: {
+        users: 5,
+        contacts: 3000,
+        tasks: Infinity,
+        automations: 0,
+      },
+      features: {
+        painel: true,
+        clientes: true,
+        processos: false,
+        tarefas: true,
+        vendas: true,
+        conversas: false,
+        calendario: false,
+        automacoes: false,
+        formularios: false,
+        financas: true,
+        food: true,
+      },
+      operationalLimits: {
+        channels: Infinity,
+        messagesPerDay: Infinity,
+        attachmentsPerDay: Infinity,
+        mentionsPerMessage: Infinity,
+        csvImportRows: 5000,
+        customFields: 50,
+        activeDeals: 0,
+        invoicesPerMonth: Infinity,
+        products: 500,
+        foodProducts: 500,
+        activeForms: 0,
+        formSubmissionsPerMonth: 0,
+        storageGb: 50,
+        maxFileSizeMb: Infinity,
+        teamMembers: 5,
+      },
+    },
+    enterprise: {
+      label: 'Estabilidade',
+      description: 'Para restaurantes com equipa maior, delivery e gestão operacional avançada.',
+      limits: {
+        users: 15,
+        contacts: Infinity,
+        tasks: Infinity,
+        automations: 0,
+      },
+      features: {
+        painel: true,
+        clientes: true,
+        processos: false,
+        tarefas: true,
+        vendas: true,
+        conversas: false,
+        calendario: false,
+        automacoes: false,
+        formularios: false,
+        financas: true,
+        food: true,
+      },
+      operationalLimits: {
+        channels: Infinity,
+        messagesPerDay: Infinity,
+        attachmentsPerDay: Infinity,
+        mentionsPerMessage: Infinity,
+        csvImportRows: Infinity,
+        customFields: Infinity,
+        activeDeals: 0,
+        invoicesPerMonth: Infinity,
+        products: Infinity,
+        foodProducts: Infinity,
         activeForms: 0,
         formSubmissionsPerMonth: 0,
         storageGb: Infinity,
@@ -416,6 +546,8 @@ async function getUsage(orgId, key) {
       });
     case 'products':
       return prisma.produto.count({ where: { userId: orgId, active: true } });
+    case 'foodProducts':
+      return prisma.foodProduct.count({ where: { userId: orgId, active: true } });
     case 'customFields':
       return prisma.contactFieldDef.count({ where: { userId: orgId, active: true } });
     case 'teamMembers': {

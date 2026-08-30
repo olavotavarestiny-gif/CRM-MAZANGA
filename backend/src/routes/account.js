@@ -249,25 +249,30 @@ router.post('/team', requireAccountOwner, async (req, res) => {
       return res.status(400).json({ error: 'Password deve ter pelo menos 6 caracteres' });
     }
 
-    const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
-      email: normalizedEmail,
-      password,
-      email_confirm: true,
-      user_metadata: { name },
-    });
-    if (authError) {
-      return res.status(400).json({ error: authError.message });
+    let supabaseUid = null;
+    if (!req.user.isDevAuthLocalUser) {
+      const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
+        email: normalizedEmail,
+        password,
+        email_confirm: true,
+        user_metadata: { name },
+      });
+      if (authError) {
+        return res.status(400).json({ error: authError.message });
+      }
+      supabaseUid = authData.user.id;
     }
 
     const member = await prisma.user.create({
       data: {
         name,
         email: normalizedEmail,
-        supabaseUid: authData.user.id,
+        supabaseUid,
+        passwordHash: req.user.isDevAuthLocalUser ? 'DEV_AUTH_LOCAL' : 'SUPABASE_AUTH',
         accountOwnerId,
         role: 'user',
         active: true,
-        mustChangePassword: true,
+        mustChangePassword: !req.user.isDevAuthLocalUser,
       },
       select: { id: true, name: true, email: true, accountOwnerId: true, active: true, createdAt: true },
     });

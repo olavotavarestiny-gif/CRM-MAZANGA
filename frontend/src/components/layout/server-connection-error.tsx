@@ -18,7 +18,7 @@ export default function ServerConnectionError({ onRetry, onSignOut }: Props) {
           Não conseguimos conectar ao servidor.
         </h1>
         <p className="mt-2 text-sm leading-6 text-zinc-400">
-          A sua sessão pode estar ativa, mas não foi possível carregar os dados da conta.
+          A sua sessão pode estar ativa, mas não foi possível carregar os dados da conta. Vamos tentar novamente automaticamente.
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
           <button

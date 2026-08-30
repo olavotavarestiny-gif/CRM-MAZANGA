@@ -17,11 +17,11 @@ export interface ModuleIntroContent {
   bullets: string[];
 }
 
-// Variante por workspace: 'both' aplica a serviços e comércio;
+// Variante por workspace: 'both' aplica a serviços, comércio e Food;
 // caso contrário pode haver conteúdo distinto para cada modo.
 type IntroEntry =
   | { both: ModuleIntroContent }
-  | { servicos?: ModuleIntroContent; comercio?: ModuleIntroContent };
+  | { servicos?: ModuleIntroContent; comercio?: ModuleIntroContent; food?: ModuleIntroContent };
 
 // Mapeia a pathname para a chave de módulo. Devolve null se a rota não tem intro.
 export function routeToModuleKey(pathname: string): IntroModuleKey | null {
@@ -36,6 +36,7 @@ export function routeToModuleKey(pathname: string): IntroModuleKey | null {
   if (pathname.startsWith('/finances')) return 'finances';
   if (pathname.startsWith('/caixa')) return 'caixa';
   if (pathname.startsWith('/vendas-rapidas')) return 'vendas-rapidas';
+  if (pathname.startsWith('/food')) return 'food';
   if (pathname.startsWith('/produtos')) return 'produtos';
   // /vendas e /faturacao → módulo de vendas/faturação
   if (pathname.startsWith('/vendas') || pathname.startsWith('/faturacao')) return 'vendas';
@@ -180,6 +181,17 @@ const CONTENT: Record<IntroModuleKey, IntroEntry> = {
       ],
     },
   },
+  food: {
+    food: {
+      title: 'KukuGest Food',
+      intro: 'A base operacional para restaurantes, cozinha e delivery.',
+      bullets: [
+        'Activa o módulo nas configurações para abrir o catálogo Food.',
+        'Organiza unidades, categorias, produtos e complementos com dados reais.',
+        'As próximas etapas ligam estes dados a pedidos, cozinha e delivery.',
+      ],
+    },
+  },
   caixa: {
     comercio: {
       title: 'Caixa',
@@ -223,6 +235,6 @@ export function resolveModuleIntro(
   const entry = CONTENT[moduleKey];
   if (!entry) return null;
   if ('both' in entry) return entry.both;
-  const mode = workspaceMode === 'comercio' ? 'comercio' : 'servicos';
-  return entry[mode] ?? entry.servicos ?? entry.comercio ?? null;
+  const mode = workspaceMode === 'food' ? 'food' : workspaceMode === 'comercio' ? 'comercio' : 'servicos';
+  return entry[mode] ?? entry.servicos ?? entry.comercio ?? entry.food ?? null;
 }

@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kukugest-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kukugest
+      POSTGRES_PASSWORD: kukugest_local
+      POSTGRES_DB: kukugest_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - kukugest_postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kukugest -d kukugest_dev"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  kukugest_postgres_data:

@@ -40,6 +40,64 @@ import type {
   FacturaRecorrente,
   FaturacaoConfig,
   FaturacaoDashboard,
+  FoodBranch,
+  FoodAuditEvent,
+  FoodCashSession,
+  FoodCategory,
+  FoodContext,
+  FoodCustomerAddress,
+  FoodCustomerOccurrence,
+  FoodCustomerOccurrenceSeverity,
+  FoodCustomerOccurrenceType,
+  FoodCustomerTimelineEvent,
+  FoodCustomerTimelineType,
+  FoodCustomerDuplicatePair,
+  FoodCustomerMergeResult,
+  FoodCustomerImportPreview,
+  FoodCustomerImportResult,
+  FoodCustomerImportRowInput,
+  FoodBirthdayCustomer,
+  FoodBirthdaySettings,
+  FoodCustomerSearchResult,
+  FoodV1Customer,
+  FoodDelivery,
+  FoodDeliveryCollection,
+  FoodDeliveryState,
+  FoodCourierAssignment,
+  FoodCourierSnapshot,
+  FoodFiscalDocument,
+  FoodIngredient,
+  FoodKitchenTicket,
+  FoodKitchenTicketItem,
+  FoodManagementOverview,
+  FoodOperationalReport,
+  FoodMonthCloseReadiness,
+  FoodMonthlyClose,
+  FoodMarketingOverview,
+  FoodModifierGroup,
+  FoodModifierOption,
+  FoodOrder,
+  FoodOrderEvent,
+  FoodOrderCreateInput,
+  FoodPayment,
+  FoodPurchase,
+  FoodPurchaseSuggestionsResponse,
+  FoodRecipeItem,
+  FoodOrderStatus,
+  FoodOrderStatusOption,
+  FoodOverview,
+  FoodProduct,
+  FoodSettings,
+  FoodSupplier,
+  FoodSupplierProduct,
+  FoodStockReplenishmentResponse,
+  FoodStockMovement,
+  FoodStockReport,
+  FoodShift,
+  FoodWorkforceStatus,
+  FoodWorkSchedule,
+  FoodWorkforceDashboard,
+  FoodSupplierWhatsAppDraft,
   FinancialCategory,
   FormField,
   FormContactFieldsResponse,
@@ -71,16 +129,19 @@ import type {
 import { createClient } from './supabase/client';
 import {
   DEV_AUTH_HEADER,
+  DEV_AUTH_PERSON_HEADER,
   DEV_AUTH_TOKEN,
   clearDevAuthSession,
+  isClientDevAuthBypassEnabled,
   isDevAuthSessionActive,
   isDevAuthUserPayload,
+  getDevAuthPersonId,
   writeDevAuthSession,
 } from './dev-auth';
 import { createDevSampleApiAdapter } from './dev-sample-api';
 import type { AccessRole } from './roles';
 
-const DEFAULT_API_URL = 'http://localhost:3001';
+const DEFAULT_API_URL = 'http://localhost:3011';
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL?.trim() || '';
 const API_TIMEOUT_MS = 30_000;
 const DASHBOARD_API_TIMEOUT_MS = 20_000;
@@ -223,7 +284,9 @@ export function setActiveAccountId(accountOwnerId: number | null): void {
 // Request interceptor: prefer impersonation token, fall back to Supabase session token
 api.interceptors.request.use(async (config) => {
   const devSampleAdapter = createDevSampleApiAdapter();
-  if (devSampleAdapter) {
+  const requestUrl = String(config.url || '');
+  const shouldUseDevSampleAdapter = devSampleAdapter && !requestUrl.startsWith('/api/food');
+  if (shouldUseDevSampleAdapter) {
     config.adapter = devSampleAdapter;
     config.headers[DEV_AUTH_HEADER] = DEV_AUTH_TOKEN;
     return config;
@@ -233,8 +296,10 @@ api.interceptors.request.use(async (config) => {
     throw new Error(API_URL_CONFIG_ERROR);
   }
 
-  if (isDevAuthSessionActive()) {
+  if (isClientDevAuthBypassEnabled() || isDevAuthSessionActive()) {
     config.headers[DEV_AUTH_HEADER] = DEV_AUTH_TOKEN;
+    const devPersonId = getDevAuthPersonId();
+    if (devPersonId) config.headers[DEV_AUTH_PERSON_HEADER] = String(devPersonId);
     return config;
   }
 
@@ -927,14 +992,22 @@ export async function getCurrentUser(): Promise<User> {
   const TIMEOUT_MS = 15_000;
   const MAX_TRIES = 3;
   const DELAYS = [1_000, 2_000];
+  const devPersonId = isClientDevAuthBypassEnabled() ? getDevAuthPersonId() : null;
+  const authUrl = devPersonId ? new URL('/api/auth/me', API_URL).toString() : '/api/auth/me';
 
   for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
     try {
-      const response = await fetch('/api/auth/me', {
-        headers: { 'Cache-Control': 'no-store' },
+      const response = await fetch(authUrl, {
+        headers: {
+          'Cache-Control': 'no-store',
+          ...(devPersonId ? {
+            [DEV_AUTH_HEADER]: DEV_AUTH_TOKEN,
+            [DEV_AUTH_PERSON_HEADER]: String(devPersonId),
+          } : {}),
+        },
         cache: 'no-store',
         signal: controller.signal,
       });
@@ -1068,6 +1141,19 @@ export interface UserPermissions {
   taskAssignment?: {
     assign_admin_owner?: boolean;
   };
+  food?: {
+    overview?: boolean;
+    settings?: boolean;
+    products_view?: boolean;
+    products_edit?: boolean;
+    orders_create?: boolean;
+    orders_view_all?: boolean;
+    kitchen?: boolean;
+    delivery?: boolean;
+    reports?: boolean;
+    discounts?: boolean;
+    cancel_orders?: boolean;
+  };
 }
 
 export type PlanName = 'essencial' | 'profissional' | 'enterprise';
@@ -1082,7 +1168,8 @@ export type PlanFeatureName =
   | 'calendario'
   | 'automacoes'
   | 'formularios'
-  | 'financas';
+  | 'financas'
+  | 'food';
 
 export interface PlanDetails {
   label: string;
@@ -1107,6 +1194,7 @@ export interface PlanFeatures {
   automacoes: boolean;
   formularios: boolean;
   financas: boolean;
+  food: boolean;
 }
 
 export interface PlanCatalogEntry extends PlanDetails {
@@ -1137,7 +1225,19 @@ export interface User {
   activeAccountId?: number | null;
   impersonatedBy?: number | null;
   mustChangePassword?: boolean;
-  workspaceMode?: 'servicos' | 'comercio';
+  workspaceMode?: 'servicos' | 'comercio' | 'gestao_kpi' | 'food';
+  defaultWorkspace?: 'servicos' | 'comercio' | 'gestao_kpi' | 'food';
+  availableWorkspaces?: Array<'servicos' | 'comercio' | 'gestao_kpi' | 'food'>;
+  foodAccess?: {
+    entitled: boolean;
+    enabled: boolean;
+    roles: Array<'manager' | 'cashier' | 'kitchen' | 'delivery_manager' | 'courier' | 'crm_marketing'>;
+    primaryRole: 'manager' | 'cashier' | 'kitchen' | 'delivery_manager' | 'courier' | 'crm_marketing' | null;
+    branchIds: string[] | null;
+    branches: Array<{ id: string; name: string; isMain?: boolean; active?: boolean }>;
+    permissions: string[];
+    roleLabels: Record<string, string>;
+  };
   billingType?: 'trial' | 'paid';
   trialEndsAt?: string | null;
   expiresAt?: string | null;
@@ -1548,6 +1648,986 @@ export async function createEstabelecimento(data: {
   return res.data;
 }
 
+export type FoodSettingsInput = Partial<Pick<
+  FoodSettings,
+  | 'isEnabled'
+  | 'restaurantName'
+  | 'logoUrl'
+  | 'primaryColor'
+  | 'secondaryColor'
+  | 'restaurantPhone'
+  | 'restaurantEmail'
+  | 'restaurantAddress'
+  | 'currency'
+  | 'timezone'
+  | 'defaultPreparationMinutes'
+  | 'kdsGreenMinutes'
+  | 'kdsYellowMinutes'
+  | 'kdsRedMinutes'
+  | 'orderTypes'
+  | 'paymentMethods'
+  | 'kitchenSoundEnabled'
+  | 'kitchenSoundVolume'
+  | 'kitchenSoundRepeatSeconds'
+  | 'kdsUnacceptedWarningSeconds'
+  | 'kdsUnacceptedEscalationSeconds'
+  | 'kdsReadyReminderMinutes'
+>>;
+
+export type FoodBranchInput = {
+  name: string;
+  estabelecimentoId?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  neighborhood?: string | null;
+  isMain?: boolean;
+  active?: boolean;
+};
+
+export type FoodCategoryInput = {
+  name: string;
+  color?: string | null;
+  icon?: string | null;
+  sortOrder?: number;
+  active?: boolean;
+};
+
+export type FoodModifierGroupInput = {
+  name: string;
+  required?: boolean;
+  minSelection?: number;
+  maxSelection?: number | null;
+  sortOrder?: number;
+  active?: boolean;
+  options?: Array<{ name: string; priceDelta?: number; sortOrder?: number }>;
+};
+
+export type FoodModifierOptionInput = {
+  name: string;
+  priceDelta?: number;
+  sortOrder?: number;
+  active?: boolean;
+};
+
+export type FoodProductInput = {
+  internalCode: string;
+  name: string;
+  branchId?: string | null;
+  categoryId?: string | null;
+  description?: string | null;
+  imageUrl?: string | null;
+  price?: number;
+  cost?: number | null;
+  preparationMinutes?: number;
+  available?: boolean;
+  active?: boolean;
+  sortOrder?: number;
+  modifierGroupIds?: string[];
+};
+
+export type FoodOrderCustomerInput = {
+  name: string;
+  phone: string;
+  email?: string | null;
+  company?: string | null;
+  location?: string | null;
+  neighborhood?: string | null;
+  address?: string | null;
+};
+
+export type FoodOrderStatusMeta = {
+  statuses: FoodOrderStatusOption[];
+  orderTypes: Array<{ value: string; label: string }>;
+  paymentStatuses: Array<{ value: string; label: string }>;
+};
+
+export async function getFoodSettings(): Promise<FoodSettings> {
+  const res = await api.get('/api/food/v1/settings');
+  return res.data;
+}
+
+export async function updateFoodSettings(data: FoodSettingsInput): Promise<FoodSettings> {
+  const res = await api.patch('/api/food/v1/settings', data);
+  return res.data;
+}
+
+export async function getFoodAuditEvents(params?: {
+  branchId?: string;
+  action?: string;
+  entityType?: string;
+  entityId?: string;
+  limit?: number;
+}): Promise<FoodAuditEvent[]> {
+  const res = await api.get('/api/food/v1/audit-events', { params });
+  return res.data;
+}
+
+export async function getFoodOverview(): Promise<FoodOverview> {
+  const res = await api.get('/api/food/v1/overview');
+  return res.data;
+}
+
+export async function getFoodOrderStatuses(): Promise<FoodOrderStatusMeta> {
+  const res = await api.get('/api/food/v1/order-statuses');
+  return res.data;
+}
+
+export async function searchFoodCustomers(search: string): Promise<FoodCustomerSearchResult[]> {
+  const res = await api.get('/api/food/v1/customers/search', { params: { search } });
+  return res.data;
+}
+
+export async function createFoodCustomer(data: FoodOrderCustomerInput): Promise<FoodCustomerSearchResult> {
+  const res = await api.post('/api/food/v1/customers', data);
+  return res.data;
+}
+
+export async function getFoodOrder(id: string): Promise<FoodOrder> {
+  const res = await api.get(`/api/food/v1/orders/${id}`);
+  return res.data;
+}
+
+export async function createFoodOrder(data: FoodOrderCreateInput): Promise<FoodOrder> {
+  const res = await api.post('/api/food/v1/orders', data, {
+    headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `order-${Date.now()}` },
+  });
+  return res.data;
+}
+
+export async function getFoodBranches(): Promise<FoodBranch[]> {
+  const res = await api.get('/api/food/v1/branches');
+  return res.data;
+}
+
+export async function createFoodBranch(data: FoodBranchInput): Promise<FoodBranch> {
+  const res = await api.post('/api/food/v1/branches', data);
+  return res.data;
+}
+
+export async function updateFoodBranch(id: string, data: Partial<FoodBranchInput>): Promise<FoodBranch> {
+  const res = await api.patch(`/api/food/v1/branches/${id}`, data);
+  return res.data;
+}
+
+export async function getFoodCategories(): Promise<FoodCategory[]> {
+  const res = await api.get('/api/food/v1/categories');
+  return res.data;
+}
+
+export async function createFoodCategory(data: FoodCategoryInput): Promise<FoodCategory> {
+  const res = await api.post('/api/food/v1/categories', data);
+  return res.data;
+}
+
+export async function updateFoodCategory(id: string, data: Partial<FoodCategoryInput>): Promise<FoodCategory> {
+  const res = await api.patch(`/api/food/v1/categories/${id}`, data);
+  return res.data;
+}
+
+export async function archiveFoodCategory(id: string): Promise<void> {
+  await api.delete(`/api/food/v1/categories/${id}`);
+}
+
+export async function getFoodModifierGroups(): Promise<FoodModifierGroup[]> {
+  const res = await api.get('/api/food/v1/modifier-groups');
+  return res.data;
+}
+
+export async function createFoodModifierGroup(data: FoodModifierGroupInput): Promise<FoodModifierGroup> {
+  const res = await api.post('/api/food/v1/modifier-groups', data);
+  return res.data;
+}
+
+export async function updateFoodModifierGroup(id: string, data: Partial<FoodModifierGroupInput>): Promise<FoodModifierGroup> {
+  const res = await api.patch(`/api/food/v1/modifier-groups/${id}`, data);
+  return res.data;
+}
+
+export async function createFoodModifierOption(groupId: string, data: FoodModifierOptionInput): Promise<FoodModifierOption> {
+  const res = await api.post(`/api/food/v1/modifier-groups/${groupId}/options`, data);
+  return res.data;
+}
+
+export async function updateFoodModifierOption(
+  groupId: string,
+  optionId: string,
+  data: Partial<FoodModifierOptionInput>
+): Promise<FoodModifierOption> {
+  const res = await api.patch(`/api/food/v1/modifier-groups/${groupId}/options/${optionId}`, data);
+  return res.data;
+}
+
+export async function getFoodProducts(params?: {
+  search?: string;
+  active?: boolean;
+  available?: boolean;
+  categoryId?: string;
+  branchId?: string;
+}): Promise<FoodProduct[]> {
+  const res = await api.get('/api/food/v1/products', { params });
+  return res.data;
+}
+
+export async function createFoodProduct(data: FoodProductInput): Promise<FoodProduct> {
+  const res = await api.post('/api/food/v1/products', data);
+  return res.data;
+}
+
+export async function updateFoodProduct(id: string, data: Partial<FoodProductInput>): Promise<FoodProduct> {
+  const res = await api.patch(`/api/food/v1/products/${id}`, data);
+  return res.data;
+}
+
+export async function archiveFoodProduct(id: string): Promise<void> {
+  await api.delete(`/api/food/v1/products/${id}`);
+}
+
+// KukuGest Food V1 bounded-context API
+export async function getFoodContext(): Promise<FoodContext> {
+  const res = await api.get('/api/food/v1/context');
+  return res.data;
+}
+
+export interface FoodRoleAssignment {
+  id: string;
+  organizationId: number;
+  personId: number;
+  branchId?: string | null;
+  role: 'manager' | 'cashier' | 'kitchen' | 'delivery_manager' | 'courier' | 'crm_marketing';
+  roleLabel: string;
+  isPrimary: boolean;
+  active: boolean;
+  person: { id: number; name: string; email: string; active: boolean };
+  branch?: { id: string; name: string; active: boolean } | null;
+  credentialConfigured?: boolean;
+  credentialLockedUntil?: string | null;
+}
+
+export async function getFoodTeam(): Promise<{
+  roles: Array<{ value: FoodRoleAssignment['role']; label: string }>;
+  assignments: FoodRoleAssignment[];
+}> {
+  const res = await api.get('/api/food/v1/team');
+  return res.data;
+}
+
+export async function assignFoodRole(data: {
+  personId: number;
+  role: FoodRoleAssignment['role'];
+  branchId?: string | null;
+  isPrimary?: boolean;
+}): Promise<FoodRoleAssignment> {
+  const res = await api.post('/api/food/v1/team', data);
+  return res.data;
+}
+
+export async function updateFoodRoleAssignment(id: string, data: { active?: boolean; isPrimary?: boolean }): Promise<FoodRoleAssignment> {
+  const res = await api.patch(`/api/food/v1/team/${id}`, data);
+  return res.data;
+}
+
+export async function configureFoodStaffPin(data: { personId: number; pin: string; reason?: string }): Promise<{ configured: true; personId: number; updatedAt: string }> {
+  const res = await api.post('/api/food/v1/team/credentials', data);
+  return res.data;
+}
+
+export async function configureOwnFoodStaffPin(pin: string): Promise<{ configured: true; updatedAt: string }> {
+  const res = await api.post('/api/food/v1/team/credentials/self', { pin });
+  return res.data;
+}
+
+export async function getCurrentFoodWorkforce(branchId?: string): Promise<FoodWorkforceStatus> {
+  const res = await api.get('/api/food/v1/team/workforce/current', { params: { branchId } });
+  return res.data;
+}
+
+export async function startFoodShift(data: { branchId: string; pin: string; deviceId?: string }): Promise<FoodShift> {
+  const res = await api.post('/api/food/v1/team/shifts/start', data);
+  return res.data;
+}
+
+export async function endFoodShift(id: string, data: { pin: string; deviceId?: string; notes?: string }): Promise<FoodShift> {
+  const res = await api.post(`/api/food/v1/team/shifts/${id}/end`, data);
+  return res.data;
+}
+
+export async function getFoodShifts(params?: { branchId?: string; status?: 'open' | 'closed' | 'all' }): Promise<FoodShift[]> {
+  const res = await api.get('/api/food/v1/team/shifts', { params });
+  return res.data;
+}
+
+export async function getFoodWorkforceDashboard(params?: { branchId?: string; days?: number }): Promise<FoodWorkforceDashboard> {
+  const res = await api.get('/api/food/v1/management/workforce', { params });
+  return res.data;
+}
+
+export async function saveFoodWorkSchedule(data: { personId: number; branchId: string; workDate: string; startTime: string; endTime: string; notes?: string }): Promise<FoodWorkSchedule> {
+  const res = await api.post('/api/food/v1/team/schedules', data);
+  return res.data;
+}
+
+export async function archiveFoodWorkSchedule(id: string, reason?: string): Promise<void> {
+  await api.delete(`/api/food/v1/team/schedules/${id}`, { data: { reason } });
+}
+
+export async function reviewFoodCashDifference(id: string, data: { decision: 'approved' | 'rejected'; note?: string }): Promise<FoodCashSession> {
+  const res = await api.post(`/api/food/v1/cash-sessions/${id}/approval`, data);
+  return res.data;
+}
+
+export async function getFoodV1Orders(params?: {
+  branchId?: string;
+  status?: FoodOrderStatus | 'all';
+  statuses?: FoodOrderStatus[];
+  orderState?: string;
+  kitchenState?: string;
+  deliveryState?: string;
+  paymentState?: string;
+  orderType?: string;
+  search?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}): Promise<FoodOrder[]> {
+  const res = await api.get('/api/food/v1/orders', {
+    params: { ...params, statuses: params?.statuses?.join(',') },
+  });
+  return res.data;
+}
+
+export async function executeFoodOrderCommand(
+  orderId: string,
+  command: 'send_to_kitchen' | 'kitchen_accept' | 'kitchen_start' | 'kitchen_ready' | 'complete' | 'cancel',
+  data: { expectedVersion?: number; reason?: string | null; note?: string | null } = {}
+): Promise<{ order: FoodOrder; meta?: { deliveryPin?: string } }> {
+  const res = await api.post(`/api/food/v1/orders/${orderId}/commands/${command}`, data, {
+    headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `${command}-${orderId}-${Date.now()}` },
+  });
+  return res.data;
+}
+
+export async function getFoodKitchenTickets(params?: { branchId?: string; states?: string[] }): Promise<FoodKitchenTicket[]> {
+  const res = await api.get('/api/food/v1/kitchen/tickets', {
+    params: { ...params, states: params?.states?.join(',') },
+  });
+  return res.data;
+}
+
+export async function acknowledgeFoodKitchenTicket(ticketId: string, expectedVersion: number): Promise<FoodKitchenTicket> {
+  const res = await api.post(`/api/food/v1/kitchen/tickets/${ticketId}/acknowledge`, { expectedVersion }, {
+    headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `kitchen-ack-${ticketId}-${Date.now()}` },
+  });
+  return res.data;
+}
+
+export async function getFoodKitchenEscalations(branchId?: string): Promise<FoodKitchenTicket[]> {
+  const res = await api.get('/api/food/v1/kitchen/escalations', { params: { branchId: branchId || undefined } });
+  return res.data;
+}
+
+export async function updateFoodKitchenItem(
+  ticketId: string,
+  itemId: string,
+  data: { state: FoodKitchenTicketItem['state']; issueType?: string; issueNote?: string }
+): Promise<FoodKitchenTicketItem> {
+  const res = await api.patch(`/api/food/v1/kitchen/tickets/${ticketId}/items/${itemId}`, data, {
+    headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `kitchen-item-${itemId}-${Date.now()}` },
+  });
+  return res.data;
+}
+
+export async function resolveFoodKitchenIssue(
+  ticketId: string,
+  itemId: string,
+  resolution: string
+): Promise<FoodKitchenTicketItem> {
+  const res = await api.post(`/api/food/v1/kitchen/tickets/${ticketId}/items/${itemId}/resolve`, { resolution }, {
+    headers: { 'Idempotency-Key': `kitchen-resolution-${itemId}` },
+  });
+  return res.data;
+}
+
+export async function getFoodEvents(cursor?: string): Promise<{ events: FoodOrderEvent[]; cursor: string }> {
+  const res = await api.get('/api/food/v1/events', { params: { cursor }, headers: { Accept: 'application/json' } });
+  return res.data;
+}
+
+async function getFoodStreamHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { Accept: 'text/event-stream' };
+  if (isClientDevAuthBypassEnabled() || isDevAuthSessionActive()) {
+    headers[DEV_AUTH_HEADER] = DEV_AUTH_TOKEN;
+    const devPersonId = getDevAuthPersonId();
+    if (devPersonId) headers[DEV_AUTH_PERSON_HEADER] = String(devPersonId);
+  } else {
+    const impersonationToken = typeof window !== 'undefined' ? localStorage.getItem('impersonation_token') : null;
+    const accessToken = impersonationToken || await getSupabaseAccessToken();
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  }
+  const activeAccountId = typeof window !== 'undefined' ? localStorage.getItem(ACTIVE_ACCOUNT_STORAGE_KEY) : null;
+  if (activeAccountId) headers['X-Account-Id'] = activeAccountId;
+  return headers;
+}
+
+export async function streamFoodEvents(options: {
+  cursor?: string;
+  signal: AbortSignal;
+  onEvent: (event: FoodOrderEvent) => void;
+}): Promise<void> {
+  if (API_URL_CONFIG_ERROR) throw new Error(API_URL_CONFIG_ERROR);
+  const url = new URL('/api/food/v1/events', API_URL);
+  if (options.cursor) url.searchParams.set('cursor', options.cursor);
+  const response = await fetch(url, {
+    headers: await getFoodStreamHeaders(),
+    cache: 'no-store',
+  });
+  if (!response.ok || !response.body) throw new Error(`SSE Food indisponível (HTTP ${response.status}).`);
+
+  const reader = response.body.getReader();
+  const cancelReader = () => {
+    void reader.cancel().catch(() => undefined);
+  };
+  if (options.signal.aborted) {
+    await reader.cancel().catch(() => undefined);
+    return;
+  }
+  options.signal.addEventListener('abort', cancelReader, { once: true });
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (!options.signal.aborted) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+      let boundary = buffer.indexOf('\n\n');
+      while (boundary >= 0) {
+        const block = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        const data = block.split('\n').filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trim()).join('\n');
+        if (data) {
+          try { options.onEvent(JSON.parse(data) as FoodOrderEvent); } catch { /* ignora heartbeat ou payload inválido */ }
+        }
+        boundary = buffer.indexOf('\n\n');
+      }
+    }
+  } catch (error) {
+    if (!options.signal.aborted) throw error;
+  } finally {
+    options.signal.removeEventListener('abort', cancelReader);
+    if (!options.signal.aborted) await reader.cancel().catch(() => undefined);
+  }
+}
+
+export async function getFoodDeliveries(params?: { state?: FoodDeliveryState }): Promise<FoodDelivery[]> {
+  const res = await api.get('/api/food/v1/delivery', { params });
+  return res.data;
+}
+
+export async function getFoodCouriers(branchId?: string): Promise<FoodCourierAssignment[]> {
+  const res = await api.get('/api/food/v1/delivery/couriers', { params: { branchId } });
+  return res.data;
+}
+
+export async function getOwnFoodCourierProfile(): Promise<FoodCourierSnapshot> {
+  const res = await api.get('/api/food/v1/delivery/couriers/me');
+  return res.data;
+}
+
+export async function updateOwnFoodCourierProfile(data: { phone?: string | null; address?: string | null; transportType?: string | null; vehiclePlate?: string | null }): Promise<FoodCourierSnapshot> {
+  const res = await api.patch('/api/food/v1/delivery/couriers/me', data);
+  return res.data;
+}
+
+export async function updateOwnFoodCourierStatus(data: { status: 'available' | 'unavailable' | 'no_gps'; reason?: string; latitude?: number; longitude?: number }): Promise<FoodCourierSnapshot> {
+  const res = await api.post('/api/food/v1/delivery/couriers/me/status', data);
+  return res.data;
+}
+
+export async function transitionFoodDelivery(
+  deliveryId: string,
+  state: FoodDeliveryState,
+  data: { courierUserId?: number; reason?: string; pin?: string; proofMediaId?: string } = {}
+): Promise<FoodOrder> {
+  const res = await api.post(`/api/food/v1/delivery/${deliveryId}/transitions/${state}`, data, {
+    headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `delivery-${deliveryId}-${state}-${Date.now()}` },
+  });
+  return res.data;
+}
+
+export async function confirmFoodDeliveryCollection(deliveryId: string, data: { received: boolean; method?: string; reason?: string }): Promise<FoodDeliveryCollection> {
+  const res = await api.post(`/api/food/v1/delivery/${deliveryId}/collection/confirm`, data, {
+    headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `collection-confirm-${deliveryId}-${Date.now()}` },
+  });
+  return res.data;
+}
+
+export async function handoffFoodDeliveryCollection(deliveryId: string): Promise<FoodDeliveryCollection> {
+  const res = await api.post(`/api/food/v1/delivery/${deliveryId}/collection/handoff`, {}, {
+    headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `collection-handoff-${deliveryId}-${Date.now()}` },
+  });
+  return res.data;
+}
+
+export async function reconcileFoodDeliveryCollection(collectionId: string, data: { countedAmount: number; reason?: string; cashSessionId?: string }): Promise<FoodDeliveryCollection> {
+  const res = await api.post(`/api/food/v1/delivery/collections/${collectionId}/reconcile`, data, {
+    headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `collection-reconcile-${collectionId}-${Date.now()}` },
+  });
+  return res.data;
+}
+
+export async function requestFoodDeliveryContact(deliveryId: string, channel: 'phone' | 'whatsapp'): Promise<{ channel: 'phone' | 'whatsapp'; uri: string }> {
+  const res = await api.post(`/api/food/v1/delivery/${deliveryId}/contact/${channel}`);
+  return res.data;
+}
+
+export async function regenerateFoodDeliveryPin(deliveryId: string): Promise<{ pin: string }> {
+  const res = await api.post(`/api/food/v1/delivery/${deliveryId}/regenerate-pin`);
+  return res.data;
+}
+
+export async function registerFoodDeliveryProof(data: {
+  storageUrl: string;
+  mimeType: string;
+  sizeBytes?: number;
+  checksum?: string;
+}): Promise<{ id: string; kind: string; mimeType: string; createdAt: string }> {
+  const res = await api.post('/api/food/v1/delivery/proof-media', data);
+  return res.data;
+}
+
+export async function getCurrentFoodCashSession(branchId?: string): Promise<FoodCashSession | null> {
+  const res = await api.get('/api/food/v1/cash-sessions/current', { params: { branchId } });
+  return res.data;
+}
+
+export async function openFoodCashSession(data: { branchId: string; openingBalance: number; pin: string; deviceId?: string; startShift?: boolean }): Promise<FoodCashSession> {
+  const res = await api.post('/api/food/v1/cash-sessions', data);
+  return res.data;
+}
+
+export async function closeFoodCashSession(
+  id: string,
+  data: { closingCountedAmount: number; pin: string; deviceId?: string; notes?: string; endShift?: boolean }
+): Promise<FoodCashSession> {
+  const res = await api.post(`/api/food/v1/cash-sessions/${id}/close`, data);
+  return res.data;
+}
+
+export async function recordFoodPayment(
+  orderId: string,
+  data: { amount: number; method: string; transactionReference?: string; cashSessionId?: string }
+): Promise<FoodPayment> {
+  const res = await api.post(`/api/food/v1/orders/${orderId}/payments`, data, {
+    headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `payment-${orderId}-${Date.now()}` },
+  });
+  return res.data;
+}
+
+export async function issueFoodFiscalDocument(
+  orderId: string,
+  documentType = 'FR'
+): Promise<FoodFiscalDocument> {
+  const res = await api.post(`/api/food/v1/orders/${orderId}/fiscal-documents`, { documentType }, {
+    headers: { 'Idempotency-Key': `food-fiscal-${orderId}-${documentType}` },
+  });
+  return res.data;
+}
+
+export async function getFoodIngredients(params?: { search?: string; active?: boolean | 'all' }): Promise<FoodIngredient[]> {
+  const res = await api.get('/api/food/v1/stock/ingredients', { params });
+  return res.data;
+}
+
+export async function createFoodIngredient(data: {
+  internalCode: string;
+  name: string;
+  branchId?: string | null;
+  unit: string;
+  currentStock?: number;
+  minimumStock?: number;
+  idealStock?: number;
+  purchaseUnit?: string;
+  purchaseConversion?: number;
+  preferredSupplierId?: string | null;
+  averageCost?: number;
+}): Promise<FoodIngredient> {
+  const res = await api.post('/api/food/v1/stock/ingredients', data);
+  return res.data;
+}
+
+export async function updateFoodIngredientPolicy(id: string, data: {
+  minimumStock: number;
+  idealStock: number;
+  purchaseUnit: string;
+  purchaseConversion: number;
+  preferredSupplierId?: string | null;
+  reason?: string;
+}): Promise<FoodIngredient> {
+  const res = await api.patch(`/api/food/v1/stock/ingredients/${id}`, data);
+  return res.data;
+}
+
+export async function getFoodStockReplenishment(): Promise<FoodStockReplenishmentResponse> {
+  const res = await api.get('/api/food/v1/stock/replenishment');
+  return res.data;
+}
+
+export async function getFoodStockMovements(params?: { branchId?: string; ingredientId?: string; type?: string; days?: number; limit?: number }): Promise<FoodStockMovement[]> {
+  const res = await api.get('/api/food/v1/stock/movements', { params });
+  return res.data;
+}
+
+export async function getFoodStockReport(params?: { branchId?: string; days?: number }): Promise<FoodStockReport> {
+  const res = await api.get('/api/food/v1/stock/reports/summary', { params });
+  return res.data;
+}
+
+export async function adjustFoodIngredient(id: string, data: { quantity: number; reason: string }): Promise<FoodIngredient> {
+  const res = await api.post(`/api/food/v1/stock/ingredients/${id}/adjustments`, data);
+  return res.data;
+}
+
+export async function getFoodProductRecipe(productId: string): Promise<FoodRecipeItem[]> {
+  const res = await api.get(`/api/food/v1/stock/products/${productId}/recipe`);
+  return res.data;
+}
+
+export async function saveFoodProductRecipe(
+  productId: string,
+  items: Array<{ ingredientId: string; quantity: number; unit?: string; wastePercent?: number }>
+): Promise<FoodRecipeItem[]> {
+  const res = await api.put(`/api/food/v1/stock/products/${productId}/recipe`, { items });
+  return res.data;
+}
+
+export async function getFoodSuppliers(): Promise<FoodSupplier[]> {
+  const res = await api.get('/api/food/v1/stock/suppliers');
+  return res.data;
+}
+
+export async function createFoodSupplier(data: {
+  name: string;
+  branchId?: string | null;
+  nif?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+}): Promise<FoodSupplier> {
+  const res = await api.post('/api/food/v1/stock/suppliers', data);
+  return res.data;
+}
+
+export async function prepareFoodSupplierWhatsApp(supplierId: string, data: {
+  items: Array<{ name: string; packages: number; purchaseUnit: string }>;
+  message?: string;
+}): Promise<FoodSupplierWhatsAppDraft> {
+  const res = await api.post(`/api/food/v1/stock/suppliers/${supplierId}/whatsapp-draft`, data);
+  return res.data;
+}
+
+export async function getFoodSupplierProducts(params?: { branchId?: string; ingredientId?: string }): Promise<FoodSupplierProduct[]> {
+  const res = await api.get('/api/food/v1/stock/supplier-products', { params });
+  return res.data;
+}
+
+export async function saveFoodSupplierProduct(data: {
+  supplierId: string;
+  ingredientId: string;
+  purchaseUnit: string;
+  packageQuantity: number;
+  packagePrice: number;
+  minimumPackages: number;
+  leadTimeDays: number;
+  qualityRating?: number | null;
+  paymentTerms?: string;
+}): Promise<FoodSupplierProduct> {
+  const res = await api.post('/api/food/v1/stock/supplier-products', data);
+  return res.data;
+}
+
+export async function archiveFoodSupplierProduct(id: string, reason?: string): Promise<void> {
+  await api.delete(`/api/food/v1/stock/supplier-products/${id}`, { data: { reason } });
+}
+
+export async function getFoodPurchaseSuggestions(branchId: string): Promise<FoodPurchaseSuggestionsResponse> {
+  const res = await api.get('/api/food/v1/stock/purchase-suggestions', { params: { branchId } });
+  return res.data;
+}
+
+export async function getFoodPurchases(): Promise<FoodPurchase[]> {
+  const res = await api.get('/api/food/v1/stock/purchases');
+  return res.data;
+}
+
+export async function createFoodPurchase(data: {
+  branchId: string;
+  supplierId?: string;
+  reference?: string;
+  items: Array<{ ingredientId: string; quantity: number; unitCost: number }>;
+}): Promise<FoodPurchase> {
+  const res = await api.post('/api/food/v1/stock/purchases', data);
+  return res.data;
+}
+
+export async function receiveFoodPurchase(id: string): Promise<FoodPurchase> {
+  const res = await api.post(`/api/food/v1/stock/purchases/${id}/receive`, {}, { headers: { 'Idempotency-Key': `legacy-receive-${id}` } });
+  return res.data;
+}
+
+export async function commandFoodPurchase(id: string, data: { command: 'submit' | 'confirm' | 'dispatch' | 'cancel'; version: number; reason?: string }): Promise<FoodPurchase> {
+  const res = await api.post(`/api/food/v1/stock/purchases/${id}/commands`, data, { headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `purchase-command-${id}-${Date.now()}` } });
+  return res.data;
+}
+
+export async function receiveFoodPurchaseItems(id: string, data: { version: number; items: Array<{ purchaseItemId: string; quantity: number }> }): Promise<FoodPurchase> {
+  const res = await api.post(`/api/food/v1/stock/purchases/${id}/receipts`, data, { headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `purchase-receipt-${id}-${Date.now()}` } });
+  return res.data;
+}
+
+export async function getFoodManagementOverview(): Promise<FoodManagementOverview> {
+  const res = await api.get('/api/food/v1/management/overview');
+  return res.data;
+}
+
+export async function getFoodDailyReport(days = 30): Promise<{
+  from: string;
+  days: number;
+  rows: Array<{ date: string; orders: number; cancelled: number; revenue: number }>;
+}> {
+  const res = await api.get('/api/food/v1/management/reports/daily', { params: { days } });
+  return res.data;
+}
+
+export async function getFoodOperationalReport(params?: { from?: string; to?: string; branchId?: string }): Promise<FoodOperationalReport> {
+  const res = await api.get('/api/food/v1/management/reports/operational', { params });
+  return res.data;
+}
+
+export async function getFoodMonthCloseReadiness(params: { month: string; branchId?: string }): Promise<FoodMonthCloseReadiness> {
+  const res = await api.get('/api/food/v1/management/month-close/readiness', { params });
+  return res.data;
+}
+
+export async function getFoodMonthlyCloses(branchId?: string): Promise<FoodMonthlyClose[]> {
+  const res = await api.get('/api/food/v1/management/month-close', { params: { branchId } });
+  return res.data;
+}
+
+export async function createFoodMonthlyClose(data: { month: string; branchId?: string }): Promise<FoodMonthlyClose> {
+  const res = await api.post('/api/food/v1/management/month-close', data, {
+    headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `month-close-${data.month}-${data.branchId || 'all'}-${Date.now()}` },
+  });
+  return res.data;
+}
+
+export async function reopenFoodMonthlyClose(id: string, data: { version: number; reason: string }): Promise<FoodMonthlyClose> {
+  const res = await api.post(`/api/food/v1/management/month-close/${id}/reopen`, data, {
+    headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `month-reopen-${id}-${Date.now()}` },
+  });
+  return res.data;
+}
+
+export async function recloseFoodMonthlyClose(id: string, data: { version: number; reason: string }): Promise<FoodMonthlyClose> {
+  const res = await api.post(`/api/food/v1/management/month-close/${id}/reclose`, data, {
+    headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `month-reclose-${id}-${Date.now()}` },
+  });
+  return res.data;
+}
+
+export async function exportFoodMonthlyCloseCsv(id: string, revisionId?: string): Promise<{ blob: Blob; filename: string }> {
+  const path = revisionId
+    ? `/api/food/v1/management/month-close/${id}/revisions/${revisionId}/export.csv`
+    : `/api/food/v1/management/month-close/${id}/export.csv`;
+  const res = await api.get(path, { responseType: 'blob' });
+  const disposition = String(res.headers['content-disposition'] || '');
+  const filename = disposition.match(/filename="([^"]+)"/)?.[1] || `kukugest-food-fecho-${id}.csv`;
+  return { blob: res.data, filename };
+}
+
+export async function exportFoodMonthlyClosePdf(id: string, revisionId?: string): Promise<{ blob: Blob; filename: string }> {
+  const path = revisionId
+    ? `/api/food/v1/management/month-close/${id}/revisions/${revisionId}/export.pdf`
+    : `/api/food/v1/management/month-close/${id}/export.pdf`;
+  const res = await api.get(path, { responseType: 'blob' });
+  const disposition = String(res.headers['content-disposition'] || '');
+  const filename = disposition.match(/filename="([^"]+)"/)?.[1] || `kukugest-food-fecho-${id}.pdf`;
+  return { blob: res.data, filename };
+}
+
+export async function previewFoodMonthlyClosePrint(id: string, revisionId?: string): Promise<Blob> {
+  const path = revisionId
+    ? `/api/food/v1/management/month-close/${id}/revisions/${revisionId}/print.pdf`
+    : `/api/food/v1/management/month-close/${id}/print.pdf`;
+  const res = await api.get(path, { responseType: 'blob' });
+  return res.data;
+}
+
+export async function getFoodMarketingOverview(): Promise<FoodMarketingOverview> {
+  const res = await api.get('/api/food/v1/marketing/overview');
+  return res.data;
+}
+
+export type FoodCustomerFilters = {
+  search?: string;
+  segment?: 'all' | 'new' | 'recurring' | 'vip' | 'inactive' | 'at_risk';
+  zone?: string;
+  tag?: string;
+  marketingConsent?: boolean | null;
+  minOrders?: number | null;
+  minSpent?: number | null;
+};
+
+export async function getFoodV1Customers(filters: string | FoodCustomerFilters = ''): Promise<FoodV1Customer[]> {
+  const params = typeof filters === 'string' ? { search: filters } : filters;
+  const res = await api.get('/api/food/v1/customers', { params });
+  return res.data;
+}
+
+export async function getFoodCustomerDuplicates(): Promise<FoodCustomerDuplicatePair[]> {
+  const res = await api.get('/api/food/v1/customers/duplicates');
+  return res.data;
+}
+
+export async function mergeFoodCustomers(targetContactId: number, sourceContactId: number, reason: string): Promise<FoodCustomerMergeResult> {
+  const res = await api.post(`/api/food/v1/customers/${targetContactId}/merge`, { sourceContactId, reason });
+  return res.data;
+}
+
+export async function previewFoodCustomerImport(rows: FoodCustomerImportRowInput[]): Promise<FoodCustomerImportPreview> {
+  const res = await api.post('/api/food/v1/customers/import/preview', { rows });
+  return res.data;
+}
+
+export async function commitFoodCustomerImport(rows: FoodCustomerImportRowInput[], strategy: 'skip' | 'update'): Promise<FoodCustomerImportResult> {
+  const res = await api.post('/api/food/v1/customers/import/commit', {
+    rows,
+    strategy,
+    reason: `Importação CSV confirmada com estratégia ${strategy}`,
+  });
+  return res.data;
+}
+
+export async function getFoodBirthdays(days = 30): Promise<FoodBirthdayCustomer[]> {
+  const res = await api.get('/api/food/v1/marketing/birthdays', { params: { days } });
+  return res.data;
+}
+
+export async function getFoodBirthdaySettings(): Promise<FoodBirthdaySettings> {
+  const res = await api.get('/api/food/v1/marketing/birthday-settings');
+  return res.data;
+}
+
+export async function updateFoodBirthdaySettings(data: FoodBirthdaySettings): Promise<FoodBirthdaySettings> {
+  const res = await api.patch('/api/food/v1/marketing/birthday-settings', { ...data, reason: 'Configuração de aniversários actualizada no CRM Food' });
+  return res.data;
+}
+
+export async function getFoodV1Customer(id: number): Promise<FoodV1Customer> {
+  const res = await api.get(`/api/food/v1/customers/${id}`);
+  return res.data;
+}
+
+export type FoodV1CustomerInput = {
+  name?: string;
+  phone?: string;
+  email?: string;
+  company?: string;
+  location?: string;
+  birthDate?: string | null;
+  tags?: string[];
+  preferredBranchId?: string | null;
+  marketingConsent?: boolean;
+  transactionalConsent?: boolean;
+  preferences?: Record<string, unknown>;
+  notes?: string;
+  reason?: string;
+};
+
+export async function createFoodV1Customer(data: FoodV1CustomerInput & { name: string; phone: string }): Promise<FoodV1Customer> {
+  const res = await api.post('/api/food/v1/customers', data);
+  return res.data;
+}
+
+export async function updateFoodV1Customer(id: number, data: FoodV1CustomerInput): Promise<FoodV1Customer> {
+  const res = await api.patch(`/api/food/v1/customers/${id}`, data);
+  return res.data;
+}
+
+export async function archiveFoodV1Customer(id: number, reason?: string): Promise<void> {
+  await api.delete(`/api/food/v1/customers/${id}`, { data: { reason } });
+}
+
+export type FoodCustomerAddressInput = {
+  label?: string;
+  address: string;
+  neighborhood?: string;
+  reference?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  isPrimary?: boolean;
+  reason?: string;
+};
+
+export async function createFoodCustomerAddress(contactId: number, data: FoodCustomerAddressInput): Promise<FoodCustomerAddress> {
+  const res = await api.post(`/api/food/v1/customers/${contactId}/addresses`, data);
+  return res.data;
+}
+
+export async function updateFoodCustomerAddress(contactId: number, addressId: string, data: Partial<FoodCustomerAddressInput>): Promise<FoodCustomerAddress> {
+  const res = await api.patch(`/api/food/v1/customers/${contactId}/addresses/${addressId}`, data);
+  return res.data;
+}
+
+export async function archiveFoodCustomerAddress(contactId: number, addressId: string, reason?: string): Promise<void> {
+  await api.delete(`/api/food/v1/customers/${contactId}/addresses/${addressId}`, { data: { reason } });
+}
+
+export async function getFoodCustomerTimeline(contactId: number, type: FoodCustomerTimelineType = 'all'): Promise<FoodCustomerTimelineEvent[]> {
+  const res = await api.get(`/api/food/v1/customers/${contactId}/timeline`, { params: { type } });
+  return res.data;
+}
+
+export async function createFoodCustomerOccurrence(contactId: number, data: {
+  branchId?: string | null;
+  type: FoodCustomerOccurrenceType;
+  severity: FoodCustomerOccurrenceSeverity;
+  title: string;
+  description?: string;
+  occurredAt?: string;
+}): Promise<FoodCustomerOccurrence> {
+  const res = await api.post(`/api/food/v1/customers/${contactId}/occurrences`, data);
+  return res.data;
+}
+
+export async function resolveFoodCustomerOccurrence(contactId: number, occurrenceId: string, resolutionNote: string): Promise<FoodCustomerOccurrence> {
+  const res = await api.post(`/api/food/v1/customers/${contactId}/occurrences/${occurrenceId}/resolve`, { resolutionNote });
+  return res.data;
+}
+
+export async function createFoodCoupon(data: {
+  code: string;
+  name: string;
+  discountType: 'fixed' | 'percentage';
+  discountValue: number;
+  minimumOrder?: number;
+  maximumDiscount?: number | null;
+}): Promise<FoodMarketingOverview['coupons'][number]> {
+  const res = await api.post('/api/food/v1/marketing/coupons', data);
+  return res.data;
+}
+
+export async function createFoodMarketingCampaign(data: {
+  name: string;
+  channel: 'SMS' | 'WHATSAPP';
+  content: string;
+  segmentId?: string;
+  couponId?: string;
+  scheduledAt?: string;
+}): Promise<FoodMarketingOverview['campaigns'][number]> {
+  const res = await api.post('/api/food/v1/marketing/campaigns', data);
+  return res.data;
+}
+
 // Clientes
 export async function getClientesFaturacao(params?: { search?: string; page?: number }): Promise<{ clientes: ClienteFaturacao[]; total: number }> {
   const res = await api.get('/api/faturacao/clientes', { params });
@@ -1935,6 +3015,7 @@ export async function setMemberPermissions(
 // SuperAdmin: list all orgs (account owners)
 export interface SuperAdminOrg extends User {
   accountMembers: { id: number; name: string; email: string; active: boolean }[];
+  organizationModules?: Array<{ id: string; module: string; enabled: boolean; planTier?: string | null }>;
   _count: { accountMembers: number };
 }
 
@@ -1949,13 +3030,22 @@ export async function updateSuperAdminOrg(
     plan?: PlanName;
     active?: boolean;
     permissions?: UserPermissions | null;
-    workspaceMode?: 'servicos' | 'comercio';
+    workspaceMode?: 'servicos' | 'comercio' | 'gestao_kpi' | 'food';
     billingType?: 'trial' | 'paid';
     durationDays?: 30 | 90 | 180 | 365;
     accountStatus?: 'active' | 'grace_period' | 'suspended';
   }
 ): Promise<void> {
   await api.patch(`/api/superadmin/orgs/${id}`, data);
+}
+
+export async function setSuperAdminOrganizationModule(
+  organizationId: number,
+  module: 'servicos' | 'comercio' | 'gestao_kpi' | 'food',
+  enabled: boolean
+): Promise<{ id: string; module: string; enabled: boolean; planTier?: string | null }> {
+  const res = await api.put(`/api/superadmin/orgs/${organizationId}/modules/${module}`, { enabled });
+  return res.data;
 }
 
 export async function deleteSuperAdminOrg(id: number): Promise<void> {
@@ -2004,9 +3094,20 @@ export interface SuperAdminDashboard {
   totalOrgs: number;
   activeOrgs: number;
   newOrgsThisMonth: number;
+  totalUsers: number;
   totalContacts: number;
+  access: { trial: number; paid: number };
+  food: {
+    totalOrders: number;
+    ordersThisMonth: number;
+    completedOrders: number;
+    completedItems: number;
+    confirmedPayments: number;
+    restaurantGmv: number;
+  };
+  platformRevenue: number | null;
   totalStorageMb: number;
-  workspaceMix: { servicos: number; comercio: number };
+  workspaceMix: { servicos: number; comercio: number; gestao_kpi?: number; food?: number };
   planDistribution: { essencial: number; profissional: number; enterprise: number };
   mostActiveOrg: { name: string; logins30d: number } | null;
 }
@@ -2289,7 +3390,7 @@ export async function createClientAccount(data: {
   email: string;
   password: string;
   plan?: PlanName;
-  workspaceMode?: 'servicos' | 'comercio';
+  workspaceMode?: 'servicos' | 'comercio' | 'gestao_kpi' | 'food';
   permissions?: UserPermissions | null;
   billingType?: 'trial' | 'paid';
   durationDays?: 30 | 90 | 180 | 365;
@@ -2350,7 +3451,7 @@ export interface OnboardingData {
   totalCount: number;
   allDone?: boolean;
   finalMessage?: string;
-  workspaceMode?: 'servicos' | 'comercio';
+  workspaceMode?: 'servicos' | 'comercio' | 'gestao_kpi' | 'food';
   flowKey?: string;
   welcome?: {
     show: boolean;
@@ -2390,7 +3491,7 @@ export async function markModuleIntroSeen(module: string): Promise<string[]> {
 export interface StartupTemplate {
   key: string;
   label: string;
-  workspaceMode: 'servicos' | 'comercio';
+  workspaceMode: 'servicos' | 'comercio' | 'gestao_kpi' | 'food';
   description: string;
   pipelineStages: string[];
   goals: string[];
@@ -2401,14 +3502,14 @@ export interface StartupTemplate {
 export interface StartupTemplatesResponse {
   title: string;
   version: string;
-  workspaceMode: 'servicos' | 'comercio';
+  workspaceMode: 'servicos' | 'comercio' | 'gestao_kpi' | 'food';
   templates: StartupTemplate[];
 }
 
 export interface StartupTemplateStatus {
   applied: boolean;
   templateKey?: string;
-  workspaceMode?: 'servicos' | 'comercio';
+  workspaceMode?: 'servicos' | 'comercio' | 'gestao_kpi' | 'food';
   appliedAt?: string;
   goals?: string[];
   alreadyApplied?: boolean;

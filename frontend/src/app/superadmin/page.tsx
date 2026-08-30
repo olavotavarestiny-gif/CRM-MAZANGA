@@ -17,6 +17,7 @@ import {
   getSuperAdminUsage,
   getUsers,
   impersonateUser,
+  setSuperAdminOrganizationModule,
   updateClientAccount,
   updateSuperAdminOrg,
   updateUser,
@@ -136,7 +137,7 @@ export default function SuperAdminPage() {
     email: '',
     password: '',
     plan: 'essencial' as PlanName,
-    workspaceMode: 'servicos' as 'servicos' | 'comercio',
+    workspaceMode: 'servicos' as 'servicos' | 'comercio' | 'gestao_kpi' | 'food',
     billingType: 'trial' as 'trial' | 'paid',
     durationDays: 30 as 30 | 90 | 180 | 365,
   });
@@ -273,6 +274,25 @@ export default function SuperAdminPage() {
         title: 'Falha ao atualizar organização',
         description: message,
       });
+    },
+  });
+
+  const organizationModuleMutation = useMutation({
+    mutationFn: ({ organizationId, enabled }: { organizationId: number; enabled: boolean }) =>
+      setSuperAdminOrganizationModule(organizationId, 'food', enabled),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['superadmin-orgs'] });
+      setOrgError('');
+      toast({
+        variant: 'success',
+        title: 'Módulo Food atualizado',
+        description: 'A organização já pode manter os workspaces activos em simultâneo.',
+      });
+    },
+    onError: (err: Error) => {
+      const message = err.message || 'Erro ao atualizar o módulo Food';
+      setOrgError(message);
+      toast({ variant: 'error', title: 'Falha ao atualizar módulo', description: message });
     },
   });
 
@@ -720,14 +740,44 @@ export default function SuperAdminPage() {
                     <p className="mt-1 text-xs text-slate-500">contas criadas</p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Total Contactos</p>
-                    <p className="mt-3 text-3xl font-black text-[#2c2f31]">{dashboard.totalContacts.toLocaleString('pt-PT')}</p>
-                    <p className="mt-1 text-xs text-slate-500">na plataforma</p>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Utilizadores</p>
+                    <p className="mt-3 text-3xl font-black text-[#2c2f31]">{dashboard.totalUsers.toLocaleString('pt-PT')}</p>
+                    <p className="mt-1 text-xs text-slate-500">titulares e membros</p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Armazenamento</p>
-                    <p className="mt-3 text-3xl font-black text-[#2c2f31]">{dashboard.totalStorageMb} MB</p>
-                    <p className="mt-1 text-xs text-slate-500">total de ficheiros</p>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Acessos Pagos</p>
+                    <p className="mt-3 text-3xl font-black text-[#2c2f31]">{dashboard.access.paid}</p>
+                    <p className="mt-1 text-xs text-slate-500">{dashboard.access.trial} em trial</p>
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-3 flex items-end justify-between gap-4">
+                    <div>
+                      <h2 className="text-base font-semibold text-[#0A2540]">Operação Food</h2>
+                      <p className="text-sm text-slate-500">Dados acumulados de todos os restaurantes.</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Pedidos</p>
+                      <p className="mt-3 text-3xl font-black text-[#2c2f31]">{dashboard.food.totalOrders.toLocaleString('pt-PT')}</p>
+                      <p className="mt-1 text-xs text-slate-500">{dashboard.food.ordersThisMonth} neste mês</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Pratos Concluídos</p>
+                      <p className="mt-3 text-3xl font-black text-[#2c2f31]">{dashboard.food.completedItems.toLocaleString('pt-PT')}</p>
+                      <p className="mt-1 text-xs text-slate-500">itens marcados como prontos</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Volume Restaurantes</p>
+                      <p className="mt-3 text-2xl font-black text-[#2c2f31]">{dashboard.food.restaurantGmv.toLocaleString('pt-AO', { style: 'currency', currency: 'AOA', maximumFractionDigits: 0 })}</p>
+                      <p className="mt-1 text-xs text-slate-500">{dashboard.food.confirmedPayments} pagamentos confirmados</p>
+                    </div>
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Receita KukuGest</p>
+                      <p className="mt-3 text-lg font-bold text-slate-600">A configurar</p>
+                      <p className="mt-1 text-xs text-slate-500">Será calculada pelas assinaturas, não pelas vendas dos clientes.</p>
+                    </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -841,6 +891,7 @@ export default function SuperAdminPage() {
                       {filteredOrgs.map((org) => {
                         const members = org.accountMembers || [];
                         const isOpen = expanded.has(org.id);
+                        const foodModuleEnabled = org.organizationModules?.some((item) => item.module === 'food' && item.enabled) || false;
                         return (
                           <Fragment key={org.id}>
                             <tr
@@ -857,7 +908,8 @@ export default function SuperAdminPage() {
                                 <div className="text-xs text-[#6b7e9a]">{org.email}</div>
                               </td>
                               <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
-                                <div className="relative inline-block">
+                                <div className="flex flex-col items-start gap-2">
+                                  <div className="relative inline-block">
                                   <select
                                     value={org.plan || 'essencial'}
                                     onChange={(event) =>
@@ -870,6 +922,15 @@ export default function SuperAdminPage() {
                                     <option value="enterprise">Estabilidade</option>
                                   </select>
                                   <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[#6b7e9a]" />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    disabled={organizationModuleMutation.isPending}
+                                    onClick={() => organizationModuleMutation.mutate({ organizationId: org.id, enabled: !foodModuleEnabled })}
+                                    className={`rounded-full px-2 py-1 text-[10px] font-bold transition ${foodModuleEnabled ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                  >
+                                    Food {foodModuleEnabled ? 'activo' : 'inactivo'}
+                                  </button>
                                 </div>
                               </td>
                               <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
@@ -934,13 +995,15 @@ export default function SuperAdminPage() {
                                     onChange={(event) =>
                                       orgUpdateMutation.mutate({
                                         id: org.id,
-                                        data: { workspaceMode: event.target.value as 'servicos' | 'comercio' },
+                                        data: { workspaceMode: event.target.value as 'servicos' | 'comercio' | 'gestao_kpi' | 'food' },
                                       })
                                     }
                                     className="appearance-none rounded-lg border border-[#dde3ec] bg-white py-1 pl-2 pr-6 text-xs font-medium text-[#0A2540] focus:outline-none focus:ring-2 focus:ring-blue-500"
                                   >
                                     <option value="servicos">Serviços</option>
                                     <option value="comercio">Comércio</option>
+                                    <option value="gestao_kpi">Gestão e KPI</option>
+                                    <option value="food">Food</option>
                                   </select>
                                   <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[#6b7e9a]" />
                                 </div>
@@ -1006,7 +1069,15 @@ export default function SuperAdminPage() {
                                   </td>
                                   <td className="px-4 py-2 text-xs text-[#6b7e9a]">Membro</td>
                                   <td className="px-4 py-2 text-xs text-[#6b7e9a]">Conta</td>
-                                  <td className="px-4 py-2 text-xs text-[#6b7e9a]">{org.workspaceMode === 'comercio' ? 'Comércio' : 'Serviços'}</td>
+                                  <td className="px-4 py-2 text-xs text-[#6b7e9a]">
+                                    {org.workspaceMode === 'comercio'
+                                      ? 'Comércio'
+                                      : org.workspaceMode === 'gestao_kpi'
+                                      ? 'Gestão e KPI'
+                                      : org.workspaceMode === 'food'
+                                      ? 'Food'
+                                      : 'Serviços'}
+                                  </td>
                                   <td className="px-4 py-2" />
                                   <td className="px-4 py-2 text-center">
                                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -1220,12 +1291,14 @@ export default function SuperAdminPage() {
                 value={createAccountForm.workspaceMode}
                 onChange={(event) => setCreateAccountForm({
                   ...createAccountForm,
-                  workspaceMode: event.target.value as 'servicos' | 'comercio',
+                  workspaceMode: event.target.value as 'servicos' | 'comercio' | 'gestao_kpi' | 'food',
                 })}
                 className="w-full rounded-lg border border-[#dde3ec] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="servicos">Serviços</option>
                 <option value="comercio">Comércio</option>
+                <option value="gestao_kpi">Gestão e KPI</option>
+                <option value="food">Food</option>
               </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
