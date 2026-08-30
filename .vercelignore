@@ -1,0 +1,15 @@
+backend
+compose.yaml
+docs
+infrastructure
+output
+scripts
+tmp
+
+**/.env
+**/.env.*
+**/.next
+**/.next-dev
+**/node_modules
+**/coverage
+**/*.log
