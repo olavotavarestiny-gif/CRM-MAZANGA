@@ -129,7 +129,10 @@ router.post('/clients/:id/invitations', run(async (req, res, tx, context) => {
   const existingOther = user ? await tx.growthClientAccess.findUnique({ where: { userId: user.id } }) : null;
   if (existingOther && existingOther.clientId !== clientId) throw Object.assign(new Error('Este utilizador já está associado a outro cliente.'), { statusCode: 409 });
   const admin = createSupabaseClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
-  const redirectTo = `${process.env.GROWTH_FRONTEND_URL || process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?next=/change-password`;
+  const defaultFrontend = process.env.NODE_ENV === 'production'
+    ? 'https://mazanga-growth-room.vercel.app'
+    : (process.env.FRONTEND_URL || 'http://localhost:3020');
+  const redirectTo = `${process.env.GROWTH_FRONTEND_URL || defaultFrontend}/auth/callback?next=/change-password`;
   let createdAuthId = null;
   if (!user) {
     const { data, error } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo, data: { name: input.name } });
