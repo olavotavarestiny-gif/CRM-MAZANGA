@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700&family=Syne:wght@400;600;700;800&display=swap');
 @import 'driver.js/dist/driver.css';
 
 @tailwind base;
@@ -65,23 +65,59 @@
 
 .product-growth-room,
 .product-growth-room body {
-  background: #101512;
-  color: #eff4ee;
+  background: #000000;
+  color: #f1f5f9;
+  font-family: 'Outfit', sans-serif;
 }
 
 .workspace-growth-room {
-  --workspace-primary: #d9ff6a;
-  --workspace-primary-hover: #e4ff91;
-  --workspace-primary-soft: rgba(217, 255, 106, 0.1);
-  --workspace-primary-border: rgba(217, 255, 106, 0.25);
-  --workspace-on-primary: #0c110d;
+  --workspace-primary: #ff5d00;
+  --workspace-primary-hover: #ff7a2e;
+  --workspace-primary-soft: rgba(255, 93, 0, 0.1);
+  --workspace-primary-border: rgba(255, 93, 0, 0.28);
+  --workspace-on-primary: #ffffff;
 }
 
 .workspace-growth-room h1,
 .workspace-growth-room h2,
 .workspace-growth-room h3,
 .workspace-growth-room h4 {
-  color: #eff4ee;
+  color: #f1f5f9;
+  font-family: 'Syne', sans-serif;
+}
+
+.font-growth-display {
+  font-family: 'Syne', sans-serif;
+}
+
+.growth-brand-bg {
+  background-color: #000;
+  background-image:
+    radial-gradient(circle at 92% 5%, rgba(140, 13, 194, 0.18), transparent 28rem),
+    radial-gradient(circle at 12% 95%, rgba(255, 93, 0, 0.13), transparent 30rem),
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: auto, auto, 60px 60px, 60px 60px;
+}
+
+.growth-surface {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(145deg, rgba(17, 17, 17, 0.94), rgba(10, 10, 10, 0.88));
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.growth-brand-button,
+.growth-nav-active {
+  background: linear-gradient(135deg, #ff5d00 0%, #8c0dc2 100%);
+  box-shadow: 0 12px 32px rgba(140, 13, 194, 0.18);
+}
+
+.growth-gradient-text {
+  color: #ff5d00;
+  background: linear-gradient(90deg, #ff5d00, #8c0dc2, #008fcd);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .workspace-gestao-kpi {

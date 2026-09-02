@@ -46,6 +46,7 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/favicon') ||
+    pathname.startsWith('/mazanga/') ||
     pathname.startsWith('/api/') ||
     pathname === '/auth/signout'
   ) {
@@ -150,6 +151,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/|auth/signout).*)',
+    '/((?!_next/static|_next/image|favicon.ico|mazanga/|api/|auth/signout).*)',
   ],
 };

@@ -14,9 +14,9 @@ export const metadata: Metadata = {
       ? 'Administração da plataforma KukuGest'
       : 'Sistema de gestão de clientes e faturação AGT',
   icons: {
-    icon: APP_PRODUCT === 'food' ? '/food-favicon.svg' : '/favicon.png',
-    shortcut: APP_PRODUCT === 'food' ? '/food-favicon.svg' : '/favicon.png',
-    apple: APP_PRODUCT === 'food' ? '/food-favicon.svg' : '/favicon.png',
+    icon: APP_PRODUCT === 'food' ? '/food-favicon.svg' : APP_PRODUCT === 'growth-room' ? '/mazanga/icon.png' : '/favicon.png',
+    shortcut: APP_PRODUCT === 'food' ? '/food-favicon.svg' : APP_PRODUCT === 'growth-room' ? '/mazanga/icon.png' : '/favicon.png',
+    apple: APP_PRODUCT === 'food' ? '/food-favicon.svg' : APP_PRODUCT === 'growth-room' ? '/mazanga/icon.png' : '/favicon.png',
   },
 };
 
