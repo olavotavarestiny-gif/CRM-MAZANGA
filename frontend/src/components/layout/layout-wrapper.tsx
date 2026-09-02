@@ -13,7 +13,7 @@ import ModuleOnboardingModal from '@/components/onboarding/module-onboarding-mod
 import { routeToModuleKey, resolveModuleIntro, type ModuleIntroContent } from '@/lib/module-onboarding';
 import { BillingSuspendedModal } from '@/components/billing/access-notice';
 import TrialStatusBadge from '@/components/billing/trial-status-badge';
-import KukuGestLogo from '@/components/KukuGestLogo';
+import KukuGestLogo, { KukuGestFoodLogo } from '@/components/KukuGestLogo';
 import { RestaurantMark, getFoodBrand } from '@/components/food/food-ui';
 import AppBootLoading from './app-boot-loading';
 import ServerConnectionError from './server-connection-error';
@@ -25,8 +25,11 @@ import { isComercio, isGestaoKpi } from '@/lib/business-modes';
 import { getBlockedFeatureCopy } from '@/lib/plan-utils';
 import { DEV_AUTH_USER, isDevAuthSessionActive, setDevAuthPersonId, writeDevAuthSession } from '@/lib/dev-auth';
 import { getAccessRoleLabel } from '@/lib/roles';
+import { isFoodProduct, productStorageKey, toInternalFoodPath, toPublicFoodPath } from '@/lib/product';
+import { isGrowthRoomProduct } from '@/lib/product';
+import GrowthLayout from '@/components/growth/growth-layout';
 
-const ACCESS_NOTICE_STORAGE_KEY = 'kukugest:access-notice';
+const ACCESS_NOTICE_STORAGE_KEY = productStorageKey('access-notice');
 
 const ROUTE_LABELS: Record<string, string> = {
   '/contacts':       'Contactos',
@@ -119,7 +122,9 @@ function LayoutInner({
   const [authLoadError, setAuthLoadError] = useState<AuthLoadError | null>(null);
   const [authRetryNonce, setAuthRetryNonce] = useState(0);
   const [routeTransitioning, setRouteTransitioning] = useState(false);
-  const food = pathname === '/food' || pathname.startsWith('/food/');
+  const standaloneFood = isFoodProduct();
+  const internalPathname = standaloneFood ? toInternalFoodPath(pathname) : pathname;
+  const food = standaloneFood || pathname === '/food' || pathname.startsWith('/food/');
   const gestaoKpi = !food && (pathname === '/gestao' || pathname.startsWith('/gestao/') || isGestaoKpi(currentUser?.workspaceMode));
   const comercio = !food && !gestaoKpi && isComercio(currentUser?.workspaceMode);
   const activeWorkspaceMode = food ? 'food' : gestaoKpi ? 'gestao_kpi' : comercio ? 'comercio' : 'servicos';
@@ -138,13 +143,13 @@ function LayoutInner({
   }, [devAuthBypassEnabled]);
 
   useEffect(() => {
-    setSidebarCollapsed(window.localStorage.getItem('kukugest:sidebar-collapsed') === '1');
+    setSidebarCollapsed(window.localStorage.getItem(productStorageKey('sidebar-collapsed')) === '1');
   }, []);
 
   const toggleSidebarCollapsed = () => {
     setSidebarCollapsed((value) => {
       const next = !value;
-      window.localStorage.setItem('kukugest:sidebar-collapsed', next ? '1' : '0');
+      window.localStorage.setItem(productStorageKey('sidebar-collapsed'), next ? '1' : '0');
       return next;
     });
   };
@@ -400,9 +405,24 @@ function LayoutInner({
     }
 
     const enforceAccess = (user: User) => {
+      if (standaloneFood) {
+        const access = user.foodAccess;
+        const canEnterFood =
+          user.active !== false &&
+          user.accountStatus !== 'suspended' &&
+          user.availableWorkspaces?.includes('food') === true &&
+          access?.entitled === true &&
+          access.enabled === true &&
+          access.roles.length > 0;
+        if (!canEnterFood) {
+          window.location.assign('/api/auth/signout?next=%2Flogin%3Freason%3Dfood-access');
+          return;
+        }
+      }
+
       // A rota raiz e o alias /dashboard são pontos de entrada, não tentativas de
       // acesso a outro workspace. Encaminhar contas Food sem mostrar um falso 403.
-      if (user.workspaceMode === 'food' && (pathname === '/' || pathname.startsWith('/dashboard'))) {
+      if (!standaloneFood && user.workspaceMode === 'food' && (pathname === '/' || pathname.startsWith('/dashboard'))) {
         setAccessNotice(null);
         try {
           sessionStorage.removeItem(ACCESS_NOTICE_STORAGE_KEY);
@@ -422,12 +442,12 @@ function LayoutInner({
         return;
       }
 
-      if (!canAccessWorkspaceRoute(user, pathname, activeWorkspaceMode)) {
-        const fallback = getWorkspaceFallbackRoute(user, activeWorkspaceMode);
-        const planFeature = resolveRoutePlanFeature(pathname);
+      if (!canAccessWorkspaceRoute(user, internalPathname, activeWorkspaceMode)) {
+        const fallback = toPublicFoodPath(getWorkspaceFallbackRoute(user, activeWorkspaceMode));
+        const planFeature = resolveRoutePlanFeature(internalPathname);
         const blockedByPlan = planFeature && planFeature !== 'food' ? !hasFeature(user, planFeature) : false;
         const blockedCopy = blockedByPlan
-          ? getBlockedFeatureCopy({ featureName: pathname.startsWith('/relatorios') ? 'advancedReports' : planFeature, pathname })
+          ? getBlockedFeatureCopy({ featureName: internalPathname.startsWith('/relatorios') ? 'advancedReports' : planFeature, pathname: internalPathname })
           : null;
 
         try {
@@ -436,7 +456,7 @@ function LayoutInner({
             JSON.stringify({
               title: blockedByPlan ? blockedCopy?.title || 'Funcionalidade indisponível no seu plano' : 'Acesso restrito',
               message: blockedByPlan
-                ? blockedCopy?.description || `${resolveRouteLabel(pathname)} não está disponível no plano atual da sua conta.`
+                ? blockedCopy?.description || `${resolveRouteLabel(internalPathname)} não está disponível no plano atual da sua conta.`
                 : 'Não tem permissão para aceder a esta área com a configuração atual da sua conta.',
             } satisfies AccessNotice)
           );
@@ -594,11 +614,9 @@ function LayoutInner({
             </button>
             <div className="min-w-0 overflow-hidden">
               {food ? (
-                <div className="flex min-w-0 items-center gap-2">
-                  <RestaurantMark settings={foodSettingsQuery.data} size="sm" />
-                  <span className="truncate text-sm font-black text-slate-950">
-                    {getFoodBrand(foodSettingsQuery.data).name}
-                  </span>
+                <div className="flex min-w-0 items-center gap-2.5">
+                  {standaloneFood ? <KukuGestFoodLogo compact /> : <RestaurantMark settings={foodSettingsQuery.data} size="sm" />}
+                  <span className="truncate text-sm font-bold text-slate-950">{getFoodBrand(foodSettingsQuery.data).name}</span>
                 </div>
               ) : (
                 <KukuGestLogo height={24} showBetaBadge className="max-w-full" />
@@ -644,7 +662,7 @@ function LayoutInner({
                 className="rounded-md border border-amber-300 bg-white px-2 py-1 font-bold text-amber-900 hover:bg-amber-100"
                 onClick={() => {
                   setDevAuthPersonId(null);
-                  window.location.href = '/food';
+                  window.location.href = standaloneFood ? '/' : '/food';
                 }}
               >
                 Voltar ao Gestor
@@ -748,5 +766,6 @@ export default function LayoutWrapper({
   children: ReactNode;
   devAuthBypassEnabled?: boolean;
 }) {
+  if (isGrowthRoomProduct()) return <GrowthLayout>{children}</GrowthLayout>;
   return <LayoutInner devAuthBypassEnabled={devAuthBypassEnabled}>{children}</LayoutInner>;
 }

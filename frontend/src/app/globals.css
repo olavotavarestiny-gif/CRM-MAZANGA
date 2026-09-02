@@ -52,11 +52,36 @@
 }
 
 .workspace-food {
-  --workspace-primary: #0f766e;
-  --workspace-primary-hover: #0d5f59;
-  --workspace-primary-soft: #ecfdf5;
-  --workspace-primary-border: #a7f3d0;
+  --workspace-primary: #b4232d;
+  --workspace-primary-hover: #8f1c24;
+  --workspace-primary-soft: #fff1f2;
+  --workspace-primary-border: #fecdd3;
   --workspace-on-primary: #ffffff;
+}
+
+.product-food {
+  background: #f7f8fa;
+}
+
+.product-growth-room,
+.product-growth-room body {
+  background: #101512;
+  color: #eff4ee;
+}
+
+.workspace-growth-room {
+  --workspace-primary: #d9ff6a;
+  --workspace-primary-hover: #e4ff91;
+  --workspace-primary-soft: rgba(217, 255, 106, 0.1);
+  --workspace-primary-border: rgba(217, 255, 106, 0.25);
+  --workspace-on-primary: #0c110d;
+}
+
+.workspace-growth-room h1,
+.workspace-growth-room h2,
+.workspace-growth-room h3,
+.workspace-growth-room h4 {
+  color: #eff4ee;
 }
 
 .workspace-gestao-kpi {

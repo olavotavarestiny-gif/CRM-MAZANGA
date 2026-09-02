@@ -8,6 +8,7 @@ import {
   DEV_AUTH_USER,
   isServerDevAuthBypassEnabled,
 } from '@/lib/dev-auth';
+import { isFoodProduct, isGrowthRoomProduct, toPublicFoodPath } from '@/lib/product';
 
 const PUBLIC_PATHS = [
   '/login',
@@ -36,6 +37,8 @@ function buildRedirectUrl(request: NextRequest, pathname: string) {
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  const foodProduct = isFoodProduct();
+  const growthProduct = isGrowthRoomProduct();
 
   // Assets que nunca precisam de autenticação — deixar passar sempre.
   // O matcher no config deveria excluí-los mas o regex de lookahead negativo
@@ -47,6 +50,37 @@ export async function middleware(request: NextRequest) {
     pathname === '/auth/signout'
   ) {
     return NextResponse.next();
+  }
+
+  if (foodProduct) {
+    if (pathname === '/register') {
+      return NextResponse.redirect(buildRedirectUrl(request, '/login'));
+    }
+    if (pathname === '/food' || pathname.startsWith('/food/')) {
+      return NextResponse.redirect(buildRedirectUrl(request, toPublicFoodPath(pathname)));
+    }
+
+    const allowedRoots = [
+      '/ambientes', '/gestao', '/caixa', '/cozinha', '/delivery', '/entregador',
+      '/crm', '/menu', '/configuracoes', '/ajuda', '/pedidos', '/novo-pedido',
+      '/login', '/forgot-password', '/reset-password', '/change-password',
+      '/auth', '/termos', '/privacidade', '/manutencao',
+    ];
+    const allowed = pathname === '/' || allowedRoots.some((root) => pathname === root || pathname.startsWith(`${root}/`));
+    if (!allowed) {
+      return NextResponse.redirect(buildRedirectUrl(request, '/'));
+    }
+  }
+
+  if (growthProduct) {
+    if (pathname === '/register') return NextResponse.redirect(buildRedirectUrl(request, '/login'));
+    if (pathname === '/growth' || pathname.startsWith('/growth/')) {
+      const publicPath = pathname === '/growth' ? '/' : pathname.slice('/growth'.length);
+      return NextResponse.redirect(buildRedirectUrl(request, publicPath));
+    }
+    const allowedRoots = ['/clientes', '/sala', '/login', '/forgot-password', '/reset-password', '/change-password', '/auth', '/termos', '/privacidade', '/manutencao'];
+    const allowed = pathname === '/' || allowedRoots.some((root) => pathname === root || pathname.startsWith(`${root}/`));
+    if (!allowed) return NextResponse.redirect(buildRedirectUrl(request, '/'));
   }
 
   if (isServerDevAuthBypassEnabled()) {

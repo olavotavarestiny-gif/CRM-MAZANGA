@@ -135,4 +135,51 @@ export function KukuGestLoginLogo({
   );
 }
 
+export function KukuGestFoodLogo({
+  compact = false,
+  light = false,
+  showBetaBadge = false,
+  className,
+}: {
+  compact?: boolean;
+  light?: boolean;
+  showBetaBadge?: boolean;
+  className?: string;
+}) {
+  const foreground = light ? '#ffffff' : '#17202a';
+  return (
+    <div className={className} style={{ display: 'inline-flex', alignItems: 'center', gap: compact ? 0 : 10 }}>
+      <span
+        aria-hidden="true"
+        style={{
+          display: 'inline-flex',
+          height: compact ? 38 : 44,
+          width: compact ? 38 : 44,
+          flexShrink: 0,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: compact ? 10 : 12,
+          background: '#b4232d',
+          color: '#ffffff',
+          fontFamily: "'Montserrat', sans-serif",
+          fontSize: compact ? 19 : 22,
+          fontWeight: 900,
+        }}
+      >
+        K
+      </span>
+      {!compact && (
+        <span style={{ display: 'flex', minWidth: 0, flexDirection: 'column', lineHeight: 1 }}>
+          <span style={{ color: foreground, fontFamily: "'Montserrat', sans-serif", fontSize: 16, fontWeight: 800 }}>
+            KukuGest
+          </span>
+          <span style={{ marginTop: 4, color: '#b4232d', fontFamily: "'Montserrat', sans-serif", fontSize: 11, fontWeight: 900, textTransform: 'uppercase' }}>
+            Food{showBetaBadge ? ' · Beta' : ''}
+          </span>
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default KukuGestLogo;

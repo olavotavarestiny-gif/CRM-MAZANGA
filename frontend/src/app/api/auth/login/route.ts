@@ -14,6 +14,7 @@ import {
   readJsonSafely,
 } from '@/lib/server-auth-utils';
 import type { LoginErrorCode } from '@/lib/auth-error-codes';
+import { APP_PRODUCT } from '@/lib/product';
 
 function jsonWithHeaders(
   body: Record<string, unknown>,
@@ -216,6 +217,30 @@ export async function POST(req: NextRequest) {
         { backendStatus: backendRes.status, backendHost: new URL(apiUrl).host },
         cookieOperations
       );
+    }
+
+    if (APP_PRODUCT === 'food') {
+      const foodAccess = backendData?.foodAccess;
+      const canEnterFood =
+        backendData?.active !== false &&
+        backendData?.accountStatus !== 'suspended' &&
+        backendData?.availableWorkspaces?.includes?.('food') === true &&
+        foodAccess?.entitled === true &&
+        foodAccess?.enabled === true &&
+        Array.isArray(foodAccess?.roles) &&
+        foodAccess.roles.length > 0;
+
+      if (!canEnterFood) {
+        await supabase.auth.signOut().catch(() => {});
+        return createJsonError(
+          'LOGIN_PRODUCT_ACCESS_DENIED',
+          'Esta conta não está autorizada no KukuGest Food.',
+          403,
+          requestId,
+          { product: 'food' },
+          cookieOperations
+        );
+      }
     }
 
     try {

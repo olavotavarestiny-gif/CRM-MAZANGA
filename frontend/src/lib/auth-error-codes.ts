@@ -10,6 +10,7 @@ export type LoginErrorCode =
   | 'LOGIN_INVALID_CREDENTIALS'
   | 'LOGIN_CONFIG_ERROR'
   | 'LOGIN_UNAUTHENTICATED'
+  | 'LOGIN_PRODUCT_ACCESS_DENIED'
   | 'LOGIN_UNKNOWN_ERROR';
 
 export type LoginTechnicalError = {
@@ -32,6 +33,8 @@ export function getLoginUserMessage(code?: string) {
     case 'LOGIN_PROFILE_LOAD_FAILED':
     case 'LOGIN_SESSION_CREATED_BUT_PROFILE_FAILED':
       return 'A sessão foi criada, mas não conseguimos carregar a sua conta.';
+    case 'LOGIN_PRODUCT_ACCESS_DENIED':
+      return 'Esta conta ainda não tem acesso ao KukuGest Food. Peça um convite ao gestor da sua organização.';
     case 'LOGIN_CONFIG_ERROR':
       return 'Existe um erro de configuração no ambiente.';
     case 'LOGIN_CORS_ERROR':

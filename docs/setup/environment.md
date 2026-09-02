@@ -101,6 +101,17 @@ Este documento organiza as variáveis de ambiente do projeto por aplicação e p
 | `NEXT_PUBLIC_APP_URL` | sim | URL pública do frontend |
 | `NEXT_PUBLIC_SUPABASE_URL` | sim | URL pública do Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | sim | anon key pública |
+| `NEXT_PUBLIC_PRODUCT` | não | `growth-room` ativa o deployment autónomo Mazanga Growth Room |
+
+### Mazanga Growth Room
+
+| Variável backend | Obrigatória | Observação |
+|------------------|-------------|------------|
+| `GROWTH_FRONTEND_URL` | sim no deployment Growth Room | URL usada no retorno dos convites Supabase |
+| `GROWTH_ADMIN_EMAILS` | sim | emails Mazanga autorizados a provisionar o workspace, separados por vírgula |
+| `GROWTH_ORGANIZATION_NAME` | não | nome interno; por defeito `Mazanga Marketing` |
+
+O domínio da Growth Room e `/auth/callback` devem constar na lista de Redirect URLs do Supabase Auth.
 
 ### Serviços do frontend
 

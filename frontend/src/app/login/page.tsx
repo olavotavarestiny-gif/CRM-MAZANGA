@@ -4,10 +4,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Lock, Mail, RefreshCw } from 'lucide-react';
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
-import { KukuGestLoginLogo } from '@/components/KukuGestLogo';
+import { KukuGestFoodLogo, KukuGestLoginLogo } from '@/components/KukuGestLogo';
 import { getLoginUserMessage, isRetryableLoginCode, type LoginTechnicalError } from '@/lib/auth-error-codes';
+import { isFoodProduct, isGrowthRoomProduct } from '@/lib/product';
 
 export default function LoginPage() {
+  const foodProduct = isFoodProduct();
+  const growthProduct = isGrowthRoomProduct();
   const [loading, setLoading] = useState(false);
   const [retryingProfile, setRetryingProfile] = useState(false);
   const [error, setError] = useState<LoginTechnicalError | null>(null);
@@ -99,6 +102,77 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  if (growthProduct) {
+    return (
+      <main className="relative grid min-h-screen overflow-hidden bg-[#090d0b] px-5 py-10 text-white lg:grid-cols-[1.05fr_.95fr]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(217,255,106,.11),transparent_30%),radial-gradient(circle_at_80%_80%,rgba(53,135,88,.12),transparent_34%)]" />
+        <section className="relative hidden flex-col justify-between p-10 lg:flex xl:p-16">
+          <div className="inline-flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#d9ff6a] text-lg font-black text-[#0c110d]">M</span><div><strong className="block tracking-[.2em]">MAZANGA</strong><span className="text-[10px] font-semibold uppercase tracking-[.25em] text-white/40">Growth Room</span></div></div>
+          <div className="max-w-xl"><p className="mb-6 text-xs font-bold uppercase tracking-[.22em] text-[#d9ff6a]">Clareza para crescer</p><h2 className="text-5xl font-extrabold leading-[1.08] text-white xl:text-6xl">Marketing ligado a resultados comerciais.</h2><p className="mt-7 max-w-lg text-base leading-7 text-white/50">Toda ação deve ajudar a explicar o que aconteceu, o que aprendemos e qual é a próxima decisão.</p></div>
+          <p className="text-xs text-white/25">Mazanga Marketing · Estratégia, decisão e crescimento mensurável</p>
+        </section>
+        <section className="relative flex items-center justify-center"><div className="w-full max-w-md rounded-[2rem] border border-white/10 bg-white/[.055] p-7 shadow-2xl backdrop-blur-xl sm:p-10"><div className="mb-9 lg:hidden"><div className="inline-flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#d9ff6a] font-black text-[#0c110d]">M</span><strong className="tracking-[.18em]">MAZANGA</strong></div></div><p className="text-xs font-bold uppercase tracking-[.2em] text-[#d9ff6a]">Mazanga Growth Room</p><h1 className="mt-4 text-3xl font-extrabold text-white">Entra na tua sala de crescimento.</h1><p className="mt-3 text-sm leading-6 text-white/45">Acompanha os resultados, decisões e próximos passos do teu projeto com a Mazanga.</p>
+          {error && <div className="mt-6 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">{error.message}</div>}
+          <form onSubmit={handleLogin} className="mt-8 space-y-5"><label className="block text-sm font-semibold text-white/65">Email<div className="relative mt-2"><Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30"/><input type="email" autoComplete="email" required value={email} onChange={(event)=>setEmail(event.target.value)} placeholder="nome@empresa.ao" className="h-14 w-full rounded-xl border border-white/10 bg-black/20 pl-11 pr-4 text-white outline-none placeholder:text-white/20 focus:border-[#d9ff6a]/60 focus:ring-2 focus:ring-[#d9ff6a]/10"/></div></label><label className="block text-sm font-semibold text-white/65">Palavra-passe<div className="relative mt-2"><Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30"/><input type="password" autoComplete="current-password" required value={password} onChange={(event)=>setPassword(event.target.value)} placeholder="••••••••" className="h-14 w-full rounded-xl border border-white/10 bg-black/20 pl-11 pr-4 text-white outline-none placeholder:text-white/20 focus:border-[#d9ff6a]/60 focus:ring-2 focus:ring-[#d9ff6a]/10"/></div></label><button type="submit" disabled={loading} className="h-14 w-full rounded-xl bg-[#d9ff6a] text-sm font-extrabold text-[#0c110d] transition hover:bg-[#e4ff91] disabled:opacity-50">{loading ? 'A entrar…' : 'Entrar na Growth Room'}</button></form><div className="mt-6 text-center"><Link href="/forgot-password" className="text-sm text-white/45 hover:text-white">Recuperar palavra-passe</Link></div></div></section>
+      </main>
+    );
+  }
+
+  if (foodProduct) {
+    return (
+      <main className="workspace-food min-h-screen bg-[#f7f8fa] px-4 py-8 sm:px-6">
+        <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md items-center">
+          <section className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_18px_60px_rgba(36,24,25,0.10)]">
+            <div className="border-b border-rose-100 bg-[#fff7f7] px-6 py-7 sm:px-8">
+              <KukuGestFoodLogo showBetaBadge />
+              <h1 className="mt-7 text-2xl font-bold text-slate-950">Entrar no restaurante</h1>
+              <p className="mt-2 text-sm leading-5 text-slate-500">Caixa, cozinha, delivery e gestão num só lugar.</p>
+            </div>
+
+            <div className="px-6 py-7 sm:px-8">
+              {error && (
+                <div className="mb-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                  <p>{error.message}</p>
+                  {isRetryableLoginCode(error.code) && (
+                    <button type="button" onClick={retryProfileLoad} disabled={retryingProfile} className="mt-2 inline-flex items-center gap-1.5 font-semibold text-[#9f1f29] disabled:opacity-60">
+                      <RefreshCw className={`h-3.5 w-3.5 ${retryingProfile ? 'animate-spin' : ''}`} />
+                      {retryingProfile ? 'A tentar...' : 'Tentar novamente'}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <form onSubmit={handleLogin} className="space-y-5">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Email</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input type="email" autoComplete="email" placeholder="nome@restaurante.ao" value={email} onChange={(event) => setEmail(event.target.value)} required className="h-12 w-full rounded-md border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-950 outline-none transition focus:border-[#b4232d] focus:ring-2 focus:ring-rose-100" />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input type="password" autoComplete="current-password" placeholder="A sua password" value={password} onChange={(event) => setPassword(event.target.value)} required className="h-12 w-full rounded-md border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-950 outline-none transition focus:border-[#b4232d] focus:ring-2 focus:ring-rose-100" />
+                  </div>
+                </div>
+                <button type="submit" disabled={loading} className="h-12 w-full rounded-md bg-[#b4232d] text-sm font-bold text-white transition hover:bg-[#8f1c24] disabled:cursor-not-allowed disabled:opacity-60">
+                  {loading ? 'A entrar...' : 'Entrar no KukuGest Food'}
+                </button>
+              </form>
+
+              <div className="mt-5 flex items-center justify-between gap-4 text-xs">
+                <Link href="/forgot-password" className="font-semibold text-[#9f1f29] hover:text-[#7f1820]">Recuperar password</Link>
+                <span className="text-right text-slate-400">Acesso apenas por convite</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <BackgroundGradientAnimation

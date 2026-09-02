@@ -83,6 +83,9 @@ model User {
   membershipsAsOwner             AccountMembership[]             @relation("MembershipAccountOwner")
   managementOrganization         ManagementOrganization?         @relation("ManagementOrganizationOwner")
   managementProfile              ManagementProfile?
+  growthOrganizationOwned       GrowthOrganization?             @relation("GrowthOrganizationOwner")
+  growthMemberships             GrowthMembership[]               @relation("GrowthMembershipUser")
+  growthClientAccesses          GrowthClientAccess[]             @relation("GrowthClientAccessUser")
   foodSettings                   FoodSettings?                   @relation("FoodSettingsUser")
   foodBranches                   FoodBranch[]                    @relation("FoodBranchUser")
   foodCategories                 FoodCategory[]                  @relation("FoodCategoryUser")
@@ -2738,4 +2741,216 @@ model ManagementActivityLog {
   @@index([organizationId, createdAt])
   @@index([organizationId, module, relatedRecordId])
   @@map("activity_logs")
+}
+
+model GrowthOrganization {
+  id             String             @id @default(uuid()) @db.Uuid
+  accountOwnerId Int                @unique @map("account_owner_id")
+  name           String
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  accountOwner   User               @relation("GrowthOrganizationOwner", fields: [accountOwnerId], references: [id], onDelete: Cascade)
+  memberships    GrowthMembership[]
+  clients        GrowthClient[]
+
+  @@map("growth_organizations")
+}
+
+model GrowthMembership {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  userId         Int                @map("user_id")
+  role           String             @default("mazanga_admin")
+  active         Boolean            @default(true)
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  organization   GrowthOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User               @relation("GrowthMembershipUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId, active])
+  @@map("growth_memberships")
+}
+
+model GrowthClient {
+  id             String                    @id @default(uuid()) @db.Uuid
+  organizationId String                    @map("organization_id") @db.Uuid
+  companyName    String                    @map("company_name")
+  logoUrl        String?                   @map("logo_url")
+  sector         String?
+  contactName    String?                   @map("contact_name")
+  contactEmail   String?                   @map("contact_email")
+  phone          String?
+  mainGoal       String?                   @map("main_goal")
+  status         String                    @default("active")
+  createdAt      DateTime                  @default(now()) @map("created_at")
+  updatedAt      DateTime                  @updatedAt @map("updated_at")
+  organization   GrowthOrganization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  accesses       GrowthClientAccess[]
+  periods        GrowthPerformancePeriod[]
+
+  @@index([organizationId, status, companyName])
+  @@map("growth_clients")
+}
+
+model GrowthClientAccess {
+  id        String       @id @default(uuid()) @db.Uuid
+  clientId  String       @map("client_id") @db.Uuid
+  userId    Int          @unique @map("user_id")
+  active    Boolean      @default(true)
+  invitedAt DateTime     @default(now()) @map("invited_at")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  client    GrowthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user      User         @relation("GrowthClientAccessUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, active])
+  @@map("growth_client_accesses")
+}
+
+model GrowthPerformancePeriod {
+  id                 String                    @id @default(uuid()) @db.Uuid
+  clientId           String                    @map("client_id") @db.Uuid
+  periodName         String                    @map("period_name")
+  startDate          DateTime                  @map("start_date") @db.Date
+  endDate            DateTime                  @map("end_date") @db.Date
+  investment         Decimal                   @default(0) @db.Decimal(18, 2)
+  contacts           Int                       @default(0)
+  qualifiedContacts Int                       @default(0) @map("qualified_contacts")
+  meetings           Int                       @default(0)
+  proposals          Int                       @default(0)
+  sales              Int                       @default(0)
+  attributedRevenue Decimal                   @default(0) @map("attributed_revenue") @db.Decimal(18, 2)
+  executiveSummary   String?                   @map("executive_summary")
+  mainBottleneck     String?                   @map("main_bottleneck")
+  recommendation     String?
+  status             String                    @default("draft")
+  sourceSystem       String                    @default("manual") @map("source_system")
+  externalId         String?                   @map("external_id")
+  archivedAt         DateTime?                 @map("archived_at")
+  createdAt          DateTime                  @default(now()) @map("created_at")
+  updatedAt          DateTime                  @updatedAt @map("updated_at")
+  client             GrowthClient              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  sources            GrowthContactSource[]
+  campaigns          GrowthCampaignAction[]
+  strategicReading   GrowthStrategicReading?
+  decisions          GrowthNextDecision[]
+  report             GrowthPerformanceReport?
+  publications       GrowthPublication[]
+
+  @@index([clientId, startDate, status])
+  @@unique([clientId, externalId])
+  @@map("growth_performance_periods")
+}
+
+model GrowthContactSource {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  periodId           String                  @map("period_id") @db.Uuid
+  sourceName         String                  @map("source_name")
+  contacts           Int                     @default(0)
+  qualifiedContacts Int                     @default(0) @map("qualified_contacts")
+  meetings           Int                     @default(0)
+  proposals          Int                     @default(0)
+  sales              Int                     @default(0)
+  revenue            Decimal                 @default(0) @db.Decimal(18, 2)
+  qualityLabel       String                  @default("medium") @map("quality_label")
+  strategicReading  String?                 @map("strategic_reading")
+  externalId         String?                 @map("external_id")
+  sortOrder          Int                     @default(0) @map("sort_order")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+  period             GrowthPerformancePeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@index([periodId, sortOrder])
+  @@unique([periodId, externalId])
+  @@map("growth_contact_sources")
+}
+
+model GrowthCampaignAction {
+  id          String                  @id @default(uuid()) @db.Uuid
+  periodId    String                  @map("period_id") @db.Uuid
+  name        String
+  objective   String?
+  sourceName  String?                 @map("source_name")
+  investment  Decimal                 @default(0) @db.Decimal(18, 2)
+  contacts    Int                     @default(0)
+  sales       Int                     @default(0)
+  revenue     Decimal                 @default(0) @db.Decimal(18, 2)
+  status      String                  @default("testing")
+  decision    String?
+  note        String?
+  externalId  String?                 @map("external_id")
+  sortOrder   Int                     @default(0) @map("sort_order")
+  createdAt   DateTime                @default(now()) @map("created_at")
+  updatedAt   DateTime                @updatedAt @map("updated_at")
+  period      GrowthPerformancePeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@index([periodId, sortOrder])
+  @@unique([periodId, externalId])
+  @@map("growth_campaign_actions")
+}
+
+model GrowthStrategicReading {
+  id                  String                  @id @default(uuid()) @db.Uuid
+  periodId            String                  @unique @map("period_id") @db.Uuid
+  whatHappened        String?                 @map("what_happened")
+  whatDataShows       String?                 @map("what_data_shows")
+  bottleneck          String?
+  businessMeaning     String?                 @map("business_meaning")
+  recommendedDecision String?                 @map("recommended_decision")
+  nextActions         String?                 @map("next_actions")
+  clientNeeds         String?                 @map("client_needs")
+  createdAt           DateTime                @default(now()) @map("created_at")
+  updatedAt           DateTime                @updatedAt @map("updated_at")
+  period              GrowthPerformancePeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@map("growth_strategic_readings")
+}
+
+model GrowthNextDecision {
+  id             String                  @id @default(uuid()) @db.Uuid
+  periodId       String                  @map("period_id") @db.Uuid
+  decision       String
+  reason         String?
+  owner          String?
+  priority       String                  @default("medium")
+  status         String                  @default("next_action")
+  expectedImpact String?                 @map("expected_impact")
+  sortOrder      Int                     @default(0) @map("sort_order")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+  period         GrowthPerformancePeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@index([periodId, sortOrder])
+  @@map("growth_next_decisions")
+}
+
+model GrowthPerformanceReport {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  periodId           String                  @unique @map("period_id") @db.Uuid
+  executiveSummary   String?                 @map("executive_summary")
+  mainLearnings      String?                 @map("main_learnings")
+  whatWorked         String?                 @map("what_worked")
+  whatDidNotWork     String?                 @map("what_did_not_work")
+  decisionsTaken     String?                 @map("decisions_taken")
+  nextSteps          String?                 @map("next_steps")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+  period             GrowthPerformancePeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@map("growth_performance_reports")
+}
+
+model GrowthPublication {
+  id            String                  @id @default(uuid()) @db.Uuid
+  periodId      String                  @map("period_id") @db.Uuid
+  version       Int
+  snapshot      Json
+  publishedById Int?                    @map("published_by_id")
+  publishedAt   DateTime                @default(now()) @map("published_at")
+  period        GrowthPerformancePeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@unique([periodId, version])
+  @@index([periodId, publishedAt])
+  @@map("growth_publications")
 }

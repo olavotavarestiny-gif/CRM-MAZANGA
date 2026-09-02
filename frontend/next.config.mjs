@@ -12,6 +12,13 @@ function isAbsoluteHttpUrl(value) {
 }
 
 const CONNECT_SRC_API_URL = isAbsoluteHttpUrl(RAW_API_URL) ? ` ${RAW_API_URL}` : '';
+const APP_PRODUCT = process.env.NEXT_PUBLIC_PRODUCT === 'food'
+  ? 'food'
+  : process.env.NEXT_PUBLIC_PRODUCT === 'platform-admin'
+    ? 'platform-admin'
+    : process.env.NEXT_PUBLIC_PRODUCT === 'growth-room'
+      ? 'growth-room'
+    : 'crm';
 
 // Security headers — fixes ZAP alerts: CSP, X-Frame-Options, X-Content-Type-Options,
 // Anti-clickjacking, MIME-sniffing, Cache-Control
@@ -64,6 +71,38 @@ const nextConfig = {
         permanent: false,
       },
     ];
+  },
+  async rewrites() {
+    if (APP_PRODUCT === 'growth-room') {
+      return {
+        beforeFiles: [
+          { source: '/', destination: '/growth' },
+          { source: '/clientes/:path*', destination: '/growth/clientes/:path*' },
+          { source: '/sala/:path*', destination: '/growth/sala/:path*' },
+        ],
+        afterFiles: [], fallback: [],
+      };
+    }
+    if (APP_PRODUCT !== 'food') return [];
+    return {
+      beforeFiles: [
+        { source: '/', destination: '/food' },
+        { source: '/ambientes', destination: '/food' },
+        { source: '/gestao/:path*', destination: '/food/gestao/:path*' },
+        { source: '/caixa/:path*', destination: '/food/caixa/:path*' },
+        { source: '/cozinha/:path*', destination: '/food/cozinha/:path*' },
+        { source: '/delivery/:path*', destination: '/food/delivery/:path*' },
+        { source: '/entregador/:path*', destination: '/food/entregador/:path*' },
+        { source: '/crm/:path*', destination: '/food/crm/:path*' },
+        { source: '/menu/:path*', destination: '/food/produtos/:path*' },
+        { source: '/configuracoes/:path*', destination: '/food/configuracoes/:path*' },
+        { source: '/ajuda/:path*', destination: '/food/ajuda/:path*' },
+        { source: '/pedidos/:path*', destination: '/food/pedidos/:path*' },
+        { source: '/novo-pedido/:path*', destination: '/food/novo-pedido/:path*' },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
   },
   async headers() {
     return [

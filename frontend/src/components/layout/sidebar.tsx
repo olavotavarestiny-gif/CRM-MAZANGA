@@ -13,7 +13,7 @@ import {
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { isComercio, isFood } from '@/lib/business-modes';
-import KukuGestLogo, { KukuGestIcon } from '@/components/KukuGestLogo';
+import KukuGestLogo, { KukuGestFoodLogo, KukuGestIcon } from '@/components/KukuGestLogo';
 import TrialStatusBadge from '@/components/billing/trial-status-badge';
 import AccountSwitcher from '@/components/layout/account-switcher';
 import { RestaurantMark, getFoodBrand, getFoodBrandStyle } from '@/components/food/food-ui';
@@ -24,6 +24,7 @@ import { canAccessCommerceRoute, canView, canViewReports, hasFoodPermission, has
 import type { FoodRole, ModuleKey } from '@/lib/permissions';
 import { buildWhatsAppSupportLink, getPlanBadgeClasses, getPricingTierLabel } from '@/lib/plan-utils';
 import { isClientDevAuthBypassEnabled, setDevAuthPersonId } from '@/lib/dev-auth';
+import { isFoodProduct, toPublicFoodPath } from '@/lib/product';
 
 const TOUR_ATTR: Record<string, string> = {
   '/':            'sidebar-painel',
@@ -103,7 +104,8 @@ export default function Sidebar({
       : 'text-[#6b7e9a] hover:bg-[var(--workspace-primary-soft)] hover:text-[var(--workspace-primary)]'
   );
 
-  const food = pathname === '/food' || pathname.startsWith('/food/');
+  const standaloneFood = isFoodProduct();
+  const food = standaloneFood || pathname === '/food' || pathname.startsWith('/food/');
   const foodNavItemClass = (active: boolean) => cn(
     'flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
     collapsed && 'justify-center px-2',
@@ -202,7 +204,7 @@ export default function Sidebar({
     { href: '/food/produtos', label: 'Menu', icon: Package, permission: 'catalog.view', group: 'configuration' },
     { href: '/food/configuracoes', label: 'Configurações', icon: Settings, permission: 'settings.edit', group: 'configuration' },
     { href: '/food/ajuda', label: 'Ajuda', icon: CircleHelp, permission: 'context.view', group: 'configuration' },
-  ];
+  ].map((link) => ({ ...link, href: toPublicFoodPath(link.href) })) as Array<{ href: string; label: string; icon: React.ElementType; permission: string; group: 'start' | 'operation' | 'growth' | 'configuration'; role?: FoodRole }>;
   const foodLinks = food ? allFoodLinks.filter((link) => (
     !!currentUser
     && hasFoodPermission(currentUser, link.permission)
@@ -225,7 +227,7 @@ export default function Sidebar({
   const gestaoLinks = allGestaoLinks.filter(l => isVisible(l.href));
 
   const adminLinks: { href: string; label: string; icon: React.ElementType }[] = hasPlatformAdminAccess
-    ? [{ href: '/superadmin?section=users', label: 'Administração', icon: ShieldAlert }]
+    ? [{ href: standaloneFood ? (process.env.NEXT_PUBLIC_ADMIN_URL || 'https://beta.admin.kukugest.ao') : '/superadmin?section=users', label: 'Administração', icon: ShieldAlert }]
     : [];
 
   return (
@@ -240,12 +242,12 @@ export default function Sidebar({
       <div className={cn('flex flex-shrink-0 items-center justify-between border-b border-slate-100 px-4 py-4', food && 'bg-white py-4 md:bg-white/70', collapsed && 'flex-col gap-2 px-2 py-3')}>
         {food ? (
           <div className="flex min-w-0 items-center gap-3">
-            <RestaurantMark settings={foodSettings} size="md" />
+            {standaloneFood ? <KukuGestFoodLogo compact={collapsed} showBetaBadge={!collapsed} /> : <RestaurantMark settings={foodSettings} size="md" />}
             <div className={cn('min-w-0', collapsed && 'hidden')}>
-              <p className="truncate text-sm font-black text-slate-950">{foodBrand.name}</p>
+              <p className="truncate text-xs font-semibold text-slate-500">{foodBrand.name}</p>
               <div className="mt-1 flex items-center gap-1.5">
                 <span className={cn('h-2 w-2 rounded-full', foodSettings?.isEnabled ? 'bg-emerald-500' : 'bg-amber-400')} />
-                <span className="text-xs font-medium text-slate-500">{foodSettings?.isEnabled ? 'Activo' : 'Inactivo'}</span>
+                <span className="text-[11px] font-medium text-slate-500">{foodSettings?.isEnabled ? 'Operação activa' : 'Operação inactiva'}</span>
               </div>
             </div>
           </div>
@@ -271,7 +273,7 @@ export default function Sidebar({
                         key={href}
                         href={href}
                         title={collapsed ? label : undefined}
-                        className={foodNavItemClass(href === '/food' ? pathname === '/food' : isActive(href))}
+                        className={foodNavItemClass((href === '/food' || href === '/') ? (pathname === '/food' || pathname === '/') : isActive(href))}
                         onClick={(event) => {
                           if (role === 'courier' && localFoodPreview && previewCourier) {
                             event.preventDefault();
@@ -439,7 +441,7 @@ export default function Sidebar({
       <footer className={cn('space-y-0.5 border-t border-slate-100 px-3 py-4', collapsed && 'px-2 [&_p]:hidden [&_span]:hidden')}>
         {hasFoodWorkspace && (
           <Link
-            href={food ? (currentUser?.defaultWorkspace === 'gestao_kpi' ? '/gestao' : '/') : '/food'}
+            href={food ? (standaloneFood ? (process.env.NEXT_PUBLIC_CRM_URL || 'https://beta.app.kukugest.ao') : (currentUser?.defaultWorkspace === 'gestao_kpi' ? '/gestao' : '/')) : '/food'}
             className={navItemClass(false)}
             onClick={onClose}
             title={collapsed ? (food ? 'Voltar ao CRM' : 'Abrir KukuGest Food') : undefined}

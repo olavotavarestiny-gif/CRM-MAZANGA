@@ -74,7 +74,11 @@ function getCorsDiagnostic(origin) {
   }
 
   const explicitlyAllowedOrigins = new Set(
-    parseAllowedOrigins(process.env.FRONTEND_URL, process.env.ALLOWED_VERCEL_URL)
+    parseAllowedOrigins(
+      process.env.FRONTEND_URL,
+      process.env.GROWTH_FRONTEND_URL,
+      process.env.ALLOWED_VERCEL_URL
+    )
   );
 
   if (explicitlyAllowedOrigins.has(origin)) {

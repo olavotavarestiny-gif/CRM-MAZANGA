@@ -53,6 +53,7 @@ const startupTemplatesRouter = require('./routes/startup-templates');
 const reportsRouter = require('./routes/reports');
 const serviceDashboardRouter = require('./routes/service-dashboard');
 const managementRouter = require('./routes/management');
+const growthRoomRouter = require('./routes/growth-room');
 const foodV1Router = require('./routes/food-v1');
 const requireAuth = require('./middleware/auth');
 const { requireSuperAdmin } = require('./middleware/auth');
@@ -128,7 +129,11 @@ const isManagedFrontendOrigin = (origin) => {
 };
 
 const explicitlyAllowedOrigins = new Set(
-  parseAllowedOrigins(process.env.FRONTEND_URL, process.env.ALLOWED_VERCEL_URL)
+  parseAllowedOrigins(
+    process.env.FRONTEND_URL,
+    process.env.GROWTH_FRONTEND_URL,
+    process.env.ALLOWED_VERCEL_URL
+  )
 );
 
 // Middleware
@@ -346,6 +351,7 @@ app.use('/api/superadmin', requireAuth, requireSuperAdmin, superadminRouter);
 app.use('/api/finances', requireAuth, checkSubscriptionAccess, requirePlanFeature('financas'), financesRouter);
 app.use('/api/account', requireAuth, checkSubscriptionAccess, accountRouter);
 app.use('/api/management', requireAuth, checkSubscriptionAccess, requireManagementWorkspace, managementRouter);
+app.use('/api/growth-room', requireAuth, growthRoomRouter);
 app.use('/api/food/v1', requireAuth, checkSubscriptionAccess, foodV1Router);
 app.use('/api/pipeline-stages', requireAuth, checkSubscriptionAccess, pipelineStagesRouter);
 app.use('/api/deal-stages', requireAuth, checkSubscriptionAccess, requirePlanFeature('processos'), dealStagesRouter);

@@ -222,7 +222,7 @@ export const API_URL_CONFIG_ERROR = getApiUrlConfigErrorMessage(RAW_API_URL);
 
 const API_URL = API_URL_CONFIG_ERROR ? DEFAULT_API_URL : RAW_API_URL || DEFAULT_API_URL;
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_URL,
   timeout: API_TIMEOUT_MS,
 });
@@ -285,7 +285,7 @@ export function setActiveAccountId(accountOwnerId: number | null): void {
 api.interceptors.request.use(async (config) => {
   const devSampleAdapter = createDevSampleApiAdapter();
   const requestUrl = String(config.url || '');
-  const shouldUseDevSampleAdapter = devSampleAdapter && !requestUrl.startsWith('/api/food');
+  const shouldUseDevSampleAdapter = devSampleAdapter && !requestUrl.startsWith('/api/food') && !requestUrl.startsWith('/api/growth-room');
   if (shouldUseDevSampleAdapter) {
     config.adapter = devSampleAdapter;
     config.headers[DEV_AUTH_HEADER] = DEV_AUTH_TOKEN;
