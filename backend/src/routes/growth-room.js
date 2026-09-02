@@ -2,7 +2,7 @@ const express = require('express');
 const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
 const { z } = require('zod');
 const { withGrowthContext, requireGrowthAdmin } = require('../lib/growth-context');
-const { calculateGrowthMetrics, buildGrowthWarnings, validateGrowthPublication, serializeGrowthPeriod } = require('../lib/growth-room');
+const { calculateGrowthMetrics, buildGrowthWarnings, validateGrowthPublication, serializeGrowthPeriod, buildGrowthPeriodTemplate } = require('../lib/growth-room');
 
 const router = express.Router();
 const uuid = z.string().uuid();
@@ -50,6 +50,7 @@ const periodEditorSchema = periodBaseSchema.partial().extend({
   sources: z.array(sourceSchema).optional(), campaigns: z.array(campaignSchema).optional(),
   strategicReading: readingSchema.optional(), decisions: z.array(decisionSchema).optional(), report: reportSchema.optional(),
 });
+const periodCreateSchema = periodBaseSchema.extend({ templatePeriodId: uuid.optional() });
 
 const periodInclude = {
   client: { select: { id: true, companyName: true, logoUrl: true, sector: true, mainGoal: true } },
@@ -169,11 +170,29 @@ router.post('/accesses/:id/revoke', run(async (req, res, tx, context) => {
 
 router.post('/clients/:id/periods', run(async (req, res, tx, context) => {
   requireGrowthAdmin(context);
-  const clientId = uuid.parse(req.params.id); const input = periodBaseSchema.parse(req.body);
+  const clientId = uuid.parse(req.params.id); const input = periodCreateSchema.parse(req.body);
   const client = await tx.growthClient.findFirst({ where: { id: clientId, organizationId: context.organizationId } });
   if (!client) return res.status(404).json({ error: 'Cliente não encontrado.' });
   if (input.endDate < input.startDate) return res.status(400).json({ error: 'A data final deve ser posterior à inicial.' });
-  const period = await tx.growthPerformancePeriod.create({ data: { ...input, clientId, status: 'draft' }, include: periodInclude });
+  const { templatePeriodId, ...periodData } = input;
+  let template = null;
+  if (templatePeriodId) {
+    template = await tx.growthPerformancePeriod.findFirst({
+      where: { id: templatePeriodId, clientId, client: { organizationId: context.organizationId } },
+      include: { sources: true, campaigns: true, decisions: true },
+    });
+    if (!template) return res.status(404).json({ error: 'Período-base não encontrado.' });
+  }
+  const structure = buildGrowthPeriodTemplate(template);
+  const period = await tx.growthPerformancePeriod.create({
+    data: {
+      ...periodData, clientId, status: 'draft',
+      sources: structure.sources.length ? { create: structure.sources } : undefined,
+      campaigns: structure.campaigns.length ? { create: structure.campaigns } : undefined,
+      decisions: structure.decisions.length ? { create: structure.decisions } : undefined,
+    },
+    include: periodInclude,
+  });
   res.status(201).json(jsonPeriod(period));
 }));
 

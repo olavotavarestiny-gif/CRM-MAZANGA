@@ -83,6 +83,48 @@ function serializeGrowthPeriod(period) {
   };
 }
 
+function buildGrowthPeriodTemplate(period) {
+  if (!period) return { sources: [], campaigns: [], decisions: [] };
+  return {
+    sources: (period.sources || []).map((source, index) => ({
+      sourceName: source.sourceName,
+      contacts: 0,
+      qualifiedContacts: 0,
+      meetings: 0,
+      proposals: 0,
+      sales: 0,
+      revenue: 0,
+      qualityLabel: source.qualityLabel || 'medium',
+      strategicReading: null,
+      sortOrder: source.sortOrder ?? index,
+    })),
+    campaigns: (period.campaigns || []).map((campaign, index) => ({
+      name: campaign.name,
+      objective: campaign.objective || null,
+      sourceName: campaign.sourceName || null,
+      investment: 0,
+      contacts: 0,
+      sales: 0,
+      revenue: 0,
+      status: 'testing',
+      decision: null,
+      note: null,
+      sortOrder: campaign.sortOrder ?? index,
+    })),
+    decisions: (period.decisions || [])
+      .filter((decision) => !['completed', 'cancelled'].includes(decision.status))
+      .map((decision, index) => ({
+        decision: decision.decision,
+        reason: decision.reason || null,
+        owner: decision.owner || null,
+        priority: decision.priority || 'medium',
+        status: 'next_action',
+        expectedImpact: decision.expectedImpact || null,
+        sortOrder: decision.sortOrder ?? index,
+      })),
+  };
+}
+
 module.exports = {
   FUNNEL_STAGES,
   divide,
@@ -90,4 +132,5 @@ module.exports = {
   buildGrowthWarnings,
   validateGrowthPublication,
   serializeGrowthPeriod,
+  buildGrowthPeriodTemplate,
 };
