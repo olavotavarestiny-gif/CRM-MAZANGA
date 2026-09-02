@@ -2,6 +2,8 @@ import { api } from './api';
 
 export type GrowthRole = 'mazanga_admin' | 'client';
 export type GrowthClientStatus = 'active' | 'paused' | 'finished' | 'archived';
+export interface GrowthClientGoal { id?:string; clientId?:string; targetContacts?:number|null; targetSales?:number|null; targetRevenue?:number|string|null; maxCostPerContact?:number|string|null; minEstimatedReturn?:number|string|null }
+export interface GrowthGoalEvaluation { key:string; label:string; actual:number|null; target:number; unit:'count'|'currency'|'multiple'; direction:'minimum'|'maximum'; progress:number|null; status:'achieved'|'at_risk'|'below'|'unavailable' }
 
 export interface GrowthMetrics {
   estimatedReturn: number | null; costPerContact: number | null; qualifiedRate: number | null;
@@ -20,15 +22,17 @@ export interface GrowthPeriod {
   executiveSummary?: string|null; mainBottleneck?: string|null; recommendation?: string|null; status: 'draft'|'published'|'archived';
   updatedAt: string; sources: GrowthContactSource[]; campaigns: GrowthCampaign[]; strategicReading?: GrowthReading|null;
   decisions: GrowthDecision[]; report?: GrowthReport|null; metrics: GrowthMetrics; warnings: string[];
+  goals?: GrowthGoalEvaluation[];
   publications?: Array<{ id: string; version: number; snapshot: GrowthSnapshot; publishedAt: string }>;
-  client?: Pick<GrowthClient,'id'|'companyName'|'logoUrl'|'sector'|'mainGoal'>;
+  client?: Pick<GrowthClient,'id'|'companyName'|'logoUrl'|'sector'|'mainGoal'> & { goal?:GrowthClientGoal|null };
 }
 export interface GrowthClient {
   id: string; companyName: string; logoUrl?: string|null; sector?: string|null; contactName?: string|null; contactEmail?: string|null;
   phone?: string|null; mainGoal?: string|null; status: GrowthClientStatus; updatedAt: string; periods?: GrowthPeriod[];
+  goal?: GrowthClientGoal|null;
   accesses?: Array<{ id: string; active: boolean; invitedAt: string; user: { id: number; name: string; email: string; active: boolean } }>;
 }
-export interface GrowthSnapshot { schemaVersion: number; generatedAt: string; period: GrowthPeriod; metrics: GrowthMetrics; warnings: string[] }
+export interface GrowthSnapshot { schemaVersion: number; generatedAt: string; period: GrowthPeriod; metrics: GrowthMetrics; warnings: string[]; goals?:GrowthGoalEvaluation[] }
 export interface GrowthPortalPeriod { id: string; periodName: string; startDate: string; endDate: string; status: string; publication: { id: string; version: number; snapshot: GrowthSnapshot; publishedAt: string } }
 
 export const growthApi = {
@@ -37,6 +41,7 @@ export const growthApi = {
   client: async (id: string) => (await api.get<GrowthClient>(`/api/growth-room/clients/${id}`)).data,
   createClient: async (data: Partial<GrowthClient>) => (await api.post<GrowthClient>('/api/growth-room/clients', data)).data,
   updateClient: async (id: string, data: Partial<GrowthClient>) => (await api.patch<GrowthClient>(`/api/growth-room/clients/${id}`, data)).data,
+  updateGoals: async (id:string,data:GrowthClientGoal)=>(await api.put<GrowthClientGoal>(`/api/growth-room/clients/${id}/goals`,data)).data,
   invite: async (id: string, data: { name: string; email: string }) => (await api.post(`/api/growth-room/clients/${id}/invitations`, data)).data,
   revoke: async (id: string) => { await api.post(`/api/growth-room/accesses/${id}/revoke`); },
   createPeriod: async (clientId: string, data: Record<string, unknown>) => (await api.post<GrowthPeriod>(`/api/growth-room/clients/${clientId}/periods`, data)).data,

@@ -23,8 +23,10 @@ test('RLS da Growth Room isola organizações e clientes', { skip: !testDatabase
       await tx.growthMembership.create({ data: { organizationId: orgB.id, userId: adminB.id } });
       const clientA = await tx.growthClient.create({ data: { organizationId: orgA.id, companyName: 'Cliente A' } });
       await tx.growthClient.create({ data: { organizationId: orgA.id, companyName: 'Cliente A2' } });
-      await tx.growthClient.create({ data: { organizationId: orgB.id, companyName: 'Cliente B' } });
+      const clientB = await tx.growthClient.create({ data: { organizationId: orgB.id, companyName: 'Cliente B' } });
       await tx.growthClientAccess.create({ data: { clientId: clientA.id, userId: clientUser.id } });
+      await tx.growthClientGoal.create({ data: { clientId: clientA.id, targetContacts: 100 } });
+      await tx.growthClientGoal.create({ data: { clientId: clientB.id, targetContacts: 200 } });
 
       const adminContext = async (orgId, userId) => {
         await set('app.growth_system', ''); await set('app.growth_user_id', userId); await set('app.growth_organization_id', orgId);
@@ -32,13 +34,17 @@ test('RLS da Growth Room isola organizações e clientes', { skip: !testDatabase
       };
       await adminContext(orgA.id, adminA.id);
       assert.equal(await tx.growthClient.count(), 2);
+      assert.equal(await tx.growthClientGoal.count(), 1);
       await adminContext(orgB.id, adminB.id);
       assert.equal(await tx.growthClient.count(), 1);
+      assert.equal(await tx.growthClientGoal.count(), 1);
 
       await set('app.growth_user_id', clientUser.id); await set('app.growth_organization_id', orgA.id);
       await set('app.growth_client_id', clientA.id); await set('app.growth_role', 'client');
       assert.deepEqual((await tx.growthClient.findMany()).map((row) => row.companyName), ['Cliente A']);
+      assert.deepEqual((await tx.growthClientGoal.findMany()).map((row) => row.targetContacts), [100]);
       await assert.rejects(tx.growthClient.update({ where: { id: clientA.id }, data: { companyName: 'Tentativa' } }));
+      await assert.rejects(tx.growthClientGoal.update({ where: { clientId: clientA.id }, data: { targetContacts: 999 } }));
       throw rollback;
     }), (error) => error === rollback);
   } finally {

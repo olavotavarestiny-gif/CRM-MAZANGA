@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { calculateGrowthMetrics, buildGrowthWarnings, validateGrowthPublication, buildGrowthPeriodTemplate } = require('./growth-room');
+const { calculateGrowthMetrics, buildGrowthWarnings, validateGrowthPublication, buildGrowthPeriodTemplate, evaluateGrowthGoals } = require('./growth-room');
 
 test('calcula métricas e gargalo do funil', () => {
   const metrics = calculateGrowthMetrics({ contacts: 100, qualifiedContacts: 30, meetings: 20, proposals: 10, sales: 5, investment: 100, attributedRevenue: 500 });
@@ -44,4 +44,18 @@ test('novo período reutiliza apenas a estrutura e decisões pendentes', () => {
   assert.equal(template.campaigns[0].status, 'testing');
   assert.deepEqual(template.decisions.map((decision) => decision.decision), ['Rever landing page']);
   assert.equal(template.decisions[0].status, 'next_action');
+});
+
+test('metas distinguem atingida, em risco, abaixo e indisponível', () => {
+  const goals = evaluateGrowthGoals({
+    contacts: 80, sales: 2, attributedRevenue: 200000, investment: 100000,
+    client: { goal: { targetContacts: 100, targetSales: 4, targetRevenue: 200000, maxCostPerContact: 1000, minEstimatedReturn: 3 } },
+  });
+  assert.equal(goals.find((goal) => goal.key === 'contacts').status, 'at_risk');
+  assert.equal(goals.find((goal) => goal.key === 'sales').status, 'below');
+  assert.equal(goals.find((goal) => goal.key === 'revenue').status, 'achieved');
+  assert.equal(goals.find((goal) => goal.key === 'costPerContact').status, 'at_risk');
+  assert.equal(goals.find((goal) => goal.key === 'estimatedReturn').status, 'below');
+  const unavailable = evaluateGrowthGoals({ contacts: 0, investment: 0, client: { goal: { maxCostPerContact: 1000 } } });
+  assert.equal(unavailable[0].status, 'unavailable');
 });

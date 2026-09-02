@@ -2,7 +2,7 @@ const express = require('express');
 const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
 const { z } = require('zod');
 const { withGrowthContext, requireGrowthAdmin } = require('../lib/growth-context');
-const { calculateGrowthMetrics, buildGrowthWarnings, validateGrowthPublication, serializeGrowthPeriod, buildGrowthPeriodTemplate } = require('../lib/growth-room');
+const { calculateGrowthMetrics, buildGrowthWarnings, validateGrowthPublication, serializeGrowthPeriod, buildGrowthPeriodTemplate, evaluateGrowthGoals } = require('../lib/growth-room');
 
 const router = express.Router();
 const uuid = z.string().uuid();
@@ -14,6 +14,13 @@ const clientSchema = z.object({
   companyName: z.string().trim().min(2).max(180), logoUrl: text, sector: text,
   contactName: text, contactEmail: z.string().trim().email().nullable().optional().or(z.literal('')),
   phone: text, mainGoal: text, status: z.enum(['active','paused','finished','archived']).default('active'),
+});
+const clientGoalSchema = z.object({
+  targetContacts: z.coerce.number().int().positive().nullable().optional(),
+  targetSales: z.coerce.number().int().positive().nullable().optional(),
+  targetRevenue: z.coerce.number().positive().nullable().optional(),
+  maxCostPerContact: z.coerce.number().positive().nullable().optional(),
+  minEstimatedReturn: z.coerce.number().positive().nullable().optional(),
 });
 const sourceSchema = z.object({
   id: uuid.optional(), sourceName: z.string().trim().min(1), contacts: nonNegativeInt.default(0),
@@ -53,7 +60,7 @@ const periodEditorSchema = periodBaseSchema.partial().extend({
 const periodCreateSchema = periodBaseSchema.extend({ templatePeriodId: uuid.optional() });
 
 const periodInclude = {
-  client: { select: { id: true, companyName: true, logoUrl: true, sector: true, mainGoal: true } },
+  client: { select: { id: true, companyName: true, logoUrl: true, sector: true, mainGoal: true, goal: true } },
   sources: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
   campaigns: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
   strategicReading: true,
@@ -63,7 +70,7 @@ const periodInclude = {
 };
 
 function jsonPeriod(period) {
-  return { ...period, metrics: calculateGrowthMetrics(period), warnings: buildGrowthWarnings(period) };
+  return { ...period, metrics: calculateGrowthMetrics(period), warnings: buildGrowthWarnings(period), goals: evaluateGrowthGoals(period) };
 }
 function handleError(res, error) {
   if (error instanceof z.ZodError) return res.status(400).json({ error: 'Dados inválidos.', details: error.issues });
@@ -86,7 +93,7 @@ router.get('/clients', run(async (_req, res, tx, context) => {
   const clients = await tx.growthClient.findMany({
     where: { organizationId: context.organizationId }, orderBy: { updatedAt: 'desc' },
     include: {
-      accesses: { include: { user: { select: { id: true, name: true, email: true, active: true } } } },
+      accesses: { include: { user: { select: { id: true, name: true, email: true, active: true } } } }, goal: true,
       periods: { orderBy: { startDate: 'desc' }, take: 1, include: { publications: { orderBy: { version: 'desc' }, take: 1 } } },
     },
   });
@@ -105,7 +112,7 @@ router.get('/clients/:id', run(async (req, res, tx, context) => {
   const id = uuid.parse(req.params.id);
   const client = await tx.growthClient.findFirst({
     where: { id, organizationId: context.organizationId },
-    include: { accesses: { include: { user: { select: { id: true, name: true, email: true, active: true } } } }, periods: { orderBy: { startDate: 'desc' }, include: { publications: { orderBy: { version: 'desc' }, take: 1 } } } },
+    include: { goal: true, accesses: { include: { user: { select: { id: true, name: true, email: true, active: true } } } }, periods: { orderBy: { startDate: 'desc' }, include: { publications: { orderBy: { version: 'desc' }, take: 1 } } } },
   });
   if (!client) return res.status(404).json({ error: 'Cliente não encontrado.' });
   res.json(client);
@@ -117,6 +124,23 @@ router.patch('/clients/:id', run(async (req, res, tx, context) => {
   const found = await tx.growthClient.findFirst({ where: { id, organizationId: context.organizationId } });
   if (!found) return res.status(404).json({ error: 'Cliente não encontrado.' });
   res.json(await tx.growthClient.update({ where: { id }, data: { ...input, contactEmail: input.contactEmail || null } }));
+}));
+
+router.put('/clients/:id/goals', run(async (req, res, tx, context) => {
+  requireGrowthAdmin(context);
+  const clientId = uuid.parse(req.params.id);
+  const input = clientGoalSchema.parse(req.body);
+  const client = await tx.growthClient.findFirst({ where: { id: clientId, organizationId: context.organizationId }, select: { id: true } });
+  if (!client) return res.status(404).json({ error: 'Cliente não encontrado.' });
+  const data = {
+    targetContacts: input.targetContacts ?? null,
+    targetSales: input.targetSales ?? null,
+    targetRevenue: input.targetRevenue ?? null,
+    maxCostPerContact: input.maxCostPerContact ?? null,
+    minEstimatedReturn: input.minEstimatedReturn ?? null,
+  };
+  const goal = await tx.growthClientGoal.upsert({ where: { clientId }, update: data, create: { clientId, ...data } });
+  res.json(goal);
 }));
 
 router.post('/clients/:id/invitations', run(async (req, res, tx, context) => {

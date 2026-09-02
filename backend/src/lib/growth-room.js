@@ -62,6 +62,30 @@ function buildGrowthWarnings(period) {
   return warnings;
 }
 
+function evaluateGrowthGoals(period) {
+  const goal = period.client?.goal;
+  if (!goal) return [];
+  const metrics = calculateGrowthMetrics(period);
+  const definitions = [
+    ['contacts', 'Contactos', period.contacts, goal.targetContacts, 'count', 'minimum'],
+    ['sales', 'Vendas', period.sales, goal.targetSales, 'count', 'minimum'],
+    ['revenue', 'Receita', period.attributedRevenue, goal.targetRevenue, 'currency', 'minimum'],
+    ['costPerContact', 'CPL máximo', metrics.costPerContact, goal.maxCostPerContact, 'currency', 'maximum'],
+    ['estimatedReturn', 'Retorno mínimo', metrics.estimatedReturn, goal.minEstimatedReturn, 'multiple', 'minimum'],
+  ];
+  return definitions.flatMap(([key, label, rawActual, rawTarget, unit, direction]) => {
+    const target = Number(rawTarget || 0);
+    if (target <= 0) return [];
+    const actual = rawActual === null || rawActual === undefined ? null : Number(rawActual);
+    if (actual === null || !Number.isFinite(actual)) return [{ key, label, actual: null, target, unit, direction, progress: null, status: 'unavailable' }];
+    const progress = direction === 'maximum'
+      ? (actual <= 0 ? 1 : target / actual)
+      : actual / target;
+    const status = progress >= 1 ? 'achieved' : progress >= 0.7 ? 'at_risk' : 'below';
+    return [{ key, label, actual, target, unit, direction, progress, status }];
+  });
+}
+
 function validateGrowthPublication(period) {
   const missing = [];
   if (!period.periodName?.trim()) missing.push('nome do período');
@@ -75,11 +99,12 @@ function serializeGrowthPeriod(period) {
   const clean = JSON.parse(JSON.stringify(period));
   delete clean.publications;
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     period: clean,
     metrics: calculateGrowthMetrics(period),
     warnings: buildGrowthWarnings(period),
+    goals: evaluateGrowthGoals(period),
   };
 }
 
@@ -133,4 +158,5 @@ module.exports = {
   validateGrowthPublication,
   serializeGrowthPeriod,
   buildGrowthPeriodTemplate,
+  evaluateGrowthGoals,
 };
