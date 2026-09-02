@@ -53,7 +53,9 @@ function isManagedFrontendOrigin(origin) {
     return (
       hostname === 'app.kukugest.ao' ||
       hostname.endsWith('.app.kukugest.ao') ||
-      hostname === 'beta.kukugest.ao'
+      hostname === 'beta.kukugest.ao' ||
+      hostname === 'mazanga-growth-room.vercel.app' ||
+      hostname.startsWith('mazanga-growth-room-') && hostname.endsWith('-olavos-projects-c1426332.vercel.app')
     );
   } catch {
     return false;

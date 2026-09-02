@@ -122,6 +122,14 @@ const isManagedFrontendOrigin = (origin) => {
       return true;
     }
 
+    // Dedicated Mazanga Growth Room deployment and its Vercel previews.
+    if (
+      hostname === 'mazanga-growth-room.vercel.app' ||
+      hostname.startsWith('mazanga-growth-room-') && hostname.endsWith('-olavos-projects-c1426332.vercel.app')
+    ) {
+      return true;
+    }
+
     return false;
   } catch {
     return false;
