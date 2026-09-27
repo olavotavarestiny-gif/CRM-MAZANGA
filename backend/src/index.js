@@ -20,6 +20,7 @@ const whatsappRouter = require('./routes/whatsapp');
 const tasksRouter = require('./routes/tasks');
 const formsRouter = require('./routes/forms');
 const publicLeadRouter = require('./routes/public-lead');
+const integrationApiRouter = require('./routes/integration-api');
 const inboxRouter = require('./routes/inbox');
 const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
@@ -325,6 +326,7 @@ app.use('/api/webhook', webhookRouter);
 app.use('/api/forms', formsRouter);
 app.use('/api/setup', setupRouter);
 app.use('/api/public', publicLeadRouter);
+app.use('/api/integrations/v1', integrationApiRouter);
 // Pagamentos: /charge é protegido internamente (requireAuth na rota),
 // /callback é público para receber o webhook do gateway E+ Kwanza.
 app.use('/api/payments', paymentsRouter);

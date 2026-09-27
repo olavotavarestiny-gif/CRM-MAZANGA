@@ -10,6 +10,7 @@ Este diretório concentra as integrações externas reais do KukuGest e o estado
 - [whatsapp-cloud-api.md](whatsapp-cloud-api.md): integração com WhatsApp Cloud API via Meta Graph
 - [supabase-auth.md](supabase-auth.md): autenticação da aplicação com Supabase Auth
 - [vercel-blob-uploads.md](vercel-blob-uploads.md): uploads públicos com Vercel Blob
+- [external-crm-api.md](external-crm-api.md): API por conta para criar contactos e registar vendas externas
 
 ## Leitura recomendada
 

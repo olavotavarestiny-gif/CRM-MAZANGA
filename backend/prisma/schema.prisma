@@ -80,6 +80,7 @@ model User {
   deals                     Deal[]                 @relation("DealUser")
   dealStages                DealStage[]            @relation("DealStageUser")
   dealNotes                 DealNote[]             @relation("DealNoteAuthor")
+  integrationApiKeys        IntegrationApiKey[]
   subscriptionPayments      SubscriptionPayment[]  @relation("SubscriptionPaymentUser")
   membershipsAsPerson       AccountMembership[]    @relation("MembershipPerson")
   membershipsAsOwner        AccountMembership[]    @relation("MembershipAccountOwner")
@@ -1203,6 +1204,8 @@ model Deal {
   companyId         String
   stageId           String
   title             String
+  externalId        String?
+  source            String?
   valueKz           Float?
   status            String            @default("aberto")
   lossReason        String?
@@ -1220,8 +1223,27 @@ model Deal {
 
   @@index([userId])
   @@index([userId, status])
+  @@unique([userId, externalId])
   @@index([userId, stageId])
   @@index([companyId])
+}
+
+model IntegrationApiKey {
+  id         String    @id @default(cuid())
+  userId     Int
+  name       String
+  keyPrefix  String
+  keyHash    String    @unique
+  scopes     String    @default("[]")
+  active     Boolean   @default(true)
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, active])
+  @@map("integration_api_keys")
 }
 
 model DealNote {
